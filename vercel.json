@@ -1,0 +1,21 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/liff/(.*)",
+      "destination": "/liff/$1"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/reminders?secret=${CRON_SECRET}",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/update-class-status?secret=${CRON_SECRET}",
+      "schedule": "0 11 * * *"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+.firebase/
+.github/
+firebase-debug.log
+.env.local
+.env
+*.log
+.DS_Store
+
+# Ignore build cache that might cause issues
+.next/cache/
+
+# Firebase files
+firebase.json
+.firebaserc

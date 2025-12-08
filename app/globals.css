@@ -1,0 +1,196 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 0 84.2% 60.2%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 0 84.2% 60.2%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Prevent unwanted scrolling */
+  html,
+  body {
+    overflow-x: hidden;
+    height: 100%;
+  }
+
+  /* Fix for form pages to prevent extra scroll space */
+  main > div {
+    min-height: 100%;
+  }
+
+  /* Ensure the root div takes full height */
+  #__next {
+    height: 100%;
+  }
+}
+
+/* Custom styles */
+.bg-codelab-red {
+  background-color: #ef4444;
+}
+
+.text-codelab-red {
+  color: #ef4444;
+}
+
+.border-codelab-red {
+  border-color: #ef4444;
+}
+
+.hover\:bg-codelab-red-dark:hover {
+  background-color: #dc2626;
+}
+
+/* FullCalendar v6 styles */
+/* Base styles for FullCalendar - เพียงพอสำหรับการใช้งานพื้นฐาน */
+.fc {
+  @apply w-full;
+}
+
+.fc .fc-toolbar {
+  @apply mb-4 flex flex-wrap items-center justify-between gap-2;
+}
+
+.fc .fc-toolbar-title {
+  @apply text-lg font-semibold;
+}
+
+.fc-button {
+  @apply rounded bg-primary px-3 py-1 text-primary-foreground hover:bg-primary/90;
+}
+
+.fc-button:disabled {
+  @apply opacity-50;
+}
+
+.fc-button-active {
+  @apply bg-primary/80;
+}
+
+.fc-daygrid-day-number {
+  @apply text-sm;
+}
+
+.fc-daygrid-day.fc-day-today {
+  @apply bg-accent/10;
+}
+
+.fc-event {
+  @apply cursor-pointer rounded px-1 text-xs;
+}
+
+.fc-timegrid-event {
+  @apply overflow-hidden rounded px-1;
+}
+
+/* Remove import statements that were causing errors */
+/* เพิ่มต่อท้ายไฟล์ app/globals.css */
+
+/* Force active state animation */
+button:active,
+.inline-flex:active {
+  transform: scale(0.95) !important;
+  transition: transform 75ms !important;
+}
+
+/* Add visual feedback for loading */
+button[aria-busy="true"],
+.inline-flex[aria-busy="true"] {
+  position: relative;
+  color: transparent !important;
+}
+
+button[aria-busy="true"]::after,
+.inline-flex[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 50%;
+  left: 50%;
+  margin-left: -10px;
+  margin-top: -10px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spinner 0.8s linear infinite;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ripple effect */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.5);
+  animation: ripple 0.6s;
+  pointer-events: none;
+}
