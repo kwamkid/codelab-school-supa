@@ -9,9 +9,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Save, 
-  Loader2, 
+import {
+  Save,
+  Loader2,
   MessageSquare,
   Key,
   Webhook,
@@ -23,8 +23,10 @@ import {
   ExternalLink,
   Info,
   Send,
-  User
+  User,
+  ArrowRight
 } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { 
   getLineSettings, 
@@ -769,15 +771,41 @@ export default function LineSettingsComponent() {
         
         {/* Test Tab */}
         <TabsContent value="test" className="space-y-6">
+          {/* Advanced Test Page Link */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TestTube className="h-5 w-5" />
+                ทดสอบการแจ้งเตือนแบบละเอียด
+              </CardTitle>
+              <CardDescription>
+                ทดสอบส่งการแจ้งเตือนไปยังผู้ปกครองจริงผ่านระบบ
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                เลือกผู้ปกครอง → นักเรียน → คลาส และทดสอบส่งการแจ้งเตือนจริงผ่านระบบ LINE
+              </p>
+
+              <Link href="/settings/line/test-notifications">
+                <Button className="w-full sm:w-auto" variant="default">
+                  <TestTube className="h-4 w-4 mr-2" />
+                  เปิดหน้าทดสอบแบบละเอียด
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           {/* Test Notifications */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Send className="h-5 w-5" />
-                ทดสอบส่งข้อความแจ้งเตือน
+                ทดสอบส่งข้อความด่วน (Quick Test)
               </CardTitle>
               <CardDescription>
-                ทดสอบส่งข้อความแจ้งเตือนแบบต่างๆ ไปยัง LINE User ID ที่ระบุ
+                ทดสอบส่งข้อความแจ้งเตือนแบบต่างๆ ไปยัง LINE User ID ที่ระบุโดยตรง
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

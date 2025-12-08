@@ -58,10 +58,14 @@ export default function NotificationLogsPage() {
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Set default start date to today
+  const today = new Date().toISOString().split('T')[0];
+
   const [filters, setFilters] = useState({
     type: '',
     status: '',
-    startDate: '',
+    startDate: today,
     endDate: ''
   });
   const [page, setPage] = useState(1);
@@ -97,7 +101,9 @@ export default function NotificationLogsPage() {
   }, [page, filters]);
 
   const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    // Convert "all" to empty string for API
+    const apiValue = value === 'all' ? '' : value;
+    setFilters(prev => ({ ...prev, [key]: apiValue }));
     setPage(1);
   };
 
@@ -105,7 +111,7 @@ export default function NotificationLogsPage() {
     setFilters({
       type: '',
       status: '',
-      startDate: '',
+      startDate: today,
       endDate: ''
     });
     setPage(1);
@@ -198,16 +204,16 @@ export default function NotificationLogsPage() {
             ตัวกรอง
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>ประเภท</Label>
-              <Select value={filters.type} onValueChange={(v) => handleFilterChange('type', v)}>
-                <SelectTrigger>
+              <Label className="text-sm font-medium">ประเภท</Label>
+              <Select value={filters.type || 'all'} onValueChange={(v) => handleFilterChange('type', v)}>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="ทั้งหมด" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">ทั้งหมด</SelectItem>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
                   <SelectItem value="class-reminder">แจ้งเตือนคลาส</SelectItem>
                   <SelectItem value="makeup-reminder">แจ้งเตือน Makeup</SelectItem>
                   <SelectItem value="makeup-scheduled">ยืนยัน Makeup</SelectItem>
@@ -217,13 +223,13 @@ export default function NotificationLogsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>สถานะ</Label>
-              <Select value={filters.status} onValueChange={(v) => handleFilterChange('status', v)}>
-                <SelectTrigger>
+              <Label className="text-sm font-medium">สถานะ</Label>
+              <Select value={filters.status || 'all'} onValueChange={(v) => handleFilterChange('status', v)}>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="ทั้งหมด" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">ทั้งหมด</SelectItem>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
                   <SelectItem value="success">สำเร็จ</SelectItem>
                   <SelectItem value="failed">ล้มเหลว</SelectItem>
                 </SelectContent>
@@ -231,31 +237,35 @@ export default function NotificationLogsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>วันที่เริ่มต้น</Label>
+              <Label className="text-sm font-medium">วันที่เริ่มต้น</Label>
               <Input
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                className="w-full"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>วันที่สิ้นสุด</Label>
+              <Label className="text-sm font-medium">วันที่สิ้นสุด</Label>
               <Input
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                className="w-full"
+                placeholder="เลือกวันสิ้นสุด (ไม่จำกัด)"
               />
             </div>
           </div>
 
-          <div className="flex gap-2 mt-4">
+          <div className="flex flex-wrap gap-2 pt-2 border-t">
             <Button variant="outline" size="sm" onClick={handleReset}>
+              <RefreshCw className="w-4 h-4 mr-2" />
               รีเซ็ตตัวกรอง
             </Button>
-            <Button variant="outline" size="sm" onClick={loadLogs}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              รีเฟรช
+            <Button variant="default" size="sm" onClick={loadLogs}>
+              <Filter className="w-4 h-4 mr-2" />
+              ค้นหา
             </Button>
           </div>
         </CardContent>
