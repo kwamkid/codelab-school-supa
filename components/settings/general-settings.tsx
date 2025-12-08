@@ -5,21 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Save, 
-  Loader2, 
+import {
+  Save,
+  Loader2,
   Building,
   Phone,
   Mail,
   Globe,
   Link2,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  KeyRound
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
-import { 
-  getGeneralSettings, 
+import {
+  getGeneralSettings,
   updateGeneralSettings,
   validateSettings,
   GeneralSettings
@@ -34,6 +35,7 @@ export default function GeneralSettingsComponent() {
   const [settings, setSettings] = useState<GeneralSettings | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resettingPasswords, setResettingPasswords] = useState(false);
   
   // Load settings on mount
   useEffect(() => {
@@ -74,6 +76,41 @@ export default function GeneralSettingsComponent() {
       toast.error('เกิดข้อผิดพลาดในการบันทึก');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResetAllPasswords = async () => {
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตรหัสผ่านของผู้ดูแลระบบทุกคนเป็น "codel@b1432"?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้!')) {
+      return;
+    }
+
+    setResettingPasswords(true);
+
+    try {
+      const response = await fetch('/api/admin/reset-all-passwords', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(
+          `รีเซ็ตรหัสผ่านเรียบร้อย!\n` +
+          `สำเร็จ: ${data.results.successCount} คน\n` +
+          `ล้มเหลว: ${data.results.failedCount} คน`
+        );
+
+        if (data.results.failedList && data.results.failedList.length > 0) {
+          console.error('Failed to reset passwords for:', data.results.failedList);
+        }
+      } else {
+        toast.error(`เกิดข้อผิดพลาด: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error resetting passwords:', error);
+      toast.error('เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน');
+    } finally {
+      setResettingPasswords(false);
     }
   };
   
@@ -373,7 +410,39 @@ export default function GeneralSettingsComponent() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="p-4 bg-red-50 rounded-lg">
+            <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <h4 className="font-medium mb-2 flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                รีเซ็ตรหัสผ่านผู้ดูแลระบบทั้งหมด
+              </h4>
+              <p className="text-sm text-gray-600 mb-4">
+                รีเซ็ตรหัสผ่านของผู้ดูแลระบบทุกคนในระบบเป็น <code className="bg-gray-100 px-2 py-1 rounded">codel@b1432</code>
+                <br />
+                <span className="text-yellow-700 font-medium">
+                  ⚠️ ผู้ดูแลทุกคนจะต้องใช้รหัสผ่านนี้ในการเข้าสู่ระบบ
+                </span>
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleResetAllPasswords}
+                disabled={resettingPasswords}
+                className="w-full sm:w-auto border-yellow-300 hover:bg-yellow-50"
+              >
+                {resettingPasswords ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    กำลังรีเซ็ต...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    รีเซ็ตรหัสผ่านทั้งหมด
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <div className="p-4 bg-red-50 rounded-lg border border-red-200">
               <h4 className="font-medium mb-2">ล้างข้อมูลทั้งหมด</h4>
               <p className="text-sm text-gray-600 mb-4">
                 ลบข้อมูลทั้งหมดในระบบ เช่น นักเรียน ครู ผู้ปกครอง คลาส วิชา และอื่นๆ

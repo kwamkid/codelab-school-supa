@@ -25,7 +25,7 @@ import { getParents, getAllStudentsWithParents } from '@/lib/services/parents';
 import { getClasses } from '@/lib/services/classes';
 import { getBranches } from '@/lib/services/branches';
 import { getSubjects } from '@/lib/services/subjects';
-import { getTeachers } from '@/lib/services/teachers';
+import { getActiveTeachers } from '@/lib/services/teachers';
 import { createEnrollment, checkDuplicateEnrollment, checkAvailableSeats } from '@/lib/services/enrollments';
 import { toast } from 'sonner';
 import { formatCurrency, formatDate, getDayName, calculateAge } from '@/lib/utils';
@@ -129,9 +129,9 @@ export default function EnrollmentForm() {
         getAllStudentsWithParents(),
         getBranches(),
         getSubjects(),
-        getTeachers()
+        getActiveTeachers()
       ]);
-      
+
       setAllStudents(studentsData.filter(s => s.isActive));
       setBranches(branchesData.filter(b => b.isActive));
       setSubjects(subjectsData);

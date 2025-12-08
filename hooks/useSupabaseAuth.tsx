@@ -363,15 +363,34 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   }, []); // router is used but stable in Next.js
 
   const signOut = useCallback(async () => {
-    const supabase = getClient();
     try {
-      await supabase.auth.signOut();
+      // Clear local state first
       setAdminUser(null);
       setTeacher(null);
+      setUser(null);
+      setSession(null);
+
+      // Clear localStorage
+      if (typeof window !== 'undefined') {
+        // Clear all Supabase auth tokens
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith('sb-') || key.includes('supabase')) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+
+      // Navigate to login
       router.push('/login');
     } catch (error) {
       console.error('Sign out error:', error);
-      throw error;
+      // Even if there's an error, still clear state and redirect
+      setAdminUser(null);
+      setTeacher(null);
+      setUser(null);
+      setSession(null);
+      router.push('/login');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // router is used but stable in Next.js

@@ -225,9 +225,7 @@ export default function UserFormDialog({
       console.error('Error saving user:', error);
       
       // Error handling
-      if (error.message?.includes('FIREBASE_ADMIN')) {
-        toast.error('ไม่สามารถสร้างผู้ใช้ได้: กรุณาตั้งค่า Firebase Admin');
-      } else if (error.message?.includes('auth/email-already-exists')) {
+      if (error.message?.includes('auth/email-already-exists')) {
         toast.error('อีเมลนี้มีผู้ใช้งานแล้ว');
       } else if (error.message?.includes('auth/weak-password')) {
         toast.error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');

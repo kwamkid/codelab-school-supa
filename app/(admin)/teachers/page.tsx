@@ -7,7 +7,7 @@ import { getActiveBranches } from '@/lib/services/branches';
 import { getActiveSubjects } from '@/lib/services/subjects';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Phone, Mail, MapPin, BookOpen, Users, Key } from 'lucide-react';
+import { Plus, Edit, Phone, Mail, MapPin, BookOpen, Users, Key, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
@@ -24,13 +24,16 @@ import { useBranch } from '@/contexts/BranchContext';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 import { getClient } from '@/lib/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function TeachersPage() {
   const { selectedBranchId, isAllBranches } = useBranch();
+  const { adminUser } = useAuth();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -79,6 +82,38 @@ export default function TeachersPage() {
     } catch (error: any) {
       console.error('Error sending password reset:', error);
       toast.error('เกิดข้อผิดพลาดในการส่งลิงก์');
+    }
+  };
+
+  const handleDeleteTeacher = async (teacher: Teacher) => {
+    if (!confirm(
+      `คุณแน่ใจหรือไม่ว่าต้องการลบครูผู้สอน "${teacher.name}"?\n\n` +
+      `การกระทำนี้จะทำให้ครูไม่สามารถเข้าสู่ระบบได้ แต่ข้อมูลการสอนจะยังคงอยู่ในระบบ\n\n` +
+      `(เฉพาะ Super Admin เท่านั้นที่สามารถลบครูได้)`
+    )) {
+      return;
+    }
+
+    setDeletingTeacherId(teacher.id);
+    try {
+      const response = await fetch(`/api/admin/teachers/${teacher.id}/soft-delete`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        // Reload data to update the list
+        await loadData();
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting teacher:', error);
+      toast.error('เกิดข้อผิดพลาดในการลบครูผู้สอน');
+    } finally {
+      setDeletingTeacherId(null);
     }
   };
 
@@ -296,10 +331,10 @@ export default function TeachersPage() {
                               </Button>
                             </Link>
                           </PermissionGuard>
-                          
+
                           <PermissionGuard action="update">
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleResetPassword(teacher)}
                               title="Reset Password"
@@ -307,6 +342,23 @@ export default function TeachersPage() {
                               <Key className="h-4 w-4" />
                             </Button>
                           </PermissionGuard>
+
+                          {adminUser?.role === 'super_admin' && teacher.isActive && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteTeacher(teacher)}
+                              disabled={deletingTeacherId === teacher.id}
+                              title="ลบครูผู้สอน (Soft Delete)"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              {deletingTeacherId === teacher.id ? (
+                                <div className="h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

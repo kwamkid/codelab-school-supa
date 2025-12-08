@@ -33,7 +33,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { MakeupClass, Teacher, Room } from '@/types/models';
 import { scheduleMakeupClass } from '@/lib/services/makeup';
-import { getTeachers } from '@/lib/services/teachers';
+import { getActiveTeachers } from '@/lib/services/teachers';
 import { getRoomsByBranch } from '@/lib/services/rooms';
 import { checkAvailability, AvailabilityWarning } from '@/lib/utils/availability';
 import { useAuth } from '@/hooks/useAuth';
@@ -85,16 +85,11 @@ export default function ScheduleMakeupDialog({
         }
 
         const [teachersData, roomsData] = await Promise.all([
-          getTeachers(makeupRequest.branchId),
+          getActiveTeachers(makeupRequest.branchId),
           getRoomsByBranch(makeupRequest.branchId)
         ]);
 
-        // Filter teachers for this branch
-        const availableTeachers = teachersData.filter(t => 
-          t.isActive && t.availableBranches.includes(makeupRequest.branchId)
-        );
-        
-        setTeachers(availableTeachers);
+        setTeachers(teachersData);
         setRooms(roomsData.filter(r => r.isActive));
 
         // Set default values from class
