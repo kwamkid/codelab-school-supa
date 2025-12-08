@@ -7,6 +7,14 @@ import { getHolidaysForBranch } from './holidays';
 
 const TABLE_NAME = 'classes';
 
+// Helper function to get local date string (YYYY-MM-DD) without timezone issues
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // Type for database row - classes table
 interface ClassRow {
   id: string;
@@ -536,12 +544,12 @@ function generateSchedules(
   const currentDate = new Date(startDate);
 
   const holidayStrings = holidayDates.map(date =>
-    date.toISOString().split('T')[0]
+    getLocalDateString(date)
   );
 
   while (schedules.length < totalSessions && currentDate <= endDate) {
     const dayOfWeek = currentDate.getDay();
-    const dateString = currentDate.toISOString().split('T')[0];
+    const dateString = getLocalDateString(currentDate);
 
     if (daysOfWeek.includes(dayOfWeek) && !holidayStrings.includes(dateString)) {
       schedules.push(new Date(currentDate));

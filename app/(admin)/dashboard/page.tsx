@@ -440,7 +440,7 @@ export default function DashboardPage() {
                 <CardTitle className="text-lg">คำขอ Makeup Class</CardTitle>
               </div>
               <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-                {makeupRequests.filter(m => m.status === 'pending').length} รอดำเนินการ
+                {stats?.pendingMakeups || 0} รอดำเนินการ
               </Badge>
             </div>
           </CardHeader>
@@ -449,11 +449,11 @@ export default function DashboardPage() {
               <div className="flex gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <span>รอจัดตาราง: {makeupRequests.filter(m => m.status === 'pending').length}</span>
+                  <span>รอจัดตาราง: {stats?.pendingMakeups || 0}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span>นัดแล้ว: {makeupRequests.filter(m => m.status === 'scheduled').length}</span>
+                  <span>นัดแล้ว: {stats?.upcomingMakeups || 0}</span>
                 </div>
               </div>
               <a href="/makeup" className="text-sm text-purple-600 hover:text-purple-700 font-medium">

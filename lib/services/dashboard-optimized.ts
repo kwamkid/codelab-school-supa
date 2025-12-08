@@ -111,6 +111,14 @@ let staticDataCache: {
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// Helper function to get local date string (YYYY-MM-DD) without timezone issues
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 async function getStaticData() {
   const now = Date.now();
 
@@ -244,8 +252,8 @@ export async function getOptimizedCalendarEvents(
     let holidaysQuery = supabase
       .from('holidays')
       .select('*')
-      .gte('date', start.toISOString().split('T')[0])
-      .lte('date', end.toISOString().split('T')[0]);
+      .gte('date', getLocalDateString(start))
+      .lte('date', getLocalDateString(end));
 
     const { data: holidaysData } = await holidaysQuery;
 
@@ -295,8 +303,8 @@ export async function getOptimizedCalendarEvents(
 
     // 2. Get class schedules in date range
     // Get classes with schedules in the date range
-    const startDateStr = start.toISOString().split('T')[0];
-    const endDateStr = end.toISOString().split('T')[0];
+    const startDateStr = getLocalDateString(start);
+    const endDateStr = getLocalDateString(end);
 
     let classesQuery = supabase
       .from('classes')
@@ -561,7 +569,7 @@ export async function getOptimizedCalendarEvents(
       if (!makeup.makeupSchedule) continue;
 
       const makeupDate = makeup.makeupSchedule.date;
-      const dateKey = makeupDate.toISOString().split('T')[0];
+      const dateKey = getLocalDateString(makeupDate);
       const key = `${makeup.makeupSchedule.branchId}-${makeup.makeupSchedule.roomId}-${dateKey}-${makeup.makeupSchedule.startTime}-${makeup.makeupSchedule.endTime}-${makeup.makeupSchedule.teacherId}`;
 
       if (!makeupGroups.has(key)) {
@@ -699,7 +707,7 @@ export async function getOptimizedCalendarEvents(
       };
 
       const trialDate = trial.scheduledDate;
-      const dateKey = trialDate.toISOString().split('T')[0];
+      const dateKey = getLocalDateString(trialDate);
       const key = `${trial.branchId}-${trial.roomId}-${dateKey}-${trial.startTime}-${trial.endTime}-${trial.teacherId}`;
 
       if (!trialGroups.has(key)) {
@@ -824,10 +832,10 @@ export async function getOptimizedDashboardStats(branchId?: string): Promise<Das
   try {
     const supabase = getClient();
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Use local date to avoid timezone issues
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
     // Get only active classes
     let classQuery = supabase
@@ -841,33 +849,47 @@ export async function getOptimizedDashboardStats(branchId?: string): Promise<Das
 
     const { data: classData } = await classQuery;
 
-    // Calculate student count
-    let totalStudents = 0;
-    (classData || []).forEach(doc => {
-      totalStudents += doc.enrolled_count || 0;
-    });
+    // Get total student count from students table (all students in system)
+    const { count: totalStudents } = await supabase
+      .from('students')
+      .select('id', { count: 'exact', head: true });
 
-    // Get today's events count
+    // Get today's events count - count unique classes, not events
     const todayEvents = await getOptimizedCalendarEvents(today, tomorrow, branchId);
-    const todayClassCount = todayEvents.filter(e => e.extendedProps.type === 'class').length;
+    const uniqueClassIds = new Set(
+      todayEvents
+        .filter(e => e.extendedProps.type === 'class')
+        .map(e => e.classId)
+    );
+    const todayClassCount = uniqueClassIds.size;
 
-    // Get makeup stats
-    const { data: makeupData } = await supabase
+    // Get makeup stats - join with classes to filter by branch
+    let makeupQuery = supabase
       .from('makeup_classes')
-      .select('*')
+      .select(`
+        *,
+        classes!makeup_classes_original_class_id_fkey(branch_id)
+      `)
       .in('status', ['pending', 'scheduled']);
+
+    if (branchId) {
+      makeupQuery = makeupQuery.eq('classes.branch_id', branchId);
+    }
+
+    const { data: makeupData, error: makeupError } = await makeupQuery;
+
+    console.log('🔍 DEBUG Makeup Stats:');
+    console.log('  Branch ID:', branchId || 'ALL');
+    console.log('  Total makeup data:', makeupData?.length || 0);
+    console.log('  Makeup error:', makeupError);
+    if (makeupData && makeupData.length > 0) {
+      console.log('  First item:', makeupData[0]);
+    }
 
     let upcomingMakeups = 0;
     let pendingMakeups = 0;
 
     (makeupData || []).forEach(doc => {
-      // Filter by branch if needed
-      if (branchId) {
-        const classId = doc.original_class_id;
-        const classDoc = (classData || []).find(d => d.id === classId);
-        if (!classDoc || classDoc.branch_id !== branchId) return;
-      }
-
       if (doc.status === 'pending') {
         pendingMakeups++;
       } else if (doc.status === 'scheduled' && doc.makeup_date) {
@@ -878,12 +900,15 @@ export async function getOptimizedDashboardStats(branchId?: string): Promise<Das
       }
     });
 
+    console.log('  Pending count:', pendingMakeups);
+    console.log('  Upcoming count:', upcomingMakeups);
+
     // Get trial stats
     let trialQuery = supabase
       .from('trial_sessions')
       .select('*')
       .eq('status', 'scheduled')
-      .gte('scheduled_date', today.toISOString().split('T')[0]);
+      .gte('scheduled_date', getLocalDateString(today));
 
     if (branchId) {
       trialQuery = trialQuery.eq('branch_id', branchId);
