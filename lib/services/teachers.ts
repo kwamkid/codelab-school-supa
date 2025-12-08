@@ -36,13 +36,14 @@ function mapToTeacher(row: TeacherRow): Teacher {
   };
 }
 
-// Get all teachers
+// Get all teachers (only active ones - excluding soft deleted)
 export async function getTeachers(branchId?: string): Promise<Teacher[]> {
   try {
     const supabase = getClient();
     const { data, error } = await supabase
       .from(TABLE_NAME)
       .select('*')
+      .eq('is_active', true) // Only get active teachers (exclude soft deleted)
       .order('name', { ascending: true });
 
     if (error) throw error;
