@@ -105,8 +105,7 @@ export async function GET(request: NextRequest) {
             const { error: updateError } = await supabase
               .from('classes')
               .update({
-                status: 'completed',
-                updated_at: new Date().toISOString()
+                status: 'completed'
               })
               .eq('id', cls.id)
 
@@ -130,8 +129,7 @@ export async function GET(request: NextRequest) {
             const { error: updateError } = await supabase
               .from('classes')
               .update({
-                status: 'started',
-                updated_at: new Date().toISOString()
+                status: 'started'
               })
               .eq('id', cls.id)
 
