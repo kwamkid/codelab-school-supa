@@ -30,15 +30,26 @@ export async function POST(request: NextRequest) {
 
     // ตรวจสอบว่าเป็น super admin
     const supabase = createServiceClient()
+    console.log('Checking admin permission for user:', user.id)
+
     const { data: adminDoc, error: adminError } = await supabase
       .from('admin_users')
       .select('role')
-      .eq('id', user.id)
+      .eq('auth_user_id', user.id)
       .single()
 
+    console.log('Admin query result:', { adminDoc, adminError })
+
     if (adminError || !adminDoc || adminDoc.role !== 'super_admin') {
+      console.log('Permission denied:', {
+        hasError: !!adminError,
+        hasDoc: !!adminDoc,
+        role: adminDoc?.role
+      })
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    console.log('Permission granted for super_admin:', user.id)
 
     // รับข้อมูลจาก request
     const { email, password, userData, createdBy } = await request.json()
@@ -59,12 +70,16 @@ export async function POST(request: NextRequest) {
 
     // สร้าง document ใน adminUsers
     const { error: insertError } = await supabase.from('admin_users').insert({
-      id: authData.user.id,
+      auth_user_id: authData.user.id,
       email: email.toLowerCase(),
       display_name: userData.displayName,
       role: userData.role || 'branch_admin',
       branch_ids: userData.branchIds || [],
-      permissions: userData.permissions || {},
+      can_manage_users: userData.permissions?.canManageUsers || false,
+      can_manage_settings: userData.permissions?.canManageSettings || false,
+      can_view_reports: userData.permissions?.canViewReports || false,
+      can_manage_all_branches: userData.permissions?.canManageAllBranches || false,
+      teacher_id: userData.teacherId || null,
       is_active: userData.isActive !== false,
       created_at: new Date().toISOString(),
       created_by: createdBy,

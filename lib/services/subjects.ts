@@ -1,11 +1,20 @@
 import { Subject } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
+import { Database } from '@/types/supabase';
 
 const TABLE_NAME = 'subjects';
 
+type SubjectRow = Database['public']['Tables']['subjects']['Row'];
+type SubjectInsert = Database['public']['Tables']['subjects']['Insert'];
+type SubjectUpdate = Database['public']['Tables']['subjects']['Update'];
+
 // Map database item to Subject model
 function mapToSubject(item: any): Subject {
-  return {
+  console.log('mapToSubject - raw item:', item);
+  console.log('mapToSubject - age_range_min:', item.age_range_min);
+  console.log('mapToSubject - age_range_max:', item.age_range_max);
+
+  const mapped = {
     id: item.id,
     code: item.code,
     name: item.name,
@@ -13,11 +22,17 @@ function mapToSubject(item: any): Subject {
     description: item.description || '',
     color: item.color,
     level: item.level,
-    ageRange: item.age_range || { min: 0, max: 0 },
+    ageRange: {
+      min: item.age_range_min || 0,
+      max: item.age_range_max || 0,
+    },
     prerequisites: item.prerequisites || [],
     icon: item.icon,
     isActive: item.is_active,
   };
+
+  console.log('mapToSubject - mapped ageRange:', mapped.ageRange);
+  return mapped;
 }
 
 // Get all subjects
@@ -114,7 +129,8 @@ export async function createSubject(subjectData: Omit<Subject, 'id'>): Promise<s
         description: subjectData.description,
         color: subjectData.color,
         level: subjectData.level,
-        age_range: subjectData.ageRange,
+        age_range_min: subjectData.ageRange.min,
+        age_range_max: subjectData.ageRange.max,
         prerequisites: subjectData.prerequisites || [],
         icon: subjectData.icon,
         is_active: subjectData.isActive,
@@ -145,7 +161,10 @@ export async function updateSubject(id: string, subjectData: Partial<Subject>): 
     if (subjectData.description !== undefined) updateData.description = subjectData.description;
     if (subjectData.color !== undefined) updateData.color = subjectData.color;
     if (subjectData.level !== undefined) updateData.level = subjectData.level;
-    if (subjectData.ageRange !== undefined) updateData.age_range = subjectData.ageRange;
+    if (subjectData.ageRange !== undefined) {
+      updateData.age_range_min = subjectData.ageRange.min;
+      updateData.age_range_max = subjectData.ageRange.max;
+    }
     if (subjectData.prerequisites !== undefined) updateData.prerequisites = subjectData.prerequisites;
     if (subjectData.icon !== undefined) updateData.icon = subjectData.icon;
     if (subjectData.isActive !== undefined) updateData.is_active = subjectData.isActive;

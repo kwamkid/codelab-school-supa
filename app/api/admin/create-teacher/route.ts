@@ -42,11 +42,12 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient()
     const { data: adminUser, error: adminError } = await supabase
       .from('admin_users')
-      .select('role')
-      .eq('id', requestingUserId)
+      .select('role, id')
+      .eq('auth_user_id', requestingUserId)
       .single()
 
     if (adminError || !adminUser) {
+      console.error('Admin check error:', adminError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -81,13 +82,12 @@ export async function POST(request: NextRequest) {
     try {
       // Create teacher document
       const { error: teacherError } = await supabase.from('teachers').insert({
-        id: teacherId,
         name: teacherData.name,
         email: email.toLowerCase(),
         phone: teacherData.phone || null,
         nickname: teacherData.nickname || null,
         available_branches: teacherData.availableBranches || [],
-        subjects: teacherData.subjects || [],
+        specialties: teacherData.specialties || [],
         is_active: teacherData.isActive !== false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -97,23 +97,21 @@ export async function POST(request: NextRequest) {
 
       // Create adminUser document
       const { error: adminInsertError } = await supabase.from('admin_users').insert({
-        id: teacherId,
+        auth_user_id: teacherId,
         email: email.toLowerCase(),
         display_name: teacherData.name,
         role: 'teacher',
         branch_ids: teacherData.availableBranches || [],
-        permissions: {
-          canManageUsers: false,
-          canManageSettings: false,
-          canViewReports: false,
-          canManageAllBranches: false
-        },
+        can_manage_users: false,
+        can_manage_settings: false,
+        can_view_reports: false,
+        can_manage_all_branches: false,
+        teacher_id: null,
         is_active: teacherData.isActive !== false,
-        auth_created: true,
         created_at: new Date().toISOString(),
-        created_by: requestingUserId,
+        created_by: adminUser.id,
         updated_at: new Date().toISOString(),
-        updated_by: requestingUserId
+        updated_by: adminUser.id
       })
 
       if (adminInsertError) throw adminInsertError

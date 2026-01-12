@@ -63,6 +63,10 @@ export default function TeachersPage() {
     return branch?.name || branchId;
   };
 
+  const getSubject = (subjectId: string) => {
+    return subjects.find(s => s.id === subjectId);
+  };
+
   const getSubjectName = (subjectId: string) => {
     const subject = subjects.find(s => s.id === subjectId);
     return subject?.name || subjectId;
@@ -276,11 +280,22 @@ export default function TeachersPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {teacher.specialties.slice(0, 3).map((subjectId) => (
-                            <Badge key={subjectId} variant="secondary" className="text-xs">
-                              {getSubjectName(subjectId)}
-                            </Badge>
-                          ))}
+                          {teacher.specialties.slice(0, 3).map((subjectId) => {
+                            const subject = getSubject(subjectId);
+                            return (
+                              <Badge
+                                key={subjectId}
+                                className="text-xs border-0"
+                                style={{
+                                  backgroundColor: subject?.color ? `${subject.color}15` : '#f3f4f6',
+                                  color: subject?.color || '#6b7280',
+                                  borderLeft: `3px solid ${subject?.color || '#9ca3af'}`
+                                }}
+                              >
+                                {getSubjectName(subjectId)}
+                              </Badge>
+                            );
+                          })}
                           {teacher.specialties.length > 3 && (
                             <Badge variant="secondary" className="text-xs">
                               +{teacher.specialties.length - 3}

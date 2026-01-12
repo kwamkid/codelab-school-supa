@@ -151,8 +151,11 @@ export async function createTeacher(
     // ถ้ามี password ให้สร้าง Auth ผ่าน API
     if (password) {
       try {
-        const token = await fetch('/api/auth/token').then(r => r.json());
-        if (!token) {
+        // Get token from Supabase session
+        const supabase = getClient();
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.access_token) {
           throw new Error('No auth token available');
         }
 
@@ -160,7 +163,7 @@ export async function createTeacher(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
             email: teacherData.email,
@@ -459,9 +462,10 @@ export async function syncTeachersToAdminUsers(): Promise<{
     // Phase 2: Create Supabase Auth users (if any)
     if (teachersNeedingAuth.length > 0) {
       try {
-        // Get current user token
-        const token = await fetch('/api/auth/token').then(r => r.json());
-        if (!token) {
+        // Get token from Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.access_token) {
           throw new Error('No auth token available');
         }
 
@@ -470,7 +474,7 @@ export async function syncTeachersToAdminUsers(): Promise<{
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
             teacherIds: teachersNeedingAuth
