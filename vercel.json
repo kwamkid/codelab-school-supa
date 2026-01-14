@@ -7,15 +7,5 @@
       "source": "/liff/(.*)",
       "destination": "/liff/$1"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/reminders?secret=${CRON_SECRET}",
-      "schedule": "0 19 * * *"
-    },
-    {
-      "path": "/api/cron/update-class-status?secret=${CRON_SECRET}",
-      "schedule": "0 1 * * *"
-    }
   ]
 }

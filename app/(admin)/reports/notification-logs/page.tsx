@@ -29,8 +29,17 @@ import {
   Calendar,
   Filter,
   Download,
-  RefreshCw
+  RefreshCw,
+  Eye
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { formatDate } from '@/lib/utils';
 
 interface NotificationLog {
@@ -59,14 +68,20 @@ export default function NotificationLogsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Set default start date to today
-  const today = new Date().toISOString().split('T')[0];
+  // Set default date range to today (Thailand timezone)
+  const now = new Date();
+  const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const todayStr = today.toISOString().split('T')[0];
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
   const [filters, setFilters] = useState({
     type: '',
     status: '',
-    startDate: today,
-    endDate: ''
+    startDate: todayStr,
+    endDate: tomorrowStr
   });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -111,8 +126,8 @@ export default function NotificationLogsPage() {
     setFilters({
       type: '',
       status: '',
-      startDate: today,
-      endDate: ''
+      startDate: todayStr,
+      endDate: tomorrowStr
     });
     setPage(1);
   };
@@ -339,9 +354,55 @@ export default function NotificationLogsPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-xs truncate text-sm">
-                          {log.error_message || log.message_preview || '-'}
-                        </div>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 px-2">
+                              <Eye className="w-4 h-4 mr-1" />
+                              ดูข้อความ
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle className="flex items-center gap-2">
+                                <Badge className={getTypeColor(log.type)} variant="secondary">
+                                  {getTypeLabel(log.type)}
+                                </Badge>
+                                {log.status === 'success' ? (
+                                  <Badge variant="default" className="bg-green-100 text-green-800">
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                    สำเร็จ
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive">
+                                    <XCircle className="w-3 h-3 mr-1" />
+                                    ล้มเหลว
+                                  </Badge>
+                                )}
+                              </DialogTitle>
+                              <DialogDescription>
+                                {new Date(log.sent_at).toLocaleString('th-TH')}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="mt-4 space-y-4">
+                              {log.error_message && (
+                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                  <p className="text-sm font-medium text-red-800">Error:</p>
+                                  <p className="text-sm text-red-700">{log.error_message}</p>
+                                </div>
+                              )}
+                              <div className="p-4 bg-gray-50 rounded-lg">
+                                <p className="text-sm font-medium text-gray-700 mb-2">ข้อความที่ส่ง:</p>
+                                <pre className="text-sm whitespace-pre-wrap font-sans text-gray-900">
+                                  {log.message_preview || '-'}
+                                </pre>
+                              </div>
+                              <div className="text-xs text-muted-foreground space-y-1">
+                                <p>ผู้รับ: {log.recipient_name || '-'}</p>
+                                <p>LINE ID: {log.line_user_id || '-'}</p>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </TableCell>
                     </TableRow>
                   ))}

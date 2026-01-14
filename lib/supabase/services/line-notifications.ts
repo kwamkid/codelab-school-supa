@@ -214,19 +214,33 @@ export async function sendClassReminder(
       console.log(`[sendClassReminder] Failed to send reminder: ${result.error}`)
     }
 
+    // Build detailed message preview
+    const studentName = student.nickname || student.name
+    const sessionText = sessionNumber ? ` (ครั้งที่ ${sessionNumber})` : ''
+    const messagePreview = [
+      `🔔 แจ้งเตือนคลาสเรียนพรุ่งนี้`,
+      `👦 นักเรียน: ${studentName}`,
+      `📚 คลาส: ${classData.name}${sessionText}`,
+      `📅 วันที่: ${formatDate(scheduleDate, 'long')}`,
+      `⏰ เวลา: ${formatTime(classData.start_time)} - ${formatTime(classData.end_time)}`,
+      `👩‍🏫 ครูผู้สอน: ครู${teacher?.nickname || teacher?.name || 'ไม่ระบุ'}`,
+      `📍 สถานที่: ${branch?.name || '-'}`,
+      `🚪 ห้อง: ${room?.name || classData.room_id || '-'}`
+    ].join('\n')
+
     // Log notification
     await logNotification({
       type: 'class-reminder',
       recipientType: 'parent',
       recipientId: parent.id,
-      recipientName: `${student.nickname || student.name}'s parent`,
+      recipientName: `${studentName}'s parent`,
       lineUserId: parent.line_user_id,
       studentId: student.id,
-      studentName: student.nickname || student.name,
+      studentName: studentName,
       classId: classData.id,
       className: classData.name,
       scheduleId: scheduleId,
-      messagePreview: `Class reminder for ${student.nickname || student.name} - ${classData.name}`,
+      messagePreview: messagePreview,
       status: result.success ? 'success' : 'failed',
       errorMessage: result.error,
       sentAt: new Date()
@@ -328,6 +342,39 @@ export async function sendMakeupNotification(
     } else {
       console.error(`[sendMakeupNotification] Failed to send makeup ${type}:`, result.error)
     }
+
+    // Build detailed message preview
+    const studentName = student?.nickname || student?.name
+    const sessionText = makeup.original_session_number ? ` (ครั้งที่ ${makeup.original_session_number})` : ''
+    const headerText = type === 'reminder' ? '⏰ แจ้งเตือน Makeup Class พรุ่งนี้' : '✅ ยืนยันการนัด Makeup Class'
+    const messagePreview = [
+      headerText,
+      `👦 นักเรียน: ${studentName}`,
+      `📚 คลาส: ${classData?.name || 'Makeup Class'}${sessionText}`,
+      `📅 วันที่: ${formatDate(makeupDate, 'long')}`,
+      `⏰ เวลา: ${formatTime(makeup.makeup_start_time)} - ${formatTime(makeup.makeup_end_time)}`,
+      `👩‍🏫 ครูผู้สอน: ครู${teacher?.nickname || teacher?.name || 'ไม่ระบุ'}`,
+      `📍 สถานที่: ${branch?.name || '-'}`,
+      `🚪 ห้อง: ${room?.name || makeup.makeup_room_id || '-'}`
+    ].join('\n')
+
+    // Log notification
+    await logNotification({
+      type: type === 'reminder' ? 'makeup-reminder' : 'makeup-scheduled',
+      recipientType: 'parent',
+      recipientId: parent.id,
+      recipientName: `${studentName}'s parent`,
+      lineUserId: parent.line_user_id,
+      studentId: student?.id,
+      studentName: studentName,
+      classId: classData?.id,
+      className: classData?.name,
+      makeupId: makeupId,
+      messagePreview: messagePreview,
+      status: result.success ? 'success' : 'failed',
+      errorMessage: result.error,
+      sentAt: new Date()
+    })
 
     return result.success
   } catch (error) {
