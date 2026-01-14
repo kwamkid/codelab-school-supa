@@ -482,11 +482,29 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       iconColor: 'text-indigo-600',
       requiredRole: ['super_admin', 'branch_admin'],
       subItems: [
-        { 
-          name: 'ห้องและครูว่าง', 
-          href: '/reports/availability', 
+        {
+          name: 'ทดลองเรียน',
+          href: '/reports/trial',
+          icon: TestTube,
+          iconColor: 'text-cyan-600'
+        },
+        {
+          name: 'สมัครเรียน',
+          href: '/reports/enrollment',
+          icon: UserCheck,
+          iconColor: 'text-green-600'
+        },
+        {
+          name: 'ห้องและครูว่าง',
+          href: '/reports/availability',
           icon: Calendar,
           iconColor: 'text-teal-600'
+        },
+        {
+          name: 'Notification Logs',
+          href: '/reports/notification-logs',
+          icon: Bell,
+          iconColor: 'text-purple-600'
         },
       ]
     },
