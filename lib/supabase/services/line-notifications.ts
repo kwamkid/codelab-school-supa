@@ -445,6 +445,32 @@ export async function sendTrialConfirmation(trialSessionId: string): Promise<boo
       console.log('[sendTrialConfirmation] Failed to send trial confirmation:', result.error)
     }
 
+    // Build detailed message preview
+    const messagePreview = [
+      `✅ ยืนยันการทดลองเรียน`,
+      `👦 นักเรียน: ${trial.student_name}`,
+      `📚 วิชา: ${subject?.name || 'ไม่ระบุ'}`,
+      `📅 วันที่: ${formatDate(new Date(trial.scheduled_date), 'long')}`,
+      `⏰ เวลา: ${formatTime(trial.start_time)} - ${formatTime(trial.end_time)}`,
+      `📍 สถานที่: ${branch?.name || 'ไม่ระบุ'}`,
+      `🚪 ห้อง: ${room?.name || trial.room_name || 'ไม่ระบุ'}`,
+      `📞 ติดต่อ: ${branch?.phone || '081-234-5678'}`
+    ].join('\n')
+
+    // Log notification
+    await logNotification({
+      type: 'trial-confirmation',
+      recipientType: 'parent',
+      recipientId: booking.id,
+      recipientName: `${trial.student_name}'s parent`,
+      lineUserId: booking.parent_line_id,
+      studentName: trial.student_name,
+      messagePreview: messagePreview,
+      status: result.success ? 'success' : 'failed',
+      errorMessage: result.error,
+      sentAt: new Date()
+    })
+
     return result.success
   } catch (error) {
     console.error('[sendTrialConfirmation] Error:', error)
@@ -478,6 +504,20 @@ export async function sendFeedbackNotification(
     } else {
       console.log('[sendFeedbackNotification] Failed to send feedback notification:', result.error)
     }
+
+    // Log notification
+    await logNotification({
+      type: 'feedback',
+      recipientType: 'parent',
+      recipientName: `${studentName}'s parent`,
+      lineUserId: parentLineId,
+      studentName: studentName,
+      className: className,
+      messagePreview: message,
+      status: result.success ? 'success' : 'failed',
+      errorMessage: result.error,
+      sentAt: new Date()
+    })
 
     return result.success
   } catch (error) {
@@ -523,6 +563,20 @@ export async function sendScheduleChangeNotification(
       console.log('[sendScheduleChangeNotification] Failed to send notification:', result.error)
     }
 
+    // Log notification
+    await logNotification({
+      type: 'schedule-change',
+      recipientType: 'parent',
+      recipientName: `${studentName}'s parent`,
+      lineUserId: parentLineId,
+      studentName: studentName,
+      className: className,
+      messagePreview: message,
+      status: result.success ? 'success' : 'failed',
+      errorMessage: result.error,
+      sentAt: new Date()
+    })
+
     return result.success
   } catch (error) {
     console.error('[sendScheduleChangeNotification] Error:', error)
@@ -556,6 +610,20 @@ export async function sendPaymentReminder(
     } else {
       console.log('[sendPaymentReminder] Failed to send payment reminder:', result.error)
     }
+
+    // Log notification
+    await logNotification({
+      type: 'payment-reminder',
+      recipientType: 'parent',
+      recipientName: `${studentName}'s parent`,
+      lineUserId: parentLineId,
+      studentName: studentName,
+      className: className,
+      messagePreview: message,
+      status: result.success ? 'success' : 'failed',
+      errorMessage: result.error,
+      sentAt: new Date()
+    })
 
     return result.success
   } catch (error) {
