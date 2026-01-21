@@ -25,8 +25,13 @@ export function PermissionGuard({
   fallback = null,
   showError = false
 }: PermissionGuardProps) {
-  const { adminUser, isSuperAdmin } = useAuth();
+  const { adminUser, isSuperAdmin, loading } = useAuth();
   const { isAllBranches } = useBranch();
+
+  // Wait for auth to load before checking permissions
+  if (loading) {
+    return <>{children}</>; // Show children while loading (will be handled by ActionButton)
+  }
 
   // Check if user has required role
   if (requiredRole && adminUser) {
@@ -76,30 +81,35 @@ export function PermissionGuard({
  * Hook to check permissions
  */
 export function usePermissions() {
-  const { adminUser, isSuperAdmin } = useAuth();
+  const { adminUser, isSuperAdmin, loading } = useAuth();
   const { isAllBranches } = useBranch();
 
   const hasRole = (roles: ('super_admin' | 'branch_admin' | 'teacher')[]): boolean => {
+    if (loading) return true; // Allow while loading
     if (!adminUser) return false;
     return roles.includes(adminUser.role);
   };
 
   const hasPermission = (permission: string): boolean => {
+    if (loading) return true; // Allow while loading
     if (isSuperAdmin()) return true;
     return adminUser?.permissions?.[permission] || false;
   };
 
   const canEdit = (): boolean => {
+    if (loading) return true; // Allow while loading
     // Super admin and branch admin can edit
     return hasRole(['super_admin', 'branch_admin']);
   };
 
   const canDelete = (): boolean => {
+    if (loading) return true; // Allow while loading
     // Only super admin and branch admin can delete
     return hasRole(['super_admin', 'branch_admin']);
   };
 
   const canCreate = (): boolean => {
+    if (loading) return true; // Allow while loading
     // Super admin and branch admin can create
     return hasRole(['super_admin', 'branch_admin']);
   };
@@ -124,6 +134,7 @@ export function usePermissions() {
     isSuperAdmin: isSuperAdmin(),
     isBranchAdmin: adminUser?.role === 'branch_admin',
     isTeacher: adminUser?.role === 'teacher',
-    userRole: adminUser?.role
+    userRole: adminUser?.role,
+    loading
   };
 }

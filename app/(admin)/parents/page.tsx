@@ -3,9 +3,8 @@
 import { useEffect, useState, useMemo, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Parent, Student, Enrollment } from '@/types/models';
-import { getParents, getStudentsByParent } from '@/lib/services/parents';
+import { getParentsWithStudentsAndEnrollments } from '@/lib/services/parents';
 import { getActiveBranches } from '@/lib/services/branches';
-import { getEnrollmentsByStudent } from '@/lib/services/enrollments';
 import { getClasses } from '@/lib/services/classes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,14 +49,21 @@ import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 import { Skeleton } from '@/components/ui/skeleton';
 
+interface StudentEnrollment {
+  id: string;
+  classId: string;
+  branchId: string;
+  status: string;
+}
+
 interface StudentWithEnrollment extends Student {
-  enrollments?: Enrollment[];
+  enrollments: StudentEnrollment[];
   hasActiveClass?: boolean;
   enrollmentStatus?: 'active' | 'completed' | 'never';
 }
 
 interface ParentWithInfo extends Parent {
-  students?: StudentWithEnrollment[];
+  students: StudentWithEnrollment[];
   activeStudentCount?: number;
   enrollmentStatus?: 'active' | 'completed' | 'never' | 'mixed';
 }
@@ -74,8 +80,6 @@ const BadgeSkeleton = () => (
 );
 
 export default function ParentsPage() {
-  const [allParentsData, setAllParentsData] = useState<ParentWithInfo[]>([]);
-  const [enrollmentLoading, setEnrollmentLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterBranch, setFilterBranch] = useState<string>('all');
@@ -95,16 +99,16 @@ export default function ParentsPage() {
   } = usePagination(20);
 
   // ============================================
-  // 🎯 Query 1: Parents (Load First)
+  // 🎯 Query 1: Parents with Students & Enrollments (Single Query)
   // ============================================
-  const { data: parents = [], isLoading: loadingParents } = useQuery({
-    queryKey: ['parents'],
-    queryFn: getParents,
+  const { data: parentsRaw = [], isLoading: loadingParents } = useQuery({
+    queryKey: ['parents-with-students-enrollments'],
+    queryFn: getParentsWithStudentsAndEnrollments,
     staleTime: 60000, // 1 minute
   });
 
   // ============================================
-  // 🎯 Query 2-3: Supporting Data (Load After)
+  // 🎯 Query 2-3: Supporting Data
   // ============================================
   const { data: branches = [], isLoading: loadingBranches } = useQuery({
     queryKey: ['branches', 'active'],
@@ -130,129 +134,88 @@ export default function ParentsPage() {
   );
 
   const getBranchName = (branchId: string) => branchesMap.get(branchId)?.name || 'Unknown';
-  const getStudentInfo = (studentId: string) => allParentsData.flatMap(p => p.students || []).find(s => s.id === studentId);
   const getClassInfo = (classId: string) => classesMap.get(classId);
 
-  // Load enrollment data when parents change
-  useEffect(() => {
-    if (parents.length > 0 && Array.isArray(classes) && classes.length > 0 && !loadingClasses) {
-      setAllParentsData(parents);
-      
-      const freshClassMap: Record<string, any> = {};
-      classes.forEach((cls: any) => {
-        freshClassMap[cls.id] = cls;
+  // Process parents data with enrollment status (computed from already-loaded data)
+  const allParentsData = useMemo(() => {
+    if (!parentsRaw.length) return [];
+
+    return parentsRaw.map((parent) => {
+      const studentsWithStatus = parent.students.map((student) => {
+        let hasActiveClass = false;
+        let enrollmentStatus: 'active' | 'completed' | 'never' = 'never';
+
+        if (student.enrollments.length > 0) {
+          const activeEnrollments = student.enrollments.filter(e => {
+            const cls = classesMap.get(e.classId);
+            return e.status === 'active' && cls && cls.status !== 'completed';
+          });
+
+          hasActiveClass = activeEnrollments.length > 0;
+          enrollmentStatus = hasActiveClass ? 'active' : 'completed';
+        }
+
+        return {
+          ...student,
+          hasActiveClass,
+          enrollmentStatus
+        };
       });
-      
-      loadAllParentDetails(parents, freshClassMap);
-    }
-  }, [parents, classes, loadingClasses]);
+
+      const activeCount = studentsWithStatus.filter(s => s.isActive).length;
+      const statuses = studentsWithStatus.map(s => s.enrollmentStatus);
+
+      let parentStatus: 'active' | 'completed' | 'never' | 'mixed' = 'never';
+      if (statuses.includes('active')) {
+        parentStatus = 'active';
+      } else if (statuses.includes('completed')) {
+        parentStatus = 'completed';
+      } else if (statuses.length > 1 && new Set(statuses).size > 1) {
+        parentStatus = 'mixed';
+      }
+
+      return {
+        ...parent,
+        students: studentsWithStatus,
+        activeStudentCount: activeCount,
+        enrollmentStatus: parentStatus
+      };
+    });
+  }, [parentsRaw, classesMap]);
 
   // Reset page when filters change
-  useMemo(() => {
+  useEffect(() => {
     resetPagination();
   }, [searchTerm, filterBranch, filterStatus, resetPagination]);
-
-  const loadAllParentDetails = async (parentsList: Parent[], classMapping: Record<string, any>) => {
-    try {
-      setEnrollmentLoading(true);
-      
-      const parentsWithDetails = await Promise.all(
-        parentsList.map(async (parent) => {
-          try {
-            const students = await getStudentsByParent(parent.id);
-            
-            const studentsWithEnrollments = await Promise.all(
-              students.map(async (student) => {
-                const enrollments = await getEnrollmentsByStudent(student.id);
-                
-                let hasActiveClass = false;
-                let enrollmentStatus: 'active' | 'completed' | 'never' = 'never';
-                
-                if (enrollments.length > 0) {
-                  const activeEnrollments = enrollments.filter(e => {
-                    const cls = classMapping[e.classId];
-                    return e.status === 'active' && cls && cls.status !== 'completed';
-                  });
-                  
-                  hasActiveClass = activeEnrollments.length > 0;
-                  enrollmentStatus = hasActiveClass ? 'active' : 'completed';
-                }
-                
-                return {
-                  ...student,
-                  enrollments,
-                  hasActiveClass,
-                  enrollmentStatus
-                };
-              })
-            );
-            
-            const activeCount = studentsWithEnrollments.filter(s => s.isActive).length;
-            const statuses = studentsWithEnrollments.map(s => s.enrollmentStatus);
-            
-            let parentStatus: 'active' | 'completed' | 'never' | 'mixed' = 'never';
-            if (statuses.includes('active')) {
-              parentStatus = 'active';
-            } else if (statuses.includes('completed')) {
-              parentStatus = 'completed';
-            } else if (statuses.length > 1 && new Set(statuses).size > 1) {
-              parentStatus = 'mixed';
-            }
-            
-            return {
-              ...parent,
-              students: studentsWithEnrollments,
-              activeStudentCount: activeCount,
-              enrollmentStatus: parentStatus
-            };
-          } catch (error) {
-            console.error(`Error loading details for parent ${parent.id}:`, error);
-            return {
-              ...parent,
-              students: [],
-              activeStudentCount: 0,
-              enrollmentStatus: 'never' as const
-            };
-          }
-        })
-      );
-      
-      setAllParentsData(parentsWithDetails);
-      setEnrollmentLoading(false);
-    } catch (error) {
-      console.error('Error loading parent details:', error);
-      setEnrollmentLoading(false);
-    }
-  };
 
   // Filter parents
   const filteredParents = useMemo(() => {
     let filtered = [...allParentsData];
-    
+
     if (filterBranch !== 'all') {
       filtered = filtered.filter(parent => {
-        const hasStudentInBranch = parent.students?.some(student => 
+        const hasStudentInBranch = parent.students?.some(student =>
           student.enrollments?.some(e => e.branchId === filterBranch)
         );
         const interestedInBranch = parent.preferredBranchId === filterBranch;
         return hasStudentInBranch || interestedInBranch;
       });
     }
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(parent => 
+      filtered = filtered.filter(parent =>
         parent.displayName.toLowerCase().includes(term) ||
         parent.phone?.toLowerCase().includes(term) ||
         parent.email?.toLowerCase().includes(term) ||
-        parent.students?.some(s => 
+        parent.students?.some(s =>
           s.name.toLowerCase().includes(term) ||
-          s.nickname.toLowerCase().includes(term)
+          s.nickname?.toLowerCase().includes(term)
         )
       );
     }
-    
-    if (filterStatus !== 'all' && !enrollmentLoading) {
+
+    if (filterStatus !== 'all') {
       filtered = filtered.filter(parent => {
         if (filterStatus === 'active') return parent.enrollmentStatus === 'active';
         if (filterStatus === 'completed') return parent.enrollmentStatus === 'completed' || parent.enrollmentStatus === 'mixed';
@@ -260,9 +223,9 @@ export default function ParentsPage() {
         return true;
       });
     }
-    
+
     return filtered;
-  }, [allParentsData, searchTerm, filterBranch, filterStatus, enrollmentLoading]);
+  }, [allParentsData, searchTerm, filterBranch, filterStatus]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -350,7 +313,7 @@ export default function ParentsPage() {
           </h1>
           <p className="text-gray-600 mt-2">
             ข้อมูลผู้ปกครองและนักเรียนทั้งหมดในระบบ - สามารถกรองตามสาขาได้
-            {(loadingBranches || loadingClasses || enrollmentLoading) && (
+            {(loadingBranches || loadingClasses) && (
               <span className="text-orange-500 ml-2">(กำลังโหลดข้อมูลเพิ่มเติม...)</span>
             )}
           </p>
@@ -402,29 +365,29 @@ export default function ParentsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {enrollmentLoading ? '...' : stats.activeEnrollment}
+              {stats.activeEnrollment}
             </div>
           </CardContent>
         </Card>
-        
+
         <Card key="card-completed">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">จบคอร์สแล้ว</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {enrollmentLoading ? '...' : stats.completedEnrollment}
+              {stats.completedEnrollment}
             </div>
           </CardContent>
         </Card>
-        
+
         <Card key="card-never">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">ยังไม่ลงคอร์ส</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-600">
-              {enrollmentLoading ? '...' : stats.neverEnrolled}
+              {stats.neverEnrolled}
             </div>
           </CardContent>
         </Card>
@@ -563,9 +526,7 @@ export default function ParentsPage() {
                               )}
                               <div>
                                 <p className="font-medium">{parent.displayName}</p>
-                                {enrollmentLoading ? (
-                                  <p className="text-xs text-gray-500">กำลังโหลด...</p>
-                                ) : parent.enrollmentStatus === 'active' ? (
+                                {parent.enrollmentStatus === 'active' ? (
                                   <Badge className="bg-green-100 text-green-700 text-xs">กำลังเรียน</Badge>
                                 ) : parent.enrollmentStatus === 'completed' || parent.enrollmentStatus === 'mixed' ? (
                                   <Badge className="bg-orange-100 text-orange-700 text-xs">จบคอร์สแล้ว</Badge>
@@ -630,9 +591,7 @@ export default function ParentsPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1 max-w-[200px]">
-                              {enrollmentLoading ? (
-                                <span className="text-gray-400 text-sm">กำลังโหลด...</span>
-                              ) : loadingBranches ? (
+                              {loadingBranches ? (
                                 <BadgeSkeleton />
                               ) : (() => {
                                 const enrolledBranches = new Set<string>();
@@ -641,11 +600,11 @@ export default function ParentsPage() {
                                     enrolledBranches.add(enrollment.branchId);
                                   });
                                 });
-                                
+
                                 return enrolledBranches.size > 0 ? (
                                   Array.from(enrolledBranches).map(branchId => (
-                                    <Badge 
-                                      key={branchId} 
+                                    <Badge
+                                      key={branchId}
                                       variant="outline"
                                       className="text-xs"
                                     >
@@ -747,33 +706,29 @@ export default function ParentsPage() {
                                           })()}
                                         </div>
                                         
-                                        {!enrollmentLoading && (
-                                          <>
-                                            {student.enrollmentStatus === 'active' ? (
-                                              <div className="space-y-1">
-                                                <Badge className="bg-green-100 text-green-700 text-xs">
-                                                  <GraduationCap className="h-3 w-3 mr-1" />
-                                                  กำลังเรียน
-                                                </Badge>
-                                                {student.enrollments && student.enrollments.length > 0 && !loadingClasses && (
-                                                  <div className="text-xs text-gray-600 max-w-[300px]">
-                                                    {student.enrollments
-                                                      .filter(e => e.status === 'active')
-                                                      .map(e => getClassInfo(e.classId)?.name || e.classId)
-                                                      .join(', ')}
-                                                  </div>
-                                                )}
+                                        {student.enrollmentStatus === 'active' ? (
+                                          <div className="space-y-1">
+                                            <Badge className="bg-green-100 text-green-700 text-xs">
+                                              <GraduationCap className="h-3 w-3 mr-1" />
+                                              กำลังเรียน
+                                            </Badge>
+                                            {student.enrollments && student.enrollments.length > 0 && !loadingClasses && (
+                                              <div className="text-xs text-gray-600 max-w-[300px]">
+                                                {student.enrollments
+                                                  .filter(e => e.status === 'active')
+                                                  .map(e => getClassInfo(e.classId)?.name || e.classId)
+                                                  .join(', ')}
                                               </div>
-                                            ) : student.enrollmentStatus === 'completed' ? (
-                                              <Badge className="bg-orange-100 text-orange-700 text-xs">
-                                                จบคอร์สแล้ว
-                                              </Badge>
-                                            ) : (
-                                              <Badge variant="secondary" className="text-xs">
-                                                ยังไม่ลงคอร์ส
-                                              </Badge>
                                             )}
-                                          </>
+                                          </div>
+                                        ) : student.enrollmentStatus === 'completed' ? (
+                                          <Badge className="bg-orange-100 text-orange-700 text-xs">
+                                            จบคอร์สแล้ว
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="secondary" className="text-xs">
+                                            ยังไม่ลงคอร์ส
+                                          </Badge>
                                         )}
                                         {!student.isActive && (
                                           <Badge variant="destructive" className="text-xs">ไม่ใช้งาน</Badge>

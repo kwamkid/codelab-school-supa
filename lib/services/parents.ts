@@ -722,3 +722,70 @@ export async function canDeleteParent(parentId: string): Promise<{
     };
   }
 }
+
+// Get all parents with students and enrollments in one query (optimized for list page)
+export async function getParentsWithStudentsAndEnrollments(): Promise<(Parent & {
+  students: (Student & {
+    enrollments: { id: string; classId: string; branchId: string; status: string }[];
+  })[];
+})[]> {
+  try {
+    const supabase = getClient();
+
+    // Get all parents with students in one query
+    const { data: parentsData, error: parentsError } = await supabase
+      .from('parents')
+      .select(`
+        *,
+        students (
+          *,
+          enrollments (
+            id,
+            class_id,
+            branch_id,
+            status
+          )
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (parentsError) throw parentsError;
+
+    return (parentsData || []).map((row: any) => ({
+      id: row.id,
+      displayName: row.display_name,
+      phone: row.phone,
+      lineUserId: row.line_user_id || undefined,
+      email: row.email || undefined,
+      pictureUrl: row.picture_url || undefined,
+      preferredBranchId: row.preferred_branch_id || undefined,
+      createdAt: new Date(row.created_at),
+      lastLoginAt: new Date(row.last_login_at),
+      students: (row.students || []).map((student: any) => ({
+        id: student.id,
+        parentId: student.parent_id,
+        name: student.name,
+        nickname: student.nickname,
+        birthdate: new Date(student.birthdate),
+        gender: student.gender,
+        schoolName: student.school_name,
+        gradeLevel: student.grade_level,
+        profileImage: student.profile_image,
+        allergies: student.allergies,
+        specialNeeds: student.special_needs,
+        emergencyContact: student.emergency_contact,
+        emergencyPhone: student.emergency_phone,
+        isActive: student.is_active ?? true,
+        enrollments: (student.enrollments || []).map((e: any) => ({
+          id: e.id,
+          classId: e.class_id,
+          branchId: e.branch_id,
+          status: e.status,
+        })),
+      })),
+    }));
+  } catch (error) {
+    console.error('Error getting parents with students and enrollments:', error);
+    throw error;
+  }
+}

@@ -118,13 +118,13 @@ export default function CreateTrialBookingPage() {
   const toggleSubjectInterest = (studentIndex: number, subjectId: string) => {
     const updated = [...students];
     const interests = updated[studentIndex].subjectInterests;
-    
+
     if (interests.includes(subjectId)) {
       updated[studentIndex].subjectInterests = interests.filter(id => id !== subjectId);
     } else {
       updated[studentIndex].subjectInterests = [...interests, subjectId];
     }
-    
+
     setStudents(updated);
   };
 
@@ -239,7 +239,7 @@ export default function CreateTrialBookingPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6">
       {/* Header */}
       <div className="mb-6">
         <Button
@@ -449,7 +449,7 @@ export default function CreateTrialBookingPage() {
                   <Label>
                     วิชาที่สนใจ <span className="text-red-500">*</span>
                   </Label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     {subjects.map((subject) => {
                       const isSelected = student.subjectInterests.includes(subject.id);
                       return (
@@ -458,8 +458,8 @@ export default function CreateTrialBookingPage() {
                           onClick={() => toggleSubjectInterest(idx, subject.id)}
                           className={`
                             p-3 rounded-lg border cursor-pointer transition-all
-                            ${isSelected 
-                              ? 'border-red-500 bg-red-50' 
+                            ${isSelected
+                              ? 'border-green-500 bg-green-50'
                               : 'border-gray-200 hover:border-gray-300'
                             }
                           `}
@@ -469,7 +469,7 @@ export default function CreateTrialBookingPage() {
                             {subject.category} • {subject.level}
                           </div>
                           {isSelected && (
-                            <Badge className="mt-2 bg-red-100 text-red-700">
+                            <Badge className="mt-2 bg-green-100 text-green-700">
                               เลือกแล้ว
                             </Badge>
                           )}

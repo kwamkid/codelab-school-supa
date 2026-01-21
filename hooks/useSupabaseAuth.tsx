@@ -180,6 +180,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     try {
       // Use provided email or fetch it
       let email = userEmail;
+
       if (!email) {
         const { data: userData } = await client.auth.getUser();
         email = userData?.user?.email;
@@ -190,37 +191,55 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         return;
       }
 
-      // Prevent duplicate calls
+      const emailLower = email.toLowerCase();
+
+      // Skip if already loaded for this email
+      if (loadedEmailRef.current === emailLower) {
+        return;
+      }
+
+      // Prevent duplicate concurrent calls
       if (loadingAdminRef.current) {
         return;
       }
 
       loadingAdminRef.current = true;
 
-      // Use direct fetch API (faster than Supabase client in browser)
-
+      // Use fetch directly to avoid Supabase client issues
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/admin_users?email=eq.${email.toLowerCase()}&select=*`,
-        {
-          headers: {
-            'apikey': supabaseKey!,
-            'Authorization': `Bearer ${supabaseKey!}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      let adminDataArray;
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      try {
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/admin_users?email=eq.${encodeURIComponent(emailLower)}&select=*`,
+          {
+            method: 'GET',
+            headers: {
+              'apikey': supabaseKey!,
+              'Authorization': `Bearer ${supabaseKey!}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+          }
+        );
+
+        if (!response.ok) {
+          console.error('[loadAdminUser] Fetch error:', response.status);
+          loadingAdminRef.current = false;
+          return;
+        }
+
+        adminDataArray = await response.json();
+      } catch (queryError) {
+        console.error('[loadAdminUser] Query exception:', queryError);
+        loadingAdminRef.current = false;
+        return;
       }
 
-      const adminDataArray = await response.json();
-
       if (!adminDataArray || adminDataArray.length === 0) {
-        console.error('No admin user found for email:', email);
+        console.error('[loadAdminUser] No admin user found for email:', emailLower);
         loadingAdminRef.current = false;
         return;
       }
@@ -260,6 +279,10 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     let mounted = true;
     let supabase;
+
+    // Reset refs on mount
+    loadingAdminRef.current = false;
+    loadedEmailRef.current = null;
 
     try {
       supabase = getClient();
