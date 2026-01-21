@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, GraduationCap, Users, Calendar, BookOpen } from 'lucide-react';
 import { getGeneralSettings } from '@/lib/services/settings';
 import Image from 'next/image';
 import { getClient } from '@/lib/supabase/client';
@@ -105,134 +105,213 @@ export default function LoginPage() {
     }
   };
 
+  const features = [
+    { icon: GraduationCap, title: 'จัดการหลักสูตร', desc: 'ออกแบบและจัดการหลักสูตรได้อย่างยืดหยุ่น' },
+    { icon: Users, title: 'ติดตามนักเรียน', desc: 'ดูแลและติดตามความก้าวหน้าของนักเรียน' },
+    { icon: Calendar, title: 'จัดตารางเรียน', desc: 'วางแผนตารางเรียนและจัดการห้องเรียน' },
+    { icon: BookOpen, title: 'สื่อการสอน', desc: 'จัดเก็บและแชร์สื่อการสอนได้ง่าย' },
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4">
-          <div className="flex justify-center">
+    <div className="min-h-screen w-full flex">
+      {/* Left Side - Branding/Hero Section (Hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 bg-gradient-to-br from-red-500 via-red-600 to-orange-500 relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-white rounded-full translate-x-1/4 translate-y-1/4" />
+          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-20 text-white">
+          {/* Logo */}
+          <div className="mb-8">
             {settings?.logoUrl ? (
-              <div className="relative w-[200px] h-[50px]">
-                <Image
-                  src={settings.logoUrl}
-                  alt={settings.schoolName || 'School Logo'}
-                  width={200}
-                  height={50}
-                  className="object-contain"
-                  priority
-                  unoptimized // สำหรับ external URL
-                />
-              </div>
+              <Image
+                src={settings.logoUrl}
+                alt={settings.schoolName || 'School Logo'}
+                width={180}
+                height={45}
+                className="object-contain brightness-0 invert"
+                priority
+                unoptimized
+              />
             ) : (
-              <div className="relative w-[200px] h-[50px]">
-                <Image
-                  src="/logo.svg"
-                  alt="CodeLab Logo"
-                  fill
-                  className="object-contain"
-                  priority
-                />
+              <Image
+                src="/logo.svg"
+                alt="CodeLab Logo"
+                width={180}
+                height={45}
+                className="object-contain brightness-0 invert"
+                priority
+              />
+            )}
+          </div>
+
+          {/* Headline */}
+          <h1 className="text-4xl xl:text-5xl font-bold mb-4 leading-tight">
+            ระบบจัดการ<br />โรงเรียนสอนพิเศษ
+          </h1>
+          <p className="text-lg xl:text-xl text-white/80 mb-12 max-w-md">
+            จัดการทุกอย่างในที่เดียว ตั้งแต่นักเรียน ครูผู้สอน ตารางเรียน ไปจนถึงการเงิน
+          </p>
+
+          {/* Feature Grid */}
+          <div className="grid grid-cols-2 gap-6 max-w-lg">
+            {features.map((feature, index) => (
+              <div key={index} className="flex items-start gap-3 group">
+                <div className="p-2 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
+                  <feature.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">{feature.title}</h3>
+                  <p className="text-xs text-white/70">{feature.desc}</p>
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center bg-gray-50 p-6 sm:p-8 lg:p-12">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="flex justify-center mb-8 lg:hidden">
+            {settings?.logoUrl ? (
+              <Image
+                src={settings.logoUrl}
+                alt={settings.schoolName || 'School Logo'}
+                width={160}
+                height={40}
+                className="object-contain"
+                priority
+                unoptimized
+              />
+            ) : (
+              <Image
+                src="/logo.svg"
+                alt="CodeLab Logo"
+                width={160}
+                height={40}
+                className="object-contain"
+                priority
+              />
             )}
           </div>
-          <div className="text-center">
-            <CardTitle className="text-2xl font-bold">เข้าสู่ระบบ</CardTitle>
-            <CardDescription>
-              ระบบจัดการโรงเรียนสอนพิเศษ
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email">อีเมล</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@codelabschool.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
+          {/* Login Card */}
+          <Card className="border-0 shadow-xl bg-white">
+            <CardHeader className="space-y-1 pb-6">
+              <CardTitle className="text-2xl font-bold text-center text-gray-900">
+                ยินดีต้อนรับ
+              </CardTitle>
+              <CardDescription className="text-center text-gray-500">
+                เข้าสู่ระบบเพื่อจัดการโรงเรียนของคุณ
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {error && (
+                  <Alert variant="destructive" className="border-red-200 bg-red-50">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
-            <div className="space-y-2">
-              <Label htmlFor="password">รหัสผ่าน</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-gray-700 font-medium">อีเมล</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="example@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="h-12 px-4 bg-gray-50 border-gray-200 focus:bg-white focus:border-red-500 focus:ring-red-500 transition-colors"
+                  />
+                </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-red-500 hover:bg-red-600"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  กำลังเข้าสู่ระบบ...
-                </>
-              ) : (
-                'เข้าสู่ระบบ'
-              )}
-            </Button>
-          </form>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-gray-700 font-medium">รหัสผ่าน</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="h-12 px-4 bg-gray-50 border-gray-200 focus:bg-white focus:border-red-500 focus:ring-red-500 transition-colors"
+                  />
+                </div>
 
-          <div className="mt-4 text-center text-sm text-gray-600">
-            ลืมรหัสผ่าน?
-            <button
-              type="button"
-              onClick={() => setShowResetDialog(true)}
-              className="text-red-600 hover:underline ml-1"
-            >
-              รีเซ็ตรหัสผ่าน
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetDialog(true)}
+                    className="text-sm text-red-600 hover:text-red-700 hover:underline transition-colors"
+                  >
+                    ลืมรหัสผ่าน?
+                  </button>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium shadow-lg shadow-red-500/25 transition-all duration-200"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      กำลังเข้าสู่ระบบ...
+                    </>
+                  ) : (
+                    'เข้าสู่ระบบ'
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Footer */}
+          <p className="text-center text-sm text-gray-400 mt-8">
+            {settings?.schoolName || 'CodeLab School'} Management System
+          </p>
+        </div>
+      </div>
 
       {/* Reset Password Dialog */}
       {showResetDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>ลืมรหัสผ่าน</CardTitle>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md border-0 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl">ลืมรหัสผ่าน</CardTitle>
               <CardDescription>
                 กรอกอีเมลที่ใช้สมัคร เราจะส่งลิงก์รีเซ็ตรหัสผ่านไปให้
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="reset-email">อีเมล</Label>
                 <Input
                   id="reset-email"
                   type="email"
-                  placeholder="admin@codelabschool.com"
+                  placeholder="example@email.com"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   disabled={isResetting}
+                  className="h-12"
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handleResetPassword}
                   disabled={isResetting}
-                  className="flex-1 bg-red-500 hover:bg-red-600"
+                  className="flex-1 h-11 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
                 >
                   {isResetting ? (
                     <>
@@ -250,6 +329,7 @@ export default function LoginPage() {
                     setResetEmail('');
                   }}
                   disabled={isResetting}
+                  className="h-11"
                 >
                   ยกเลิก
                 </Button>

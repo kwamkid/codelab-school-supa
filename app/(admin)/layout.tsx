@@ -614,9 +614,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             {/* Logo */}
             <div className="flex h-16 items-center justify-between px-6 border-b">
               <div className="w-full">
-                <Image 
-                  src="/logo.svg" 
-                  alt="CodeLab School" 
+                <Image
+                  src="/logo.svg"
+                  alt="CodeLab School"
                   width={150}
                   height={40}
                   className="w-full max-w-[180px]"
@@ -635,7 +635,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
             <nav className="flex-1 overflow-y-auto px-4 py-6">
               {filteredNavigation.map((item) => {
                 const ItemIcon = item.icon;
-                
+
                 return (
                   <div key={item.name} className={item.isDivider ? '' : 'mb-2'}>
                     {item.isDivider ? (
@@ -665,7 +665,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                           <div className="mt-2 ml-8 space-y-1">
                             {item.subItems.map((subItem) => {
                               const SubItemIcon = subItem.icon;
-                              
+
                               return subItem.href ? (
                                 <MenuLink
                                   key={subItem.name}
@@ -832,7 +832,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                         src={user.photoURL || ''}
                         alt={user.displayName || ''}
                       />
-                      <AvatarFallback>
+                      <AvatarFallback className="bg-red-500 text-white">
                         {user.displayName?.charAt(0) || 'A'}
                       </AvatarFallback>
                     </Avatar>
