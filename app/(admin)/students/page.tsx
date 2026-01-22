@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Student, Branch } from '@/types/models';
-import { getAllStudentsWithParents } from '@/lib/services/parents';
+import { getAllStudentsWithParents, deleteStudent } from '@/lib/services/parents';
 import { getActiveBranches } from '@/lib/services/branches';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Pagination, usePagination } from '@/components/ui/pagination';
-import { 
-  Search, 
+import {
+  Search,
   User,
   Cake,
   School,
@@ -19,11 +19,25 @@ import {
   Edit,
   Users,
   Globe,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import { calculateAge } from '@/lib/utils';
+import { toast } from 'sonner';
+import { usePermissions } from '@/components/auth/permission-guard';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -91,10 +105,13 @@ const QUERY_KEYS = {
 };
 
 export default function StudentsPage() {
+  const queryClient = useQueryClient();
+  const { isSuperAdmin } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('active');
   const [filterAllergy, setFilterAllergy] = useState<string>('all');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // ============================================
   // 🎯 Pagination Hook
@@ -195,6 +212,23 @@ export default function StudentsPage() {
       withAllergies: students.filter(s => s.allergies).length,
     };
   }, [students]);
+
+  // Delete student handler
+  const handleDeleteStudent = async (student: StudentWithInfo) => {
+    setDeletingId(student.id);
+    try {
+      await deleteStudent(student.parentId, student.id);
+      toast.success(`ลบนักเรียน "${student.nickname || student.name}" เรียบร้อยแล้ว`);
+      // Invalidate all student-related queries
+      await queryClient.invalidateQueries({ queryKey: ['students'] });
+      await queryClient.invalidateQueries({ queryKey: ['parents-with-students-enrollments'] });
+    } catch (error: any) {
+      console.error('Error deleting student:', error);
+      toast.error(error.message || 'ไม่สามารถลบนักเรียนได้');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const calculatedTotalPages = totalPages(filteredStudents.length);
 
@@ -497,11 +531,51 @@ export default function StudentsPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Link href={`/parents/${student.parentId}/students/${student.id}/edit`}>
-                            <Button size="sm" variant="ghost">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </Link>
+                          <div className="flex items-center justify-end gap-1">
+                            <Link href={`/parents/${student.parentId}/students/${student.id}/edit`}>
+                              <Button size="sm" variant="ghost">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            {isSuperAdmin && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>ยืนยันการลบนักเรียน</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      คุณต้องการลบ <strong>{student.nickname || student.name}</strong> ใช่หรือไม่?
+                                      <br /><br />
+                                      <span className="text-red-500">
+                                        หมายเหตุ: ไม่สามารถลบนักเรียนที่มีประวัติการลงทะเบียนเรียนได้
+                                      </span>
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteStudent(student)}
+                                      className="bg-red-500 hover:bg-red-600"
+                                      disabled={deletingId === student.id}
+                                    >
+                                      {deletingId === student.id ? (
+                                        <>
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                          กำลังลบ...
+                                        </>
+                                      ) : (
+                                        'ลบนักเรียน'
+                                      )}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

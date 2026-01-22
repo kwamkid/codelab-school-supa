@@ -45,7 +45,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { formatDate, formatDateCompact, formatCurrency } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -162,9 +162,7 @@ export default function EnrollmentsPage() {
     getPaginatedData,
     totalPages: calculateTotalPages
   } = usePagination(20);
-  
-  const [cursorMap, setCursorMap] = useState<Map<number, QueryDocumentSnapshot>>(new Map());
-  
+
   const isSearchMode = debouncedSearchTerm.length > 0;
   
   // Other states
@@ -193,21 +191,20 @@ export default function EnrollmentsPage() {
   // ============================================
   // 🎯 Query 2: Paginated Enrollments (Normal Mode)
   // ============================================
-  const cursor = currentPage > 1 ? cursorMap.get(currentPage - 1) : undefined;
-  
-  const { 
-    data: paginatedData, 
+  const offset = (currentPage - 1) * pageSize;
+
+  const {
+    data: paginatedData,
     isLoading: loadingEnrollments,
     isFetching: fetchingEnrollments
   } = useQuery<PaginatedEnrollments>({
     queryKey: [
-      'enrollments-paginated', 
-      selectedBranchId, 
-      selectedStatus, 
+      'enrollments-paginated',
+      selectedBranchId,
+      selectedStatus,
       selectedPaymentStatus,
       pageSize,
-      currentPage,
-      cursor?.id
+      currentPage
     ],
     queryFn: async () => {
       return await getEnrollmentsPaginated({
@@ -215,7 +212,7 @@ export default function EnrollmentsPage() {
         status: selectedStatus,
         paymentStatus: selectedPaymentStatus,
         limit: pageSize,
-        startAfterDoc: cursor,
+        offset: offset,
       });
     },
     enabled: !isSearchMode,
@@ -324,49 +321,18 @@ export default function EnrollmentsPage() {
     if (isSearchMode) {
       return calculateTotalPages(enrollmentsToDisplay.length);
     } else {
-      if (stats?.total) {
-        return Math.ceil(stats.total / pageSize);
+      // Use paginatedData.total which is already filtered
+      if (paginatedData?.total !== undefined) {
+        return Math.ceil(paginatedData.total / pageSize);
       }
       return paginatedData?.hasMore ? currentPage + 1 : currentPage;
     }
-  }, [isSearchMode, enrollmentsToDisplay.length, calculateTotalPages, stats?.total, pageSize, paginatedData?.hasMore, currentPage]);
+  }, [isSearchMode, enrollmentsToDisplay.length, calculateTotalPages, paginatedData?.total, pageSize, paginatedData?.hasMore, currentPage]);
 
   // ============================================
-  // 🎯 Auto-save cursor
+  // 🎯 Reset pagination on filter change
   // ============================================
   useEffect(() => {
-    if (!isSearchMode && paginatedData?.lastDoc && paginatedData.hasMore) {
-      setCursorMap(prev => {
-        const newMap = new Map(prev);
-        newMap.set(currentPage, paginatedData.lastDoc);
-        return newMap;
-      });
-    }
-  }, [paginatedData?.lastDoc, paginatedData?.hasMore, currentPage, isSearchMode]);
-
-  // ============================================
-  // 🎯 Pagination Handlers
-  // ============================================
-  const handlePageChangeWithFirestore = (page: number) => {
-    if (!isSearchMode && page < currentPage) {
-      setCursorMap(prev => {
-        const newMap = new Map(prev);
-        for (let i = page; i <= currentPage; i++) {
-          newMap.delete(i);
-        }
-        return newMap;
-      });
-    }
-    handlePageChange(page);
-  };
-
-  const handlePageSizeChangeWithReset = (newSize: number) => {
-    setCursorMap(new Map());
-    handlePageSizeChange(newSize);
-  };
-
-  useEffect(() => {
-    setCursorMap(new Map());
     resetPagination();
   }, [selectedBranchId, selectedStatus, selectedPaymentStatus, debouncedSearchTerm, resetPagination]);
 
@@ -510,57 +476,25 @@ export default function EnrollmentsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Summary Cards - แสดงข้อมูลทันทีที่มี stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ลงทะเบียนทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">กำลังเรียน {stats?.active || 0} คน</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">รายได้รวม</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(stats?.totalRevenue || 0)}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">ชำระแล้ว</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">รอชำระเงิน</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
-              {formatCurrency(stats?.pendingPayments || 0)}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">ค้างชำระ</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">อัตราการคงอยู่</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats?.total && stats.total > 0
-                ? `${((stats.active / stats.total) * 100).toFixed(0)}%`
-                : '0%'
-              }
-            </div>
-            <p className="text-xs text-gray-500 mt-1">นักเรียนที่ยังเรียนอยู่</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Summary Cards */}
+      <Card className="mb-6">
+        <CardContent className="py-4">
+          <div className="flex items-center justify-center gap-2 text-lg">
+            <span>นักเรียนทั้งหมด</span>
+            <span className="font-bold text-2xl">{stats?.total || 0}</span>
+            <span>คน</span>
+            <span className="mx-2 text-gray-300">|</span>
+            <span className="text-green-600">กำลังเรียน</span>
+            <span className="font-bold text-green-600">{stats?.active || 0}</span>
+            <span className="mx-2 text-gray-300">|</span>
+            <span className="text-gray-600">เรียนจบ</span>
+            <span className="font-bold text-gray-600">{stats?.completed || 0}</span>
+            <span className="mx-2 text-gray-300">|</span>
+            <span className="text-red-600">ยกเลิก</span>
+            <span className="font-bold text-red-600">{stats?.dropped || 0}</span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -681,7 +615,9 @@ export default function EnrollmentsPage() {
                             ) : classInfo ? (
                               <div>
                                 <p className="font-medium">{classInfo.name}</p>
-                                <p className="text-sm text-gray-500">{classInfo.code}</p>
+                                <p className="text-sm text-gray-500">
+                                  {formatDateCompact(classInfo.startDate)} - {formatDateCompact(classInfo.endDate)}
+                                </p>
                               </div>
                             ) : (
                               <div>
@@ -716,9 +652,16 @@ export default function EnrollmentsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge className={statusColors[enrollment.status]}>
-                              {statusLabels[enrollment.status]}
-                            </Badge>
+                            <div>
+                              <Badge className={statusColors[enrollment.status]}>
+                                {statusLabels[enrollment.status]}
+                              </Badge>
+                              {enrollment.status === 'dropped' && enrollment.droppedReason && (
+                                <p className="text-xs text-red-500 mt-1">
+                                  {enrollment.droppedReason}
+                                </p>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
@@ -844,9 +787,9 @@ export default function EnrollmentsPage() {
                   currentPage={currentPage}
                   totalPages={totalPages}
                   pageSize={pageSize}
-                  totalItems={isSearchMode ? enrollmentsToDisplay.length : stats?.total || 0}
-                  onPageChange={handlePageChangeWithFirestore}
-                  onPageSizeChange={handlePageSizeChangeWithReset}
+                  totalItems={isSearchMode ? enrollmentsToDisplay.length : paginatedData?.total || 0}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
                   pageSizeOptions={[10, 20, 50, 100]}
                   showFirstLastButtons={false}
                 />

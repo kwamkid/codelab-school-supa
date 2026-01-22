@@ -1,23 +1,23 @@
 'use client';
 
 import { useEffect, useState, useMemo, Fragment } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Parent, Student, Enrollment } from '@/types/models';
-import { getParentsWithStudentsAndEnrollments } from '@/lib/services/parents';
+import { getParentsWithStudentsAndEnrollments, deleteParent, deleteStudent } from '@/lib/services/parents';
 import { getActiveBranches } from '@/lib/services/branches';
 import { getClasses } from '@/lib/services/classes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pagination, usePagination } from '@/components/ui/pagination';
-import { 
-  Plus, 
-  Search, 
-  Users, 
-  Phone, 
-  Mail, 
-  Eye, 
-  Edit, 
+import {
+  Plus,
+  Search,
+  Users,
+  Phone,
+  Mail,
+  Eye,
+  Edit,
   Building2,
   ChevronDown,
   ChevronUp,
@@ -25,7 +25,9 @@ import {
   Cake,
   School,
   GraduationCap,
-  Globe
+  Globe,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
@@ -45,9 +47,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, calculateAge } from '@/lib/utils';
-import { PermissionGuard } from '@/components/auth/permission-guard';
+import { PermissionGuard, usePermissions } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface StudentEnrollment {
   id: string;
@@ -80,10 +94,14 @@ const BadgeSkeleton = () => (
 );
 
 export default function ParentsPage() {
+  const { isSuperAdmin } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterBranch, setFilterBranch] = useState<string>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [deletingParentId, setDeletingParentId] = useState<string | null>(null);
+  const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // ============================================
   // 🎯 Pagination Hook
@@ -256,6 +274,37 @@ export default function ParentsPage() {
       newExpanded.add(parentId);
     }
     setExpandedRows(newExpanded);
+  };
+
+  // Delete parent handler
+  const handleDeleteParent = async (parent: ParentWithStudents) => {
+    setDeletingParentId(parent.id);
+    try {
+      await deleteParent(parent.id);
+      toast.success(`ลบผู้ปกครอง "${parent.displayName}" เรียบร้อยแล้ว`);
+      queryClient.invalidateQueries({ queryKey: ['parents-with-students-enrollments'] });
+    } catch (error: any) {
+      console.error('Error deleting parent:', error);
+      toast.error(error.message || 'ไม่สามารถลบผู้ปกครองได้');
+    } finally {
+      setDeletingParentId(null);
+    }
+  };
+
+  // Delete student handler
+  const handleDeleteStudent = async (parentId: string, student: StudentWithEnrollment) => {
+    setDeletingStudentId(student.id);
+    try {
+      await deleteStudent(parentId, student.id);
+      toast.success(`ลบนักเรียน "${student.nickname || student.name}" เรียบร้อยแล้ว`);
+      queryClient.invalidateQueries({ queryKey: ['parents-with-students-enrollments'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    } catch (error: any) {
+      console.error('Error deleting student:', error);
+      toast.error(error.message || 'ไม่สามารถลบนักเรียนได้');
+    } finally {
+      setDeletingStudentId(null);
+    }
   };
 
   // ============================================
@@ -502,7 +551,7 @@ export default function ParentsPage() {
                   <TableBody>
                     {paginatedParents.map((parent) => (
                       <Fragment key={parent.id}>
-                        <TableRow className="cursor-pointer hover:bg-gray-50" onClick={() => toggleRow(parent.id)}>
+                        <TableRow className="cursor-pointer hover:bg-gray-50 h-16" onClick={() => toggleRow(parent.id)}>
                           <TableCell>
                             <Button variant="ghost" size="sm" className="p-0 h-6 w-6">
                               {expandedRows.has(parent.id) ? 
@@ -632,6 +681,49 @@ export default function ParentsPage() {
                                   </Button>
                                 </Link>
                               </PermissionGuard>
+                              {isSuperAdmin && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>ยืนยันการลบผู้ปกครอง</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        คุณต้องการลบ <strong>{parent.displayName}</strong> ใช่หรือไม่?
+                                        <br /><br />
+                                        <span className="text-red-500">
+                                          หมายเหตุ: ต้องลบข้อมูลนักเรียนทั้งหมดก่อนจึงจะลบผู้ปกครองได้
+                                        </span>
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteParent(parent)}
+                                        className="bg-red-500 hover:bg-red-600"
+                                        disabled={deletingParentId === parent.id}
+                                      >
+                                        {deletingParentId === parent.id ? (
+                                          <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            กำลังลบ...
+                                          </>
+                                        ) : (
+                                          'ลบผู้ปกครอง'
+                                        )}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -738,6 +830,48 @@ export default function ParentsPage() {
                                             <Edit className="h-4 w-4" />
                                           </Button>
                                         </Link>
+                                        {isSuperAdmin && (
+                                          <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                              <AlertDialogHeader>
+                                                <AlertDialogTitle>ยืนยันการลบนักเรียน</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                  คุณต้องการลบ <strong>{student.nickname || student.name}</strong> ใช่หรือไม่?
+                                                  <br /><br />
+                                                  <span className="text-red-500">
+                                                    หมายเหตุ: ไม่สามารถลบนักเรียนที่มีประวัติการลงทะเบียนเรียนได้
+                                                  </span>
+                                                </AlertDialogDescription>
+                                              </AlertDialogHeader>
+                                              <AlertDialogFooter>
+                                                <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                  onClick={() => handleDeleteStudent(parent.id, student)}
+                                                  className="bg-red-500 hover:bg-red-600"
+                                                  disabled={deletingStudentId === student.id}
+                                                >
+                                                  {deletingStudentId === student.id ? (
+                                                    <>
+                                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                      กำลังลบ...
+                                                    </>
+                                                  ) : (
+                                                    'ลบนักเรียน'
+                                                  )}
+                                                </AlertDialogAction>
+                                              </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                          </AlertDialog>
+                                        )}
                                       </div>
                                     </div>
                                   ))}

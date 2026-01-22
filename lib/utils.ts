@@ -157,6 +157,47 @@ export function getShortDayNameEN(dayIndex: number): string {
   return days[dayIndex] || '';
 }
 
+// Format date as DD/MM/YY (Buddhist year) e.g., "29/11/68"
+export function formatDateCompact(date: any): string {
+  if (!date) {
+    return '-';
+  }
+
+  let d: Date;
+
+  try {
+    if (date instanceof Date) {
+      d = date;
+    } else if (typeof date === 'string' || typeof date === 'number') {
+      d = new Date(date);
+    } else if (date && typeof date === 'object') {
+      if (date.toDate && typeof date.toDate === 'function') {
+        d = date.toDate();
+      } else if (date.seconds) {
+        d = new Date(date.seconds * 1000);
+      } else {
+        return '-';
+      }
+    } else {
+      return '-';
+    }
+
+    if (!d || isNaN(d.getTime())) {
+      return '-';
+    }
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = String(d.getFullYear() + 543).slice(-2); // Buddhist year, last 2 digits
+
+    return `${day}/${month}/${year}`;
+
+  } catch (error) {
+    console.error('Error formatting compact date:', error);
+    return '-';
+  }
+}
+
 // Format date with short English day (e.g., "SAT 25/10/68")
 export function formatDateShort(date: any): string {
   if (!date) {

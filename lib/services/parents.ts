@@ -225,12 +225,33 @@ export async function deleteParent(parentId: string): Promise<void> {
     }
 
     const supabase = getClient();
-    const { error } = await supabase
+
+    console.log('Attempting to delete parent:', parentId);
+
+    const { error, count } = await supabase
       .from(TABLE_NAME)
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', parentId);
 
-    if (error) throw error;
+    console.log('Delete result - error:', error, 'count:', count);
+
+    if (error) {
+      throw new Error(`ไม่สามารถลบได้: ${error.message}`);
+    }
+
+    // Check if actually deleted
+    if (count === 0 || count === null) {
+      // Double check by trying to select the parent again
+      const { data: stillExists } = await supabase
+        .from(TABLE_NAME)
+        .select('id')
+        .eq('id', parentId)
+        .single();
+
+      if (stillExists) {
+        throw new Error('ไม่สามารถลบได้ - คุณต้องเป็น Super Admin และต้อง run migration 005_fix_delete_policies.sql ใน Supabase');
+      }
+    }
 
     console.log('Parent deleted successfully:', parentId);
   } catch (error) {
@@ -405,15 +426,48 @@ export async function deleteStudent(
     }
 
     const supabase = getClient();
-    const { error } = await supabase
+
+    // First check if student exists
+    const { data: existing, error: checkError } = await supabase
       .from('students')
-      .delete()
+      .select('id, name')
       .eq('id', studentId)
-      .eq('parent_id', parentId);
+      .single();
 
-    if (error) throw error;
+    if (checkError || !existing) {
+      throw new Error('ไม่พบข้อมูลนักเรียน');
+    }
 
-    console.log('Student deleted successfully:', studentId);
+    console.log('Attempting to delete student:', studentId, existing.name);
+
+    // Delete the student
+    const { error, count } = await supabase
+      .from('students')
+      .delete({ count: 'exact' })
+      .eq('id', studentId);
+
+    console.log('Delete result - error:', error, 'count:', count);
+
+    if (error) {
+      console.error('Supabase delete error:', error);
+      throw new Error(`ไม่สามารถลบได้: ${error.message}`);
+    }
+
+    // Check if actually deleted
+    if (count === 0 || count === null) {
+      // Double check by trying to select the student again
+      const { data: stillExists } = await supabase
+        .from('students')
+        .select('id')
+        .eq('id', studentId)
+        .single();
+
+      if (stillExists) {
+        throw new Error('ไม่สามารถลบได้ - คุณต้องเป็น Super Admin และต้อง run migration 005_fix_delete_policies.sql ใน Supabase');
+      }
+    }
+
+    console.log('Student deleted successfully:', studentId, 'count:', count);
   } catch (error) {
     console.error('Error deleting student:', error);
     throw error;
