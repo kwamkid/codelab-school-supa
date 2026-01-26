@@ -1,4 +1,5 @@
 // app/api/liff/trial-booking/route.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -77,24 +78,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'ไม่พบข้อมูลสาขาที่เลือก' }, { status: 400 })
     }
 
-    if (!branch.is_active) {
+    const branchData = branch as { id: string; is_active: boolean }
+    if (!branchData.is_active) {
       return NextResponse.json({ error: 'สาขาที่เลือกไม่เปิดให้บริการ' }, { status: 400 })
     }
 
-    // Create booking data
+    // Create booking data (without students - they go in a separate table)
     const bookingData = {
       source: body.source || 'online',
-      has_line_login: false,
       parent_name: body.parentName.trim(),
       parent_phone: cleanPhone,
       parent_email: body.parentEmail?.trim() || null,
       branch_id: body.branchId,
-      students: body.students.map(s => ({
-        name: s.name.trim(),
-        school_name: s.schoolName?.trim() || null,
-        grade_level: s.gradeLevel || null,
-        subject_interests: s.subjectInterests || []
-      })),
       status: 'new',
       contact_note: body.contactNote?.trim() || null
     }
@@ -102,23 +97,50 @@ export async function POST(request: NextRequest) {
     console.log('Creating booking with data:', bookingData)
 
     // Create booking
-    const { data: result, error: insertError } = await supabase
+    const { data: booking, error: insertError } = await supabase
       .from('trial_bookings')
-      .insert(bookingData)
+      .insert(bookingData as any)
       .select('id')
       .single()
 
-    if (insertError) {
+    if (insertError || !booking) {
       console.error('Error creating booking:', insertError)
-      throw insertError
+      throw insertError || new Error('Failed to create booking')
     }
 
-    console.log('Booking created successfully:', result.id)
+    const bookingId = (booking as any).id
+    console.log('Booking created successfully:', bookingId)
+
+    // Create student records in separate table
+    if (body.students && body.students.length > 0) {
+      const studentsData = body.students.map(s => ({
+        booking_id: bookingId,
+        name: s.name.trim(),
+        school_name: s.schoolName?.trim() || null,
+        grade_level: s.gradeLevel || null,
+        subject_interests: s.subjectInterests || []
+      }))
+
+      console.log('Creating students with data:', studentsData)
+
+      const { error: studentsError } = await supabase
+        .from('trial_booking_students')
+        .insert(studentsData as any)
+
+      if (studentsError) {
+        console.error('Error creating students:', studentsError)
+        // Rollback: delete the booking if students failed
+        await supabase.from('trial_bookings').delete().eq('id', bookingId)
+        throw studentsError
+      }
+
+      console.log('Students created successfully')
+    }
 
     // Return success response
     return NextResponse.json({
       success: true,
-      bookingId: result.id,
+      bookingId: bookingId,
       message: 'บันทึกการจองทดลองเรียนสำเร็จ'
     })
   } catch (error: any) {

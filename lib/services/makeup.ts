@@ -659,69 +659,25 @@ export async function revertMakeupToScheduled(
   }
 }
 
-// Delete makeup class
+// Delete makeup class - Uses API route to bypass RLS restrictions
 export async function deleteMakeupClass(
   makeupId: string,
   deletedBy: string,
   reason?: string
 ): Promise<void> {
   try {
-    const makeup = await getMakeupClass(makeupId);
-    if (!makeup) {
-      throw new Error('Makeup class not found');
-    }
+    const response = await fetch(`/api/admin/makeup/${makeupId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ deletedBy, reason }),
+    });
 
-    if (makeup.status === 'completed') {
-      throw new Error('Cannot delete completed makeup class');
-    }
+    const result = await response.json();
 
-    const supabase = getClient();
-
-    // Delete makeup class
-    const { error: deleteError } = await supabase
-      .from('makeup_classes')
-      .delete()
-      .eq('id', makeupId);
-
-    if (deleteError) throw deleteError;
-
-    // Update original schedule attendance
-    if (makeup.originalScheduleId && makeup.originalClassId) {
-      const scheduleData = await getClassSchedule(makeup.originalClassId, makeup.originalScheduleId);
-      if (scheduleData && scheduleData.attendance) {
-        const updatedAttendance = scheduleData.attendance.filter(
-          a => a.studentId !== makeup.studentId
-        );
-
-        await updateClassSchedule(makeup.originalClassId, makeup.originalScheduleId, {
-          attendance: updatedAttendance
-        });
-      }
-    }
-
-    // Create deletion log
-    const { error: logError } = await supabase
-      .from('deletion_logs')
-      .insert({
-        type: 'makeup_class',
-        document_id: makeupId,
-        deleted_by: deletedBy,
-        deleted_at: new Date().toISOString(),
-        reason: reason || 'No reason provided',
-        original_data: {
-          studentId: makeup.studentId,
-          studentName: makeup.studentName,
-          classId: makeup.originalClassId,
-          className: makeup.className,
-          scheduleId: makeup.originalScheduleId,
-          status: makeup.status,
-          requestDate: makeup.requestDate
-        }
-      });
-
-    if (logError) {
-      console.error('Error creating deletion log:', logError);
-      // Don't throw, just log the error
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete makeup class');
     }
   } catch (error) {
     console.error('Error deleting makeup class:', error);

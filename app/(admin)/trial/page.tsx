@@ -251,10 +251,13 @@ export default function TrialBookingsPage() {
     try {
       await deleteTrialBooking(bookingToDelete.id);
       toast.success('ลบข้อมูลการจองเรียบร้อย');
-      
+
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialBookings(selectedBranchId) });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialStats(selectedBranchId) });
+
+      // Dispatch event to update sidebar badge
+      window.dispatchEvent(new CustomEvent('trial-booking-changed'));
     } catch (error) {
       console.error('Error deleting booking:', error);
       toast.error('ไม่สามารถลบข้อมูลได้');
@@ -272,14 +275,17 @@ export default function TrialBookingsPage() {
 
   const handleCancelConfirm = async (reason: string) => {
     if (!bookingToCancel) return;
-    
+
     try {
       await cancelTrialBooking(bookingToCancel.id, reason);
       toast.success('ยกเลิกการจองเรียบร้อย');
-      
+
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialBookings(selectedBranchId) });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialStats(selectedBranchId) });
+
+      // Dispatch event to update sidebar badge
+      window.dispatchEvent(new CustomEvent('trial-booking-changed'));
     } catch (error) {
       console.error('Error cancelling booking:', error);
       toast.error('ไม่สามารถยกเลิกการจองได้');

@@ -858,32 +858,20 @@ export async function getEnrollmentTransferHistory(
 }
 
 // ============================================
-// Delete enrollment completely
+// Delete enrollment completely - Uses API route to bypass RLS restrictions
 // ============================================
 export async function deleteEnrollment(
   enrollmentId: string
 ): Promise<void> {
   try {
-    const enrollment = await getEnrollment(enrollmentId);
-    if (!enrollment) throw new Error('Enrollment not found');
+    const response = await fetch(`/api/admin/enrollments/${enrollmentId}`, {
+      method: 'DELETE',
+    });
 
-    const supabase = getClient();
+    const result = await response.json();
 
-    // Delete enrollment
-    const { error: enrollmentError } = await supabase
-      .from(TABLE_NAME)
-      .delete()
-      .eq('id', enrollmentId);
-
-    if (enrollmentError) throw enrollmentError;
-
-    // Decrement class count
-    const classData = await getClass(enrollment.classId);
-    if (classData) {
-      await supabase
-        .from('classes')
-        .update({ enrolled_count: Math.max(0, classData.enrolledCount - 1) })
-        .eq('id', enrollment.classId);
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete enrollment');
     }
   } catch (error) {
     console.error('Error deleting enrollment:', error);

@@ -215,42 +215,17 @@ export async function updateParent(id: string, parentData: Partial<Parent>): Pro
   }
 }
 
-// Delete parent
+// Delete parent - Uses API route to bypass RLS restrictions
 export async function deleteParent(parentId: string): Promise<void> {
   try {
-    const students = await getStudentsByParent(parentId);
+    const response = await fetch(`/api/admin/parents/${parentId}`, {
+      method: 'DELETE',
+    });
 
-    if (students.length > 0) {
-      throw new Error('ไม่สามารถลบผู้ปกครองที่ยังมีข้อมูลนักเรียนได้ กรุณาลบข้อมูลนักเรียนทั้งหมดก่อน');
-    }
+    const result = await response.json();
 
-    const supabase = getClient();
-
-    console.log('Attempting to delete parent:', parentId);
-
-    const { error, count } = await supabase
-      .from(TABLE_NAME)
-      .delete({ count: 'exact' })
-      .eq('id', parentId);
-
-    console.log('Delete result - error:', error, 'count:', count);
-
-    if (error) {
-      throw new Error(`ไม่สามารถลบได้: ${error.message}`);
-    }
-
-    // Check if actually deleted
-    if (count === 0 || count === null) {
-      // Double check by trying to select the parent again
-      const { data: stillExists } = await supabase
-        .from(TABLE_NAME)
-        .select('id')
-        .eq('id', parentId)
-        .single();
-
-      if (stillExists) {
-        throw new Error('ไม่สามารถลบได้ - คุณต้องเป็น Super Admin และต้อง run migration 005_fix_delete_policies.sql ใน Supabase');
-      }
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete parent');
     }
 
     console.log('Parent deleted successfully:', parentId);
@@ -412,62 +387,23 @@ export async function updateStudent(
   }
 }
 
-// Delete student
+// Delete student - Uses API route to bypass RLS restrictions
 export async function deleteStudent(
   parentId: string,
   studentId: string
 ): Promise<void> {
   try {
-    const { getEnrollmentsByStudent } = await import('./enrollments');
-    const enrollments = await getEnrollmentsByStudent(studentId);
+    const response = await fetch(`/api/admin/students/${studentId}`, {
+      method: 'DELETE',
+    });
 
-    if (enrollments.length > 0) {
-      throw new Error('ไม่สามารถลบนักเรียนที่มีประวัติการลงทะเบียนเรียนได้');
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete student');
     }
 
-    const supabase = getClient();
-
-    // First check if student exists
-    const { data: existing, error: checkError } = await supabase
-      .from('students')
-      .select('id, name')
-      .eq('id', studentId)
-      .single();
-
-    if (checkError || !existing) {
-      throw new Error('ไม่พบข้อมูลนักเรียน');
-    }
-
-    console.log('Attempting to delete student:', studentId, existing.name);
-
-    // Delete the student
-    const { error, count } = await supabase
-      .from('students')
-      .delete({ count: 'exact' })
-      .eq('id', studentId);
-
-    console.log('Delete result - error:', error, 'count:', count);
-
-    if (error) {
-      console.error('Supabase delete error:', error);
-      throw new Error(`ไม่สามารถลบได้: ${error.message}`);
-    }
-
-    // Check if actually deleted
-    if (count === 0 || count === null) {
-      // Double check by trying to select the student again
-      const { data: stillExists } = await supabase
-        .from('students')
-        .select('id')
-        .eq('id', studentId)
-        .single();
-
-      if (stillExists) {
-        throw new Error('ไม่สามารถลบได้ - คุณต้องเป็น Super Admin และต้อง run migration 005_fix_delete_policies.sql ใน Supabase');
-      }
-    }
-
-    console.log('Student deleted successfully:', studentId, 'count:', count);
+    console.log('Student deleted successfully:', studentId);
   } catch (error) {
     console.error('Error deleting student:', error);
     throw error;

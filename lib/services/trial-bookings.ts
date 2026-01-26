@@ -1078,36 +1078,18 @@ export async function convertTrialToEnrollment(
 }
 
 // Delete trial booking (only for new or cancelled bookings)
+// Uses API route to bypass RLS restrictions
 export async function deleteTrialBooking(id: string): Promise<void> {
   try {
-    const supabase = getClient();
+    const response = await fetch(`/api/admin/trial-booking/${id}`, {
+      method: 'DELETE',
+    });
 
-    // Get booking to check status
-    const booking = await getTrialBooking(id);
-    if (!booking) {
-      throw new Error('Booking not found');
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete booking');
     }
-
-    // Only allow deletion for new or cancelled bookings
-    if (booking.status !== 'new' && booking.status !== 'cancelled') {
-      throw new Error('Can only delete new or cancelled bookings');
-    }
-
-    // Delete all associated trial sessions first (cascade will handle students)
-    const { error: sessionsError } = await supabase
-      .from('trial_sessions')
-      .delete()
-      .eq('booking_id', id);
-
-    if (sessionsError) throw sessionsError;
-
-    // Delete the booking (cascade will handle trial_booking_students)
-    const { error: bookingError } = await supabase
-      .from('trial_bookings')
-      .delete()
-      .eq('id', id);
-
-    if (bookingError) throw bookingError;
   } catch (error) {
     console.error('Error deleting trial booking:', error);
     throw error;

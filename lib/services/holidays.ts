@@ -198,16 +198,18 @@ export async function updateHoliday(
   }
 }
 
-// Delete holiday
+// Delete holiday - Uses API route to bypass RLS restrictions
 export async function deleteHoliday(id: string): Promise<void> {
   try {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .delete()
-      .eq('id', id);
+    const response = await fetch(`/api/admin/holidays/${id}`, {
+      method: 'DELETE',
+    });
 
-    if (error) throw error;
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete holiday');
+    }
   } catch (error) {
     console.error('Error deleting holiday:', error);
     throw error;

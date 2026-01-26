@@ -313,40 +313,17 @@ export async function updateTeacher(id: string, teacherData: Partial<Teacher>): 
   }
 }
 
-// Delete teacher (soft delete) - ปิดการใช้งานทั้ง 2 tables
+// Delete teacher (soft delete) - Uses API route to bypass RLS restrictions
 export async function deleteTeacher(id: string): Promise<void> {
   try {
-    const supabase = getClient();
+    const response = await fetch(`/api/admin/teachers/${id}`, {
+      method: 'DELETE',
+    });
 
-    // 1. Soft delete teacher
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update({
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
+    const result = await response.json();
 
-    if (error) throw error;
-
-    // 2. Soft delete adminUser
-    try {
-      const { error: adminError } = await supabase
-        .from('admin_users')
-        .update({
-          is_active: false,
-          updated_at: new Date().toISOString(),
-          updated_by: 'system',
-        })
-        .eq('id', id);
-
-      if (adminError) {
-        console.error('Error deleting admin user:', adminError);
-        // Don't throw - teacher delete succeeded
-      }
-    } catch (adminError) {
-      console.error('Error deleting admin user for teacher:', adminError);
-      // Don't throw - teacher delete succeeded
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete teacher');
     }
   } catch (error) {
     console.error('Error deleting teacher:', error);

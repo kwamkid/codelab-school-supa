@@ -323,32 +323,18 @@ export async function updateClass(
   }
 }
 
-// Delete class
+// Delete class - Uses API route to bypass RLS restrictions
 export async function deleteClass(id: string): Promise<void> {
   try {
-    const supabase = getClient();
+    const response = await fetch(`/api/admin/classes/${id}`, {
+      method: 'DELETE',
+    });
 
-    // Check if there are enrolled students
-    const classDoc = await getClass(id);
-    if (classDoc && classDoc.enrolledCount > 0) {
-      throw new Error('Cannot delete class with enrolled students');
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete class');
     }
-
-    // Delete schedules first
-    const { error: scheduleError } = await supabase
-      .from('class_schedules')
-      .delete()
-      .eq('class_id', id);
-
-    if (scheduleError) throw scheduleError;
-
-    // Delete the class
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
   } catch (error) {
     console.error('Error deleting class:', error);
     throw error;

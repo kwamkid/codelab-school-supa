@@ -249,6 +249,9 @@ export default function MakeupPage() {
       setShowDeleteDialog(false);
 
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.makeupClasses(selectedBranchId) });
+
+      // Dispatch event to update sidebar badge
+      window.dispatchEvent(new CustomEvent('makeup-changed'));
     } catch (error: any) {
       console.error('Error deleting makeup:', error);
       if (error.message === 'Cannot delete completed makeup class') {
@@ -691,6 +694,8 @@ export default function MakeupPage() {
           onSuccess={async () => {
             setShowScheduleDialog(false);
             await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.makeupClasses(selectedBranchId) });
+            // Dispatch event to update sidebar badge
+            window.dispatchEvent(new CustomEvent('makeup-changed'));
           }}
         />
       )}
@@ -702,6 +707,8 @@ export default function MakeupPage() {
         onCreated={async () => {
           setShowCreateDialog(false);
           await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.makeupClasses(selectedBranchId) });
+          // Dispatch event to update sidebar badge
+          window.dispatchEvent(new CustomEvent('makeup-changed'));
           toast.success('สร้าง Makeup Request เรียบร้อยแล้ว');
         }}
       />

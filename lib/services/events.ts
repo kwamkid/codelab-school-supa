@@ -310,23 +310,18 @@ export async function updateEvent(
   }
 }
 
-// Delete event
+// Delete event - Uses API route to bypass RLS restrictions
 export async function deleteEvent(id: string): Promise<void> {
   try {
-    // Check if event has registrations
-    const registrations = await getEventRegistrations(id);
-    if (registrations.length > 0) {
-      throw new Error('ไม่สามารถลบ Event ที่มีผู้ลงทะเบียนแล้วได้');
+    const response = await fetch(`/api/admin/events/${id}`, {
+      method: 'DELETE',
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete event');
     }
-
-    // Delete event (schedules will be cascade deleted due to ON DELETE CASCADE)
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('events')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
   } catch (error) {
     console.error('Error deleting event:', error);
     throw error;

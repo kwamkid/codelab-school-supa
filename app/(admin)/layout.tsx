@@ -205,7 +205,17 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       loadMakeupCount();
       // Refresh ทุก 30 วินาที
       const interval = setInterval(loadMakeupCount, 30000);
-      return () => clearInterval(interval);
+
+      // Listen for makeup changes from other components
+      const handleMakeupChange = () => {
+        loadMakeupCount();
+      };
+      window.addEventListener('makeup-changed', handleMakeupChange);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('makeup-changed', handleMakeupChange);
+      };
     }
   }, [user, selectedBranchId]); // เพิ่ม selectedBranchId ใน dependency
 
@@ -215,7 +225,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       try {
         // ดึงข้อมูล trial bookings (กรองตาม selectedBranchId)
         const bookings = await getTrialBookings(selectedBranchId);
-        
+
         // นับเฉพาะที่มีสถานะ 'new' (รอติดต่อ)
         const newBookings = bookings.filter(b => b.status === 'new').length;
         setNewTrialCount(newBookings);
@@ -223,11 +233,21 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         console.error('Error loading trial count:', error);
       }
     };
-    
+
     if (user) {
       loadTrialCount();
       const interval = setInterval(loadTrialCount, 30000);
-      return () => clearInterval(interval);
+
+      // Listen for trial booking changes from other components
+      const handleTrialChange = () => {
+        loadTrialCount();
+      };
+      window.addEventListener('trial-booking-changed', handleTrialChange);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('trial-booking-changed', handleTrialChange);
+      };
     }
   }, [user, selectedBranchId]);
 
