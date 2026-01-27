@@ -16,7 +16,7 @@ export default function NewClassPage() {
       </div>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">สร้างคลาสใหม่</h1>
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">สร้างคลาสใหม่</h1>
         <p className="text-gray-600 mt-2">กรอกข้อมูลเพื่อสร้างคลาสเรียนใหม่</p>
       </div>
 

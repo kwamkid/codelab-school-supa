@@ -289,7 +289,7 @@ export default function ClassesPage() {
         </div>
 
         {/* Stats Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[...Array(5)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
@@ -329,15 +329,15 @@ export default function ClassesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            จัดการคลาสเรียน
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">
+            คลาสเรียน
             {!isAllBranches && (
-              <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>
+              <span className="text-red-600 text-base sm:text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>
             )}
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-sm text-gray-600 mt-1">
             จัดการตารางเรียนและคลาสทั้งหมด
             {(loadingSubjects || loadingTeachers || loadingBranches) && (
               <span className="text-orange-500 ml-2">(กำลังโหลดข้อมูลเพิ่มเติม...)</span>
@@ -348,25 +348,18 @@ export default function ClassesPage() {
           {isSuperAdmin() && (
             <Button
               variant="outline"
+              size="icon"
               onClick={handleUpdateClassStatuses}
               disabled={updatingStatus}
+              title="อัปเดตสถานะคลาส"
+              className="h-9 w-9"
             >
-              {updatingStatus ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  กำลังอัปเดต...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  อัปเดตสถานะ
-                </>
-              )}
+              <RefreshCw className={`h-4 w-4 ${updatingStatus ? 'animate-spin' : ''}`} />
             </Button>
           )}
           <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
             <Link href="/classes/new">
-              <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
+              <ActionButton action="create" size="sm" className="bg-red-500 hover:bg-red-600">
                 <Plus className="h-4 w-4 mr-2" />
                 สร้างคลาสใหม่
               </ActionButton>
@@ -403,7 +396,7 @@ export default function ClassesPage() {
       )}
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">คลาสทั้งหมด</CardTitle>

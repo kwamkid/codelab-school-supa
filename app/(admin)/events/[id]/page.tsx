@@ -177,7 +177,7 @@ export default function EventDetailPage() {
       <div className="flex justify-between items-start mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-gray-900">{event.name}</h1>
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900">{event.name}</h1>
             <Badge className={getStatusColor(event.status)}>
               {getStatusText(event.status)}
             </Badge>
@@ -215,7 +215,7 @@ export default function EventDetailPage() {
       </div>
 
       {/* Quick Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">

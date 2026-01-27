@@ -115,7 +115,7 @@ export default function DataCleaningPage() {
           <Skeleton className="h-4 w-96" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[...Array(5)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
@@ -135,7 +135,7 @@ export default function DataCleaningPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
           <Database className="h-8 w-8 text-orange-500" />
           Data Cleaning
         </h1>
@@ -145,7 +145,7 @@ export default function DataCleaningPage() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">

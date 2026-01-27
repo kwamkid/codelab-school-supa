@@ -366,7 +366,7 @@ export default function AttendanceCheckPage() {
           ← กลับ
         </Button>
         
-        <h1 className="text-3xl font-bold tracking-tight">เช็คชื่อ - {classData.name}</h1>
+        <h1 className="text-xl sm:text-3xl font-bold tracking-tight">เช็คชื่อ - {classData.name}</h1>
         <div className="flex items-center gap-4 text-muted-foreground mt-2">
           <div className="flex items-center gap-1">
             <Calendar className="h-4 w-4" />

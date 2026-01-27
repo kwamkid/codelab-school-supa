@@ -101,7 +101,7 @@ export default function TestCronPage() {
     <div className="space-y-6 max-w-6xl mx-auto p-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
           <Clock className="w-8 h-8" />
           ทดสอบ Cron Jobs
         </h1>

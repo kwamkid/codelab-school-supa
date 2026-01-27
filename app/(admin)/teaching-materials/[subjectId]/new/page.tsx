@@ -50,7 +50,7 @@ export default function NewTeachingMaterialPage() {
             กลับ
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold">เพิ่มบทเรียนใหม่</h1>
+        <h1 className="text-xl sm:text-3xl font-bold">เพิ่มบทเรียนใหม่</h1>
         <p className="text-gray-600 mt-1">
           วิชา: {subject?.name || 'ไม่ระบุ'}
         </p>

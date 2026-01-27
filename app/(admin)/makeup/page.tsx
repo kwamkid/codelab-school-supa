@@ -276,7 +276,7 @@ export default function MakeupPage() {
           <Skeleton className="h-10 w-40" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           {[...Array(6)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
@@ -309,11 +309,11 @@ export default function MakeupPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            จัดการการลา และชดเชย
-            {!isAllBranches && <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>}
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">
+            การลา และชดเชย
+            {/* {!isAllBranches && <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>} */}
           </h1>
-          <p className="text-gray-600 mt-2">จัดการการลา และการเรียนชดเชย Makeup Class</p>
+          <p className="text-gray-600 mt-2">การลา เรียนชดเชย Makeup Class</p>
         </div>
         <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
           <Button
@@ -321,7 +321,7 @@ export default function MakeupPage() {
             className="bg-red-500 hover:bg-red-600"
           >
             <Plus className="h-4 w-4 mr-2" />
-            สร้าง Makeup Request
+            สร้าง Makeup
           </Button>
         </PermissionGuard>
       </div>
@@ -339,7 +339,7 @@ export default function MakeupPage() {
       )}
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>

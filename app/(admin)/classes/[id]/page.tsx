@@ -261,7 +261,7 @@ export default function ClassDetailPage() {
       <div className="mb-8">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
               <div 
                 className="w-4 h-4 rounded-full" 
                 style={{ backgroundColor: subject.color }}
@@ -285,7 +285,7 @@ export default function ClassDetailPage() {
               <CardTitle>ข้อมูลทั่วไป</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">วิชา</p>
                   <p className="font-medium">{subject.name}</p>
@@ -354,7 +354,7 @@ export default function ClassDetailPage() {
               <CardTitle>ตารางเรียน</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">วันที่เรียน</p>
                   <p className="font-medium">

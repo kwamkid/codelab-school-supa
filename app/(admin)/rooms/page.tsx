@@ -191,7 +191,7 @@ export default function RoomsPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">
             จัดการห้องเรียน
             {!isAllBranches && (
               <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>

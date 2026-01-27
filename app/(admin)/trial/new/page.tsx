@@ -251,7 +251,7 @@ export default function CreateTrialBookingPage() {
           กลับ
         </Button>
         
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
           <TestTube className="h-8 w-8 text-red-500" />
           เพิ่มการจองทดลองเรียน (Walk-in)
         </h1>
@@ -297,7 +297,7 @@ export default function CreateTrialBookingPage() {
             <CardDescription>กรอกข้อมูลติดต่อผู้ปกครอง</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="parentName">
                   ชื่อผู้ปกครอง <span className="text-red-500">*</span>
@@ -388,7 +388,7 @@ export default function CreateTrialBookingPage() {
                   นักเรียนคนที่ {idx + 1}
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>
                       ชื่อนักเรียน <span className="text-red-500">*</span>

@@ -164,7 +164,7 @@ export default function NotificationLogsPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
           <Bell className="w-8 h-8" />
           Notification Logs
         </h1>
@@ -175,7 +175,7 @@ export default function NotificationLogsPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
@@ -220,7 +220,7 @@ export default function NotificationLogsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium">ประเภท</Label>
               <Select value={filters.type || 'all'} onValueChange={(v) => handleFilterChange('type', v)}>

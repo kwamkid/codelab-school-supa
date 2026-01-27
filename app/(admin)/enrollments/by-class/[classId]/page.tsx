@@ -180,12 +180,12 @@ export default function EnrollmentsByClassPage() {
 
       {/* Class Info */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">{classData.name}</h1>
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">{classData.name}</h1>
         <p className="text-gray-600 mt-2">รหัสคลาส: {classData.code}</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">นักเรียนทั้งหมด</CardTitle>

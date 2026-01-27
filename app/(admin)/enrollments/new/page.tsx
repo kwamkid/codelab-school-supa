@@ -22,7 +22,7 @@ export default function NewEnrollmentPage() {
       </div>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">
           ลงทะเบียนเรียน
           {!isAllBranches && <span className="text-red-600 text-lg ml-2">(สาขาที่เลือก)</span>}
         </h1>

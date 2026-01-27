@@ -271,7 +271,7 @@ export default function EnrollmentReportPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
           <UserPlus className="w-8 h-8" />
           รายงานการสมัครเรียน (Enrollment)
         </h1>
@@ -289,7 +289,7 @@ export default function EnrollmentReportPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Date Preset */}
             <div className="space-y-2">
               <Label>ช่วงเวลา</Label>
@@ -340,7 +340,7 @@ export default function EnrollmentReportPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -349,7 +349,7 @@ export default function EnrollmentReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats.total}</div>
+              <div className="text-xl sm:text-3xl font-bold">{stats.total}</div>
               <p className="text-xs text-muted-foreground mt-1">คน</p>
             </CardContent>
           </Card>
@@ -362,7 +362,7 @@ export default function EnrollmentReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-cyan-600">{stats.fromTrial}</div>
+              <div className="text-xl sm:text-3xl font-bold text-cyan-600">{stats.fromTrial}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.total > 0 ? Math.round((stats.fromTrial / stats.total) * 100) : 0}% ของทั้งหมด
               </p>
@@ -377,7 +377,7 @@ export default function EnrollmentReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-orange-600">{stats.walkIn}</div>
+              <div className="text-xl sm:text-3xl font-bold text-orange-600">{stats.walkIn}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.total > 0 ? Math.round((stats.walkIn / stats.total) * 100) : 0}% ของทั้งหมด
               </p>
@@ -528,7 +528,7 @@ export default function EnrollmentReportPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...stats.bySubject]
                 .sort((a, b) => subjectSortBy === 'revenue' ? b.revenue - a.revenue : b.total - a.total)
                 .map((subject, index) => {
@@ -574,7 +574,7 @@ export default function EnrollmentReportPage() {
 
                       <div className="flex justify-between items-end">
                         <div>
-                          <div className="text-3xl font-bold">{subject.total}</div>
+                          <div className="text-xl sm:text-3xl font-bold">{subject.total}</div>
                           <div className="text-xs opacity-80">คน</div>
                         </div>
                         <div className="text-right">

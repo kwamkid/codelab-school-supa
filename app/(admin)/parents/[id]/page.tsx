@@ -214,7 +214,7 @@ export default function ParentDetailPage() {
             </div>
           )}
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">{parent.displayName}</h1>
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900">{parent.displayName}</h1>
             <div className="flex items-center gap-4 mt-2">
               {parent.lineUserId && (
                 <Badge className="bg-green-100 text-green-700">

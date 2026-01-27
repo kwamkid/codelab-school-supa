@@ -89,7 +89,7 @@ export default function SubjectsPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">จัดการวิชาเรียน</h1>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">จัดการวิชาเรียน</h1>
           <p className="text-gray-600 mt-2">จัดการหลักสูตรและวิชาที่เปิดสอน</p>
         </div>
         <PermissionGuard requiredRole={['super_admin']}>
@@ -112,7 +112,7 @@ export default function SubjectsPage() {
       )}
 
       {/* Category Filter Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <Card 
           className={`cursor-pointer transition-all ${selectedCategory === 'all' ? 'ring-2 ring-red-500' : 'hover:shadow-md'}`}
           onClick={() => setSelectedCategory('all')}

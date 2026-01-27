@@ -380,7 +380,7 @@ export default function AttendancePage() {
             <Skeleton className="h-5 w-24" />
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i}>
                   <Skeleton className="h-4 w-16 mb-2" />
@@ -411,7 +411,7 @@ export default function AttendancePage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">เช็คชื่อนักเรียน</h1>
+            <h1 className="text-xl sm:text-3xl font-bold tracking-tight">เช็คชื่อนักเรียน</h1>
             <p className="text-muted-foreground">เลือกสาขาเพื่อดูคลาสเรียน</p>
           </div>
         </div>
@@ -432,7 +432,7 @@ export default function AttendancePage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">เช็คชื่อนักเรียน</h1>
+          <h1 className="text-xl sm:text-3xl font-bold tracking-tight">เช็คชื่อนักเรียน</h1>
           <p className="text-muted-foreground">
             {isToday ? 'วันนี้' : ''} {getDayName(selectedDate.getDay())} {format(selectedDate, 'd MMMM yyyy', { locale: th })}
             {isAllBranches && ' - ทุกสาขา'}
@@ -456,7 +456,7 @@ export default function AttendancePage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Date Picker */}
             <div>
               <label className="text-sm font-medium mb-2 block">วันที่</label>

@@ -65,7 +65,7 @@ export default function EditTeacherPage() {
       </div>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">แก้ไขข้อมูลครู</h1>
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">แก้ไขข้อมูลครู</h1>
         <p className="text-gray-600 mt-2">แก้ไขข้อมูล {teacher.name}</p>
       </div>
 

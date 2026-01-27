@@ -218,7 +218,7 @@ export default function HolidaysPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">
             จัดการวันหยุด
             {!isAllBranches && (
               <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>
@@ -309,7 +309,7 @@ export default function HolidaysPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">วันหยุดทั้งหมด</CardTitle>

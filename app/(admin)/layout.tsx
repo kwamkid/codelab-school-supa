@@ -610,8 +610,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="h-[100dvh] bg-gray-50 flex flex-col">
-      <div className="flex flex-1 overflow-hidden">
+    <div className="h-[100dvh] overflow-hidden bg-gray-50">
+      <div className="flex h-full">
         {/* Loading overlay */}
         {navigating && <PageLoading />}
         
@@ -747,9 +747,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         </div>
 
         {/* Main content area */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top bar */}
-          <header className="h-16 flex-shrink-0 bg-white shadow-sm px-4 flex items-center justify-between">
+          <header className="h-16 bg-white shadow-sm px-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(true)}
@@ -910,8 +910,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           </header>
 
           {/* Page content */}
-          <main className="flex-1 overflow-y-auto overflow-x-hidden -webkit-overflow-scrolling-touch">
-            <div className="p-4 md:p-6 pb-24">
+          <main className="h-[calc(100%-4rem)] overflow-y-auto overflow-x-hidden overscroll-contain">
+            <div className="p-4 md:p-6 pb-12">
               {children}
             </div>
           </main>

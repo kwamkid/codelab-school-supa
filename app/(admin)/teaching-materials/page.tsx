@@ -191,7 +191,7 @@ export default function TeachingMaterialsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">จัดการสื่อการสอน</h1>
+          <h1 className="text-xl sm:text-3xl font-bold">จัดการสื่อการสอน</h1>
           <p className="text-gray-600 mt-1">เลือกวิชาเพื่อจัดการ Slides และเนื้อหาการสอน</p>
         </div>
       </div>
@@ -262,7 +262,7 @@ export default function TeachingMaterialsPage() {
                               color: subject.color 
                             }}
                           >
-                            <div className="text-3xl font-bold">
+                            <div className="text-xl sm:text-3xl font-bold">
                               {materialCount}
                             </div>
                             <div className="text-xs mt-1">

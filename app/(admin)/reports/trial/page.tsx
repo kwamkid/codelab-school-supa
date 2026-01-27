@@ -284,7 +284,7 @@ export default function TrialReportPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
           <Users className="w-8 h-8" />
           รายงานทดลองเรียน (Free Trial)
         </h1>
@@ -302,7 +302,7 @@ export default function TrialReportPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Date Preset */}
             <div className="space-y-2">
               <Label>ช่วงเวลา</Label>
@@ -353,7 +353,7 @@ export default function TrialReportPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -362,7 +362,7 @@ export default function TrialReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats.total}</div>
+              <div className="text-xl sm:text-3xl font-bold">{stats.total}</div>
               <p className="text-xs text-muted-foreground mt-1">คน</p>
             </CardContent>
           </Card>
@@ -375,7 +375,7 @@ export default function TrialReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{stats.attended}</div>
+              <div className="text-xl sm:text-3xl font-bold text-blue-600">{stats.attended}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.attendedRate}% ของทั้งหมด
               </p>
@@ -390,7 +390,7 @@ export default function TrialReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">{stats.converted}</div>
+              <div className="text-xl sm:text-3xl font-bold text-green-600">{stats.converted}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.conversionRate}% ของผู้เข้าเรียน
               </p>
@@ -405,7 +405,7 @@ export default function TrialReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-purple-600">{stats.conversionRate}%</div>
+              <div className="text-xl sm:text-3xl font-bold text-purple-600">{stats.conversionRate}%</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.converted} / {stats.attended} คน
               </p>

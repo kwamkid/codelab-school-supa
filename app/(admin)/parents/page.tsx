@@ -356,12 +356,12 @@ export default function ParentsPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
             <Globe className="h-8 w-8 text-blue-500" />
-            จัดการผู้ปกครอง (ทุกสาขา)
+            ผู้ปกครอง
           </h1>
           <p className="text-gray-600 mt-2">
-            ข้อมูลผู้ปกครองและนักเรียนทั้งหมดในระบบ - สามารถกรองตามสาขาได้
+            ข้อมูลผู้ปกครองและนักเรียนทั้งหมด
             {(loadingBranches || loadingClasses) && (
               <span className="text-orange-500 ml-2">(กำลังโหลดข้อมูลเพิ่มเติม...)</span>
             )}

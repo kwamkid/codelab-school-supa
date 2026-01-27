@@ -132,7 +132,7 @@ export default function WebhookTestPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
           <Webhook className="h-8 w-8 text-red-500" />
           ทดสอบ Webhook
         </h1>

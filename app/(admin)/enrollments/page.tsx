@@ -433,7 +433,7 @@ export default function EnrollmentsPage() {
           </div>
           <Skeleton className="h-10 w-40" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
@@ -455,20 +455,20 @@ export default function EnrollmentsPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            จัดการการลงทะเบียน
-            {!isAllBranches && <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>}
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">
+            ลงทะเบียน
+            {!isAllBranches && <span className="text-red-600 text-base sm:text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>}
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-sm text-gray-600 mt-1">
             จัดการข้อมูลการลงทะเบียนเรียนทั้งหมด
-            {isSearchMode && <span className="text-orange-500 ml-2">(โหมดค้นหา - โหลดข้อมูลทั้งหมด)</span>}
+            {isSearchMode && <span className="text-orange-500 ml-2">(โหมดค้นหา)</span>}
           </p>
         </div>
         <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
           <Link href="/enrollments/new">
-            <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
+            <ActionButton action="create" size="sm" className="bg-red-500 hover:bg-red-600">
               <Plus className="h-4 w-4 mr-2" />
               ลงทะเบียนใหม่
             </ActionButton>
@@ -477,27 +477,45 @@ export default function EnrollmentsPage() {
       </div>
 
       {/* Summary Cards */}
-      <Card className="mb-6">
-        <CardContent className="py-4">
-          <div className="flex items-center justify-center gap-2 text-lg">
-            <span>นักเรียนทั้งหมด</span>
-            <span className="font-bold text-2xl">{stats?.total || 0}</span>
-            <span>คน</span>
-            <span className="mx-2 text-gray-300">|</span>
-            <span className="text-green-600">กำลังเรียน</span>
-            <span className="font-bold text-green-600">{stats?.active || 0}</span>
-            <span className="mx-2 text-gray-300">|</span>
-            <span className="text-gray-600">เรียนจบ</span>
-            <span className="font-bold text-gray-600">{stats?.completed || 0}</span>
-            <span className="mx-2 text-gray-300">|</span>
-            <span className="text-red-600">ยกเลิก</span>
-            <span className="font-bold text-red-600">{stats?.dropped || 0}</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.total || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">กำลังเรียน</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats?.active || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">เรียนจบ</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-600">{stats?.completed || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">ยกเลิก</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats?.dropped || 0}</div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -535,7 +553,9 @@ export default function EnrollmentsPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Enrollments Table */}
       <Card>

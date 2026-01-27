@@ -128,7 +128,7 @@ export default function ProfilePage() {
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold">โปรไฟล์ของฉัน</h1>
+            <h1 className="text-xl sm:text-3xl font-bold">โปรไฟล์ของฉัน</h1>
             <p className="text-gray-600 mt-1">ข้อมูลส่วนตัวและการตั้งค่า</p>
           </div>
         </div>
@@ -282,7 +282,7 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold">โปรไฟล์ของฉัน</h1>
+          <h1 className="text-xl sm:text-3xl font-bold">โปรไฟล์ของฉัน</h1>
           <p className="text-gray-600 mt-1">ข้อมูลส่วนตัวและการตั้งค่า</p>
         </div>
       </div>

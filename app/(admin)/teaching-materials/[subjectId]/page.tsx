@@ -227,7 +227,7 @@ export default function SubjectMaterialsPage() {
               กลับ
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">{subject.name}</h1>
+          <h1 className="text-xl sm:text-3xl font-bold">{subject.name}</h1>
           <p className="text-gray-600 mt-1">จัดการสื่อการสอนและ Slides</p>
         </div>
         <ActionButton

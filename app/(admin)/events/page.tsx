@@ -196,7 +196,7 @@ export default function EventsPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">
             จัดการ Events
           </h1>
           <p className="text-gray-600 mt-2">
@@ -214,7 +214,7 @@ export default function EventsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>

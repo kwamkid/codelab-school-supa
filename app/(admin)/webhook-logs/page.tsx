@@ -111,7 +111,7 @@ export default function WebhookLogsPage() {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
             <MessageSquare className="h-8 w-8 text-red-500" />
             Webhook Logs & User IDs
           </h1>

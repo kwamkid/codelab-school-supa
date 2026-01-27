@@ -462,7 +462,7 @@ export default function EnrollmentDetailPage() {
       <div className="mb-8">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">รายละเอียดการลงทะเบียน</h1>
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900">รายละเอียดการลงทะเบียน</h1>
             <p className="text-gray-600 mt-2">วันที่ลงทะเบียน: {formatDate(enrollment.enrolledAt, 'long')}</p>
           </div>
           <Badge className={statusColors[enrollment.status]}>
@@ -483,7 +483,7 @@ export default function EnrollmentDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">ชื่อ-นามสกุล</p>
                   <p className="font-medium">{student.name}</p>
@@ -550,7 +550,7 @@ export default function EnrollmentDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">ชื่อผู้ปกครอง</p>
                   <p className="font-medium">{parent.displayName}</p>
@@ -609,7 +609,7 @@ export default function EnrollmentDetailPage() {
                   <p className="text-sm text-gray-500">รหัส: {classData.code}</p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">วิชา</p>
                     <div className="flex items-center gap-2">

@@ -271,7 +271,7 @@ export default function MakeupDetailPage() {
 
       {/* Title */}
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+        <h1 className="text-2xl sm:text-xl sm:text-3xl font-bold text-gray-900">
           Makeup Class - {makeup.studentNickname}
           {!isAllBranches && <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>}
         </h1>

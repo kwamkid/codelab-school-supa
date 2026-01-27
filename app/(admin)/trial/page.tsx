@@ -8,6 +8,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -300,7 +307,7 @@ export default function TrialBookingsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="space-y-6">
         {/* Header Skeleton */}
         <div className="flex justify-between items-center">
           <div>
@@ -311,7 +318,7 @@ export default function TrialBookingsPage() {
         </div>
 
         {/* Stats Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[...Array(5)].map((_, i) => (
             <Card key={i}>
               <CardContent className="p-4">
@@ -347,16 +354,16 @@ export default function TrialBookingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-full mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <TestTube className="h-8 w-8 text-red-500" />
-            จองทดลองเรียน
-            {!isAllBranches && (
+          <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
+            {/* <TestTube className="h-8 w-8 text-red-500" /> */}
+            ทดลองเรียน
+            {/* {!isAllBranches && (
               <span className="text-lg font-normal text-gray-500">(เฉพาะสาขาที่เลือก)</span>
-            )}
+            )} */}
           </h1>
           <p className="text-gray-600 mt-2">จัดการการจองทดลองเรียนทั้งหมด</p>
         </div>
@@ -366,14 +373,14 @@ export default function TrialBookingsPage() {
             className="bg-red-500 hover:bg-red-600"
           >
             <Plus className="h-4 w-4 mr-2" />
-            เพิ่มการจอง (Walk-in)
+            จองทดลองเรียน
           </Button>
         </PermissionGuard>
       </div>
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">{stats.total}</div>
@@ -435,25 +442,33 @@ export default function TrialBookingsPage() {
         </CardContent>
       </Card>
 
-      {/* Tabs */}
+      {/* Status Filter - Dropdown on mobile, Tabs on desktop */}
       <Tabs value={selectedStatus} onValueChange={setSelectedStatus}>
-        <TabsList>
+        {/* Mobile: Dropdown */}
+        <div className="md:hidden">
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทั้งหมด ({statusCounts.all})</SelectItem>
+              <SelectItem value="new">ใหม่ ({statusCounts.new})</SelectItem>
+              <SelectItem value="contacted">ติดต่อแล้ว ({statusCounts.contacted})</SelectItem>
+              <SelectItem value="scheduled">นัดหมายแล้ว ({statusCounts.scheduled})</SelectItem>
+              <SelectItem value="completed">เรียนแล้ว ({statusCounts.completed})</SelectItem>
+              <SelectItem value="converted">ลงทะเบียน ({statusCounts.converted})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: Tabs */}
+        <TabsList className="hidden md:inline-flex">
           <TabsTrigger value="all">ทั้งหมด ({statusCounts.all})</TabsTrigger>
-          <TabsTrigger value="new">
-            ใหม่ ({statusCounts.new})
-          </TabsTrigger>
-          <TabsTrigger value="contacted">
-            ติดต่อแล้ว ({statusCounts.contacted})
-          </TabsTrigger>
-          <TabsTrigger value="scheduled">
-            นัดหมายแล้ว ({statusCounts.scheduled})
-          </TabsTrigger>
-          <TabsTrigger value="completed">
-            เรียนแล้ว ({statusCounts.completed})
-          </TabsTrigger>
-          <TabsTrigger value="converted">
-            ลงทะเบียน ({statusCounts.converted})
-          </TabsTrigger>
+          <TabsTrigger value="new">ใหม่ ({statusCounts.new})</TabsTrigger>
+          <TabsTrigger value="contacted">ติดต่อแล้ว ({statusCounts.contacted})</TabsTrigger>
+          <TabsTrigger value="scheduled">นัดหมายแล้ว ({statusCounts.scheduled})</TabsTrigger>
+          <TabsTrigger value="completed">เรียนแล้ว ({statusCounts.completed})</TabsTrigger>
+          <TabsTrigger value="converted">ลงทะเบียน ({statusCounts.converted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedStatus} className="mt-6">

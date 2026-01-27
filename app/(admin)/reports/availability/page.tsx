@@ -420,7 +420,7 @@ export default function AvailabilityReportPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold">รายงานห้องและครูว่าง</h1>
+          <h1 className="text-xl sm:text-3xl font-bold">รายงานห้องและครูว่าง</h1>
           {!isAllBranches && (
             <span className="text-sm text-red-600 font-medium">(เฉพาะสาขาที่เลือก)</span>
           )}
@@ -439,7 +439,7 @@ export default function AvailabilityReportPage() {
           </div>
         </CardHeader>
         <CardContent className="pb-6">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-12 gap-4">
             {/* วันที่ */}
             <div className="md:col-span-2">
               <label className="text-sm font-medium mb-2 block">วันที่</label>

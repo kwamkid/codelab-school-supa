@@ -69,7 +69,7 @@ export default function EditTeachingMaterialPage() {
             กลับ
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold">แก้ไขบทเรียน</h1>
+        <h1 className="text-xl sm:text-3xl font-bold">แก้ไขบทเรียน</h1>
         <p className="text-gray-600 mt-1">
           วิชา: {subject?.name || 'ไม่ระบุ'} - {material.title}
         </p>

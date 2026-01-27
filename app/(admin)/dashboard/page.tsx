@@ -306,10 +306,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-2xl sm:text-xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">
             ภาพรวมตารางเรียนและข้อมูลสำคัญ
             {!isAllBranches && <span className="text-red-600 font-medium"> (เฉพาะสาขาที่เลือก)</span>}

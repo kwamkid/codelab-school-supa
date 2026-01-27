@@ -143,7 +143,7 @@ export default function TeachingSlidesPage() {
           {[...Array(2)].map((_, categoryIndex) => (
             <div key={categoryIndex}>
               <Skeleton className="h-6 w-32 mb-3" />
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {[...Array(5)].map((_, i) => (
                   <Card key={i}>
                     <CardContent className="p-3">
@@ -167,7 +167,7 @@ export default function TeachingSlidesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Slides & เนื้อหาการสอน</h1>
+        <h1 className="text-xl sm:text-3xl font-bold">Slides & เนื้อหาการสอน</h1>
         <p className="text-gray-600 mt-1">เลือกวิชาที่ต้องการสอน</p>
       </div>
 
@@ -225,7 +225,7 @@ export default function TeachingSlidesPage() {
             <div key={category}>
               <h2 className="text-lg font-semibold mb-3 text-gray-700">{category}</h2>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {categorySubjects.map((subject) => {
                   const materialCount = materialCounts[subject.id] || 0;
                   

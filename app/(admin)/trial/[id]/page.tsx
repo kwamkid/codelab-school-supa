@@ -382,7 +382,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
         
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
+            <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
               <TestTube className="h-8 w-8 text-red-500" />
               รายละเอียดการจองทดลองเรียน
             </h1>
@@ -401,7 +401,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
         {/* Left Column - Booking Info */}
         <div className="lg:col-span-2 space-y-6">
           {/* Parent & Students Info - 2 columns */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-6">
             {/* Parent Info */}
             <Card>
               <CardHeader className="pb-3">

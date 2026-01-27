@@ -102,7 +102,7 @@ export default function SubjectMaterialsPage() {
         
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold">{subject.name}</h1>
+            <h1 className="text-xl sm:text-3xl font-bold">{subject.name}</h1>
             <div className="flex items-center gap-4 mt-2">
               <span className="text-gray-600">{subject.code}</span>
               <Badge 
@@ -153,7 +153,7 @@ export default function SubjectMaterialsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
           {filteredMaterials.map((material) => (
             <Card
               key={material.id}

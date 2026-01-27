@@ -144,7 +144,7 @@ export default function BranchesPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">จัดการสาขา</h1>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">จัดการสาขา</h1>
           <p className="text-gray-600 mt-2">จัดการข้อมูลสาขาและห้องเรียน</p>
         </div>
         <PermissionGuard requiredRole={['super_admin']}>
@@ -158,7 +158,7 @@ export default function BranchesPage() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">สาขาทั้งหมด</CardTitle>
@@ -236,7 +236,7 @@ export default function BranchesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBranches.map((branch) => (
             <Card key={branch.id} className={!branch.isActive ? 'opacity-75' : ''}>
               <CardHeader className="pb-4">

@@ -229,7 +229,7 @@ export default function TeacherMigrationPage() {
             <ChevronLeft className="h-4 w-4 mr-1" />
             กลับหน้าตั้งค่า
           </Link>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
             <Shield className="h-8 w-8 text-red-500" />
             Teacher Login Migration
           </h1>
