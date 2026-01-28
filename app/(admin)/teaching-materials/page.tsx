@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -61,8 +62,18 @@ const useMaterialCounts = (subjects: Subject[]) => {
 
 export default function TeachingMaterialsPage() {
   const router = useRouter();
+  const { adminUser, isSuperAdmin, loading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  // Permission check - redirect if not super_admin
+  useEffect(() => {
+    if (!authLoading && adminUser) {
+      if (!isSuperAdmin()) {
+        router.push('/dashboard');
+      }
+    }
+  }, [authLoading, adminUser, isSuperAdmin, router]);
 
   // Fetch subjects using React Query
   const { data: subjects = [], isLoading: loadingSubjects } = useQuery({

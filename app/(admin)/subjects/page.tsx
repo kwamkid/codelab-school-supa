@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, BookOpen, Code, Cpu, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
 import {
@@ -43,10 +44,20 @@ const levelColors = {
 };
 
 export default function SubjectsPage() {
-  const { isSuperAdmin } = useAuth();
+  const { adminUser, isSuperAdmin, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  // Permission check - redirect if not super_admin
+  useEffect(() => {
+    if (!authLoading && adminUser) {
+      if (!isSuperAdmin()) {
+        router.push('/dashboard');
+      }
+    }
+  }, [authLoading, adminUser, isSuperAdmin, router]);
 
   useEffect(() => {
     loadSubjects();

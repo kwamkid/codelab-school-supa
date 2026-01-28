@@ -36,6 +36,8 @@ import {
   Printer
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
   Table,
@@ -144,7 +146,18 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function EnrollmentsPage() {
   const { selectedBranchId, isAllBranches } = useBranch();
+  const { adminUser, isSuperAdmin, isBranchAdmin, loading: authLoading } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
+
+  // Permission check - redirect if not super_admin or branch_admin
+  useEffect(() => {
+    if (!authLoading && adminUser) {
+      if (!isSuperAdmin() && !isBranchAdmin()) {
+        router.push('/dashboard');
+      }
+    }
+  }, [authLoading, adminUser, isSuperAdmin, isBranchAdmin, router]);
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');

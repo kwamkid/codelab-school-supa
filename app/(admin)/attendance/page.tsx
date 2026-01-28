@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -238,8 +238,17 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
 
 export default function AttendancePage() {
   const router = useRouter();
-  const { user, isTeacher, adminUser } = useAuth();
+  const { user, isTeacher, isSuperAdmin, isBranchAdmin, adminUser, loading: authLoading } = useAuth();
   const { selectedBranchId, isAllBranches } = useBranch();
+
+  // Permission check - redirect if not super_admin, branch_admin, or teacher
+  useEffect(() => {
+    if (!authLoading && adminUser) {
+      if (!isSuperAdmin() && !isBranchAdmin() && !isTeacher()) {
+        router.push('/dashboard');
+      }
+    }
+  }, [authLoading, adminUser, isSuperAdmin, isBranchAdmin, isTeacher, router]);
   
   // Filter states
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
