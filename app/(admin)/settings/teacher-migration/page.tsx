@@ -45,12 +45,12 @@ export default function TeacherMigrationPage() {
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
   const [progress, setProgress] = useState(0);
 
-  // Check permission
+  // Check permission - ต้องรอ adminUser โหลดเสร็จก่อน
   useEffect(() => {
-    if (!isSuperAdmin()) {
+    if (adminUser && !isSuperAdmin()) {
       router.push('/dashboard');
     }
-  }, [isSuperAdmin, router]);
+  }, [adminUser, isSuperAdmin, router]);
 
   // Load data
   useEffect(() => {

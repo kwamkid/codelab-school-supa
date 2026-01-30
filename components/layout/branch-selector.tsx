@@ -39,7 +39,10 @@ export function BranchSelector() {
   const isGlobalDataPage = globalDataPages.some(page => pathname.startsWith(page));
   
   useEffect(() => {
-    loadBranches();
+    // ต้องรอ adminUser โหลดเสร็จก่อนถึงจะ filter สาขาได้ถูกต้อง
+    if (adminUser) {
+      loadBranches();
+    }
   }, [adminUser]);
 
   useEffect(() => {
@@ -55,12 +58,15 @@ export function BranchSelector() {
       
       // Filter branches based on user role
       let availableBranches = allBranches;
-      
-      if (!isSuperAdmin() && adminUser?.branchIds && adminUser.branchIds.length > 0) {
-        // Branch admin - show only assigned branches
-        availableBranches = allBranches.filter(branch => 
-          adminUser.branchIds.includes(branch.id)
-        );
+
+      if (!isSuperAdmin() && adminUser) {
+        if (adminUser.branchIds && adminUser.branchIds.length > 0) {
+          // Branch admin/teacher - show only assigned branches
+          availableBranches = allBranches.filter(branch =>
+            adminUser.branchIds.includes(branch.id)
+          );
+        }
+        // ถ้า branchIds ว่าง → แสดงทุกสาขา (backward compatibility)
       }
       
       setBranches(availableBranches);

@@ -55,15 +55,15 @@ const DAYS_MAP: { [key: number]: string } = {
 };
 
 export default function BranchesPage() {
-  const { isSuperAdmin, loading: authLoading } = useAuth();
+  const { adminUser, isSuperAdmin, loading: authLoading } = useAuth();
   const [branches, setBranches] = useState<BranchWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Wait for auth to load first
-    if (authLoading) return;
+    // Wait for auth to load first and adminUser to be available
+    if (authLoading || !adminUser) return;
 
     // Check if user is super admin
     if (!isSuperAdmin()) {
@@ -73,7 +73,7 @@ export default function BranchesPage() {
     }
 
     loadBranches();
-  }, [isSuperAdmin, authLoading]);
+  }, [isSuperAdmin, authLoading, adminUser]);
 
   const loadBranches = async () => {
     try {

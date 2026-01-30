@@ -294,10 +294,13 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
   // Filter navigation based on role
   const filterNavigation = (items: NavigationItem[]): NavigationItem[] => {
+    // ถ้า adminUser ยังไม่โหลด → return array ว่าง (ไม่แสดงเมนูจนกว่าจะรู้ role)
+    if (!adminUser) return [];
+
     return items.filter(item => {
       if (item.isDivider) return true;
-      
-      if (item.requiredRole && adminUser) {
+
+      if (item.requiredRole) {
         if (!item.requiredRole.includes(adminUser.role)) {
           return false;
         }
@@ -587,6 +590,25 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
   if (!user) {
     return null;
+  }
+
+  // auth โหลดเสร็จแล้วแต่ไม่พบข้อมูล admin user ในระบบ
+  if (!adminUser) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center max-w-md p-8">
+          <div className="text-red-500 text-5xl mb-4">⚠</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">ไม่พบข้อมูลผู้ดูแลระบบ</h2>
+          <p className="text-gray-600 mb-4">
+            ไม่พบข้อมูลสิทธิ์สำหรับ email: {user?.email || 'ไม่ทราบ'}
+            <br />กรุณาติดต่อผู้ดูแลระบบเพื่อเพิ่มสิทธิ์การใช้งาน
+          </p>
+          <Button onClick={() => signOut()} variant="outline">
+            ออกจากระบบ
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const isActive = (href: string) => {

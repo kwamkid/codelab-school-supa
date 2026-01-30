@@ -213,7 +213,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
       try {
         const response = await fetch(
-          `${supabaseUrl}/rest/v1/admin_users?email=eq.${encodeURIComponent(emailLower)}&select=*`,
+          `${supabaseUrl}/rest/v1/admin_users?email=ilike.${encodeURIComponent(emailLower)}&select=*`,
           {
             method: 'GET',
             headers: {

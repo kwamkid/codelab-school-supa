@@ -70,23 +70,22 @@ export default function UsersPage() {
   const [showAddRightsDialog, setShowAddRightsDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
 
-  // Check permission - redirect หลังจาก auth loading เสร็จ
+  // Check permission - redirect หลังจาก auth loading เสร็จ และ adminUser โหลดแล้ว
   useEffect(() => {
-    if (!authLoading && !isSuperAdmin()) {
-      // Delay เล็กน้อยเพื่อให้ user เห็นหน้าก่อน redirect
+    if (!authLoading && adminUser && !isSuperAdmin()) {
       const timer = setTimeout(() => {
         router.push('/dashboard');
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [authLoading, isSuperAdmin, router]);
+  }, [authLoading, adminUser, isSuperAdmin, router]);
 
   // Load data only if has permission
   useEffect(() => {
-    if (!authLoading && isSuperAdmin()) {
+    if (!authLoading && adminUser && isSuperAdmin()) {
       loadData();
     }
-  }, [authLoading, isSuperAdmin]);
+  }, [authLoading, adminUser, isSuperAdmin]);
 
   const loadData = async () => {
     try {
