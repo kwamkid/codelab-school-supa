@@ -1197,6 +1197,94 @@ export function getEditableFields(classData: Class): {
   };
 }
 
+// Get info for ending a class early (preview before confirming)
+export async function getEndClassPreview(classId: string): Promise<{
+  lastSessionDate: string | null;
+  completedSessions: number;
+  futureSessions: number;
+  totalSessions: number;
+}> {
+  try {
+    const schedules = await getClassSchedules(classId);
+    const today = getLocalDateString(new Date());
+
+    const completedSessions = schedules.filter(s => s.status === 'completed').length;
+    const futureSessions = schedules.filter(s =>
+      s.status === 'scheduled' && s.sessionDate.toISOString().slice(0, 10) > today
+    ).length;
+
+    // Find the last completed or past session date
+    const pastSessions = schedules
+      .filter(s => s.status === 'completed' || (s.status === 'scheduled' && s.sessionDate.toISOString().slice(0, 10) <= today))
+      .sort((a, b) => b.sessionDate.getTime() - a.sessionDate.getTime());
+
+    const lastSessionDate = pastSessions.length > 0
+      ? getLocalDateString(pastSessions[0].sessionDate)
+      : null;
+
+    return {
+      lastSessionDate,
+      completedSessions,
+      futureSessions,
+      totalSessions: schedules.length,
+    };
+  } catch (error) {
+    console.error('Error getting end class preview:', error);
+    throw error;
+  }
+}
+
+// End a class immediately: set status to completed, update end_date, cancel future sessions
+export async function endClassNow(classId: string): Promise<{ newEndDate: string }> {
+  try {
+    const supabase = getClient();
+    const schedules = await getClassSchedules(classId);
+    const today = getLocalDateString(new Date());
+
+    // Find the last session that already happened (completed or past scheduled)
+    const pastSessions = schedules
+      .filter(s => s.status === 'completed' || (s.status === 'scheduled' && s.sessionDate.toISOString().slice(0, 10) <= today))
+      .sort((a, b) => b.sessionDate.getTime() - a.sessionDate.getTime());
+
+    const newEndDate = pastSessions.length > 0
+      ? getLocalDateString(pastSessions[0].sessionDate)
+      : today;
+
+    // Cancel all future scheduled sessions
+    const futureScheduleIds = schedules
+      .filter(s => s.status === 'scheduled' && s.sessionDate.toISOString().slice(0, 10) > today)
+      .map(s => s.id);
+
+    if (futureScheduleIds.length > 0) {
+      const { error: cancelError } = await supabase
+        .from('class_schedules')
+        .update({ status: 'cancelled' })
+        .in('id', futureScheduleIds);
+
+      if (cancelError) {
+        console.error('Error cancelling future sessions:', cancelError);
+        throw cancelError;
+      }
+    }
+
+    // Update class: set status to completed and update end_date
+    const { error: updateError } = await supabase
+      .from(TABLE_NAME)
+      .update({
+        status: 'completed',
+        end_date: newEndDate,
+      })
+      .eq('id', classId);
+
+    if (updateError) throw updateError;
+
+    return { newEndDate };
+  } catch (error) {
+    console.error('Error ending class:', error);
+    throw error;
+  }
+}
+
 // Export functions
 export {
   generateSchedules,

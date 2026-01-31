@@ -248,12 +248,12 @@ export async function getOptimizedCalendarEvents(
     const events: CalendarEvent[] = [];
     const now = new Date();
 
-    // 1. Get holidays in range
+    // 1. Get holidays in range (end is exclusive)
     let holidaysQuery = supabase
       .from('holidays')
       .select('*')
       .gte('date', getLocalDateString(start))
-      .lte('date', getLocalDateString(end));
+      .lt('date', getLocalDateString(end));
 
     const { data: holidaysData } = await holidaysQuery;
 
@@ -317,12 +317,12 @@ export async function getOptimizedCalendarEvents(
 
     const { data: classesData } = await classesQuery;
 
-    // Get all schedules in the date range
+    // Get all schedules in the date range (end is exclusive to match FullCalendar behavior)
     let schedulesQuery = supabase
       .from('class_schedules')
       .select('*')
       .gte('session_date', startDateStr)
-      .lte('session_date', endDateStr);
+      .lt('session_date', endDateStr);
 
     const { data: allSchedulesData } = await schedulesQuery;
 
@@ -454,7 +454,7 @@ export async function getOptimizedCalendarEvents(
       .from('makeup_classes')
       .select('*')
       .gte('makeup_date', startDateStr)
-      .lte('makeup_date', endDateStr)
+      .lt('makeup_date', endDateStr)
       .in('status', ['scheduled', 'completed']);
 
     if (branchId) {
@@ -668,7 +668,7 @@ export async function getOptimizedCalendarEvents(
       .from('trial_sessions')
       .select('*')
       .gte('scheduled_date', startDateStr)
-      .lte('scheduled_date', endDateStr)
+      .lt('scheduled_date', endDateStr)
       .in('status', ['scheduled', 'attended', 'absent', 'cancelled']);
 
     if (branchId) {
@@ -863,45 +863,58 @@ export async function getOptimizedDashboardStats(branchId?: string): Promise<Das
     );
     const todayClassCount = uniqueClassIds.size;
 
-    // Get makeup stats - join with classes to filter by branch
-    let makeupQuery = supabase
+    // Get makeup stats
+    const { data: makeupData } = await supabase
       .from('makeup_classes')
-      .select(`
-        *,
-        classes!makeup_classes_original_class_id_fkey(branch_id)
-      `)
+      .select('*')
       .in('status', ['pending', 'scheduled']);
-
-    if (branchId) {
-      makeupQuery = makeupQuery.eq('classes.branch_id', branchId);
-    }
-
-    const { data: makeupData, error: makeupError } = await makeupQuery;
-
-    console.log('🔍 DEBUG Makeup Stats:');
-    console.log('  Branch ID:', branchId || 'ALL');
-    console.log('  Total makeup data:', makeupData?.length || 0);
-    console.log('  Makeup error:', makeupError);
-    if (makeupData && makeupData.length > 0) {
-      console.log('  First item:', makeupData[0]);
-    }
 
     let upcomingMakeups = 0;
     let pendingMakeups = 0;
 
-    (makeupData || []).forEach(doc => {
-      if (doc.status === 'pending') {
-        pendingMakeups++;
-      } else if (doc.status === 'scheduled' && doc.makeup_date) {
-        const makeupDate = new Date(doc.makeup_date);
-        if (makeupDate >= today) {
-          upcomingMakeups++;
-        }
-      }
-    });
+    if (branchId && makeupData) {
+      // Filter by branch: lookup original class branch_id (same logic as layout.tsx sidebar)
+      const makeupClassIds = [...new Set(makeupData.map(m => m.original_class_id).filter(Boolean))];
+      const classBranchMap = new Map<string, string>();
 
-    console.log('  Pending count:', pendingMakeups);
-    console.log('  Upcoming count:', upcomingMakeups);
+      if (makeupClassIds.length > 0) {
+        const { data: classesForMakeup } = await supabase
+          .from('classes')
+          .select('id, branch_id')
+          .in('id', makeupClassIds);
+
+        (classesForMakeup || []).forEach(c => {
+          classBranchMap.set(c.id, c.branch_id);
+        });
+      }
+
+      (makeupData || []).forEach(doc => {
+        // Check branch: use makeup_branch_id if scheduled, otherwise original class branch
+        const docBranch = doc.makeup_branch_id || classBranchMap.get(doc.original_class_id);
+        if (docBranch !== branchId) return;
+
+        if (doc.status === 'pending') {
+          pendingMakeups++;
+        } else if (doc.status === 'scheduled' && doc.makeup_date) {
+          const makeupDate = new Date(doc.makeup_date);
+          if (makeupDate >= today) {
+            upcomingMakeups++;
+          }
+        }
+      });
+    } else {
+      // No branch filter: count all
+      (makeupData || []).forEach(doc => {
+        if (doc.status === 'pending') {
+          pendingMakeups++;
+        } else if (doc.status === 'scheduled' && doc.makeup_date) {
+          const makeupDate = new Date(doc.makeup_date);
+          if (makeupDate >= today) {
+            upcomingMakeups++;
+          }
+        }
+      });
+    }
 
     // Get trial stats
     let trialQuery = supabase

@@ -1,10 +1,11 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, School, MessageSquare, Repeat, Bell } from 'lucide-react';
+import { Settings, School, MessageSquare, Repeat, Bell, Database } from 'lucide-react';
 import GeneralSettingsComponent from './general-settings';
 import LineSettingsComponent from './line-settings';
 import MakeupSettingsComponent from './makeup-settings';
+import BackupLogsTab from './backup-logs-tab';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +38,10 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications">
             <Bell className="h-4 w-4 mr-2" />
             Notification Logs
+          </TabsTrigger>
+          <TabsTrigger value="backup">
+            <Database className="h-4 w-4 mr-2" />
+            Backup
           </TabsTrigger>
         </TabsList>
 
@@ -78,6 +83,10 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="backup">
+          <BackupLogsTab />
         </TabsContent>
       </Tabs>
     </div>

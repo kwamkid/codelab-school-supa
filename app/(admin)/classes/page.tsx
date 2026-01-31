@@ -7,7 +7,7 @@ import { getClasses, deleteClass, batchUpdateClassStatuses } from '@/lib/service
 import { getActiveBranches } from '@/lib/services/branches';
 import { getActiveSubjects } from '@/lib/services/subjects';
 import { getActiveTeachers } from '@/lib/services/teachers';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Plus, 
@@ -25,13 +25,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency, getDayName } from '@/lib/utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -211,11 +205,22 @@ export default function ClassesPage() {
   // Calculate statistics with memoization
   const stats = useMemo(() => ({
     total: classes.length,
+    draft: classes.filter(c => c.status === 'draft').length,
     published: classes.filter(c => c.status === 'published').length,
     started: classes.filter(c => c.status === 'started').length,
+    completed: classes.filter(c => c.status === 'completed').length,
+    cancelled: classes.filter(c => c.status === 'cancelled').length,
     totalSeats: classes.reduce((sum, c) => sum + c.maxStudents, 0),
     enrolledSeats: classes.reduce((sum, c) => sum + c.enrolledCount, 0),
   }), [classes]);
+
+  // Get unique subjects used in current classes (for subject chips)
+  const usedSubjects = useMemo(() => {
+    const subjectIds = [...new Set(classes.map(c => c.subjectId))];
+    return subjectIds
+      .map(id => subjects.find(s => s.id === id))
+      .filter(Boolean) as typeof subjects;
+  }, [classes, subjects]);
 
   // ============================================
   // 🎯 Reset Pagination on Filter Change
@@ -288,30 +293,22 @@ export default function ClassesPage() {
           </div>
         </div>
 
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-20" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-12" />
-              </CardContent>
-            </Card>
+        {/* Tabs Skeleton */}
+        <div className="flex gap-2">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-8 w-28 rounded-full" />
           ))}
         </div>
 
-        {/* Filters Skeleton */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <Skeleton className="h-10 flex-1" />
-              <Skeleton className="h-10 w-[200px]" />
-              <Skeleton className="h-10 w-[200px]" />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Search + Chips Skeleton */}
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-80" />
+          <div className="flex gap-2">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-7 w-20 rounded-full" />
+            ))}
+          </div>
+        </div>
 
         {/* Table Skeleton */}
         <Card>
@@ -395,108 +392,105 @@ export default function ClassesPage() {
         </Card>
       )}
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">คลาสทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">เปิดรับสมัคร</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.published}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">กำลังเรียน</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.started}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ที่นั่งทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalSeats}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">นักเรียนทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.enrolledSeats}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Status Filter Tabs */}
+      <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="mb-4">
+        <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
+          <TabsTrigger
+            value="all"
+            className="data-[state=active]:bg-gray-900 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+          >
+            ทั้งหมด ({stats.total})
+          </TabsTrigger>
+          {stats.started > 0 && (
+            <TabsTrigger
+              value="started"
+              className="data-[state=active]:bg-green-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+            >
+              กำลังเรียน ({stats.started})
+            </TabsTrigger>
+          )}
+          {stats.published > 0 && (
+            <TabsTrigger
+              value="published"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+            >
+              เปิดรับสมัคร ({stats.published})
+            </TabsTrigger>
+          )}
+          {stats.completed > 0 && (
+            <TabsTrigger
+              value="completed"
+              className="data-[state=active]:bg-gray-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+            >
+              จบแล้ว ({stats.completed})
+            </TabsTrigger>
+          )}
+          {stats.draft > 0 && (
+            <TabsTrigger
+              value="draft"
+              className="data-[state=active]:bg-gray-500 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+            >
+              ร่าง ({stats.draft})
+            </TabsTrigger>
+          )}
+          {stats.cancelled > 0 && (
+            <TabsTrigger
+              value="cancelled"
+              className="data-[state=active]:bg-red-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+            >
+              ยกเลิก ({stats.cancelled})
+            </TabsTrigger>
+          )}
+        </TabsList>
+      </Tabs>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  type="text"
-                  placeholder="ค้นหาชื่อคลาส, รหัส, วิชา, ครู, สาขา..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+      {/* Search + Subject Chips */}
+      <div className="flex flex-col gap-3 mb-6">
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            type="text"
+            placeholder="ค้นหาชื่อคลาส, รหัส, ครู, สาขา..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Subject Chips */}
+        {usedSubjects.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedSubject('all')}
+              className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                selectedSubject === 'all'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              ทุกวิชา
+            </button>
+            {usedSubjects.map(subject => (
+              <button
+                key={subject.id}
+                onClick={() => setSelectedSubject(selectedSubject === subject.id ? 'all' : subject.id)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                  selectedSubject === subject.id
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: subject.color }}
                 />
-              </div>
-            </div>
-
-            {/* Subject Filter */}
-            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="เลือกวิชา" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทุกวิชา</SelectItem>
-                {loadingSubjects ? (
-                  <SelectItem value="loading" disabled>กำลังโหลด...</SelectItem>
-                ) : (
-                  subjects.map(subject => (
-                    <SelectItem key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-
-            {/* Status Filter */}
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="เลือกสถานะ" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทุกสถานะ</SelectItem>
-                {Object.entries(statusLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                {subject.name}
+              </button>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
       {/* Classes Table */}
       <Card>
@@ -546,16 +540,16 @@ export default function ClassesPage() {
                       return (
                         <TableRow key={cls.id}>
                           <TableCell className="align-top">
-                            <div className="flex items-start gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full flex-shrink-0 mt-1" 
+                            <Link href={`/classes/${cls.id}`} className="flex items-start gap-2 group">
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
                                 style={{ backgroundColor: getSubjectColor(cls.subjectId) }}
                               />
                               <div className="min-w-0">
-                                <div className="font-medium truncate" title={cls.name}>{cls.name}</div>
+                                <div className="font-medium truncate group-hover:text-red-600 transition-colors" title={cls.name}>{cls.name}</div>
                                 <div className="text-xs text-gray-500">{cls.code}</div>
                               </div>
-                            </div>
+                            </Link>
                           </TableCell>
                           <TableCell className="align-top">
                             {loadingSubjects ? (
