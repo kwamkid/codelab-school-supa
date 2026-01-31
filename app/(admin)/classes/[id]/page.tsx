@@ -300,7 +300,7 @@ export default function ClassDetailPage() {
             </AlertDialog>
           )}
           
-          {!isDeletable && classData.status !== 'cancelled' && classData.enrolledCount > 0 && (
+          {!isDeletable && classData.status !== 'cancelled' && classData.status !== 'completed' && classData.enrolledCount > 0 && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-red-600">

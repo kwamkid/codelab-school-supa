@@ -458,21 +458,8 @@ export async function createEnrollment(
 
     const enrollmentId = data.id;
 
-    // Update class enrolled count
-    const { error: classError } = await supabase.rpc('increment_enrolled_count', {
-      class_id: enrollmentData.classId
-    });
-
-    if (classError) {
-      // Fallback: manual update
-      const classData = await getClass(enrollmentData.classId);
-      if (classData) {
-        await supabase
-          .from('classes')
-          .update({ enrolled_count: classData.enrolledCount + 1 })
-          .eq('id', enrollmentData.classId);
-      }
-    }
+    // Note: enrolled_count is updated automatically by database trigger on enrollments table
+    // Do NOT manually increment here to avoid double-counting
 
     // Create makeup requests for missed sessions
     await createMakeupForMissedSessions(
@@ -656,21 +643,8 @@ export async function cancelEnrollment(
 
     if (enrollmentError) throw enrollmentError;
 
-    // Decrement class enrolled count
-    const { error: classError } = await supabase.rpc('decrement_enrolled_count', {
-      class_id: enrollment.classId
-    });
-
-    if (classError) {
-      // Fallback: manual update
-      const classData = await getClass(enrollment.classId);
-      if (classData) {
-        await supabase
-          .from('classes')
-          .update({ enrolled_count: Math.max(0, classData.enrolledCount - 1) })
-          .eq('id', enrollment.classId);
-      }
-    }
+    // Note: enrolled_count is updated automatically by database trigger on enrollments table
+    // Do NOT manually decrement here to avoid double-counting
   } catch (error) {
     console.error('Error canceling enrollment:', error);
     throw error;
@@ -746,23 +720,8 @@ export async function transferEnrollment(
 
     if (enrollmentError) throw enrollmentError;
 
-    // Update old class count
-    const oldClass = await getClass(enrollment.classId);
-    if (oldClass) {
-      await supabase
-        .from('classes')
-        .update({ enrolled_count: Math.max(0, oldClass.enrolledCount - 1) })
-        .eq('id', enrollment.classId);
-    }
-
-    // Update new class count
-    const newClass = await getClass(newClassId);
-    if (newClass) {
-      await supabase
-        .from('classes')
-        .update({ enrolled_count: newClass.enrolledCount + 1 })
-        .eq('id', newClassId);
-    }
+    // Note: enrolled_count is updated automatically by database trigger on enrollments table
+    // The trigger handles class_id changes (decrement old, increment new)
   } catch (error) {
     console.error('Error transferring enrollment:', error);
     throw error;

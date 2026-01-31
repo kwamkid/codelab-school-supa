@@ -446,15 +446,8 @@ export async function createEnrollment(
     throw enrollError
   }
 
-  // Update enrolled count on class (trigger handles this, but being explicit)
-  const { error: updateError } = await supabase
-    .from('classes')
-    .update({ enrolled_count: seats.currentEnrolled + 1 })
-    .eq('id', enrollmentData.class_id)
-
-  if (updateError) {
-    console.error('Error updating enrolled count:', updateError)
-  }
+  // Note: enrolled_count is updated automatically by database trigger on enrollments table
+  // Do NOT manually increment here to avoid double-counting
 
   // Auto-create makeup requests for missed sessions
   await createMakeupForMissedSessions(
@@ -583,18 +576,8 @@ export async function cancelEnrollment(
     throw updateError
   }
 
-  // Decrease enrolled count on class
-  const { error: classError } = await supabase.rpc('decrement_enrolled_count', {
-    p_class_id: enrollment.class_id
-  })
-
-  // Fallback if RPC doesn't exist
-  if (classError) {
-    await supabase
-      .from('classes')
-      .update({ enrolled_count: Math.max(0, enrollment.class_id ? 1 : 0) })
-      .eq('id', enrollment.class_id)
-  }
+  // Note: enrolled_count is updated automatically by database trigger on enrollments table
+  // Do NOT manually decrement here to avoid double-counting
 }
 
 // Delete enrollment completely
@@ -616,19 +599,8 @@ export async function deleteEnrollment(enrollmentId: string): Promise<void> {
     throw deleteError
   }
 
-  // Update enrolled count
-  const { data: classData } = await supabase
-    .from('classes')
-    .select('enrolled_count')
-    .eq('id', enrollment.class_id)
-    .single()
-
-  if (classData) {
-    await supabase
-      .from('classes')
-      .update({ enrolled_count: Math.max(0, classData.enrolled_count - 1) })
-      .eq('id', enrollment.class_id)
-  }
+  // Note: enrolled_count is updated automatically by database trigger on enrollments table
+  // Do NOT manually decrement here to avoid double-counting
 }
 
 // ============================================
@@ -688,26 +660,8 @@ export async function transferEnrollment(
     throw updateError
   }
 
-  // Update enrolled counts on both classes
-  // Decrease old class
-  const { data: oldClass } = await supabase
-    .from('classes')
-    .select('enrolled_count')
-    .eq('id', oldClassId)
-    .single()
-
-  if (oldClass) {
-    await supabase
-      .from('classes')
-      .update({ enrolled_count: Math.max(0, oldClass.enrolled_count - 1) })
-      .eq('id', oldClassId)
-  }
-
-  // Increase new class
-  await supabase
-    .from('classes')
-    .update({ enrolled_count: seats.currentEnrolled + 1 })
-    .eq('id', newClassId)
+  // Note: enrolled_count is updated automatically by database trigger on enrollments table
+  // The trigger handles class_id changes (decrement old, increment new)
 }
 
 // Get transfer history for enrollment
