@@ -181,6 +181,7 @@ export default function EnrollmentsPage() {
   } = usePagination(20);
 
   const isSearchMode = debouncedSearchTerm.length > 0;
+  const hasActiveFilters = isSearchMode || !!dateRange;
   
   // Other states
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -247,7 +248,7 @@ export default function EnrollmentsPage() {
   } = useQuery<Enrollment[]>({
     queryKey: ['enrollments-all', selectedBranchId],
     queryFn: () => getEnrollments(selectedBranchId),
-    enabled: isSearchMode,
+    enabled: hasActiveFilters,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -305,33 +306,32 @@ export default function EnrollmentsPage() {
   };
 
   const enrollmentsToDisplay = useMemo(() => {
-    if (isSearchMode) {
+    if (hasActiveFilters) {
       return allEnrollments.filter(enrollment => {
         if (selectedStatus !== 'all' && enrollment.status !== selectedStatus) return false;
         if (selectedPaymentStatus !== 'all' && enrollment.payment.status !== selectedPaymentStatus) return false;
         if (!isInDateRange(enrollment.enrolledAt)) return false;
 
-        const student = getStudentInfo(enrollment.studentId);
-        const classInfo = getClassInfo(enrollment.classId);
-        const searchLower = debouncedSearchTerm.toLowerCase();
+        if (isSearchMode) {
+          const student = getStudentInfo(enrollment.studentId);
+          const classInfo = getClassInfo(enrollment.classId);
+          const searchLower = debouncedSearchTerm.toLowerCase();
 
-        return (
-          student?.name.toLowerCase().includes(searchLower) ||
-          student?.nickname.toLowerCase().includes(searchLower) ||
-          student?.parentName.toLowerCase().includes(searchLower) ||
-          classInfo?.name.toLowerCase().includes(searchLower) ||
-          classInfo?.code.toLowerCase().includes(searchLower)
-        );
+          return (
+            student?.name.toLowerCase().includes(searchLower) ||
+            student?.nickname.toLowerCase().includes(searchLower) ||
+            student?.parentName.toLowerCase().includes(searchLower) ||
+            classInfo?.name.toLowerCase().includes(searchLower) ||
+            classInfo?.code.toLowerCase().includes(searchLower)
+          );
+        }
+        return true;
       });
     } else {
-      const enrollments = paginatedData?.enrollments || [];
-      // Apply date filter client-side for paginated data
-      if (dateRange) {
-        return enrollments.filter(e => isInDateRange(e.enrolledAt));
-      }
-      return enrollments;
+      return paginatedData?.enrollments || [];
     }
   }, [
+    hasActiveFilters,
     isSearchMode,
     allEnrollments,
     paginatedData,
@@ -343,15 +343,44 @@ export default function EnrollmentsPage() {
     getClassInfo
   ]);
 
-  const paginatedSearchResults = useMemo(() => {
-    if (!isSearchMode) return enrollmentsToDisplay;
-    return getPaginatedData(enrollmentsToDisplay);
-  }, [isSearchMode, enrollmentsToDisplay, getPaginatedData]);
+  // Filtered stats for tabs — count by payment status from filtered data
+  const filteredStats = useMemo(() => {
+    if (!hasActiveFilters) return null;
+    // Count from allEnrollments with search + date filters (but NOT payment status filter)
+    const baseFiltered = allEnrollments.filter(enrollment => {
+      if (selectedStatus !== 'all' && enrollment.status !== selectedStatus) return false;
+      if (!isInDateRange(enrollment.enrolledAt)) return false;
+      if (isSearchMode) {
+        const student = getStudentInfo(enrollment.studentId);
+        const classInfo = getClassInfo(enrollment.classId);
+        const searchLower = debouncedSearchTerm.toLowerCase();
+        return (
+          student?.name.toLowerCase().includes(searchLower) ||
+          student?.nickname.toLowerCase().includes(searchLower) ||
+          student?.parentName.toLowerCase().includes(searchLower) ||
+          classInfo?.name.toLowerCase().includes(searchLower) ||
+          classInfo?.code.toLowerCase().includes(searchLower)
+        );
+      }
+      return true;
+    });
+    return {
+      total: baseFiltered.length,
+      paidCount: baseFiltered.filter(e => e.payment.status === 'paid').length,
+      pendingCount: baseFiltered.filter(e => e.payment.status === 'pending').length,
+      partialCount: baseFiltered.filter(e => e.payment.status === 'partial').length,
+    };
+  }, [hasActiveFilters, allEnrollments, selectedStatus, dateRange, isSearchMode, debouncedSearchTerm, getStudentInfo, getClassInfo]);
 
-  const displayedEnrollments = isSearchMode ? paginatedSearchResults : enrollmentsToDisplay;
+  const paginatedSearchResults = useMemo(() => {
+    if (!hasActiveFilters) return enrollmentsToDisplay;
+    return getPaginatedData(enrollmentsToDisplay);
+  }, [hasActiveFilters, enrollmentsToDisplay, getPaginatedData]);
+
+  const displayedEnrollments = hasActiveFilters ? paginatedSearchResults : enrollmentsToDisplay;
 
   const totalPages = useMemo(() => {
-    if (isSearchMode) {
+    if (hasActiveFilters) {
       return calculateTotalPages(enrollmentsToDisplay.length);
     } else {
       // Use paginatedData.total which is already filtered
@@ -360,7 +389,7 @@ export default function EnrollmentsPage() {
       }
       return paginatedData?.hasMore ? currentPage + 1 : currentPage;
     }
-  }, [isSearchMode, enrollmentsToDisplay.length, calculateTotalPages, paginatedData?.total, pageSize, paginatedData?.hasMore, currentPage]);
+  }, [hasActiveFilters, enrollmentsToDisplay.length, calculateTotalPages, paginatedData?.total, pageSize, paginatedData?.hasMore, currentPage]);
 
   // ============================================
   // 🎯 Reset pagination on filter change
@@ -555,25 +584,25 @@ export default function EnrollmentsPage() {
             value="all"
             className="data-[state=active]:bg-gray-900 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
           >
-            ทั้งหมด ({stats?.total || 0})
+            ทั้งหมด ({filteredStats?.total ?? stats?.total ?? 0})
           </TabsTrigger>
           <TabsTrigger
             value="paid"
             className="data-[state=active]:bg-green-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
           >
-            ชำระแล้ว ({stats?.paidCount || 0})
+            ชำระแล้ว ({filteredStats?.paidCount ?? stats?.paidCount ?? 0})
           </TabsTrigger>
           <TabsTrigger
             value="pending"
             className="data-[state=active]:bg-yellow-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
           >
-            รอชำระ ({stats?.pendingCount || 0})
+            รอชำระ ({filteredStats?.pendingCount ?? stats?.pendingCount ?? 0})
           </TabsTrigger>
           <TabsTrigger
             value="partial"
             className="data-[state=active]:bg-orange-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
           >
-            ชำระบางส่วน ({stats?.partialCount || 0})
+            ชำระบางส่วน ({filteredStats?.partialCount ?? stats?.partialCount ?? 0})
           </TabsTrigger>
         </TabsList>
       </Tabs>

@@ -11,6 +11,12 @@ interface DateRangePickerProps {
   className?: string
 }
 
+function toDateStr(d: Date | string | null | undefined): string {
+  if (!d) return ""
+  if (typeof d === "string") return d.slice(0, 10)
+  return d.toISOString().slice(0, 10)
+}
+
 export function DateRangePicker({
   value,
   onChange,
@@ -22,66 +28,39 @@ export function DateRangePicker({
     endDate: value?.to || null,
   }
 
-  const handleChange = (newValue: { startDate: string | null; endDate: string | null } | null) => {
-    if (newValue?.startDate && newValue?.endDate) {
-      onChange({
-        from: newValue.startDate,
-        to: newValue.endDate,
-      })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleChange = (newValue: any) => {
+    const start = toDateStr(newValue?.startDate)
+    const end = toDateStr(newValue?.endDate)
+    if (start && end) {
+      onChange({ from: start, to: end })
     } else {
       onChange(undefined)
     }
   }
 
   const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
   const configs = {
     shortcuts: {
-      today: {
-        text: "วันนี้",
+      today: "วันนี้",
+      yesterday: "เมื่อวาน",
+      past: (days: number) =>
+        days === 7 ? "7 วันย้อนหลัง" : days === 30 ? "30 วันย้อนหลัง" : `${days} วันย้อนหลัง`,
+      currentMonth: "เดือนนี้",
+      pastMonth: "เดือนที่แล้ว",
+      thisYear: {
+        text: "ปีนี้",
         period: {
-          start: today.toISOString().slice(0, 10),
-          end: today.toISOString().slice(0, 10),
+          start: new Date(now.getFullYear(), 0, 1),
+          end: new Date(now.getFullYear(), 11, 31),
         },
       },
-      yesterday: {
-        text: "เมื่อวาน",
+      lastYear: {
+        text: "ปีที่แล้ว",
         period: {
-          start: new Date(today.getTime() - 86400000).toISOString().slice(0, 10),
-          end: new Date(today.getTime() - 86400000).toISOString().slice(0, 10),
-        },
-      },
-      past: [
-        {
-          daysNumber: 7,
-          text: "7 วันย้อนหลัง",
-          period: {
-            start: new Date(today.getTime() - 6 * 86400000).toISOString().slice(0, 10),
-            end: today.toISOString().slice(0, 10),
-          },
-        },
-        {
-          daysNumber: 30,
-          text: "30 วันย้อนหลัง",
-          period: {
-            start: new Date(today.getTime() - 29 * 86400000).toISOString().slice(0, 10),
-            end: today.toISOString().slice(0, 10),
-          },
-        },
-      ],
-      currentMonth: {
-        text: "เดือนนี้",
-        period: {
-          start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10),
-          end: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10),
-        },
-      },
-      pastMonth: {
-        text: "เดือนที่แล้ว",
-        period: {
-          start: new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10),
-          end: new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10),
+          start: new Date(now.getFullYear() - 1, 0, 1),
+          end: new Date(now.getFullYear() - 1, 11, 31),
         },
       },
     },
