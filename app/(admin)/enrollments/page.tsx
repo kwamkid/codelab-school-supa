@@ -3,12 +3,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Enrollment } from '@/types/models';
-import { 
+import {
   getEnrollmentsPaginated,
   getEnrollmentStats,
   getEnrollments,
-  deleteEnrollment, 
-  updateEnrollment, 
+  deleteEnrollment,
+  updateEnrollment,
   cancelEnrollment,
   PaginatedEnrollments,
   EnrollmentStats
@@ -20,11 +20,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Plus, 
-  Search, 
-  Users, 
-  DollarSign,
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Plus,
+  Search,
+  Users,
   Eye,
   Edit,
   XCircle,
@@ -33,9 +33,10 @@ import {
   CreditCard,
   CheckCircle,
   Loader2,
-  Printer
+  Printer,
 } from 'lucide-react';
 import Link from 'next/link';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -164,6 +165,9 @@ export default function EnrollmentsPage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>('all');
+
+  // Date range filter
+  const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>(undefined);
   
   // Pagination using hook
   const {
@@ -291,16 +295,26 @@ export default function EnrollmentsPage() {
   // ============================================
   // 🎯 Enrollment Data
   // ============================================
+  // Date filter helper
+  const isInDateRange = (enrolledAt: Date) => {
+    if (!dateRange) return true;
+    const enrolled = enrolledAt.toISOString().split('T')[0];
+    if (dateRange.from && enrolled < dateRange.from) return false;
+    if (dateRange.to && enrolled > dateRange.to) return false;
+    return true;
+  };
+
   const enrollmentsToDisplay = useMemo(() => {
     if (isSearchMode) {
       return allEnrollments.filter(enrollment => {
         if (selectedStatus !== 'all' && enrollment.status !== selectedStatus) return false;
         if (selectedPaymentStatus !== 'all' && enrollment.payment.status !== selectedPaymentStatus) return false;
-        
+        if (!isInDateRange(enrollment.enrolledAt)) return false;
+
         const student = getStudentInfo(enrollment.studentId);
         const classInfo = getClassInfo(enrollment.classId);
         const searchLower = debouncedSearchTerm.toLowerCase();
-        
+
         return (
           student?.name.toLowerCase().includes(searchLower) ||
           student?.nickname.toLowerCase().includes(searchLower) ||
@@ -310,15 +324,21 @@ export default function EnrollmentsPage() {
         );
       });
     } else {
-      return paginatedData?.enrollments || [];
+      const enrollments = paginatedData?.enrollments || [];
+      // Apply date filter client-side for paginated data
+      if (dateRange) {
+        return enrollments.filter(e => isInDateRange(e.enrolledAt));
+      }
+      return enrollments;
     }
   }, [
-    isSearchMode, 
-    allEnrollments, 
-    paginatedData, 
-    selectedStatus, 
-    selectedPaymentStatus, 
+    isSearchMode,
+    allEnrollments,
+    paginatedData,
+    selectedStatus,
+    selectedPaymentStatus,
     debouncedSearchTerm,
+    dateRange,
     getStudentInfo,
     getClassInfo
   ]);
@@ -347,7 +367,7 @@ export default function EnrollmentsPage() {
   // ============================================
   useEffect(() => {
     resetPagination();
-  }, [selectedBranchId, selectedStatus, selectedPaymentStatus, debouncedSearchTerm, resetPagination]);
+  }, [selectedBranchId, selectedStatus, selectedPaymentStatus, debouncedSearchTerm, dateRange, resetPagination]);
 
   // ============================================
   // 🎯 Action Handlers
@@ -493,15 +513,7 @@ export default function EnrollmentsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">กำลังเรียน</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">กำลังเรียน</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats?.active || 0}</div>
@@ -509,26 +521,73 @@ export default function EnrollmentsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">เรียนจบ</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">ชำระแล้ว</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{stats?.completed || 0}</div>
+            <div className="text-2xl font-bold">{stats?.paidCount || 0}</div>
+            <p className="text-xs text-gray-500 mt-1">{formatCurrency(stats?.totalRevenue || 0)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ยกเลิก</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">รอชำระ</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats?.dropped || 0}</div>
+            <div className="text-2xl font-bold text-yellow-600">{stats?.pendingCount || 0}</div>
+            <p className="text-xs text-gray-500 mt-1">{formatCurrency(stats?.pendingAmount || 0)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">ชำระบางส่วน</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{stats?.partialCount || 0}</div>
+            <p className="text-xs text-gray-500 mt-1">ค้าง {formatCurrency(stats?.partialRemainingAmount || 0)}</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Payment Status Tabs */}
+      <Tabs value={selectedPaymentStatus} onValueChange={setSelectedPaymentStatus} className="mb-4">
+        <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
+          <TabsTrigger
+            value="all"
+            className="data-[state=active]:bg-gray-900 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+          >
+            ทั้งหมด ({stats?.total || 0})
+          </TabsTrigger>
+          <TabsTrigger
+            value="paid"
+            className="data-[state=active]:bg-green-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+          >
+            ชำระแล้ว ({stats?.paidCount || 0})
+          </TabsTrigger>
+          <TabsTrigger
+            value="pending"
+            className="data-[state=active]:bg-yellow-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+          >
+            รอชำระ ({stats?.pendingCount || 0})
+          </TabsTrigger>
+          <TabsTrigger
+            value="partial"
+            className="data-[state=active]:bg-orange-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+          >
+            ชำระบางส่วน ({stats?.partialCount || 0})
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col md:flex-row gap-3 mb-6">
+        {/* Date Range */}
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          placeholder="กรองตามวันที่ลงทะเบียน"
+        />
+
+        {/* Search */}
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -538,9 +597,10 @@ export default function EnrollmentsPage() {
             className="pl-10"
           />
         </div>
-        
+
+        {/* Status filter */}
         <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-full md:w-[150px]">
             <SelectValue placeholder="สถานะ" />
           </SelectTrigger>
           <SelectContent>
@@ -552,23 +612,7 @@ export default function EnrollmentsPage() {
             ))}
           </SelectContent>
         </Select>
-        
-        <Select value={selectedPaymentStatus} onValueChange={setSelectedPaymentStatus}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="การชำระเงิน" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทั้งหมด</SelectItem>
-            {Object.entries(paymentStatusLabels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Enrollments Table */}
       <Card>
@@ -634,6 +678,11 @@ export default function EnrollmentsPage() {
                               <div>
                                 <p className="font-medium">{student.nickname || student.name}</p>
                                 <p className="text-sm text-gray-500">ผู้ปกครอง: {student.parentName}</p>
+                                {(student.schoolName || student.gradeLevel) && (
+                                  <p className="text-xs text-gray-400">
+                                    {[student.schoolName, student.gradeLevel].filter(Boolean).join(' / ')}
+                                  </p>
+                                )}
                               </div>
                             ) : (
                               <div>
@@ -668,7 +717,16 @@ export default function EnrollmentsPage() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell>{formatDate(enrollment.enrolledAt)}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p>{formatDate(enrollment.enrolledAt)}</p>
+                              {classInfo && (
+                                <p className="text-xs text-gray-400">
+                                  เริ่มเรียน: {formatDateCompact(classInfo.startDate)}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-right">
                             <div>
                               <p className="font-medium">{formatCurrency(enrollment.pricing.finalPrice)}</p>

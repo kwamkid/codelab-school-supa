@@ -155,6 +155,8 @@ export interface EnrollmentStats {
   dropped: number;
   totalRevenue: number;
   pendingPayments: number;
+  pendingAmount: number;
+  partialRemainingAmount: number;
   pendingCount: number;
   partialCount: number;
   paidCount: number;
@@ -181,6 +183,8 @@ export async function getEnrollmentStats(branchId?: string | null): Promise<Enro
       dropped: 0,
       totalRevenue: 0,
       pendingPayments: 0,
+      pendingAmount: 0,
+      partialRemainingAmount: 0,
       pendingCount: 0,
       partialCount: 0,
       paidCount: 0
@@ -195,10 +199,14 @@ export async function getEnrollmentStats(branchId?: string | null): Promise<Enro
       // Count by payment status
       if (row.payment_status === 'pending') {
         stats.pendingCount++;
-        stats.pendingPayments += row.final_price || 0;
+        const amount = row.final_price || 0;
+        stats.pendingAmount += amount;
+        stats.pendingPayments += amount;
       } else if (row.payment_status === 'partial') {
         stats.partialCount++;
-        stats.pendingPayments += (row.final_price || 0) - (row.paid_amount || 0);
+        const remaining = (row.final_price || 0) - (row.paid_amount || 0);
+        stats.partialRemainingAmount += remaining;
+        stats.pendingPayments += remaining;
       } else if (row.payment_status === 'paid') {
         stats.paidCount++;
         stats.totalRevenue += row.paid_amount || 0;
@@ -215,6 +223,8 @@ export async function getEnrollmentStats(branchId?: string | null): Promise<Enro
       dropped: 0,
       totalRevenue: 0,
       pendingPayments: 0,
+      pendingAmount: 0,
+      partialRemainingAmount: 0,
       pendingCount: 0,
       partialCount: 0,
       paidCount: 0
