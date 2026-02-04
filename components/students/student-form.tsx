@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GradeLevelCombobox } from "@/components/ui/grade-level-combobox";
+import { SchoolNameCombobox } from "@/components/ui/school-name-combobox";
 import { toast } from 'sonner';
 import { Loader2, Save, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -193,12 +194,14 @@ export default function StudentForm({ parentId, student, isEdit = false }: Stude
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="schoolName">โรงเรียน</Label>
-              <Input
-                id="schoolName"
+              <SchoolNameCombobox
                 value={formData.schoolName}
-                onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
-                placeholder="ชื่อโรงเรียน"
+                onChange={(value) => setFormData({ ...formData, schoolName: value })}
+                placeholder="พิมพ์ชื่อโรงเรียน..."
               />
+              <p className="text-xs text-gray-500">
+                เลือกจากรายชื่อที่มี หรือพิมพ์ชื่อใหม่
+              </p>
             </div>
             
             <div className="space-y-2">

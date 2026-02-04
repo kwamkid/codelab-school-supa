@@ -432,98 +432,81 @@ export default function AvailabilityReportPage() {
 
       {/* Filters */}
       <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-gray-500" />
-            <CardTitle className="text-lg">ตัวกรองการค้นหา</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="pb-6">
-          <div className="grid grid-cols-2 md:grid-cols-12 gap-4">
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Filter className="w-4 h-4" />
+              ตัวกรอง
+            </div>
+
             {/* วันที่ */}
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium mb-2 block">วันที่</label>
-              <input
-                type="date"
-                value={formatDateForInput(selectedDate)}
-                onChange={handleDateChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent h-9"
-              />
+            <input
+              type="date"
+              value={formatDateForInput(selectedDate)}
+              onChange={handleDateChange}
+              className="w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            />
+
+            {/* ช่วงเวลา */}
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground hidden sm:block" />
+              <Select
+                value={timeRange.start}
+                onValueChange={(value) => setTimeRange(prev => ({ ...prev, start: value }))}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {timeOptions.map(time => (
+                    <SelectItem key={time} value={time}>
+                      {time} น.
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">—</span>
+              <Select
+                value={timeRange.end}
+                onValueChange={(value) => setTimeRange(prev => ({ ...prev, end: value }))}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {timeOptions.filter(time => time > timeRange.start).map(time => (
+                    <SelectItem key={time} value={time}>
+                      {time} น.
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            
-            {/* ช่วงเวลา - รวม dropdown 2 อันเข้าด้วยกัน */}
-            <div className="md:col-span-4">
-              <label className="text-sm font-medium mb-2 block">ช่วงเวลา</label>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={timeRange.start}
-                  onValueChange={(value) => setTimeRange(prev => ({ ...prev, start: value }))}
-                >
-                  <SelectTrigger className="flex-1">
-                    <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {timeOptions.map(time => (
-                      <SelectItem key={time} value={time}>
-                        {time} น.
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <span className="text-gray-500">ถึง</span>
-                
-                <Select
-                  value={timeRange.end}
-                  onValueChange={(value) => setTimeRange(prev => ({ ...prev, end: value }))}
-                >
-                  <SelectTrigger className="flex-1">
-                    <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {timeOptions.filter(time => time > timeRange.start).map(time => (
-                      <SelectItem key={time} value={time}>
-                        {time} น.
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            {/* แสดงช่วงเวลา - ใช้ column ที่เหลือ */}
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium mb-2 block">แสดงช่วง</label>
-              <div className="flex gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="alignment"
-                    checked={timeAlignment === '00'}
-                    onChange={() => setTimeAlignment('00')}
-                    className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
-                  />
-                  <span className={cn(
-                    "text-sm font-medium",
-                    timeAlignment === '00' ? "text-gray-900" : "text-gray-500"
-                  )}>xx:00</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="alignment"
-                    checked={timeAlignment === '30'}
-                    onChange={() => setTimeAlignment('30')}
-                    className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
-                  />
-                  <span className={cn(
-                    "text-sm font-medium",
-                    timeAlignment === '30' ? "text-gray-900" : "text-gray-500"
-                  )}>xx:30</span>
-                </label>
-              </div>
+
+            {/* แสดงช่วง */}
+            <div className="flex items-center gap-1 border rounded-md overflow-hidden">
+              <button
+                onClick={() => setTimeAlignment('00')}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium transition-colors",
+                  timeAlignment === '00'
+                    ? "bg-gray-900 text-white"
+                    : "bg-background text-muted-foreground hover:bg-muted"
+                )}
+              >
+                xx:00
+              </button>
+              <button
+                onClick={() => setTimeAlignment('30')}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium transition-colors",
+                  timeAlignment === '30'
+                    ? "bg-gray-900 text-white"
+                    : "bg-background text-muted-foreground hover:bg-muted"
+                )}
+              >
+                xx:30
+              </button>
             </div>
           </div>
         </CardContent>

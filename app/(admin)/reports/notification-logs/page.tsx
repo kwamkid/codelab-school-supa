@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -13,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   Table,
   TableBody,
@@ -26,9 +25,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  Calendar,
   Filter,
-  Download,
   RefreshCw,
   Eye
 } from 'lucide-react';
@@ -40,7 +37,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { formatDate } from '@/lib/utils';
+
 
 interface NotificationLog {
   id: string;
@@ -68,21 +65,18 @@ export default function NotificationLogsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Set default date range to today (Thailand timezone)
-  const now = new Date();
-  const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // Default: last 7 days
+  const getDefault7Days = () => {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+    const today = now.toISOString().split('T')[0];
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    return { from: sevenDaysAgo.toISOString().split('T')[0], to: today };
+  };
 
-  const todayStr = today.toISOString().split('T')[0];
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-  const [filters, setFilters] = useState({
-    type: '',
-    status: '',
-    startDate: todayStr,
-    endDate: tomorrowStr
-  });
+  const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>(getDefault7Days);
+  const [filterType, setFilterType] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const pageSize = 50;
@@ -91,10 +85,10 @@ export default function NotificationLogsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.type) params.append('type', filters.type);
-      if (filters.status) params.append('status', filters.status);
-      if (filters.startDate) params.append('startDate', filters.startDate);
-      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filterType) params.append('type', filterType);
+      if (filterStatus) params.append('status', filterStatus);
+      if (dateRange?.from) params.append('startDate', dateRange.from);
+      if (dateRange?.to) params.append('endDate', dateRange.to);
       params.append('page', page.toString());
       params.append('pageSize', pageSize.toString());
 
@@ -113,22 +107,17 @@ export default function NotificationLogsPage() {
 
   useEffect(() => {
     loadLogs();
-  }, [page, filters]);
+  }, [page, dateRange, filterType, filterStatus]);
 
-  const handleFilterChange = (key: string, value: string) => {
-    // Convert "all" to empty string for API
+  const handleFilterChange = (key: 'type' | 'status', value: string) => {
     const apiValue = value === 'all' ? '' : value;
-    setFilters(prev => ({ ...prev, [key]: apiValue }));
+    if (key === 'type') setFilterType(apiValue);
+    else setFilterStatus(apiValue);
     setPage(1);
   };
 
-  const handleReset = () => {
-    setFilters({
-      type: '',
-      status: '',
-      startDate: todayStr,
-      endDate: tomorrowStr
-    });
+  const handleDateRangeChange = (range: { from: string; to: string } | undefined) => {
+    setDateRange(range);
     setPage(1);
   };
 
@@ -213,74 +202,42 @@ export default function NotificationLogsPage() {
 
       {/* Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
-            ตัวกรอง
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">ประเภท</Label>
-              <Select value={filters.type || 'all'} onValueChange={(v) => handleFilterChange('type', v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="ทั้งหมด" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="class-reminder">แจ้งเตือนคลาส</SelectItem>
-                  <SelectItem value="makeup-reminder">แจ้งเตือน Makeup</SelectItem>
-                  <SelectItem value="makeup-scheduled">ยืนยัน Makeup</SelectItem>
-                  <SelectItem value="trial-confirmation">ยืนยันทดลองเรียน</SelectItem>
-                </SelectContent>
-              </Select>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Filter className="w-4 h-4" />
+              ตัวกรอง
             </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">สถานะ</Label>
-              <Select value={filters.status || 'all'} onValueChange={(v) => handleFilterChange('status', v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="ทั้งหมด" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="success">สำเร็จ</SelectItem>
-                  <SelectItem value="failed">ล้มเหลว</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">วันที่เริ่มต้น</Label>
-              <Input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="w-full"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">วันที่สิ้นสุด</Label>
-              <Input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="w-full"
-                placeholder="เลือกวันสิ้นสุด (ไม่จำกัด)"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2 pt-2 border-t">
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              รีเซ็ตตัวกรอง
-            </Button>
-            <Button variant="default" size="sm" onClick={loadLogs}>
-              <Filter className="w-4 h-4 mr-2" />
-              ค้นหา
+            <DateRangePicker
+              value={dateRange}
+              onChange={handleDateRangeChange}
+              placeholder="เลือกช่วงวันที่"
+              className="w-full sm:w-auto sm:min-w-[300px]"
+            />
+            <Select value={filterType || 'all'} onValueChange={(v) => handleFilterChange('type', v)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="ประเภท: ทั้งหมด" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ประเภท: ทั้งหมด</SelectItem>
+                <SelectItem value="class-reminder">แจ้งเตือนคลาส</SelectItem>
+                <SelectItem value="makeup-reminder">แจ้งเตือน Makeup</SelectItem>
+                <SelectItem value="makeup-scheduled">ยืนยัน Makeup</SelectItem>
+                <SelectItem value="trial-confirmation">ยืนยันทดลองเรียน</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus || 'all'} onValueChange={(v) => handleFilterChange('status', v)}>
+              <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectValue placeholder="สถานะ: ทั้งหมด" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">สถานะ: ทั้งหมด</SelectItem>
+                <SelectItem value="success">สำเร็จ</SelectItem>
+                <SelectItem value="failed">ล้มเหลว</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={loadLogs} disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             </Button>
           </div>
         </CardContent>

@@ -1,18 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import {
   Table,
   TableBody,
@@ -39,14 +31,13 @@ import {
 import { useBranch } from '@/contexts/BranchContext'
 import Link from 'next/link'
 
-// Date preset helpers (same as trial report)
-const getThailandDate = () => {
-  const now = new Date()
-  return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
-}
-
-const formatDateForInput = (date: Date) => {
-  return date.toISOString().split('T')[0]
+// Default: last 7 days
+const getDefault7Days = () => {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
+  const today = now.toISOString().split('T')[0]
+  const sevenDaysAgo = new Date(now)
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+  return { from: sevenDaysAgo.toISOString().split('T')[0], to: today }
 }
 
 const formatCurrency = (amount: number) => {
@@ -58,69 +49,6 @@ const formatCurrency = (amount: number) => {
   }).format(amount)
 }
 
-const getDatePresets = () => {
-  const today = getThailandDate()
-  today.setHours(0, 0, 0, 0)
-
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-
-  const startOfWeek = new Date(today)
-  startOfWeek.setDate(today.getDate() - today.getDay())
-
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-
-  const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-  const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0)
-
-  const startOfYear = new Date(today.getFullYear(), 0, 1)
-
-  const startOfLastYear = new Date(today.getFullYear() - 1, 0, 1)
-  const endOfLastYear = new Date(today.getFullYear() - 1, 11, 31)
-
-  return {
-    today: {
-      label: 'วันนี้',
-      startDate: formatDateForInput(today),
-      endDate: formatDateForInput(today)
-    },
-    yesterday: {
-      label: 'เมื่อวาน',
-      startDate: formatDateForInput(yesterday),
-      endDate: formatDateForInput(yesterday)
-    },
-    thisWeek: {
-      label: 'สัปดาห์นี้',
-      startDate: formatDateForInput(startOfWeek),
-      endDate: formatDateForInput(today)
-    },
-    thisMonth: {
-      label: 'เดือนนี้',
-      startDate: formatDateForInput(startOfMonth),
-      endDate: formatDateForInput(today)
-    },
-    lastMonth: {
-      label: 'เดือนที่แล้ว',
-      startDate: formatDateForInput(startOfLastMonth),
-      endDate: formatDateForInput(endOfLastMonth)
-    },
-    thisYear: {
-      label: 'ปีนี้',
-      startDate: formatDateForInput(startOfYear),
-      endDate: formatDateForInput(today)
-    },
-    lastYear: {
-      label: 'ปีที่แล้ว',
-      startDate: formatDateForInput(startOfLastYear),
-      endDate: formatDateForInput(endOfLastYear)
-    },
-    custom: {
-      label: 'กำหนดเอง',
-      startDate: '',
-      endDate: ''
-    }
-  }
-}
 
 interface EnrollmentStats {
   total: number
@@ -181,21 +109,15 @@ export default function EnrollmentReportPage() {
   const [page, setPage] = useState(1)
   const pageSize = 50
 
-  const presets = useMemo(() => getDatePresets(), [])
-
-  const [selectedPreset, setSelectedPreset] = useState<string>('thisMonth')
-  const [filters, setFilters] = useState({
-    startDate: presets.thisMonth.startDate,
-    endDate: presets.thisMonth.endDate
-  })
+  const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>(getDefault7Days)
   const [subjectSortBy, setSubjectSortBy] = useState<'revenue' | 'students'>('revenue')
 
   const loadData = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (filters.startDate) params.append('startDate', filters.startDate)
-      if (filters.endDate) params.append('endDate', filters.endDate)
+      if (dateRange?.from) params.append('startDate', dateRange.from)
+      if (dateRange?.to) params.append('endDate', dateRange.to)
       if (selectedBranchId) params.append('branchId', selectedBranchId)
       params.append('page', page.toString())
       params.append('pageSize', pageSize.toString())
@@ -217,23 +139,10 @@ export default function EnrollmentReportPage() {
 
   useEffect(() => {
     loadData()
-  }, [filters, selectedBranchId, page])
+  }, [dateRange, selectedBranchId, page])
 
-  const handlePresetChange = (preset: string) => {
-    setSelectedPreset(preset)
-    if (preset !== 'custom') {
-      const presetData = presets[preset as keyof typeof presets]
-      setFilters({
-        startDate: presetData.startDate,
-        endDate: presetData.endDate
-      })
-    }
-    setPage(1)
-  }
-
-  const handleDateChange = (field: 'startDate' | 'endDate', value: string) => {
-    setSelectedPreset('custom')
-    setFilters(prev => ({ ...prev, [field]: value }))
+  const handleDateRangeChange = (range: { from: string; to: string } | undefined) => {
+    setDateRange(range)
     setPage(1)
   }
 
@@ -282,58 +191,21 @@ export default function EnrollmentReportPage() {
 
       {/* Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
-            ตัวกรอง
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Date Preset */}
-            <div className="space-y-2">
-              <Label>ช่วงเวลา</Label>
-              <Select value={selectedPreset} onValueChange={handlePresetChange}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(presets).map(([key, value]) => (
-                    <SelectItem key={key} value={key}>
-                      {value.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Filter className="w-4 h-4" />
+              ช่วงเวลา
             </div>
-
-            {/* Start Date */}
-            <div className="space-y-2">
-              <Label>วันที่เริ่มต้น</Label>
-              <Input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleDateChange('startDate', e.target.value)}
-              />
-            </div>
-
-            {/* End Date */}
-            <div className="space-y-2">
-              <Label>วันที่สิ้นสุด</Label>
-              <Input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleDateChange('endDate', e.target.value)}
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-end gap-2">
-              <Button onClick={loadData} disabled={loading}>
-                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                รีเฟรช
-              </Button>
-            </div>
+            <DateRangePicker
+              value={dateRange}
+              onChange={handleDateRangeChange}
+              placeholder="เลือกช่วงวันที่"
+              className="w-full sm:w-auto sm:min-w-[300px]"
+            />
+            <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            </Button>
           </div>
         </CardContent>
       </Card>

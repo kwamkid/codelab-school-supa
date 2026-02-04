@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GradeLevelCombobox } from "@/components/ui/grade-level-combobox";
+import { SchoolNameCombobox } from "@/components/ui/school-name-combobox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
@@ -551,10 +552,10 @@ function RegisterContent() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label>โรงเรียน</Label>
-                      <Input
+                      <SchoolNameCombobox
                         value={student.schoolName}
-                        onChange={(e) => handleStudentChange(index, 'schoolName', e.target.value)}
-                        placeholder="ชื่อโรงเรียน"
+                        onChange={(value) => handleStudentChange(index, 'schoolName', value)}
+                        placeholder="พิมพ์ชื่อโรงเรียน..."
                       />
                     </div>
                     <div>

@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GradeLevelCombobox } from "@/components/ui/grade-level-combobox"
+import { SchoolNameCombobox } from "@/components/ui/school-name-combobox"
 import { 
   Loader2, 
   Phone, 
@@ -788,15 +789,11 @@ export default function TrialBookingPage() {
                     
                     <div className="md:col-span-2">
                       <Label>โรงเรียน</Label>
-                      <div className="relative">
-                        <School className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                          value={student.schoolName}
-                          onChange={(e) => updateStudent(idx, 'schoolName', e.target.value)}
-                          placeholder="ชื่อโรงเรียน"
-                          className="pl-10"
-                        />
-                      </div>
+                      <SchoolNameCombobox
+                        value={student.schoolName}
+                        onChange={(value) => updateStudent(idx, 'schoolName', value)}
+                        placeholder="พิมพ์ชื่อโรงเรียน..."
+                      />
                     </div>
                   </div>
                   

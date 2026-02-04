@@ -1,14 +1,11 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, School, MessageSquare, Repeat, Bell, Database } from 'lucide-react';
+import { Settings, School, MessageSquare, Repeat, Database } from 'lucide-react';
 import GeneralSettingsComponent from './general-settings';
 import LineSettingsComponent from './line-settings';
 import MakeupSettingsComponent from './makeup-settings';
 import BackupLogsTab from './backup-logs-tab';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function SettingsPage() {
   return (
@@ -35,10 +32,6 @@ export default function SettingsPage() {
             <MessageSquare className="h-4 w-4 mr-2" />
             LINE Integration
           </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Bell className="h-4 w-4 mr-2" />
-            Notification Logs
-          </TabsTrigger>
           <TabsTrigger value="backup">
             <Database className="h-4 w-4 mr-2" />
             Backup
@@ -55,34 +48,6 @@ export default function SettingsPage() {
         
         <TabsContent value="line">
           <LineSettingsComponent />
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notification Logs
-              </CardTitle>
-              <CardDescription>
-                ดูประวัติการส่งการแจ้งเตือนทั้งหมดและสถิติ
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  ดูรายละเอียดการส่งการแจ้งเตือนทั้งหมด รวมถึงการแจ้งเตือนคลาส, Makeup Class, และอื่นๆ พร้อมสถิติความสำเร็จ
-                </p>
-
-                <Link href="/reports/notification-logs">
-                  <Button className="w-full sm:w-auto">
-                    <Bell className="h-4 w-4 mr-2" />
-                    เปิดดู Notification Logs
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="backup">

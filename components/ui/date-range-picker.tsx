@@ -14,7 +14,10 @@ interface DateRangePickerProps {
 function toDateStr(d: Date | string | null | undefined): string {
   if (!d) return ""
   if (typeof d === "string") return d.slice(0, 10)
-  return d.toISOString().slice(0, 10)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
 export function DateRangePicker({
@@ -47,8 +50,20 @@ export function DateRangePicker({
       yesterday: "เมื่อวาน",
       past: (days: number) =>
         days === 7 ? "7 วันย้อนหลัง" : days === 30 ? "30 วันย้อนหลัง" : `${days} วันย้อนหลัง`,
-      currentMonth: "เดือนนี้",
-      pastMonth: "เดือนที่แล้ว",
+      thisMonth: {
+        text: "เดือนนี้",
+        period: {
+          start: new Date(now.getFullYear(), now.getMonth(), 1),
+          end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+        },
+      },
+      prevMonth: {
+        text: "เดือนที่แล้ว",
+        period: {
+          start: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+          end: new Date(now.getFullYear(), now.getMonth(), 0),
+        },
+      },
       thisYear: {
         text: "ปีนี้",
         period: {

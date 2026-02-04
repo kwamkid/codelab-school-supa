@@ -96,7 +96,7 @@ export default function ClassesPage() {
   } | null>(null);
   
   // Filters
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('active');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
 
   // ============================================
@@ -183,8 +183,10 @@ export default function ClassesPage() {
         if (!matchesSearch) return false;
       }
 
-      // Other filters
-      if (selectedStatus !== 'all' && cls.status !== selectedStatus) return false;
+      // Status filter
+      if (selectedStatus === 'active') {
+        if (cls.status !== 'published' && cls.status !== 'started') return false;
+      } else if (selectedStatus !== 'all' && cls.status !== selectedStatus) return false;
       if (selectedSubject !== 'all' && cls.subjectId !== selectedSubject) return false;
       return true;
     });
@@ -395,6 +397,12 @@ export default function ClassesPage() {
       {/* Status Filter Tabs */}
       <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="mb-4">
         <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
+          <TabsTrigger
+            value="active"
+            className="data-[state=active]:bg-gray-900 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
+          >
+            กำลังดำเนินการ ({stats.published + stats.started})
+          </TabsTrigger>
           <TabsTrigger
             value="all"
             className="data-[state=active]:bg-gray-900 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"

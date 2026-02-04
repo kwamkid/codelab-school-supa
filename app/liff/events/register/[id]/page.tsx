@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
+import { SchoolNameCombobox } from '@/components/ui/school-name-combobox';
 import { 
   Calendar, 
   MapPin, 
@@ -858,10 +859,9 @@ export default function EventRegistrationPage() {
                             
                             <div className="space-y-1">
                               <Label className="text-xs">โรงเรียน</Label>
-                              <Input
+                              <SchoolNameCombobox
                                 value={student.schoolName}
-                                onChange={(e) => handleUpdateStudent(index, 'schoolName', e.target.value)}
-                                placeholder="ชื่อโรงเรียน"
+                                onChange={(value) => handleUpdateStudent(index, 'schoolName', value)}
                               />
                             </div>
                             

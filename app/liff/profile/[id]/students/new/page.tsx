@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { GradeLevelCombobox } from "@/components/ui/grade-level-combobox"
+import { SchoolNameCombobox } from "@/components/ui/school-name-combobox"
 import { ChevronLeft, User, Calendar, School, AlertCircle, Loader2 } from 'lucide-react'
 import { createStudent } from '@/lib/services/parents'
 import { toast } from 'sonner'
@@ -227,12 +228,10 @@ function AddStudentContent() {
                 name="schoolName"
                 control={control}
                 render={({ field }) => (
-                  <Input
-                    id="schoolName"
-                    placeholder="ชื่อโรงเรียน (ไม่บังคับ)"
+                  <SchoolNameCombobox
                     value={field.value || ''}
                     onChange={field.onChange}
-                    onBlur={field.onBlur}
+                    placeholder="ชื่อโรงเรียน (ไม่บังคับ)"
                   />
                 )}
               />

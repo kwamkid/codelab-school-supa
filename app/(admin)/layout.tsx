@@ -524,6 +524,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           iconColor: 'text-teal-600'
         },
         {
+          name: 'นักเรียน',
+          href: '/reports/students',
+          icon: Users,
+          iconColor: 'text-blue-600'
+        },
+        {
           name: 'Notification Logs',
           href: '/reports/notification-logs',
           icon: Bell,
