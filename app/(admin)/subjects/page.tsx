@@ -50,10 +50,10 @@ export default function SubjectsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Permission check - redirect if not super_admin
+  // Permission check - redirect if not super_admin or branch_admin
   useEffect(() => {
     if (!authLoading && adminUser) {
-      if (!isSuperAdmin()) {
+      if (!isSuperAdmin() && adminUser.role !== 'branch_admin') {
         router.push('/dashboard');
       }
     }
@@ -103,7 +103,7 @@ export default function SubjectsPage() {
           <h1 className="text-xl sm:text-3xl font-bold text-gray-900">จัดการวิชาเรียน</h1>
           <p className="text-gray-600 mt-2">จัดการหลักสูตรและวิชาที่เปิดสอน</p>
         </div>
-        <PermissionGuard requiredRole={['super_admin']}>
+        <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
           <Link href="/subjects/new">
             <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
               <Plus className="h-4 w-4 mr-2" />
@@ -113,11 +113,11 @@ export default function SubjectsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Alert for non-super admin */}
-      {!isSuperAdmin() && (
+      {/* Alert for teacher role */}
+      {!isSuperAdmin() && adminUser?.role !== 'branch_admin' && (
         <Alert className="mb-6">
           <AlertDescription>
-            คุณสามารถดูข้อมูลวิชาได้เท่านั้น การเพิ่มหรือแก้ไขวิชาต้องติดต่อ Super Admin
+            คุณสามารถดูข้อมูลวิชาได้เท่านั้น การเพิ่มหรือแก้ไขวิชาต้องติดต่อ Admin
           </AlertDescription>
         </Alert>
       )}
@@ -176,7 +176,7 @@ export default function SubjectsPage() {
                 {selectedCategory === 'all' ? 'ยังไม่มีวิชา' : `ยังไม่มีวิชา ${selectedCategory}`}
               </h3>
               <p className="text-gray-600 mb-4">เริ่มต้นด้วยการเพิ่มวิชาแรก</p>
-              <PermissionGuard requiredRole={['super_admin']}>
+              <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
                 <Link href="/subjects/new">
                   <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
                     <Plus className="h-4 w-4 mr-2" />
@@ -239,14 +239,14 @@ export default function SubjectsPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <PermissionGuard requiredRole={['super_admin']}>
+                        <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
                           <Link href={`/subjects/${subject.id}/edit`}>
                             <Button variant="ghost" size="sm">
                               <Edit className="h-4 w-4" />
                             </Button>
                           </Link>
                         </PermissionGuard>
-                        {!isSuperAdmin() && (
+                        {!isSuperAdmin() && adminUser?.role !== 'branch_admin' && (
                           <span className="text-gray-400 text-xs">ดูอย่างเดียว</span>
                         )}
                       </TableCell>

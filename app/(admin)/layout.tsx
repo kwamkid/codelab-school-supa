@@ -398,11 +398,11 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           href: '/subjects', 
           icon: BookOpen,
           iconColor: 'text-green-500',
-          requiredRole: ['super_admin']
+          requiredRole: ['super_admin', 'branch_admin']
         },
       ]
     },
-    { 
+    {
       name: 'divider-2',
       isDivider: true 
     },
