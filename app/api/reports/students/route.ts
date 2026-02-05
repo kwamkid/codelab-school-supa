@@ -3,8 +3,30 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { normalizeGradeLevel } from '@/lib/constants/grade-levels'
 import { gradeLevels } from '@/lib/constants/grade-levels'
 import { groupSchoolNames } from '@/lib/utils/normalize-school-name'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+
+// Supabase returns max 1000 rows per query by default.
+// This helper fetches all rows by paginating with .range().
+async function fetchAllRows<T>(
+  queryFn: (from: number, to: number) => ReturnType<ReturnType<SupabaseClient['from']>['select']>
+): Promise<T[]> {
+  const PAGE_SIZE = 1000
+  const allRows: T[] = []
+  let from = 0
+
+  while (true) {
+    const { data, error } = await queryFn(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    const rows = (data || []) as T[]
+    allRows.push(...rows)
+    if (rows.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+
+  return allRows
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,12 +37,12 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'all'
 
     // Step 1: Get all enrollments to map student -> branches
-    const { data: allEnrollments } = await supabase
-      .from('enrollments')
-      .select('student_id, branch_id')
+    const allEnrollments = await fetchAllRows<{ student_id: string; branch_id: string }>(
+      (from, to) => supabase.from('enrollments').select('student_id, branch_id').range(from, to)
+    )
 
     const studentBranchMap = new Map<string, Set<string>>()
-    for (const e of (allEnrollments || []) as Array<{ student_id: string; branch_id: string }>) {
+    for (const e of allEnrollments) {
       if (!studentBranchMap.has(e.student_id)) {
         studentBranchMap.set(e.student_id, new Set())
       }
@@ -52,34 +74,47 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Step 4: Stats query
-    let statsQuery = supabase
-      .from('students')
-      .select('id, gender, grade_level, school_name, is_active')
-
-    if (studentIdsInBranch) {
-      statsQuery = statsQuery.in('id', [...studentIdsInBranch])
-    }
-    if (status === 'active') {
-      statsQuery = statsQuery.eq('is_active', true)
-    } else if (status === 'inactive') {
-      statsQuery = statsQuery.eq('is_active', false)
-    }
-
-    const { data: allStudentsRaw, error: statsError } = await statsQuery
-
-    if (statsError) {
-      console.error('Error fetching stats:', statsError)
-      throw statsError
-    }
-
-    const allStudents = (allStudentsRaw || []) as Array<{
+    // Step 4: Stats query - fetch all rows (bypass 1000-row limit)
+    type StudentRow = {
       id: string
       gender: string
       grade_level: string | null
       school_name: string | null
       is_active: boolean
-    }>
+    }
+
+    let allStudents: StudentRow[]
+
+    if (studentIdsInBranch) {
+      // When filtering by branch, we have a list of IDs - need to batch .in() queries
+      // because Supabase .in() + .range() together works fine
+      const ids = [...studentIdsInBranch]
+      allStudents = []
+      // Batch IDs in chunks to avoid URL length limits
+      const BATCH_SIZE = 500
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batchIds = ids.slice(i, i + BATCH_SIZE)
+        const rows = await fetchAllRows<StudentRow>((from, to) => {
+          let q = supabase
+            .from('students')
+            .select('id, gender, grade_level, school_name, is_active')
+            .in('id', batchIds)
+          if (status === 'active') q = q.eq('is_active', true)
+          else if (status === 'inactive') q = q.eq('is_active', false)
+          return q.range(from, to)
+        })
+        allStudents.push(...rows)
+      }
+    } else {
+      allStudents = await fetchAllRows<StudentRow>((from, to) => {
+        let q = supabase
+          .from('students')
+          .select('id, gender, grade_level, school_name, is_active')
+        if (status === 'active') q = q.eq('is_active', true)
+        else if (status === 'inactive') q = q.eq('is_active', false)
+        return q.range(from, to)
+      })
+    }
 
     // Step 5: Calculate stats
     let active = 0
@@ -112,15 +147,18 @@ export async function GET(request: NextRequest) {
         schoolNames.push(s.school_name)
 
         // Track which branches this student belongs to
+        if (!schoolBranchCounts.has(s.school_name)) {
+          schoolBranchCounts.set(s.school_name, new Map())
+        }
+        const branchCounts = schoolBranchCounts.get(s.school_name)!
         const studentBranches = studentBranchMap.get(s.id)
-        if (studentBranches) {
-          if (!schoolBranchCounts.has(s.school_name)) {
-            schoolBranchCounts.set(s.school_name, new Map())
-          }
-          const branchCounts = schoolBranchCounts.get(s.school_name)!
+        if (studentBranches && studentBranches.size > 0) {
           for (const bid of studentBranches) {
             branchCounts.set(bid, (branchCounts.get(bid) || 0) + 1)
           }
+        } else {
+          // Student has no enrollment - track as "no branch"
+          branchCounts.set('__no_branch__', (branchCounts.get('__no_branch__') || 0) + 1)
         }
       } else {
         noSchool++
@@ -176,9 +214,13 @@ export async function GET(request: NextRequest) {
 
       const branchBreakdown: Record<string, number> = {}
       for (const [bid, cnt] of aggregatedBranches) {
-        const bName = branchNameMap.get(bid)
-        if (bName) {
-          branchBreakdown[bName] = cnt
+        if (bid === '__no_branch__') {
+          branchBreakdown['ไม่ระบุสาขา'] = cnt
+        } else {
+          const bName = branchNameMap.get(bid)
+          if (bName) {
+            branchBreakdown[bName] = cnt
+          }
         }
       }
 

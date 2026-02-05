@@ -1,8 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizeSchoolName } from '@/lib/utils/normalize-school-name'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+
+// Supabase returns max 1000 rows per query by default.
+async function fetchAllRows<T>(
+  queryFn: (from: number, to: number) => ReturnType<ReturnType<SupabaseClient['from']>['select']>
+): Promise<T[]> {
+  const PAGE_SIZE = 1000
+  const allRows: T[] = []
+  let from = 0
+
+  while (true) {
+    const { data, error } = await queryFn(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    const rows = (data || []) as T[]
+    allRows.push(...rows)
+    if (rows.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+
+  return allRows
+}
 
 // GET /api/schools?search=xxx - search distinct school names
 export async function GET(request: NextRequest) {
@@ -11,23 +32,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
 
-    let query = supabase
-      .from('students')
-      .select('school_name')
-      .not('school_name', 'is', null)
-      .neq('school_name', '')
-
-    if (search) {
-      query = query.ilike('school_name', `%${search}%`)
-    }
-
-    const { data, error } = await query
-
-    if (error) throw error
+    const data = await fetchAllRows<{ school_name: string | null }>((from, to) => {
+      let q = supabase
+        .from('students')
+        .select('school_name')
+        .not('school_name', 'is', null)
+        .neq('school_name', '')
+      if (search) {
+        q = q.ilike('school_name', `%${search}%`)
+      }
+      return q.range(from, to)
+    })
 
     // Get distinct school names with counts
     const countMap = new Map<string, number>()
-    for (const row of (data || []) as Array<{ school_name: string | null }>) {
+    for (const row of data) {
       if (row.school_name) {
         countMap.set(row.school_name, (countMap.get(row.school_name) || 0) + 1)
       }
@@ -61,11 +80,12 @@ export async function POST(request: NextRequest) {
       for (const source of sources) {
         if (source === target) continue
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { count } = await (supabase.from('students') as any)
+        const { data: updatedRows } = await (supabase.from('students') as any)
           .update({ school_name: target })
           .eq('school_name', source)
+          .select('id')
 
-        updated += count || 0
+        updated += updatedRows?.length || 0
       }
 
       return NextResponse.json({ success: true, updated })
@@ -73,16 +93,17 @@ export async function POST(request: NextRequest) {
 
     if (body.action === 'normalize') {
       // Normalize all school names: strip prefixes, trim
-      const { data: students, error } = await supabase
-        .from('students')
-        .select('id, school_name')
-        .not('school_name', 'is', null)
-        .neq('school_name', '')
-
-      if (error) throw error
+      const students = await fetchAllRows<{ id: string; school_name: string }>((from, to) =>
+        supabase
+          .from('students')
+          .select('id, school_name')
+          .not('school_name', 'is', null)
+          .neq('school_name', '')
+          .range(from, to)
+      )
 
       let updated = 0
-      for (const student of (students || []) as Array<{ id: string; school_name: string }>) {
+      for (const student of students) {
         const normalized = normalizeSchoolName(student.school_name)
         if (normalized !== student.school_name) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

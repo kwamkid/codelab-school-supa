@@ -40,6 +40,9 @@ import {
   Settings2,
   Merge,
   Building2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { useBranch } from '@/contexts/BranchContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -82,8 +85,10 @@ export default function StudentReportPage() {
 
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // School search
+  // School search & sort
   const [schoolSearch, setSchoolSearch] = useState('')
+  const [sortKey, setSortKey] = useState<string>('count') // 'name', 'count', or branch name
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   // Merge UI state
   const [mergeOpen, setMergeOpen] = useState(false)
@@ -92,6 +97,7 @@ export default function StudentReportPage() {
   const [mergeTarget, setMergeTarget] = useState('')
   const [merging, setMerging] = useState(false)
   const [normalizing, setNormalizing] = useState(false)
+  const [mergeSearch, setMergeSearch] = useState('')
 
   // Pagination for school table
   const {
@@ -110,8 +116,9 @@ export default function StudentReportPage() {
       const params = new URLSearchParams()
       if (selectedBranchId) params.append('branchId', selectedBranchId)
       params.append('status', statusFilter)
+      params.append('_t', Date.now().toString())
 
-      const response = await fetch(`/api/reports/students?${params}`)
+      const response = await fetch(`/api/reports/students?${params}`, { cache: 'no-store' })
       const data = await response.json()
       if (data.success) {
         setStats(data.stats)
@@ -131,18 +138,56 @@ export default function StudentReportPage() {
     setStatusFilter(value)
   }
 
-  // Filter and paginate schools
+  // Filter and sort schools
   const filteredSchools = useMemo(() => {
     if (!stats) return []
-    if (!schoolSearch) return stats.bySchool
-    const q = schoolSearch.toLowerCase()
-    return stats.bySchool.filter(s => s.displayName.toLowerCase().includes(q))
-  }, [stats, schoolSearch])
+    let list = stats.bySchool
+    if (schoolSearch) {
+      const q = schoolSearch.toLowerCase()
+      list = list.filter(s => s.displayName.toLowerCase().includes(q))
+    }
+    const sorted = [...list].sort((a, b) => {
+      let valA: number | string
+      let valB: number | string
+      if (sortKey === 'name') {
+        valA = a.displayName
+        valB = b.displayName
+        return sortDir === 'asc'
+          ? valA.localeCompare(valB, 'th')
+          : valB.localeCompare(valA, 'th')
+      } else if (sortKey === 'count') {
+        valA = a.count
+        valB = b.count
+      } else {
+        // branch name
+        valA = a.byBranch[sortKey] || 0
+        valB = b.byBranch[sortKey] || 0
+      }
+      return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number)
+    })
+    return sorted
+  }, [stats, schoolSearch, sortKey, sortDir])
 
-  // Reset pagination when search changes
+  // Reset pagination when search or sort changes
   useEffect(() => {
     resetSchoolPagination()
-  }, [schoolSearch, resetSchoolPagination])
+  }, [schoolSearch, sortKey, sortDir, resetSchoolPagination])
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'name' ? 'asc' : 'desc')
+    }
+  }
+
+  const SortIcon = ({ columnKey }: { columnKey: string }) => {
+    if (sortKey !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />
+    return sortDir === 'asc'
+      ? <ArrowUp className="w-3 h-3 ml-1" />
+      : <ArrowDown className="w-3 h-3 ml-1" />
+  }
 
   const paginatedSchools = getSchoolPaginatedData(filteredSchools)
 
@@ -160,7 +205,7 @@ export default function StudentReportPage() {
 
   const loadAllSchools = async () => {
     try {
-      const res = await fetch('/api/schools')
+      const res = await fetch(`/api/schools?_t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) {
         setAllSchools(data.schools || [])
@@ -174,8 +219,16 @@ export default function StudentReportPage() {
     setMergeOpen(true)
     setSelectedSchools(new Set())
     setMergeTarget('')
+    setMergeSearch('')
     loadAllSchools()
   }
+
+  // Filter schools in merge dialog
+  const filteredMergeSchools = useMemo(() => {
+    if (!mergeSearch) return allSchools
+    const q = mergeSearch.toLowerCase()
+    return allSchools.filter(s => s.name.toLowerCase().includes(q))
+  }, [allSchools, mergeSearch])
 
   const handleMerge = async () => {
     if (!mergeTarget || selectedSchools.size < 2) return
@@ -492,11 +545,33 @@ export default function StudentReportPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-8">#</TableHead>
-                        <TableHead>โรงเรียน</TableHead>
-                        <TableHead className="text-right w-20">จำนวน</TableHead>
+                        <TableHead>
+                          <button
+                            className="flex items-center hover:text-foreground transition-colors"
+                            onClick={() => handleSort('name')}
+                          >
+                            โรงเรียน
+                            <SortIcon columnKey="name" />
+                          </button>
+                        </TableHead>
+                        <TableHead className="text-right w-20">
+                          <button
+                            className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                            onClick={() => handleSort('count')}
+                          >
+                            จำนวน
+                            <SortIcon columnKey="count" />
+                          </button>
+                        </TableHead>
                         {isAllBranches && branchNames.map((bName) => (
                           <TableHead key={bName} className="text-right w-20">
-                            <span className="text-xs">{bName}</span>
+                            <button
+                              className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                              onClick={() => handleSort(bName)}
+                            >
+                              <span className="text-xs">{bName}</span>
+                              <SortIcon columnKey={bName} />
+                            </button>
                           </TableHead>
                         ))}
                       </TableRow>
@@ -569,15 +644,25 @@ export default function StudentReportPage() {
               </Button>
             </div>
 
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="ค้นหาชื่อโรงเรียน..."
+                value={mergeSearch}
+                onChange={(e) => setMergeSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
             {/* School List */}
-            <div className="space-y-1">
-              {allSchools.map((school) => (
-                <div
+            <div className="space-y-1 max-h-[40vh] overflow-y-auto">
+              {filteredMergeSchools.map((school) => (
+                <label
                   key={school.name}
                   className={`flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-gray-50 ${
                     selectedSchools.has(school.name) ? 'bg-blue-50 border border-blue-200' : ''
                   }`}
-                  onClick={() => toggleSchoolSelection(school.name)}
                 >
                   <Checkbox
                     checked={selectedSchools.has(school.name)}
@@ -585,14 +670,23 @@ export default function StudentReportPage() {
                   />
                   <span className="flex-1 text-sm">{school.name}</span>
                   <Badge variant="secondary" className="text-xs">{school.count}</Badge>
-                </div>
+                </label>
               ))}
-              {allSchools.length === 0 && (
+              {filteredMergeSchools.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  {normalizing ? 'กำลังโหลด...' : 'ไม่มีข้อมูลโรงเรียน'}
+                  {allSchools.length === 0
+                    ? (normalizing ? 'กำลังโหลด...' : 'ไม่มีข้อมูลโรงเรียน')
+                    : 'ไม่พบผลลัพธ์'}
                 </p>
               )}
             </div>
+
+            {/* Selected count */}
+            {selectedSchools.size > 0 && (
+              <p className="text-xs text-muted-foreground">
+                เลือกแล้ว {selectedSchools.size} รายการ
+              </p>
+            )}
 
             {/* Merge Target Selection */}
             {selectedSchools.size >= 2 && (
