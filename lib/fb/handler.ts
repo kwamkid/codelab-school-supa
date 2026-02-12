@@ -36,17 +36,22 @@ interface ConversionResult {
 export async function sendFBConversionInternal(
   params: ConversionParams
 ): Promise<ConversionResult> {
+  console.log('[FB CAPI] handler called:', params.event_type, 'entity:', params.entity_id)
+
   const supabase = createServiceClient()
 
   let settings: FacebookAdsSettings
   try {
     settings = await getFacebookAdsSettings()
-  } catch {
+    console.log('[FB CAPI] settings loaded, pixelId:', settings.fbPixelId ? 'set' : 'empty', 'token:', settings.fbAccessToken ? 'set' : 'empty')
+  } catch (settingsErr) {
+    console.error('[FB CAPI] Failed to load settings:', settingsErr)
     return { success: false, error: 'Failed to load FB settings' }
   }
 
   // Check if CAPI is configured
   if (!settings.fbPixelId || !settings.fbAccessToken) {
+    console.log('[FB CAPI] Not configured, skipping')
     return { success: false, error: 'FB Pixel ID or Access Token not configured' }
   }
 
@@ -109,6 +114,8 @@ export async function sendFBConversionInternal(
     },
     settings.fbTestEventCode || undefined
   )
+
+  console.log('[FB CAPI] CAPI result:', capiResult.success ? 'sent' : 'failed', capiResult.error || '')
 
   // 2. Audience sync
   const audienceResults: Array<{
