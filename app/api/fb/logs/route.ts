@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query
 
+    console.log('[FB] logs query result:', { dataLength: data?.length, count, error })
+
     if (error) throw error
 
     // Summary counts using separate count queries (no full row fetch)

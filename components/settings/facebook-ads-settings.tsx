@@ -87,6 +87,9 @@ export default function FacebookAdsSettingsComponent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [sendingTest, setSendingTest] = useState(false)
+  const [testPhone, setTestPhone] = useState('')
+  const [showTestEvent, setShowTestEvent] = useState(false)
   const [showToken, setShowToken] = useState(false)
   const [settings, setSettings] = useState<FacebookAdsSettings | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -212,6 +215,34 @@ export default function FacebookAdsSettingsComponent() {
     }
   }
 
+  const handleSendTestEvent = async () => {
+    if (!testPhone.trim()) {
+      toast.error('กรุณาใส่เบอร์โทรสำหรับทดสอบ')
+      return
+    }
+
+    setSendingTest(true)
+    try {
+      const res = await fetch('/api/fb/test-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: testPhone.trim() }),
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        toast.success('ส่ง Test Event สำเร็จ! เช็คที่ Conversion Logs ด้านล่าง')
+        loadLogs() // refresh logs
+      } else {
+        toast.error(data.error || 'ส่ง Test Event ล้มเหลว')
+      }
+    } catch {
+      toast.error('เกิดข้อผิดพลาดในการส่ง Test Event')
+    } finally {
+      setSendingTest(false)
+    }
+  }
+
   const maskedToken = settings?.fbAccessToken
     ? `${'*'.repeat(20)}${settings.fbAccessToken.slice(-4)}`
     : ''
@@ -307,7 +338,7 @@ export default function FacebookAdsSettingsComponent() {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Button
               variant="outline"
               onClick={handleTestConnection}
@@ -320,7 +351,46 @@ export default function FacebookAdsSettingsComponent() {
               )}
               ทดสอบการเชื่อมต่อ
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowTestEvent(!showTestEvent)}
+              disabled={!settings.fbPixelId || !settings.fbAccessToken}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              ส่ง Test Event
+            </Button>
           </div>
+
+          {showTestEvent && (
+            <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                ส่ง Conversion Event จริง (CompleteRegistration) เพื่อทดสอบ pipeline ทั้งหมด
+                {settings.fbTestEventCode
+                  ? ` — ใช้ Test Event Code: ${settings.fbTestEventCode}`
+                  : ' — ⚠️ ไม่มี Test Event Code จะส่งเป็น production'}
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="เบอร์โทรทดสอบ เช่น 0812345678"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  className="max-w-xs"
+                />
+                <Button
+                  onClick={handleSendTestEvent}
+                  disabled={sendingTest || !testPhone.trim()}
+                  size="sm"
+                >
+                  {sendingTest ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  ส่ง
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
