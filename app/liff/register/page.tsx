@@ -251,8 +251,23 @@ function RegisterContent() {
       if (studentsError) throw studentsError;
 
       console.log('[Register] Registration completed successfully!');
+
+      // Fire FB conversion event (non-blocking)
+      fetch('/api/fb/send-conversion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: 'register',
+          phone: parentData.phone,
+          email: parentData.email || undefined,
+          member_id: parentId,
+          entity_id: parentId,
+          branch_id: parentData.preferredBranchId || undefined,
+        }),
+      }).catch((err) => console.error('[FB CAPI] Register event error:', err));
+
       toast.success('ลงทะเบียนสำเร็จ!');
-      
+
       // Clear cache and redirect
       setTimeout(() => {
         router.push('/liff');

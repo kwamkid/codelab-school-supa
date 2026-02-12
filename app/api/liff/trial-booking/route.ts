@@ -137,6 +137,19 @@ export async function POST(request: NextRequest) {
       console.log('Students created successfully')
     }
 
+    // Fire FB conversion event (non-blocking)
+    import('@/lib/fb/handler')
+      .then(({ sendFBConversionInternal }) =>
+        sendFBConversionInternal({
+          event_type: 'trial',
+          phone: cleanPhone,
+          email: body.parentEmail || undefined,
+          entity_id: bookingId,
+          branch_id: body.branchId,
+        })
+      )
+      .catch((err) => console.error('[FB CAPI] Trial booking event error:', err))
+
     // Return success response
     return NextResponse.json({
       success: true,

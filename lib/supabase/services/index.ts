@@ -52,3 +52,6 @@ export * from './dashboard-optimized'
 // Data Management
 export * from './data-cleaning'
 export * from './factory-reset'
+
+// Facebook Ads Integration
+export * from './facebook-ads-settings'

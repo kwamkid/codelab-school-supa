@@ -1468,6 +1468,68 @@ export interface Database {
           created_at?: string
         }
       }
+      fb_conversion_logs: {
+        Row: {
+          id: string
+          event_type: string
+          fb_event_name: string
+          event_id: string
+          member_id: string | null
+          reference_id: string | null
+          phone_hash: string | null
+          email_hash: string | null
+          payload: Json | null
+          fb_response: Json | null
+          fb_status: string
+          audience_actions: Json | null
+          audience_status: string
+          is_resend: boolean
+          original_log_id: string | null
+          retry_count: number
+          branch_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_type: string
+          fb_event_name: string
+          event_id: string
+          member_id?: string | null
+          reference_id?: string | null
+          phone_hash?: string | null
+          email_hash?: string | null
+          payload?: Json | null
+          fb_response?: Json | null
+          fb_status?: string
+          audience_actions?: Json | null
+          audience_status?: string
+          is_resend?: boolean
+          original_log_id?: string | null
+          retry_count?: number
+          branch_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_type?: string
+          fb_event_name?: string
+          event_id?: string
+          member_id?: string | null
+          reference_id?: string | null
+          phone_hash?: string | null
+          email_hash?: string | null
+          payload?: Json | null
+          fb_response?: Json | null
+          fb_status?: string
+          audience_actions?: Json | null
+          audience_status?: string
+          is_resend?: boolean
+          original_log_id?: string | null
+          retry_count?: number
+          branch_id?: string | null
+          created_at?: string
+        }
+      }
       settings: {
         Row: {
           id: string

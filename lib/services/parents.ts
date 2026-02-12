@@ -203,12 +203,44 @@ export async function updateParent(id: string, parentData: Partial<Parent>): Pro
       return;
     }
 
+    // Fetch old values before update (for FB re-send check)
+    let oldPhone: string | undefined;
+    let oldEmail: string | undefined;
+    if (parentData.phone !== undefined || parentData.email !== undefined) {
+      const { data: oldData } = await supabase
+        .from(TABLE_NAME)
+        .select('phone, email')
+        .eq('id', id)
+        .single();
+      if (oldData) {
+        oldPhone = (oldData as { phone: string; email: string | null }).phone;
+        oldEmail = (oldData as { phone: string; email: string | null }).email || undefined;
+      }
+    }
+
     const { error } = await supabase
       .from(TABLE_NAME)
       .update(updateData)
       .eq('id', id);
 
     if (error) throw error;
+
+    // Trigger FB re-send if phone or email changed
+    const phoneChanged = parentData.phone !== undefined && parentData.phone !== oldPhone;
+    const emailChanged = parentData.email !== undefined && parentData.email !== oldEmail;
+    if (phoneChanged || emailChanged) {
+      fetch('/api/fb/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: id,
+          new_phone: parentData.phone || oldPhone,
+          new_email: parentData.email || oldEmail,
+          old_phone: oldPhone,
+          old_email: oldEmail,
+        }),
+      }).catch((err) => console.error('[FB CAPI] Parent update resend error:', err));
+    }
   } catch (error) {
     console.error('Error updating parent:', error);
     throw error;

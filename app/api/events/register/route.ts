@@ -83,6 +83,20 @@ export async function POST(request: NextRequest) {
 
     console.log('[API] Registration created:', result.id)
 
+    // Fire FB conversion event (non-blocking)
+    import('@/lib/fb/handler')
+      .then(({ sendFBConversionInternal }) =>
+        sendFBConversionInternal({
+          event_type: 'event_join',
+          phone: data.parentPhone,
+          email: data.parentEmail || undefined,
+          member_id: data.parentId || undefined,
+          entity_id: result.id,
+          branch_id: data.branchId,
+        })
+      )
+      .catch((err) => console.error('[FB CAPI] Event registration error:', err))
+
     // Update schedule attendee count
     const currentBranchCount = (attendeesByBranch[data.branchId] as number) || 0
     const newTotal = currentAttendees + data.attendeeCount

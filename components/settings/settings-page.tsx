@@ -1,11 +1,12 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, School, MessageSquare, Repeat, Database } from 'lucide-react';
+import { Settings, School, MessageSquare, Repeat, Database, Megaphone } from 'lucide-react';
 import GeneralSettingsComponent from './general-settings';
 import LineSettingsComponent from './line-settings';
 import MakeupSettingsComponent from './makeup-settings';
 import BackupLogsTab from './backup-logs-tab';
+import FacebookAdsSettingsComponent from './facebook-ads-settings';
 
 export default function SettingsPage() {
   return (
@@ -32,6 +33,10 @@ export default function SettingsPage() {
             <MessageSquare className="h-4 w-4 mr-2" />
             LINE Integration
           </TabsTrigger>
+          <TabsTrigger value="facebook_ads">
+            <Megaphone className="h-4 w-4 mr-2" />
+            Facebook Ads
+          </TabsTrigger>
           <TabsTrigger value="backup">
             <Database className="h-4 w-4 mr-2" />
             Backup
@@ -48,6 +53,10 @@ export default function SettingsPage() {
         
         <TabsContent value="line">
           <LineSettingsComponent />
+        </TabsContent>
+
+        <TabsContent value="facebook_ads">
+          <FacebookAdsSettingsComponent />
         </TabsContent>
 
         <TabsContent value="backup">
