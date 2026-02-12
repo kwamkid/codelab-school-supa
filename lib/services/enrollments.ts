@@ -623,6 +623,15 @@ export async function updateEnrollment(
       .eq('id', id);
 
     if (error) throw error;
+
+    // Fire-and-forget: notify FB audience sync when status changes to completed/dropped
+    if (enrollmentData.status === 'completed' || enrollmentData.status === 'dropped') {
+      fetch('/api/fb/enrollment-status-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrollmentId: id, newStatus: enrollmentData.status }),
+      }).catch(() => {})
+    }
   } catch (error) {
     console.error('Error updating enrollment:', error);
     throw error;
@@ -655,6 +664,13 @@ export async function cancelEnrollment(
 
     // Note: enrolled_count is updated automatically by database trigger on enrollments table
     // Do NOT manually decrement here to avoid double-counting
+
+    // Fire-and-forget: notify FB audience sync
+    fetch('/api/fb/enrollment-status-change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enrollmentId: id, newStatus: 'dropped' }),
+    }).catch(() => {})
   } catch (error) {
     console.error('Error canceling enrollment:', error);
     throw error;

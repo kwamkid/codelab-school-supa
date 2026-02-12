@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const fbStatus = searchParams.get('fbStatus')
     const memberId = searchParams.get('memberId')
 
-    const selectColumns = 'id, event_type, fb_event_name, event_id, member_id, phone_hash, fb_status, audience_status, is_resend, created_at, fb_response'
+    const selectColumns = 'id, event_type, fb_event_name, event_id, member_id, phone_hash, fb_status, audience_status, is_resend, created_at'
 
     let query = supabase
       .from('fb_conversion_logs')
@@ -48,13 +48,13 @@ export async function GET(request: NextRequest) {
       { count: eventJoinCount },
       { count: purchaseCount },
     ] = await Promise.all([
-      supabase.from('fb_conversion_logs').select('*', { count: 'exact', head: true }),
-      supabase.from('fb_conversion_logs').select('*', { count: 'exact', head: true }).eq('fb_status', 'sent'),
-      supabase.from('fb_conversion_logs').select('*', { count: 'exact', head: true }).eq('fb_status', 'failed'),
-      supabase.from('fb_conversion_logs').select('*', { count: 'exact', head: true }).eq('event_type', 'register'),
-      supabase.from('fb_conversion_logs').select('*', { count: 'exact', head: true }).eq('event_type', 'trial'),
-      supabase.from('fb_conversion_logs').select('*', { count: 'exact', head: true }).eq('event_type', 'event_join'),
-      supabase.from('fb_conversion_logs').select('*', { count: 'exact', head: true }).eq('event_type', 'purchase'),
+      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }),
+      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('fb_status', 'sent'),
+      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('fb_status', 'failed'),
+      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('event_type', 'register'),
+      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('event_type', 'trial'),
+      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('event_type', 'event_join'),
+      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('event_type', 'purchase'),
     ])
 
     const total = totalCount || 0

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Pagination, usePagination } from '@/components/ui/pagination'
 import {
   Save,
@@ -35,6 +43,9 @@ import {
   Users,
   Target,
   ScrollText,
+  List,
+  Plus,
+  Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -44,6 +55,12 @@ import {
   FacebookAdsSettings,
 } from '@/lib/services/facebook-ads-settings'
 import { useAuth } from '@/hooks/useAuth'
+
+interface FBAudience {
+  id: string
+  name: string
+  approximate_count: number
+}
 
 interface LogEntry {
   id: string
@@ -56,7 +73,6 @@ interface LogEntry {
   audience_status: string
   is_resend: boolean
   created_at: string
-  fb_response: Record<string, unknown> | null
 }
 
 interface LogSummary {
@@ -101,6 +117,28 @@ export default function FacebookAdsSettingsComponent() {
   const [logTotal, setLogTotal] = useState(0)
   const [logEventFilter, setLogEventFilter] = useState('all')
   const [logStatusFilter, setLogStatusFilter] = useState('all')
+
+  // Audience picker state
+  const [audiences, setAudiences] = useState<FBAudience[]>([])
+  const [audiencesLoading, setAudiencesLoading] = useState(false)
+  const [audiencePickerOpen, setAudiencePickerOpen] = useState(false)
+  const [audiencePickerField, setAudiencePickerField] = useState<string>('')
+  const [createAudienceOpen, setCreateAudienceOpen] = useState(false)
+  const [createAudienceForField, setCreateAudienceForField] = useState<string>('')
+  const [newAudienceName, setNewAudienceName] = useState('')
+  const [newAudienceDesc, setNewAudienceDesc] = useState('')
+  const [creatingAudience, setCreatingAudience] = useState(false)
+
+  // Bulk sync state
+  const [bulkSyncOpen, setBulkSyncOpen] = useState(false)
+  const [bulkSyncingType, setBulkSyncingType] = useState<string | null>(null)
+  const [bulkSyncResults, setBulkSyncResults] = useState<Record<string, {
+    total: number
+    synced: number
+    failed: number
+    skipped: number
+    errors: string[]
+  }>>({})
 
   const {
     currentPage: logPage,
@@ -240,6 +278,118 @@ export default function FacebookAdsSettingsComponent() {
     }
   }
 
+  const loadAudiences = useCallback(async () => {
+    setAudiencesLoading(true)
+    try {
+      const res = await fetch('/api/fb/list-audiences', { cache: 'no-store' })
+      const data = await res.json()
+      if (data.success) {
+        setAudiences(data.audiences || [])
+      } else {
+        toast.error(data.error || 'ไม่สามารถโหลด Audiences ได้')
+      }
+    } catch {
+      toast.error('เกิดข้อผิดพลาดในการโหลด Audiences')
+    } finally {
+      setAudiencesLoading(false)
+    }
+  }, [])
+
+  const openAudiencePicker = (fieldName: string) => {
+    setAudiencePickerField(fieldName)
+    setAudiencePickerOpen(true)
+    if (audiences.length === 0) {
+      loadAudiences()
+    }
+  }
+
+  const selectAudience = (audienceId: string) => {
+    if (!settings) return
+    setSettings({ ...settings, [audiencePickerField]: audienceId })
+    setAudiencePickerOpen(false)
+    toast.success('เลือก Audience เรียบร้อย')
+  }
+
+  const openCreateAudience = (fieldName: string) => {
+    setCreateAudienceForField(fieldName)
+    setNewAudienceName('')
+    setNewAudienceDesc('')
+    setCreateAudienceOpen(true)
+  }
+
+  const handleCreateAudience = async () => {
+    if (!newAudienceName.trim()) {
+      toast.error('กรุณาระบุชื่อ Audience')
+      return
+    }
+
+    setCreatingAudience(true)
+    try {
+      const res = await fetch('/api/fb/create-audience', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newAudienceName.trim(),
+          description: newAudienceDesc.trim(),
+        }),
+      })
+      const data = await res.json()
+
+      if (data.success && data.audienceId) {
+        if (settings && createAudienceForField) {
+          setSettings({ ...settings, [createAudienceForField]: data.audienceId })
+        }
+        setCreateAudienceOpen(false)
+        toast.success(`สร้าง Audience สำเร็จ (ID: ${data.audienceId})`)
+        // Refresh audience list
+        loadAudiences()
+      } else {
+        toast.error(data.error || 'สร้าง Audience ล้มเหลว')
+      }
+    } catch {
+      toast.error('เกิดข้อผิดพลาดในการสร้าง Audience')
+    } finally {
+      setCreatingAudience(false)
+    }
+  }
+
+  const handleBulkSync = async (audienceType: string) => {
+    setBulkSyncingType(audienceType)
+
+    try {
+      const res = await fetch('/api/fb/bulk-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audienceType }),
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        setBulkSyncResults((prev) => ({
+          ...prev,
+          [audienceType]: {
+            total: data.total,
+            synced: data.synced,
+            failed: data.failed,
+            skipped: data.skipped,
+            errors: data.errors || [],
+          },
+        }))
+        if (data.synced > 0) {
+          toast.success(`Sync สำเร็จ ${data.synced}/${data.total} คน`)
+        } else if (data.total === 0) {
+          toast.info('ไม่พบข้อมูลสำหรับ sync')
+        }
+      } else {
+        toast.error(data.error || 'Bulk sync ล้มเหลว')
+      }
+    } catch {
+      toast.error('เกิดข้อผิดพลาดในการ sync')
+    } finally {
+      setBulkSyncingType(null)
+    }
+  }
+
   const maskedToken = settings?.fbAccessToken
     ? `${'*'.repeat(20)}${settings.fbAccessToken.slice(-4)}`
     : ''
@@ -335,6 +485,21 @@ export default function FacebookAdsSettingsComponent() {
             )}
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="adAccountId">Ad Account ID</Label>
+            <Input
+              id="adAccountId"
+              placeholder="เช่น act_123456789 หรือ 123456789"
+              value={settings.adAccountId}
+              onChange={(e) =>
+                setSettings({ ...settings, adAccountId: e.target.value })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              ใช้สำหรับสร้าง/ดึง Custom Audiences (หาได้จาก Facebook Ads Manager &gt; Settings &gt; Ad Account ID)
+            </p>
+          </div>
+
           <div className="flex gap-2 items-center">
             <Button
               variant="outline"
@@ -399,85 +564,313 @@ export default function FacebookAdsSettingsComponent() {
             Custom Audience Mapping
           </CardTitle>
           <CardDescription>
-            ใส่ Audience ID จาก Facebook Ads Manager เพื่อ sync ข้อมูลอัตโนมัติ
+            ใส่ Audience ID หรือกดเลือก/สร้างจากระบบ เพื่อ sync ข้อมูลอัตโนมัติ
             (ถ้าว่างจะข้ามการ sync สำหรับ segment นั้น)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="audienceAllMembers">สมาชิกทั้งหมด</Label>
-              <Input
-                id="audienceAllMembers"
-                placeholder="Audience ID"
-                value={settings.audienceAllMembers}
-                onChange={(e) =>
-                  setSettings({ ...settings, audienceAllMembers: e.target.value })
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                ผู้ปกครองที่สมัครสมาชิกทุกคน
-              </p>
-            </div>
+            {([
+              { field: 'audienceAllMembers', label: 'ลูกค้าทั้งหมด', desc: 'ผู้ปกครองที่เคยสมัครเรียน (ทุกสถานะ)' },
+              { field: 'audienceTrialNotEnrolled', label: 'สนใจแต่ยังไม่สมัคร', desc: 'ทดลองเรียน / เข้าร่วม Event / สมาชิกที่ยังไม่มี enrollment (จะถูกลบออกเมื่อสมัครจริง)' },
+              { field: 'audienceEventAttendees', label: 'เข้าร่วม Event', desc: 'ผู้ปกครองที่เคยเข้าร่วม Event (Open House, Workshop ฯลฯ)' },
+              { field: 'audienceCurrentStudents', label: 'ลูกค้าปัจจุบัน', desc: 'ผู้ปกครองที่มี enrollment active ทุกสาขา (สำหรับ exclude จาก Ad)' },
+            ] as const).map(({ field, label, desc }) => (
+              <div key={field} className="space-y-2">
+                <Label htmlFor={field}>{label}</Label>
+                <div className="flex gap-1">
+                  <Input
+                    id={field}
+                    placeholder="Audience ID"
+                    value={settings[field]}
+                    onChange={(e) =>
+                      setSettings({ ...settings, [field]: e.target.value })
+                    }
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    title="เลือกจาก Audiences ที่มี"
+                    onClick={() => openAudiencePicker(field)}
+                    disabled={!settings.adAccountId || !settings.fbAccessToken}
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    title="สร้าง Audience ใหม่"
+                    onClick={() => openCreateAudience(field)}
+                    disabled={!settings.adAccountId || !settings.fbAccessToken}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
+            ))}
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="audienceTrialNotEnrolled">
-                ทดลองแล้วยังไม่สมัคร
-              </Label>
-              <Input
-                id="audienceTrialNotEnrolled"
-                placeholder="Audience ID"
-                value={settings.audienceTrialNotEnrolled}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    audienceTrialNotEnrolled: e.target.value,
-                  })
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                ลงทะเบียนทดลองเรียนแล้ว แต่ยังไม่สมัคร (จะถูกลบออกเมื่อสมัครจริง)
-              </p>
-            </div>
+          {!settings.adAccountId && (
+            <p className="text-xs text-amber-600">
+              กรอก Ad Account ID ด้านบนเพื่อเปิดใช้ปุ่มเลือก/สร้าง Audience
+            </p>
+          )}
 
-            <div className="space-y-2">
-              <Label htmlFor="audienceEventAttendees">เข้าร่วม Event</Label>
-              <Input
-                id="audienceEventAttendees"
-                placeholder="Audience ID"
-                value={settings.audienceEventAttendees}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    audienceEventAttendees: e.target.value,
-                  })
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                ผู้ปกครองที่เคยเข้าร่วม Event (Open House, Workshop ฯลฯ)
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="audienceCurrentStudents">ลูกค้าปัจจุบัน</Label>
-              <Input
-                id="audienceCurrentStudents"
-                placeholder="Audience ID"
-                value={settings.audienceCurrentStudents}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    audienceCurrentStudents: e.target.value,
-                  })
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                ผู้ปกครองที่สมัครเรียนจริงแล้ว (สำหรับ exclude จาก Ad)
-              </p>
+          {/* Bulk Sync Button */}
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Sync ข้อมูลเดิม</p>
+                <p className="text-xs text-muted-foreground">
+                  เพิ่มผู้ปกครองที่มีอยู่แล้วในระบบเข้า Audience (ใช้สำหรับครั้งแรกที่ตั้งค่า)
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBulkSyncResults({})
+                  setBulkSyncOpen(true)
+                }}
+                disabled={!settings.fbAccessToken}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Sync ข้อมูลเดิม
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Audience Picker Dialog */}
+      <Dialog open={audiencePickerOpen} onOpenChange={setAudiencePickerOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>เลือก Custom Audience</DialogTitle>
+            <DialogDescription>
+              เลือก Audience จาก Ad Account ของคุณ
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadAudiences}
+                disabled={audiencesLoading}
+              >
+                {audiencesLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                )}
+                รีเฟรช
+              </Button>
+            </div>
+            {audiencesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : audiences.length > 0 ? (
+              <div className="max-h-[300px] overflow-y-auto border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ชื่อ</TableHead>
+                      <TableHead className="text-right">ขนาด</TableHead>
+                      <TableHead className="w-[80px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {audiences.map((aud) => (
+                      <TableRow key={aud.id}>
+                        <TableCell>
+                          <div>
+                            <p className="text-sm font-medium">{aud.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{aud.id}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {aud.approximate_count.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => selectAudience(aud.id)}
+                          >
+                            เลือก
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                ไม่พบ Custom Audiences — ลองสร้างใหม่
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Audience Dialog */}
+      <Dialog open={createAudienceOpen} onOpenChange={setCreateAudienceOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>สร้าง Custom Audience ใหม่</DialogTitle>
+            <DialogDescription>
+              สร้าง Audience ใหม่ใน Ad Account ของคุณ
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="newAudienceName">ชื่อ Audience</Label>
+              <Input
+                id="newAudienceName"
+                placeholder="เช่น All Members, Trial Not Enrolled"
+                value={newAudienceName}
+                onChange={(e) => setNewAudienceName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newAudienceDesc">คำอธิบาย (optional)</Label>
+              <Input
+                id="newAudienceDesc"
+                placeholder="รายละเอียด Audience"
+                value={newAudienceDesc}
+                onChange={(e) => setNewAudienceDesc(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateAudienceOpen(false)}
+              disabled={creatingAudience}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={handleCreateAudience}
+              disabled={creatingAudience || !newAudienceName.trim()}
+            >
+              {creatingAudience ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
+              สร้าง
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Sync Dialog */}
+      <Dialog
+        open={bulkSyncOpen}
+        onOpenChange={(open) => {
+          if (!open && bulkSyncingType !== null) return // ไม่ให้ปิดระหว่าง sync
+          setBulkSyncOpen(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-md" showCloseButton={bulkSyncingType === null}>
+          <DialogHeader>
+            <DialogTitle>Sync ข้อมูลเดิมเข้า Audience</DialogTitle>
+            <DialogDescription>
+              เลือก Audience ที่ต้องการ sync ระบบจะเพิ่มผู้ปกครองที่มีอยู่แล้วเข้า Facebook Audience
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {([
+              { type: 'all_members', field: 'audienceAllMembers', label: 'ลูกค้าทั้งหมด', desc: 'ผู้ปกครองที่เคยสมัครเรียน (ทุกสถานะ)' },
+              { type: 'current_students', field: 'audienceCurrentStudents', label: 'ลูกค้าปัจจุบัน', desc: 'ผู้ปกครองที่มี enrollment active ทุกสาขา' },
+              { type: 'trial_not_enrolled', field: 'audienceTrialNotEnrolled', label: 'สนใจแต่ยังไม่สมัคร', desc: 'trial bookings + event attendees + สมาชิกที่ไม่มี enrollment' },
+              { type: 'event_attendees', field: 'audienceEventAttendees', label: 'เข้าร่วม Event', desc: 'ผู้ปกครองที่เคยเข้าร่วม Event ทั้งหมด' },
+            ] as const).map(({ type, field, label, desc }) => {
+              const audienceId = settings[field]
+              const isConfigured = !!audienceId
+              const isSyncing = bulkSyncingType === type
+              const result = bulkSyncResults[type]
+
+              return (
+                <div
+                  key={type}
+                  className={`flex items-center justify-between p-3 border rounded-lg ${!isConfigured ? 'opacity-50' : ''}`}
+                >
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className="text-sm font-medium">{label}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                    {!isConfigured && (
+                      <p className="text-xs text-amber-600">ยังไม่ได้ตั้งค่า Audience ID</p>
+                    )}
+                    {isSyncing && (
+                      <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        กำลัง sync... ห้ามปิดหน้านี้
+                      </p>
+                    )}
+                    {result && (
+                      <div className="mt-1 flex gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-xs">
+                          ทั้งหมด {result.total}
+                        </Badge>
+                        {result.synced > 0 && (
+                          <Badge variant="default" className="text-xs">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            สำเร็จ {result.synced}
+                          </Badge>
+                        )}
+                        {result.failed > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            ล้มเหลว {result.failed}
+                          </Badge>
+                        )}
+                        {result.skipped > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            ข้าม {result.skipped}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    {result && result.errors.length > 0 && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {result.errors[0]}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={isSyncing ? 'default' : 'outline'}
+                    onClick={() => handleBulkSync(type)}
+                    disabled={!isConfigured || bulkSyncingType !== null}
+                    className="shrink-0"
+                  >
+                    {isSyncing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkSyncOpen(false)}
+              disabled={bulkSyncingType !== null}
+            >
+              ปิด
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Save Button */}
       <div className="flex justify-end">

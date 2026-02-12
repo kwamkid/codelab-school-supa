@@ -9,6 +9,7 @@ export interface FacebookAdsSettings {
   fbPixelId: string
   fbAccessToken: string
   fbTestEventCode: string // empty = production mode
+  adAccountId: string // Ad Account ID for audience management
 
   // Custom Audience IDs (empty = skip sync for that audience)
   audienceAllMembers: string
@@ -26,6 +27,7 @@ export function getDefaultFacebookAdsSettings(): FacebookAdsSettings {
     fbPixelId: '',
     fbAccessToken: '',
     fbTestEventCode: '',
+    adAccountId: '',
     audienceAllMembers: '',
     audienceTrialNotEnrolled: '',
     audienceEventAttendees: '',
@@ -56,6 +58,7 @@ export async function getFacebookAdsSettings(): Promise<FacebookAdsSettings> {
         fbPixelId: (val.fbPixelId as string) || '',
         fbAccessToken: (val.fbAccessToken as string) || '',
         fbTestEventCode: (val.fbTestEventCode as string) || '',
+        adAccountId: (val.adAccountId as string) || '',
         audienceAllMembers: (val.audienceAllMembers as string) || '',
         audienceTrialNotEnrolled: (val.audienceTrialNotEnrolled as string) || '',
         audienceEventAttendees: (val.audienceEventAttendees as string) || '',

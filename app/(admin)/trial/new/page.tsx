@@ -228,6 +228,24 @@ export default function CreateTrialBookingPage() {
       }
       
       const bookingId = await createTrialBooking(bookingData);
+
+      // Fire FB conversion event
+      try {
+        await fetch('/api/fb/send-conversion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: 'trial',
+            phone: parentPhone.replace(/[-\s]/g, ''),
+            email: parentEmail.trim() || undefined,
+            entity_id: bookingId,
+            branch_id: selectedBranch,
+          }),
+        });
+      } catch (fbErr) {
+        console.error('[FB CAPI] Admin trial booking event error:', fbErr);
+      }
+
       toast.success('บันทึกการจองทดลองเรียนสำเร็จ');
       router.push(`/trial/${bookingId}`);
     } catch (error) {

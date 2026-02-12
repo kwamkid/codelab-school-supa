@@ -325,21 +325,25 @@ export default function EnrollmentForm() {
       
       const enrollmentId = await createEnrollment(enrollmentData);
 
-      // Fire FB conversion event (non-blocking)
-      fetch('/api/fb/send-conversion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_type: 'purchase',
-          member_id: formData.parentId,
-          entity_id: enrollmentId,
-          branch_id: formData.branchId,
-          custom_data: {
-            value: enrollmentData.pricing.finalPrice,
-            content_name: selectedClass?.name || undefined,
-          },
-        }),
-      }).catch((err) => console.error('[FB CAPI] Enrollment event error:', err));
+      // Fire FB conversion event (await before redirect)
+      try {
+        await fetch('/api/fb/send-conversion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: 'purchase',
+            member_id: formData.parentId,
+            entity_id: enrollmentId,
+            branch_id: formData.branchId,
+            custom_data: {
+              value: enrollmentData.pricing.finalPrice,
+              content_name: selectedClass?.name || undefined,
+            },
+          }),
+        });
+      } catch (fbErr) {
+        console.error('[FB CAPI] Enrollment event error:', fbErr);
+      }
 
       toast.success('ลงทะเบียนเรียบร้อยแล้ว');
       router.push(`/enrollments/${enrollmentId}`);

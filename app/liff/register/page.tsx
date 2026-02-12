@@ -252,19 +252,23 @@ function RegisterContent() {
 
       console.log('[Register] Registration completed successfully!');
 
-      // Fire FB conversion event (non-blocking)
-      fetch('/api/fb/send-conversion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_type: 'register',
-          phone: parentData.phone,
-          email: parentData.email || undefined,
-          member_id: parentId,
-          entity_id: parentId,
-          branch_id: parentData.preferredBranchId || undefined,
-        }),
-      }).catch((err) => console.error('[FB CAPI] Register event error:', err));
+      // Fire FB conversion event (await before redirect)
+      try {
+        await fetch('/api/fb/send-conversion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: 'register',
+            phone: parentData.phone,
+            email: parentData.email || undefined,
+            member_id: parentId,
+            entity_id: parentId,
+            branch_id: parentData.preferredBranchId || undefined,
+          }),
+        });
+      } catch (fbErr) {
+        console.error('[FB CAPI] Register event error:', fbErr);
+      }
 
       toast.success('ลงทะเบียนสำเร็จ!');
 

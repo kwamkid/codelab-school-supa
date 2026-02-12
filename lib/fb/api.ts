@@ -232,3 +232,83 @@ export async function testFBConnection(
     }
   }
 }
+
+/**
+ * List custom audiences for an ad account.
+ */
+export async function listCustomAudiences(
+  accessToken: string,
+  adAccountId: string
+): Promise<{ success: boolean; audiences?: Array<{ id: string; name: string; approximate_count: number }>; error?: string }> {
+  try {
+    const cleanId = adAccountId.replace(/^act_/, '')
+    const res = await fetch(
+      `${FB_GRAPH_BASE}/act_${cleanId}/customaudiences?fields=id,name,approximate_count_lower_bound,approximate_count_upper_bound&limit=100&access_token=${accessToken}`
+    )
+    const json = await res.json()
+
+    if (!res.ok || json.error) {
+      return {
+        success: false,
+        error: json?.error?.message || `HTTP ${res.status}`,
+      }
+    }
+
+    return {
+      success: true,
+      audiences: (json.data || []).map((a: { id: string; name: string; approximate_count_lower_bound?: number; approximate_count_upper_bound?: number }) => ({
+        id: a.id,
+        name: a.name,
+        approximate_count: a.approximate_count_lower_bound || 0,
+      })),
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Create a new custom audience for an ad account.
+ */
+export async function createCustomAudience(
+  accessToken: string,
+  adAccountId: string,
+  name: string,
+  description: string
+): Promise<{ success: boolean; audienceId?: string; error?: string }> {
+  try {
+    const cleanId = adAccountId.replace(/^act_/, '')
+    const res = await fetch(`${FB_GRAPH_BASE}/act_${cleanId}/customaudiences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        description,
+        subtype: 'CUSTOM',
+        customer_file_source: 'USER_PROVIDED_ONLY',
+        access_token: accessToken,
+      }),
+    })
+    const json = await res.json()
+
+    if (!res.ok || json.error) {
+      return {
+        success: false,
+        error: json?.error?.message || `HTTP ${res.status}`,
+      }
+    }
+
+    return {
+      success: true,
+      audienceId: json.id,
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    }
+  }
+}

@@ -6,6 +6,7 @@ export interface FacebookAdsSettings {
   fbPixelId: string
   fbAccessToken: string
   fbTestEventCode: string // empty = production mode
+  adAccountId: string // Ad Account ID for audience management
 
   // Custom Audience IDs (empty = skip sync for that audience)
   audienceAllMembers: string
@@ -23,6 +24,7 @@ export function getDefaultFacebookAdsSettings(): FacebookAdsSettings {
     fbPixelId: '',
     fbAccessToken: '',
     fbTestEventCode: '',
+    adAccountId: '',
     audienceAllMembers: '',
     audienceTrialNotEnrolled: '',
     audienceEventAttendees: '',

@@ -223,23 +223,18 @@ function getAudienceActions(
 
   switch (eventType) {
     case 'register':
-      if (settings.audienceAllMembers) {
+      // สมัครสมาชิก → สนใจแต่ยังไม่สมัครเรียน
+      if (settings.audienceTrialNotEnrolled) {
         actions.push({
           type: 'add',
-          name: 'all_members',
-          audienceId: settings.audienceAllMembers,
+          name: 'trial_not_enrolled',
+          audienceId: settings.audienceTrialNotEnrolled,
         })
       }
       break
 
     case 'trial':
-      if (settings.audienceAllMembers) {
-        actions.push({
-          type: 'add',
-          name: 'all_members',
-          audienceId: settings.audienceAllMembers,
-        })
-      }
+      // ทดลองเรียน → สนใจแต่ยังไม่สมัครเรียน
       if (settings.audienceTrialNotEnrolled) {
         actions.push({
           type: 'add',
@@ -250,18 +245,19 @@ function getAudienceActions(
       break
 
     case 'event_join':
-      if (settings.audienceAllMembers) {
-        actions.push({
-          type: 'add',
-          name: 'all_members',
-          audienceId: settings.audienceAllMembers,
-        })
-      }
+      // เข้าร่วม Event → เข้าร่วม Event + สนใจแต่ยังไม่สมัครเรียน
       if (settings.audienceEventAttendees) {
         actions.push({
           type: 'add',
           name: 'event_attendees',
           audienceId: settings.audienceEventAttendees,
+        })
+      }
+      if (settings.audienceTrialNotEnrolled) {
+        actions.push({
+          type: 'add',
+          name: 'trial_not_enrolled',
+          audienceId: settings.audienceTrialNotEnrolled,
         })
       }
       break

@@ -229,17 +229,21 @@ export async function updateParent(id: string, parentData: Partial<Parent>): Pro
     const phoneChanged = parentData.phone !== undefined && parentData.phone !== oldPhone;
     const emailChanged = parentData.email !== undefined && parentData.email !== oldEmail;
     if (phoneChanged || emailChanged) {
-      fetch('/api/fb/resend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          member_id: id,
-          new_phone: parentData.phone || oldPhone,
-          new_email: parentData.email || oldEmail,
-          old_phone: oldPhone,
-          old_email: oldEmail,
-        }),
-      }).catch((err) => console.error('[FB CAPI] Parent update resend error:', err));
+      try {
+        await fetch('/api/fb/resend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            member_id: id,
+            new_phone: parentData.phone || oldPhone,
+            new_email: parentData.email || oldEmail,
+            old_phone: oldPhone,
+            old_email: oldEmail,
+          }),
+        });
+      } catch (fbErr) {
+        console.error('[FB CAPI] Parent update resend error:', fbErr);
+      }
     }
   } catch (error) {
     console.error('Error updating parent:', error);

@@ -549,6 +549,12 @@ export async function updateEnrollment(
     console.error('Error updating enrollment:', error)
     throw error
   }
+
+  // FB audience sync: remove from ลูกค้าปัจจุบัน if status changed to completed/dropped
+  const newStatus = (enrollmentData as Record<string, unknown>).status as string | undefined
+  if (newStatus === 'completed' || newStatus === 'dropped') {
+    handleEnrollmentStatusChangeForFB(id, newStatus).catch(() => {})
+  }
 }
 
 // Cancel enrollment (soft)
@@ -578,6 +584,9 @@ export async function cancelEnrollment(
 
   // Note: enrolled_count is updated automatically by database trigger on enrollments table
   // Do NOT manually decrement here to avoid double-counting
+
+  // FB audience sync: remove from ลูกค้าปัจจุบัน if no active enrollments left
+  handleEnrollmentStatusChangeForFB(id, 'dropped').catch(() => {})
 }
 
 // Delete enrollment completely
@@ -861,5 +870,81 @@ export async function countEnrollmentsByStatus(
     active: data.filter(e => e.status === 'active').length,
     completed: data.filter(e => e.status === 'completed').length,
     dropped: data.filter(e => e.status === 'dropped').length
+  }
+}
+
+// ============================================
+// FB AUDIENCE SYNC ON STATUS CHANGE
+// ============================================
+
+/**
+ * When enrollment status changes to completed/dropped,
+ * check if parent has remaining active enrollments.
+ * If not → remove from "ลูกค้าปัจจุบัน" audience.
+ */
+async function handleEnrollmentStatusChangeForFB(
+  enrollmentId: string,
+  newStatus: string
+): Promise<void> {
+  try {
+    if (newStatus !== 'completed' && newStatus !== 'dropped') return
+
+    const { getFacebookAdsSettings } = await import('./facebook-ads-settings')
+    const settings = await getFacebookAdsSettings()
+
+    if (!settings.fbAccessToken || !settings.audienceCurrentStudents) return
+
+    const supabase = createServiceClient()
+
+    // Get parent_id from the enrollment
+    const { data: enrollment } = await supabase
+      .from('enrollments')
+      .select('parent_id')
+      .eq('id', enrollmentId)
+      .single()
+
+    if (!enrollment) return
+    const parentId = (enrollment as { parent_id: string }).parent_id
+
+    // Check if parent has any remaining active enrollments
+    const { count } = await supabase
+      .from('enrollments')
+      .select('id', { count: 'exact', head: true })
+      .eq('parent_id', parentId)
+      .eq('status', 'active')
+
+    if ((count ?? 0) > 0) return // still has active enrollments
+
+    // No active enrollments left → remove from ลูกค้าปัจจุบัน
+    const { data: parent } = await supabase
+      .from('parents')
+      .select('phone, email')
+      .eq('id', parentId)
+      .single()
+
+    if (!parent) return
+    const { phone, email } = parent as { phone: string; email: string | null }
+    if (!phone) return
+
+    const { hashPhone, hashEmail } = await import('@/lib/fb/utils')
+    const { removeFromCustomAudience } = await import('@/lib/fb/api')
+
+    const phoneHash = hashPhone(phone)
+    const emailHash = email ? hashEmail(email) : undefined
+
+    const result = await removeFromCustomAudience(
+      settings.fbAccessToken,
+      settings.audienceCurrentStudents,
+      phoneHash,
+      emailHash
+    )
+
+    console.log(
+      '[FB] enrollment-status-change:',
+      result.success ? 'removed from current_students' : 'failed',
+      result.error || ''
+    )
+  } catch (err) {
+    console.error('[FB] handleEnrollmentStatusChangeForFB error:', err)
   }
 }

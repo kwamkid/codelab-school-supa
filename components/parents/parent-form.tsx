@@ -138,6 +138,25 @@ export default function ParentForm({ parent, isEdit = false }: ParentFormProps) 
         router.push(`/parents/${parent.id}`);
       } else {
         const newParentId = await createParent(parentData);
+
+        // Fire FB conversion event for new member
+        try {
+          await fetch('/api/fb/send-conversion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event_type: 'register',
+              phone: cleanPhone,
+              email: formData.email || undefined,
+              member_id: newParentId,
+              entity_id: newParentId,
+              branch_id: formData.preferredBranchId || undefined,
+            }),
+          });
+        } catch (fbErr) {
+          console.error('[FB CAPI] Admin register event error:', fbErr);
+        }
+
         toast.success('เพิ่มผู้ปกครองใหม่เรียบร้อยแล้ว');
         router.push(`/parents/${newParentId}`);
       }
