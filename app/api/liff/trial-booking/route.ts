@@ -138,16 +138,19 @@ export async function POST(request: NextRequest) {
       console.log('Students created successfully')
     }
 
-    // Fire FB conversion event (non-blocking)
-    sendFBConversionInternal({
-      event_type: 'trial',
-      phone: cleanPhone,
-      email: body.parentEmail || undefined,
-      entity_id: bookingId,
-      branch_id: body.branchId,
-    })
-      .then((result) => console.log('[FB CAPI] Trial booking result:', JSON.stringify(result)))
-      .catch((err) => console.error('[FB CAPI] Trial booking event error:', err))
+    // Fire FB conversion event (await so Vercel doesn't kill the function early)
+    try {
+      const fbResult = await sendFBConversionInternal({
+        event_type: 'trial',
+        phone: cleanPhone,
+        email: body.parentEmail || undefined,
+        entity_id: bookingId,
+        branch_id: body.branchId,
+      })
+      console.log('[FB CAPI] Trial booking result:', JSON.stringify(fbResult))
+    } catch (fbErr) {
+      console.error('[FB CAPI] Trial booking event error:', fbErr)
+    }
 
     // Return success response
     return NextResponse.json({

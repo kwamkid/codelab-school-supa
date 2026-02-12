@@ -84,17 +84,20 @@ export async function POST(request: NextRequest) {
 
     console.log('[API] Registration created:', result.id)
 
-    // Fire FB conversion event (non-blocking)
-    sendFBConversionInternal({
-      event_type: 'event_join',
-      phone: data.parentPhone,
-      email: data.parentEmail || undefined,
-      member_id: data.parentId || undefined,
-      entity_id: result.id,
-      branch_id: data.branchId,
-    })
-      .then((fbResult) => console.log('[FB CAPI] Event registration result:', JSON.stringify(fbResult)))
-      .catch((err) => console.error('[FB CAPI] Event registration error:', err))
+    // Fire FB conversion event (await so Vercel doesn't kill the function early)
+    try {
+      const fbResult = await sendFBConversionInternal({
+        event_type: 'event_join',
+        phone: data.parentPhone,
+        email: data.parentEmail || undefined,
+        member_id: data.parentId || undefined,
+        entity_id: result.id,
+        branch_id: data.branchId,
+      })
+      console.log('[FB CAPI] Event registration result:', JSON.stringify(fbResult))
+    } catch (fbErr) {
+      console.error('[FB CAPI] Event registration error:', fbErr)
+    }
 
     // Update schedule attendee count
     const currentBranchCount = (attendeesByBranch[data.branchId] as number) || 0
