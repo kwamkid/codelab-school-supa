@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sendFBConversionInternal } from '@/lib/fb/handler'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -138,16 +139,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Fire FB conversion event (non-blocking)
-    import('@/lib/fb/handler')
-      .then(({ sendFBConversionInternal }) =>
-        sendFBConversionInternal({
-          event_type: 'trial',
-          phone: cleanPhone,
-          email: body.parentEmail || undefined,
-          entity_id: bookingId,
-          branch_id: body.branchId,
-        })
-      )
+    sendFBConversionInternal({
+      event_type: 'trial',
+      phone: cleanPhone,
+      email: body.parentEmail || undefined,
+      entity_id: bookingId,
+      branch_id: body.branchId,
+    })
+      .then((result) => console.log('[FB CAPI] Trial booking result:', JSON.stringify(result)))
       .catch((err) => console.error('[FB CAPI] Trial booking event error:', err))
 
     // Return success response

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sendFBConversionInternal } from '@/lib/fb/handler'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,17 +85,15 @@ export async function POST(request: NextRequest) {
     console.log('[API] Registration created:', result.id)
 
     // Fire FB conversion event (non-blocking)
-    import('@/lib/fb/handler')
-      .then(({ sendFBConversionInternal }) =>
-        sendFBConversionInternal({
-          event_type: 'event_join',
-          phone: data.parentPhone,
-          email: data.parentEmail || undefined,
-          member_id: data.parentId || undefined,
-          entity_id: result.id,
-          branch_id: data.branchId,
-        })
-      )
+    sendFBConversionInternal({
+      event_type: 'event_join',
+      phone: data.parentPhone,
+      email: data.parentEmail || undefined,
+      member_id: data.parentId || undefined,
+      entity_id: result.id,
+      branch_id: data.branchId,
+    })
+      .then((fbResult) => console.log('[FB CAPI] Event registration result:', JSON.stringify(fbResult)))
       .catch((err) => console.error('[FB CAPI] Event registration error:', err))
 
     // Update schedule attendee count
