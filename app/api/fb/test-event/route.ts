@@ -20,14 +20,6 @@ export async function POST(request: NextRequest) {
       entity_id: `test_${Date.now()}`,
     })
 
-    console.log('[FB] test-event result:', JSON.stringify({
-      success: result.success,
-      logId: result.logId,
-      error: result.error,
-      capiSuccess: result.capiResult?.success,
-      capiError: result.capiResult?.error,
-    }))
-
     return NextResponse.json({
       success: result.success,
       logId: result.logId,

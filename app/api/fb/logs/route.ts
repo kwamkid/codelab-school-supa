@@ -14,9 +14,11 @@ export async function GET(request: NextRequest) {
     const fbStatus = searchParams.get('fbStatus')
     const memberId = searchParams.get('memberId')
 
+    const selectColumns = 'id, event_type, fb_event_name, event_id, member_id, phone_hash, fb_status, audience_status, is_resend, created_at, fb_response'
+
     let query = supabase
       .from('fb_conversion_logs')
-      .select('*', { count: 'exact' })
+      .select(selectColumns, { count: 'exact' })
       .order('created_at', { ascending: false })
 
     if (eventType && eventType !== 'all') {
@@ -33,8 +35,6 @@ export async function GET(request: NextRequest) {
     query = query.range(offset, offset + pageSize - 1)
 
     const { data, error, count } = await query
-
-    console.log('[FB] logs query result:', { dataLength: data?.length, count, error })
 
     if (error) throw error
 

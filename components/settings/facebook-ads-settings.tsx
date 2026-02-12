@@ -119,11 +119,8 @@ export default function FacebookAdsSettingsComponent() {
   // Load logs when filters/page change
   useEffect(() => {
     loadLogs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logPage, logPageSize, logEventFilter, logStatusFilter])
-
-  useEffect(() => {
-    resetLogPagination()
-  }, [logEventFilter, logStatusFilter, resetLogPagination])
 
   const loadSettings = async () => {
     try {
