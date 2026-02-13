@@ -43,6 +43,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Download,
 } from 'lucide-react'
 import { useBranch } from '@/contexts/BranchContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -277,6 +278,38 @@ export default function StudentReportPage() {
     } finally {
       setNormalizing(false)
     }
+  }
+
+  const handleExportSchoolCSV = () => {
+    if (!filteredSchools.length) return
+
+    const headers = ['โรงเรียน', 'จำนวน']
+    if (isAllBranches && branchNames.length > 0) {
+      headers.push(...branchNames)
+    }
+
+    const rows = filteredSchools.map((school) => {
+      const row = [school.displayName, school.count.toString()]
+      if (isAllBranches && branchNames.length > 0) {
+        for (const bName of branchNames) {
+          row.push((school.byBranch[bName] || 0).toString())
+        }
+      }
+      return row
+    })
+
+    const bom = '\uFEFF'
+    const csvContent = bom + [headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `รายชื่อโรงเรียน_${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const toggleSchoolSelection = (name: string) => {
@@ -515,12 +548,23 @@ export default function StudentReportPage() {
                     {stats.noSchool > 0 && ` | ไม่ระบุโรงเรียน: ${stats.noSchool} คน`}
                   </CardDescription>
                 </div>
-                {isSuperAdmin() && (
-                  <Button variant="outline" size="sm" onClick={handleOpenMerge}>
-                    <Settings2 className="w-4 h-4 mr-1" />
-                    จัดการ
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportSchoolCSV}
+                    disabled={filteredSchools.length === 0}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Export CSV
                   </Button>
-                )}
+                  {isSuperAdmin() && (
+                    <Button variant="outline" size="sm" onClick={handleOpenMerge}>
+                      <Settings2 className="w-4 h-4 mr-1" />
+                      จัดการ
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>

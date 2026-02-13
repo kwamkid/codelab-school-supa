@@ -618,6 +618,24 @@ export default function FacebookAdsSettingsComponent() {
             </p>
           )}
 
+          {settings.adAccountId && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Graph API Query:</span>
+              <code
+                className="bg-muted px-2 py-1 rounded cursor-pointer hover:bg-muted/80 select-all"
+                onClick={() => {
+                  const cleanId = settings.adAccountId.replace(/^act_/, '')
+                  const query = `act_${cleanId}/customaudiences?fields=id,name,approximate_count_lower_bound`
+                  navigator.clipboard.writeText(query)
+                  toast.success('คัดลอก query แล้ว')
+                }}
+                title="คลิกเพื่อคัดลอก"
+              >
+                act_{settings.adAccountId.replace(/^act_/, '')}/customaudiences?fields=id,name,approximate_count_lower_bound
+              </code>
+            </div>
+          )}
+
           {/* Bulk Sync Button */}
           <div className="border-t pt-4">
             <div className="flex items-center justify-between">
