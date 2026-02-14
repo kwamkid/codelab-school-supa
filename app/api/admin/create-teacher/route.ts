@@ -88,10 +88,15 @@ export async function POST(request: NextRequest) {
         nickname: teacherData.nickname || null,
         available_branches: teacherData.availableBranches || [],
         specialties: teacherData.specialties || [],
+        profile_image: teacherData.profileImage || null,
+        hourly_rate: teacherData.hourlyRate || null,
+        bank_name: teacherData.bankAccount?.bankName || null,
+        bank_account_number: teacherData.bankAccount?.accountNumber || null,
+        bank_account_name: teacherData.bankAccount?.accountName || null,
         is_active: teacherData.isActive !== false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      })
+      } as any)
 
       if (teacherError) throw teacherError
 

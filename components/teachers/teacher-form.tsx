@@ -32,7 +32,6 @@ export default function TeacherForm({ teacher, isEdit = false }: TeacherFormProp
     email: teacher?.email || '',
     phone: teacher?.phone || '',
     password: '',
-    lineUserId: teacher?.lineUserId || '',
     specialties: teacher?.specialties || [],
     availableBranches: teacher?.availableBranches || [],
     profileImage: teacher?.profileImage || '',
@@ -255,15 +254,6 @@ export default function TeacherForm({ teacher, isEdit = false }: TeacherFormProp
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="lineUserId">LINE User ID (สำหรับรับการแจ้งเตือน)</Label>
-              <Input
-                id="lineUserId"
-                value={formData.lineUserId}
-                onChange={(e) => setFormData({ ...formData, lineUserId: e.target.value })}
-                placeholder="LINE User ID"
-              />
-            </div>
           </CardContent>
         </Card>
 

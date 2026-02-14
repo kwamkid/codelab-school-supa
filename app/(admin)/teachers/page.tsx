@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Teacher, Branch, Subject } from '@/types/models';
 import { getTeachers } from '@/lib/services/teachers';
 import { getActiveBranches } from '@/lib/services/branches';
 import { getActiveSubjects } from '@/lib/services/subjects';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Phone, Mail, MapPin, BookOpen, Users, Key, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, Edit, Phone, Mail, MapPin, BookOpen, Users, Key, Trash2, Search } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 import { getClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Pagination, usePagination } from '@/components/ui/pagination';
 
 export default function TeachersPage() {
   const { selectedBranchId, isAllBranches } = useBranch();
@@ -34,6 +36,17 @@ export default function TeachersPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    resetPagination,
+    getPaginatedData,
+    totalPages: calculateTotalPages
+  } = usePagination(20);
 
   useEffect(() => {
     loadData();
@@ -71,6 +84,34 @@ export default function TeachersPage() {
     const subject = subjects.find(s => s.id === subjectId);
     return subject?.name || subjectId;
   };
+
+  // Filter teachers by search term
+  const filteredTeachers = useMemo(() => {
+    if (!searchTerm) return teachers;
+    const search = searchTerm.toLowerCase();
+    return teachers.filter(t =>
+      t.name.toLowerCase().includes(search) ||
+      (t.nickname && t.nickname.toLowerCase().includes(search)) ||
+      (t.phone && t.phone.includes(search)) ||
+      (t.email && t.email.toLowerCase().includes(search)) ||
+      t.specialties.some(id => getSubjectName(id).toLowerCase().includes(search)) ||
+      t.availableBranches.some(id => getBranchName(id).toLowerCase().includes(search))
+    );
+  }, [teachers, searchTerm, getSubjectName, getBranchName]);
+
+  // Paginate filtered data
+  const paginatedTeachers = useMemo(() => {
+    return getPaginatedData(filteredTeachers);
+  }, [filteredTeachers, getPaginatedData]);
+
+  const totalPages = useMemo(() => {
+    return calculateTotalPages(filteredTeachers.length);
+  }, [filteredTeachers.length, calculateTotalPages]);
+
+  // Reset pagination on search/branch change
+  useEffect(() => {
+    resetPagination();
+  }, [searchTerm, selectedBranchId, resetPagination]);
 
   const handleResetPassword = async (teacher: Teacher) => {
     if (!confirm(`ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ ${teacher.email}?`)) return;
@@ -208,12 +249,29 @@ export default function TeachersPage() {
         </Card>
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-md mb-6">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          type="text"
+          placeholder="ค้นหาชื่อ, ชื่อเล่น, เบอร์โทร, อีเมล, วิชา..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
       {/* Teachers Table */}
       <Card>
         <CardHeader>
           <CardTitle>
             รายชื่อครูผู้สอน
-            {!isAllBranches && teachers.length > 0 && (
+            {searchTerm && (
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                (พบ {filteredTeachers.length} คน)
+              </span>
+            )}
+            {!searchTerm && !isAllBranches && teachers.length > 0 && (
               <span className="text-sm font-normal text-gray-500 ml-2">
                 (ที่สอนในสาขานี้)
               </span>
@@ -221,16 +279,16 @@ export default function TeachersPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {teachers.length === 0 ? (
+          {filteredTeachers.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {!isAllBranches ? 'ไม่มีครูที่สอนในสาขานี้' : 'ยังไม่มีครูผู้สอน'}
+                {searchTerm ? 'ไม่พบครูที่ตรงกับคำค้นหา' : !isAllBranches ? 'ไม่มีครูที่สอนในสาขานี้' : 'ยังไม่มีครูผู้สอน'}
               </h3>
               <p className="text-gray-600 mb-4">
-                {!isAllBranches ? 'ครูจะแสดงเมื่อกำหนดให้สอนในสาขานี้' : 'เริ่มต้นด้วยการเพิ่มครูคนแรก'}
+                {searchTerm ? 'ลองเปลี่ยนคำค้นหาใหม่' : !isAllBranches ? 'ครูจะแสดงเมื่อกำหนดให้สอนในสาขานี้' : 'เริ่มต้นด้วยการเพิ่มครูคนแรก'}
               </p>
-              {isAllBranches && (
+              {!searchTerm && isAllBranches && (
                 <PermissionGuard action="create">
                   <Link href="/teachers/new">
                     <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
@@ -242,6 +300,7 @@ export default function TeachersPage() {
               )}
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -256,7 +315,7 @@ export default function TeachersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teachers.map((teacher) => (
+                  {paginatedTeachers.map((teacher) => (
                     <TableRow key={teacher.id} className={!teacher.isActive ? 'opacity-60' : ''}>
                       <TableCell>
                         <div>
@@ -381,6 +440,21 @@ export default function TeachersPage() {
                 </TableBody>
               </Table>
             </div>
+
+              {/* Pagination */}
+              {filteredTeachers.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  totalItems={filteredTeachers.length}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  pageSizeOptions={[10, 20, 50]}
+                  showFirstLastButtons={false}
+                />
+              )}
+          </>
           )}
         </CardContent>
       </Card>

@@ -115,7 +115,6 @@ export interface Teacher {
   nickname?: string;
   email: string;
   phone: string;
-  lineUserId?: string;
   specialties: string[]; // subject IDs
   availableBranches: string[]; // branch IDs
   profileImage?: string;

@@ -25,7 +25,7 @@ import {
 } from '@/lib/services/classes';
 import { getEnrollmentsByClass } from '@/lib/services/enrollments';
 import { getTeachersByBranch } from '@/lib/services/teachers';
-import { createMakeupRequest } from '@/lib/services/makeup';
+import { createMakeupRequest, deleteMakeupForSchedule, getMakeupByOriginalSchedule } from '@/lib/services/makeup';
 import { getStudentWithParent } from '@/lib/services/parents';
 import { Class, ClassSchedule, Teacher } from '@/types/models';
 import { formatDateWithDay, formatTime } from '@/lib/utils';
@@ -69,6 +69,7 @@ export default function AttendanceCheckPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [actualTeacherId, setActualTeacherId] = useState<string>('');
   const [attendance, setAttendance] = useState<StudentAttendance[]>([]);
+  const [initialAttendance, setInitialAttendance] = useState<Record<string, string>>({}); // studentId -> original status
   const [globalNote, setGlobalNote] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -145,7 +146,14 @@ export default function AttendanceCheckPage() {
       );
       
       setAttendance(validStudents);
-      
+
+      // Store initial attendance statuses for change detection
+      const initialMap: Record<string, string> = {};
+      validStudents.forEach(s => {
+        if (s.status) initialMap[s.studentId] = s.status;
+      });
+      setInitialAttendance(initialMap);
+
       // Set global note if exists
       if (sched.note) {
         setGlobalNote(sched.note);
@@ -217,26 +225,51 @@ export default function AttendanceCheckPage() {
       const { getMakeupSettings } = await import('@/lib/services/settings');
       const { getMakeupCount } = await import('@/lib/services/makeup');
       const makeupSettings = await getMakeupSettings();
-      
-      // Filter students for makeup based on settings
-      const studentsForMakeup = attendanceToSave.filter(att => 
-        makeupSettings.allowMakeupForStatuses.includes(att.status as any)
-      );
-      
-      if (makeupSettings.autoCreateMakeup && studentsForMakeup.length > 0) {
-        // Show notification about auto-creating makeup classes
-        const studentNames = studentsForMakeup.map(s => s.studentNickname || s.studentName).join(', ');
-        console.log('📝 Auto-create makeup enabled. Students:', studentsForMakeup.length);
-        console.log('Students for makeup:', studentNames);
-        toast.info(`กำลังสร้างคลาส Makeup อัตโนมัติสำหรับ: ${studentNames}`);
 
+      const absentStatuses = makeupSettings.allowMakeupForStatuses; // e.g. ['absent', 'sick', 'leave']
+
+      // 1) Cancel makeup for students who changed FROM absent/sick/leave TO present/late
+      const changedToPresent = attendanceToSave.filter(att => {
+        const prevStatus = initialAttendance[att.studentId];
+        const wasAbsent = prevStatus && absentStatuses.includes(prevStatus as any);
+        const isNowPresent = att.status === 'present' || att.status === 'late';
+        return wasAbsent && isNowPresent;
+      });
+
+      if (changedToPresent.length > 0) {
+        const cancelNames: string[] = [];
+        for (const student of changedToPresent) {
+          try {
+            await deleteMakeupForSchedule(student.studentId, classId, sessionId, user?.uid || '', 'แก้ไขการเช็คชื่อ - เปลี่ยนเป็นมาเรียน');
+            cancelNames.push(student.studentNickname || student.studentName);
+          } catch (error) {
+            console.warn(`Failed to delete makeup for ${student.studentId}`, error);
+          }
+        }
+        if (cancelNames.length > 0) {
+          toast.info(`ยกเลิก Makeup สำหรับ: ${cancelNames.join(', ')}`);
+        }
+      }
+
+      // 2) Create makeup for students who are newly absent (no existing makeup yet)
+      const studentsForMakeup = attendanceToSave.filter(att =>
+        absentStatuses.includes(att.status as any)
+      );
+
+      if (makeupSettings.autoCreateMakeup && studentsForMakeup.length > 0) {
         const makeupPromises = studentsForMakeup.map(async (student) => {
           try {
+            // Check if makeup already exists for this student + schedule
+            const existingMakeup = await getMakeupByOriginalSchedule(student.studentId, classId, sessionId);
+            if (existingMakeup) {
+              console.log(`⏭️ Makeup already exists for: ${student.studentNickname || student.studentName}`);
+              return null; // Skip - already has makeup
+            }
+
             // Check makeup limit if set
             if (makeupSettings.makeupLimitPerCourse > 0) {
               const currentCount = await getMakeupCount(student.studentId, classId);
               if (currentCount >= makeupSettings.makeupLimitPerCourse) {
-                console.log(`Student ${student.studentId} reached makeup limit (${currentCount}/${makeupSettings.makeupLimitPerCourse})`);
                 toast.warning(`${student.studentNickname || student.studentName} เกินจำนวนครั้งที่ชดเชยได้แล้ว`);
                 return null;
               }
@@ -244,7 +277,6 @@ export default function AttendanceCheckPage() {
 
             const studentData = await getStudentWithParent(student.studentId);
             if (studentData) {
-              console.log(`✅ Creating makeup for: ${student.studentNickname || student.studentName}`);
               const makeupId = await createMakeupRequest({
                 type: 'ad-hoc',
                 originalClassId: classId,
@@ -258,33 +290,22 @@ export default function AttendanceCheckPage() {
                 originalSessionNumber: schedule?.sessionNumber,
                 originalSessionDate: schedule?.sessionDate
               });
-              console.log(`✅ Makeup created successfully! ID: ${makeupId}`);
+              console.log(`✅ Makeup created! ID: ${makeupId}`);
               return student.studentNickname || student.studentName;
             }
             return null;
           } catch (error) {
             console.error('Error creating makeup for student:', student.studentId, error);
-            // Don't throw - just log and continue
             return null;
           }
         });
 
-        // Wait for all makeup creation attempts, ignoring errors
         const results = await Promise.allSettled(makeupPromises);
         const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
 
-        console.log(`📊 Makeup creation results: ${successCount}/${studentsForMakeup.length} successful`);
-
         if (successCount > 0) {
           toast.success(`สร้างคลาส Makeup สำเร็จ ${successCount} คน`);
-        } else if (studentsForMakeup.length > 0) {
-          console.warn('⚠️ No makeup classes were created despite having students');
         }
-      } else {
-        console.log('ℹ️ Makeup creation skipped:', {
-          autoCreateEnabled: makeupSettings.autoCreateMakeup,
-          studentsCount: studentsForMakeup.length
-        });
       }
       
       toast.success('บันทึกการเช็คชื่อเรียบร้อยแล้ว');

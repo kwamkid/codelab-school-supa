@@ -11,9 +11,13 @@ interface TeacherRow {
   nickname: string | null;
   email: string | null;
   phone: string | null;
-  line_id: string | null;
   specialties: string[];
   available_branches: string[];
+  profile_image: string | null;
+  hourly_rate: number | null;
+  bank_name: string | null;
+  bank_account_number: string | null;
+  bank_account_name: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -27,9 +31,15 @@ function mapToTeacher(row: TeacherRow): Teacher {
     nickname: row.nickname || undefined,
     email: row.email || undefined,
     phone: row.phone || undefined,
-    lineUserId: row.line_id || undefined,
     specialties: row.specialties || [],
     availableBranches: row.available_branches || [],
+    profileImage: row.profile_image || undefined,
+    hourlyRate: row.hourly_rate || undefined,
+    bankAccount: (row.bank_name || row.bank_account_number || row.bank_account_name) ? {
+      bankName: row.bank_name || '',
+      accountNumber: row.bank_account_number || '',
+      accountName: row.bank_account_name || '',
+    } : undefined,
     isActive: row.is_active,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -195,18 +205,22 @@ export async function createTeacher(
         nickname: teacherData.nickname || null,
         email: teacherData.email || null,
         phone: teacherData.phone || null,
-        line_id: teacherData.lineUserId || null,
         specialties: teacherData.specialties || [],
         available_branches: teacherData.availableBranches || [],
+        profile_image: teacherData.profileImage || null,
+        hourly_rate: teacherData.hourlyRate || null,
+        bank_name: teacherData.bankAccount?.bankName || null,
+        bank_account_number: teacherData.bankAccount?.accountNumber || null,
+        bank_account_name: teacherData.bankAccount?.accountName || null,
         is_active: teacherData.isActive,
-      })
+      } as any)
       .select()
       .single();
 
     if (error) throw error;
     if (!data) throw new Error('No data returned from insert');
 
-    const teacherId = data.id;
+    const teacherId = (data as any).id;
 
     // 2. สร้าง AdminUser ด้วย ID เดียวกัน (Dual Creation)
     try {
@@ -253,9 +267,15 @@ export async function updateTeacher(id: string, teacherData: Partial<Teacher>): 
     if (teacherData.nickname !== undefined) updateData.nickname = teacherData.nickname || null;
     if (teacherData.email !== undefined) updateData.email = teacherData.email || null;
     if (teacherData.phone !== undefined) updateData.phone = teacherData.phone || null;
-    if (teacherData.lineUserId !== undefined) updateData.line_id = teacherData.lineUserId || null;
     if (teacherData.specialties !== undefined) updateData.specialties = teacherData.specialties;
     if (teacherData.availableBranches !== undefined) updateData.available_branches = teacherData.availableBranches;
+    if (teacherData.profileImage !== undefined) updateData.profile_image = teacherData.profileImage || null;
+    if (teacherData.hourlyRate !== undefined) updateData.hourly_rate = teacherData.hourlyRate || null;
+    if (teacherData.bankAccount !== undefined) {
+      updateData.bank_name = teacherData.bankAccount?.bankName || null;
+      updateData.bank_account_number = teacherData.bankAccount?.accountNumber || null;
+      updateData.bank_account_name = teacherData.bankAccount?.accountName || null;
+    }
     if (teacherData.isActive !== undefined) updateData.is_active = teacherData.isActive;
 
     if (Object.keys(updateData).length === 1) {
@@ -264,8 +284,8 @@ export async function updateTeacher(id: string, teacherData: Partial<Teacher>): 
     }
 
     // 1. Update teacher document
-    const { error } = await supabase
-      .from(TABLE_NAME)
+    const { error } = await (supabase
+      .from(TABLE_NAME) as any)
       .update(updateData)
       .eq('id', id);
 
@@ -293,8 +313,8 @@ export async function updateTeacher(id: string, teacherData: Partial<Teacher>): 
       }
 
       if (Object.keys(adminUpdateData).length > 2) {
-        const { error: adminError } = await supabase
-          .from('admin_users')
+        const { error: adminError } = await (supabase
+          .from('admin_users') as any)
           .update(adminUpdateData)
           .eq('id', id);
 
@@ -392,8 +412,8 @@ export async function syncTeachersToAdminUsers(): Promise<{
     for (const teacher of teachers) {
       try {
         // Check if adminUser already exists
-        const { data: adminUserDoc, error: checkError } = await supabase
-          .from('admin_users')
+        const { data: adminUserDoc, error: checkError } = await (supabase
+          .from('admin_users') as any)
           .select('*')
           .eq('id', teacher.id)
           .single();
@@ -464,7 +484,6 @@ export async function syncTeachersToAdminUsers(): Promise<{
         }
 
         const authResult = await response.json();
-        console.log('Auth creation result:', authResult);
 
         // Update needsAuthCreation list based on results
         results.needsAuthCreation = authResult.results.failed.map((f: any) => f.id);

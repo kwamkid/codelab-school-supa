@@ -10,11 +10,7 @@ type SubjectUpdate = Database['public']['Tables']['subjects']['Update'];
 
 // Map database item to Subject model
 function mapToSubject(item: any): Subject {
-  console.log('mapToSubject - raw item:', item);
-  console.log('mapToSubject - age_range_min:', item.age_range_min);
-  console.log('mapToSubject - age_range_max:', item.age_range_max);
-
-  const mapped = {
+  return {
     id: item.id,
     code: item.code,
     name: item.name,
@@ -30,9 +26,6 @@ function mapToSubject(item: any): Subject {
     icon: item.icon,
     isActive: item.is_active,
   };
-
-  console.log('mapToSubject - mapped ageRange:', mapped.ageRange);
-  return mapped;
 }
 
 // Get all subjects

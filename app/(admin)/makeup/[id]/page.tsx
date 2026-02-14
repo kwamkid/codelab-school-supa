@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { MakeupClass, Class } from '@/types/models';
 import { getMakeupClass, recordMakeupAttendance, cancelMakeupClass, deleteMakeupClass, revertMakeupToScheduled } from '@/lib/services/makeup';
 import { getClass } from '@/lib/services/classes';
@@ -70,9 +71,9 @@ export default function MakeupDetailPage() {
   const makeupId = params.id as string;
   const searchParams = useSearchParams();
   const { selectedBranchId, isAllBranches } = useBranch();
-  const { adminUser, canAccessBranch } = useAuth();
+  const { user, adminUser, canAccessBranch } = useAuth();
+  const queryClient = useQueryClient();
 
-  
   const [makeup, setMakeup] = useState<MakeupClass | null>(null);
   const [classInfo, setClassInfo] = useState<Class | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,22 +135,23 @@ export default function MakeupDetailPage() {
   };
 
   const handleRecordAttendance = async (status: 'present' | 'absent') => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
+    if (!user) {
       toast.error('กรุณาเข้าสู่ระบบ');
       return;
     }
-    
+
     setActionLoading(true);
     try {
       await recordMakeupAttendance(makeupId, {
         status,
-        checkedBy: currentUser.uid,
+        checkedBy: user.uid,
         note: attendanceNote
       });
       
       toast.success(status === 'present' ? 'บันทึกการเข้าเรียนเรียบร้อยแล้ว' : 'บันทึกการขาดเรียนเรียบร้อยแล้ว');
-      loadMakeupDetails();
+      queryClient.invalidateQueries({ queryKey: ['makeupClasses'] });
+      window.dispatchEvent(new CustomEvent('makeup-changed'));
+      router.push('/makeup');
     } catch (error) {
       console.error('Error recording attendance:', error);
       toast.error('ไม่สามารถบันทึกการเข้าเรียนได้');
@@ -163,18 +165,19 @@ export default function MakeupDetailPage() {
       toast.error('กรุณาระบุเหตุผลในการยกเลิก');
       return;
     }
-    
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
+
+    if (!user) {
       toast.error('กรุณาเข้าสู่ระบบ');
       return;
     }
-    
+
     setActionLoading(true);
     try {
-      await cancelMakeupClass(makeupId, cancelReason, currentUser.uid);
+      await cancelMakeupClass(makeupId, cancelReason, user.uid);
       toast.success('ยกเลิก Makeup Class เรียบร้อยแล้ว');
-      loadMakeupDetails();
+      await loadMakeupDetails();
+      queryClient.invalidateQueries({ queryKey: ['makeupClasses'] });
+      window.dispatchEvent(new CustomEvent('makeup-changed'));
     } catch (error) {
       console.error('Error cancelling makeup:', error);
       toast.error('ไม่สามารถยกเลิกได้');
@@ -188,17 +191,18 @@ export default function MakeupDetailPage() {
       toast.error('กรุณาระบุเหตุผลในการลบ');
       return;
     }
-    
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
+
+    if (!user) {
       toast.error('กรุณาเข้าสู่ระบบ');
       return;
     }
-    
+
     setActionLoading(true);
     try {
-      await deleteMakeupClass(makeupId, currentUser.uid, deleteReason);
+      await deleteMakeupClass(makeupId, user.uid, deleteReason);
       toast.success('ลบ Makeup Class เรียบร้อยแล้ว');
+      queryClient.invalidateQueries({ queryKey: ['makeupClasses'] });
+      window.dispatchEvent(new CustomEvent('makeup-changed'));
       router.push('/makeup');
     } catch (error: any) {
       console.error('Error deleting makeup:', error);
@@ -217,19 +221,20 @@ export default function MakeupDetailPage() {
       toast.error('กรุณาระบุเหตุผลในการยกเลิกการบันทึก');
       return;
     }
-    
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
+
+    if (!user) {
       toast.error('กรุณาเข้าสู่ระบบ');
       return;
     }
-    
+
     setActionLoading(true);
     try {
-      const userName = currentUser.displayName || currentUser.email || currentUser.uid;
+      const userName = adminUser?.displayName || user.email || user.uid;
       await revertMakeupToScheduled(makeupId, userName, revertReason);
       toast.success('ยกเลิกการบันทึกเข้าเรียนเรียบร้อยแล้ว');
-      loadMakeupDetails();
+      await loadMakeupDetails();
+      queryClient.invalidateQueries({ queryKey: ['makeupClasses'] });
+      window.dispatchEvent(new CustomEvent('makeup-changed'));
     } catch (error) {
       console.error('Error reverting attendance:', error);
       toast.error('ไม่สามารถยกเลิกการบันทึกได้');
@@ -685,6 +690,8 @@ export default function MakeupDetailPage() {
           onUpdated={() => {
             setShowEditSchedule(false);
             loadMakeupDetails();
+            queryClient.invalidateQueries({ queryKey: ['makeupClasses'] });
+            window.dispatchEvent(new CustomEvent('makeup-changed'));
           }}
         />
       )}
