@@ -72,6 +72,7 @@ export default function AttendanceCheckPage() {
   const [initialAttendance, setInitialAttendance] = useState<Record<string, string>>({}); // studentId -> original status
   const [globalNote, setGlobalNote] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -107,10 +108,6 @@ export default function AttendanceCheckPage() {
       const enrolledStudentIds = [...new Set(enrollments
         .filter(e => e.status === 'active' || e.status === 'completed')
         .map(e => e.studentId))];
-
-      console.log('Enrollments count:', enrollments.length);
-      console.log('Unique student IDs:', enrolledStudentIds.length);
-      console.log('Student IDs:', enrolledStudentIds);
 
       // Load student details in parallel
       const studentPromises = enrolledStudentIds.map(async (studentId) => {
@@ -153,6 +150,11 @@ export default function AttendanceCheckPage() {
         if (s.status) initialMap[s.studentId] = s.status;
       });
       setInitialAttendance(initialMap);
+
+      // Detect edit mode - if any student already has attendance
+      if (Object.keys(initialMap).length > 0) {
+        setIsEditMode(true);
+      }
 
       // Set global note if exists
       if (sched.note) {
@@ -227,6 +229,7 @@ export default function AttendanceCheckPage() {
       const makeupSettings = await getMakeupSettings();
 
       const absentStatuses = makeupSettings.allowMakeupForStatuses; // e.g. ['absent', 'sick', 'leave']
+      const makeupMessages: string[] = [];
 
       // 1) Cancel makeup for students who changed FROM absent/sick/leave TO present/late
       const changedToPresent = attendanceToSave.filter(att => {
@@ -247,7 +250,7 @@ export default function AttendanceCheckPage() {
           }
         }
         if (cancelNames.length > 0) {
-          toast.info(`ยกเลิก Makeup สำหรับ: ${cancelNames.join(', ')}`);
+          makeupMessages.push(`ยกเลิก Makeup: ${cancelNames.join(', ')}`);
         }
       }
 
@@ -257,12 +260,12 @@ export default function AttendanceCheckPage() {
       );
 
       if (makeupSettings.autoCreateMakeup && studentsForMakeup.length > 0) {
+        const limitExceeded: string[] = [];
         const makeupPromises = studentsForMakeup.map(async (student) => {
           try {
             // Check if makeup already exists for this student + schedule
             const existingMakeup = await getMakeupByOriginalSchedule(student.studentId, classId, sessionId);
             if (existingMakeup) {
-              console.log(`⏭️ Makeup already exists for: ${student.studentNickname || student.studentName}`);
               return null; // Skip - already has makeup
             }
 
@@ -270,14 +273,14 @@ export default function AttendanceCheckPage() {
             if (makeupSettings.makeupLimitPerCourse > 0) {
               const currentCount = await getMakeupCount(student.studentId, classId);
               if (currentCount >= makeupSettings.makeupLimitPerCourse) {
-                toast.warning(`${student.studentNickname || student.studentName} เกินจำนวนครั้งที่ชดเชยได้แล้ว`);
+                limitExceeded.push(student.studentNickname || student.studentName);
                 return null;
               }
             }
 
             const studentData = await getStudentWithParent(student.studentId);
             if (studentData) {
-              const makeupId = await createMakeupRequest({
+              await createMakeupRequest({
                 type: 'ad-hoc',
                 originalClassId: classId,
                 originalScheduleId: sessionId,
@@ -290,7 +293,6 @@ export default function AttendanceCheckPage() {
                 originalSessionNumber: schedule?.sessionNumber,
                 originalSessionDate: schedule?.sessionDate
               });
-              console.log(`✅ Makeup created! ID: ${makeupId}`);
               return student.studentNickname || student.studentName;
             }
             return null;
@@ -304,11 +306,20 @@ export default function AttendanceCheckPage() {
         const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
 
         if (successCount > 0) {
-          toast.success(`สร้างคลาส Makeup สำเร็จ ${successCount} คน`);
+          makeupMessages.push(`สร้าง Makeup ${successCount} คน`);
+        }
+        if (limitExceeded.length > 0) {
+          makeupMessages.push(`เกินลิมิต: ${limitExceeded.join(', ')}`);
         }
       }
-      
-      toast.success('บันทึกการเช็คชื่อเรียบร้อยแล้ว');
+
+      // Show single combined toast
+      const mainMsg = 'บันทึกการเช็คชื่อเรียบร้อยแล้ว';
+      if (makeupMessages.length > 0) {
+        toast.success(`${mainMsg} (${makeupMessages.join(' / ')})`);
+      } else {
+        toast.success(mainMsg);
+      }
       router.push(`/attendance/${classId}`);
       
     } catch (error) {
@@ -602,11 +613,11 @@ export default function AttendanceCheckPage() {
         </Button>
         <Button
           onClick={handleSave}
-          disabled={saving || !hasChanges || stats.checked < stats.total}
+          disabled={saving || !hasChanges || (!isEditMode && stats.checked < stats.total)}
         >
           {saving ? (
             <>กำลังบันทึก...</>
-          ) : stats.checked < stats.total ? (
+          ) : !isEditMode && stats.checked < stats.total ? (
             <>
               <AlertCircle className="h-4 w-4 mr-2" />
               กรุณาเช็คชื่อให้ครบ ({stats.checked}/{stats.total})
@@ -614,7 +625,7 @@ export default function AttendanceCheckPage() {
           ) : (
             <>
               <Save className="h-4 w-4 mr-2" />
-              บันทึกการเช็คชื่อ
+              {isEditMode ? 'บันทึกการแก้ไข' : 'บันทึกการเช็คชื่อ'}
             </>
           )}
         </Button>

@@ -84,7 +84,7 @@ export async function getAttendanceRecord(
   }
 }
 
-// Save attendance for a schedule (batch upsert)
+// Save attendance for a schedule (per-record update/insert)
 export async function saveAttendance(
   scheduleId: string,
   attendanceRecords: Array<{
@@ -99,17 +99,19 @@ export async function saveAttendance(
   try {
     const supabase = getClient();
 
-    // First, delete all existing attendance for this schedule
-    const { error: deleteError } = await supabase
+    // Get existing attendance for this schedule
+    const { data: existing } = await supabase
       .from('attendance')
-      .delete()
+      .select('id, student_id')
       .eq('schedule_id', scheduleId);
 
-    if (deleteError) throw deleteError;
+    const existingMap = new Map((existing || []).map(row => [row.student_id, row.id]));
+    const newStudentIds = attendanceRecords.map(r => r.studentId);
 
-    // Then insert new attendance records
-    if (attendanceRecords.length > 0) {
-      const insertData = attendanceRecords.map(record => ({
+    // Update existing records or insert new ones
+    for (const record of attendanceRecords) {
+      const existingId = existingMap.get(record.studentId);
+      const rowData = {
         schedule_id: scheduleId,
         student_id: record.studentId,
         status: record.status,
@@ -117,13 +119,34 @@ export async function saveAttendance(
         feedback: record.feedback || null,
         checked_at: record.checkedAt ? record.checkedAt.toISOString() : new Date().toISOString(),
         checked_by: record.checkedBy || null
-      }));
+      };
 
-      const { error: insertError } = await supabase
+      if (existingId) {
+        // Update existing record
+        const { error } = await supabase
+          .from('attendance')
+          .update(rowData)
+          .eq('id', existingId);
+        if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from('attendance')
+          .insert(rowData);
+        if (error) throw error;
+      }
+    }
+
+    // Delete records for students no longer in the list
+    const toDelete = (existing || [])
+      .filter(row => !newStudentIds.includes(row.student_id));
+
+    for (const row of toDelete) {
+      const { error } = await supabase
         .from('attendance')
-        .insert(insertData);
-
-      if (insertError) throw insertError;
+        .delete()
+        .eq('id', row.id);
+      if (error) throw error;
     }
   } catch (error) {
     console.error('Error saving attendance:', error);

@@ -474,21 +474,10 @@ export async function updateClassSchedule(
         att.status === 'present' || att.status === 'late' || att.status === 'sick' || att.status === 'leave'
       );
 
-      console.log('📊 Attendance update for schedule:', scheduleId, {
-        attendanceCount: data.attendance.length,
-        hasActualAttendance,
-        currentStatus: currentSchedule.status,
-        statuses: data.attendance.map(a => a.status)
-      });
-
       if (hasActualAttendance) {
-        console.log('✅ Marking schedule as completed (has actual attendance)');
         updateData.status = 'completed';
       } else if (data.attendance.length === 0) {
-        console.log('📝 Marking schedule as scheduled (no attendance)');
         updateData.status = 'scheduled';
-      } else {
-        console.log('⏸️ Keeping current status (only absent status):', currentSchedule.status);
       }
       // If only 'absent' status (makeup requests), keep current status unchanged
     } else if (data.status !== undefined) {
@@ -510,8 +499,6 @@ export async function updateClassSchedule(
       .eq('class_id', classId);
 
     if (error) throw error;
-
-    console.log('Successfully updated schedule:', scheduleId);
   } catch (error) {
     console.error('Error updating class schedule:', error);
     throw error;
