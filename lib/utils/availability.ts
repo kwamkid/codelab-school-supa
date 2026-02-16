@@ -8,6 +8,11 @@ import { getTrialSessions } from '@/lib/services/trial-bookings';
 import { getSubjects } from '@/lib/services/subjects';
 import { Class, MakeupClass, TrialSession } from '@/types/models';
 
+// Normalize time string to HH:mm for consistent comparison
+function normalizeTime(time: string): string {
+  return time.substring(0, 5); // "10:30:00" -> "10:30"
+}
+
 export interface AvailabilityCheckResult {
   available: boolean;
   reasons: AvailabilityIssue[];
@@ -250,14 +255,14 @@ async function checkRoomAvailability(
     relevantClasses.forEach((cls, index) => {
       if (scheduleResults[index].length > 0) {
         // Check time overlap
-        if (startTime < cls.endTime && endTime > cls.startTime) {
+        if (normalizeTime(startTime) < normalizeTime(cls.endTime) && normalizeTime(endTime) > normalizeTime(cls.startTime)) {
           issues.push({
             type: 'room_conflict',
-            message: `ห้อง ${roomName} ไม่ว่าง - มีคลาส ${cls.name} เวลา ${cls.startTime}-${cls.endTime}`,
+            message: `ห้อง ${roomName} ไม่ว่าง - มีคลาส ${cls.name} เวลา ${normalizeTime(cls.startTime)}-${normalizeTime(cls.endTime)}`,
             details: {
               conflictType: 'class',
               conflictName: cls.name,
-              conflictTime: `${cls.startTime}-${cls.endTime}`
+              conflictTime: `${normalizeTime(cls.startTime)}-${normalizeTime(cls.endTime)}`
             }
           });
         }
@@ -304,8 +309,8 @@ async function checkRoomAvailability(
     for (const makeup of relevantMakeups) {
       if (makeup.makeupSchedule) {
         // Check time overlap
-        if (startTime < makeup.makeupSchedule.endTime && endTime > makeup.makeupSchedule.startTime) {
-          const timeKey = `${makeup.makeupSchedule.startTime}-${makeup.makeupSchedule.endTime}`;
+        if (normalizeTime(startTime) < normalizeTime(makeup.makeupSchedule.endTime) && normalizeTime(endTime) > normalizeTime(makeup.makeupSchedule.startTime)) {
+          const timeKey = `${normalizeTime(makeup.makeupSchedule.startTime)}-${normalizeTime(makeup.makeupSchedule.endTime)}`;
           if (!makeupsByTimeSlot.has(timeKey)) {
             makeupsByTimeSlot.set(timeKey, []);
           }
@@ -358,8 +363,8 @@ async function checkRoomAvailability(
     
     for (const trial of relevantTrials) {
       // Check time overlap
-      if (startTime < trial.endTime && endTime > trial.startTime) {
-        const timeKey = `${trial.startTime}-${trial.endTime}`;
+      if (normalizeTime(startTime) < normalizeTime(trial.endTime) && normalizeTime(endTime) > normalizeTime(trial.startTime)) {
+        const timeKey = `${normalizeTime(trial.startTime)}-${normalizeTime(trial.endTime)}`;
         if (!trialsByTimeSlot.has(timeKey)) {
           trialsByTimeSlot.set(timeKey, []);
         }
@@ -447,14 +452,14 @@ async function checkTeacherAvailability(
     teacherClasses.forEach((cls, index) => {
       if (scheduleResults[index].length > 0) {
         // Check time overlap
-        if (startTime < cls.endTime && endTime > cls.startTime) {
+        if (normalizeTime(startTime) < normalizeTime(cls.endTime) && normalizeTime(endTime) > normalizeTime(cls.startTime)) {
           issues.push({
             type: 'teacher_conflict',
-            message: `ครูไม่ว่าง - มีคลาส ${cls.name} เวลา ${cls.startTime}-${cls.endTime}`,
+            message: `ครูไม่ว่าง - มีคลาส ${cls.name} เวลา ${normalizeTime(cls.startTime)}-${normalizeTime(cls.endTime)}`,
             details: {
               conflictType: 'class',
               conflictName: cls.name,
-              conflictTime: `${cls.startTime}-${cls.endTime}`
+              conflictTime: `${normalizeTime(cls.startTime)}-${normalizeTime(cls.endTime)}`
             }
           });
         }
@@ -481,8 +486,8 @@ async function checkTeacherAvailability(
     for (const makeup of teacherMakeups) {
       if (makeup.makeupSchedule) {
         // Check time overlap
-        if (startTime < makeup.makeupSchedule.endTime && endTime > makeup.makeupSchedule.startTime) {
-          const timeKey = `${makeup.makeupSchedule.startTime}-${makeup.makeupSchedule.endTime}`;
+        if (normalizeTime(startTime) < normalizeTime(makeup.makeupSchedule.endTime) && normalizeTime(endTime) > normalizeTime(makeup.makeupSchedule.startTime)) {
+          const timeKey = `${normalizeTime(makeup.makeupSchedule.startTime)}-${normalizeTime(makeup.makeupSchedule.endTime)}`;
           if (!makeupsByTimeSlot.has(timeKey)) {
             makeupsByTimeSlot.set(timeKey, []);
           }
@@ -534,8 +539,8 @@ async function checkTeacherAvailability(
     
     for (const trial of teacherTrials) {
       // Check time overlap
-      if (startTime < trial.endTime && endTime > trial.startTime) {
-        const timeKey = `${trial.startTime}-${trial.endTime}`;
+      if (normalizeTime(startTime) < normalizeTime(trial.endTime) && normalizeTime(endTime) > normalizeTime(trial.startTime)) {
+        const timeKey = `${normalizeTime(trial.startTime)}-${normalizeTime(trial.endTime)}`;
         if (!trialsByTimeSlot.has(timeKey)) {
           trialsByTimeSlot.set(timeKey, []);
         }
@@ -717,8 +722,8 @@ export async function getDayConflicts(
         const subject = subjectMap.get(cls.subjectId);
 
         busySlots.push({
-          startTime: cls.startTime,
-          endTime: cls.endTime,
+          startTime: normalizeTime(cls.startTime),
+          endTime: normalizeTime(cls.endTime),
           type: 'class',
           name: cls.name,
           roomId: cls.roomId,
@@ -762,8 +767,8 @@ export async function getDayConflicts(
         const subject = originalClass ? subjectMap.get(originalClass.subjectId) : null;
         
         busySlots.push({
-          startTime: makeup.makeupSchedule.startTime,
-          endTime: makeup.makeupSchedule.endTime,
+          startTime: normalizeTime(makeup.makeupSchedule.startTime),
+          endTime: normalizeTime(makeup.makeupSchedule.endTime),
           type: 'makeup',
           name: `Makeup: ${student?.nickname || 'นักเรียน'}`,
           roomId: makeup.makeupSchedule.roomId,
@@ -790,7 +795,7 @@ export async function getDayConflicts(
   const trialGroups = new Map<string, TrialSession[]>();
   
   for (const trial of relevantTrials) {
-    const key = `${trial.startTime}-${trial.endTime}-${trial.roomId}-${trial.teacherId}`;
+    const key = `${normalizeTime(trial.startTime)}-${normalizeTime(trial.endTime)}-${trial.roomId}-${trial.teacherId}`;
     
     if (!trialGroups.has(key)) {
       trialGroups.set(key, []);
@@ -825,8 +830,8 @@ export async function getDayConflicts(
     });
     
     busySlots.push({
-      startTime: firstTrial.startTime,
-      endTime: firstTrial.endTime,
+      startTime: normalizeTime(firstTrial.startTime),
+      endTime: normalizeTime(firstTrial.endTime),
       type: 'trial',
       name: trials.length === 1 
         ? `ทดลอง: ${studentNames}` 

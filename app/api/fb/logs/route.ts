@@ -16,9 +16,53 @@ export async function GET(request: NextRequest) {
 
     const selectColumns = 'id, event_type, fb_event_name, event_id, member_id, phone_hash, fb_status, audience_status, is_resend, created_at'
 
+    // Fetch all rows for summary + accurate count (count: 'exact' is unreliable with @supabase/ssr)
+    const summaryClient = createServiceClient()
+    const { data: allLogs } = await summaryClient
+      .from('fb_conversion_logs')
+      .select('id, fb_status, event_type')
+
+    const allRows = (allLogs || []) as Array<{ id: string; fb_status: string; event_type: string }>
+
+    // Summary counts (always from all data, no filters)
+    const totalCount = allRows.length
+    const sentCount = allRows.filter(r => r.fb_status === 'sent').length
+    const failedCount = allRows.filter(r => r.fb_status === 'failed').length
+    const registerCount = allRows.filter(r => r.event_type === 'register').length
+    const trialCount = allRows.filter(r => r.event_type === 'trial').length
+    const eventJoinCount = allRows.filter(r => r.event_type === 'event_join').length
+    const purchaseCount = allRows.filter(r => r.event_type === 'purchase').length
+
+    const summary = {
+      total: totalCount,
+      sent: sentCount,
+      failed: failedCount,
+      pending: totalCount - sentCount - failedCount,
+      byEventType: {
+        ...(registerCount ? { register: registerCount } : {}),
+        ...(trialCount ? { trial: trialCount } : {}),
+        ...(eventJoinCount ? { event_join: eventJoinCount } : {}),
+        ...(purchaseCount ? { purchase: purchaseCount } : {}),
+      },
+    }
+
+    // Apply filters to get filtered count
+    let filteredRows = allRows
+    if (eventType && eventType !== 'all') {
+      filteredRows = filteredRows.filter(r => r.event_type === eventType)
+    }
+    if (fbStatus && fbStatus !== 'all') {
+      filteredRows = filteredRows.filter(r => r.fb_status === fbStatus)
+    }
+    if (memberId) {
+      // memberId filter not in summary data, so we can't count here — use full count
+    }
+    const filteredTotal = filteredRows.length
+
+    // Fetch paginated data for display
     let query = supabase
       .from('fb_conversion_logs')
-      .select(selectColumns, { count: 'exact' })
+      .select(selectColumns)
       .order('created_at', { ascending: false })
 
     if (eventType && eventType !== 'all') {
@@ -34,50 +78,14 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * pageSize
     query = query.range(offset, offset + pageSize - 1)
 
-    const { data, error, count } = await query
+    const { data, error } = await query
 
     if (error) throw error
-
-    // Summary counts using separate count queries (no full row fetch)
-    const [
-      { count: totalCount },
-      { count: sentCount },
-      { count: failedCount },
-      { count: registerCount },
-      { count: trialCount },
-      { count: eventJoinCount },
-      { count: purchaseCount },
-    ] = await Promise.all([
-      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }),
-      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('fb_status', 'sent'),
-      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('fb_status', 'failed'),
-      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('event_type', 'register'),
-      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('event_type', 'trial'),
-      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('event_type', 'event_join'),
-      supabase.from('fb_conversion_logs').select('id', { count: 'exact', head: true }).eq('event_type', 'purchase'),
-    ])
-
-    const total = totalCount || 0
-    const sent = sentCount || 0
-    const failed = failedCount || 0
-
-    const summary = {
-      total,
-      sent,
-      failed,
-      pending: total - sent - failed,
-      byEventType: {
-        ...(registerCount ? { register: registerCount } : {}),
-        ...(trialCount ? { trial: trialCount } : {}),
-        ...(eventJoinCount ? { event_join: eventJoinCount } : {}),
-        ...(purchaseCount ? { purchase: purchaseCount } : {}),
-      },
-    }
 
     return NextResponse.json({
       success: true,
       logs: data || [],
-      total: count || 0,
+      total: filteredTotal,
       page,
       pageSize,
       summary,

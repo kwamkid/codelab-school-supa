@@ -90,6 +90,13 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   purchase: 'สมัครเรียน',
 }
 
+const EVENT_TYPE_COLORS: Record<string, { bg: string; text: string; subtext: string }> = {
+  register: { bg: 'bg-green-50', text: 'text-green-700', subtext: 'text-green-600' },
+  trial: { bg: 'bg-amber-50', text: 'text-amber-700', subtext: 'text-amber-600' },
+  event_join: { bg: 'bg-purple-50', text: 'text-purple-700', subtext: 'text-purple-600' },
+  purchase: { bg: 'bg-rose-50', text: 'text-rose-700', subtext: 'text-rose-600' },
+}
+
 const STATUS_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   sent: { label: 'สำเร็จ', variant: 'default' },
   failed: { label: 'ล้มเหลว', variant: 'destructive' },
@@ -928,27 +935,23 @@ export default function FacebookAdsSettingsComponent() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Summary */}
+          {/* Summary by Event Type */}
           {logSummary && logSummary.total > 0 && (
-            <div className="flex flex-wrap gap-3">
-              <Badge variant="outline" className="text-sm">
-                ทั้งหมด {logSummary.total}
-              </Badge>
-              <Badge variant="default" className="text-sm">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                สำเร็จ {logSummary.sent}
-              </Badge>
-              {logSummary.failed > 0 && (
-                <Badge variant="destructive" className="text-sm">
-                  <XCircle className="w-3 h-3 mr-1" />
-                  ล้มเหลว {logSummary.failed}
-                </Badge>
-              )}
-              {logSummary.pending > 0 && (
-                <Badge variant="secondary" className="text-sm">
-                  รอ {logSummary.pending}
-                </Badge>
-              )}
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              <div className="bg-blue-50 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-blue-700">{logSummary.total}</p>
+                <p className="text-xs text-blue-600">ทั้งหมด</p>
+              </div>
+              {Object.entries(EVENT_TYPE_LABELS).map(([key, label]) => {
+                const count = logSummary.byEventType[key] || 0
+                const colors = EVENT_TYPE_COLORS[key] || { bg: 'bg-gray-50', text: 'text-gray-700', subtext: 'text-gray-600' }
+                return (
+                  <div key={key} className={`${colors.bg} rounded-lg p-3 text-center`}>
+                    <p className={`text-2xl font-bold ${colors.text}`}>{count}</p>
+                    <p className={`text-xs ${colors.subtext}`}>{label}</p>
+                  </div>
+                )
+              })}
             </div>
           )}
 

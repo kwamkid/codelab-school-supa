@@ -62,10 +62,12 @@ export function Pagination({
     return pages;
   };
 
-  // Don't show pagination if no items or only one page
-  if (totalItems === 0 || totalPages <= 1) {
+  // Don't show pagination if no items
+  if (totalItems === 0) {
     return null;
   }
+
+  const showNavigation = totalPages > 1;
 
   const canGoFirst = currentPage > 1;
   const canGoLast = currentPage < totalPages;
@@ -99,73 +101,70 @@ export function Pagination({
           </span>
         </div>
 
-        {/* Row 2: Navigation */}
-        <div className="flex items-center justify-center gap-1">
-          {/* First Page Button - แสดงเฉพาะเมื่อ showFirstLastButtons = true */}
-          {showFirstLastButtons && (
+        {/* Row 2: Navigation - only show when multiple pages */}
+        {showNavigation && (
+          <div className="flex items-center justify-center gap-1">
+            {showFirstLastButtons && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(1)}
+                disabled={!canGoFirst}
+                className="h-8 w-8"
+                title="หน้าแรก"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(1)}
-              disabled={!canGoFirst}
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
               className="h-8 w-8"
-              title="หน้าแรก"
+              title="หน้าก่อนหน้า"
             >
-              <ChevronsLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          )}
 
-          {/* Previous Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="h-8 w-8"
-            title="หน้าก่อนหน้า"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+            {getPageNumbers(true).map((pageNum) => (
+              <Button
+                key={pageNum}
+                variant={currentPage === pageNum ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => onPageChange(pageNum)}
+                className="h-8 w-8 text-xs"
+              >
+                {pageNum}
+              </Button>
+            ))}
 
-          {/* Page Numbers */}
-          {getPageNumbers(true).map((pageNum) => (
-            <Button
-              key={pageNum}
-              variant={currentPage === pageNum ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onPageChange(pageNum)}
-              className="h-8 w-8 text-xs"
-            >
-              {pageNum}
-            </Button>
-          ))}
-
-          {/* Next Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="h-8 w-8"
-            title="หน้าถัดไป"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-
-          {/* Last Page Button - แสดงเฉพาะเมื่อ showFirstLastButtons = true */}
-          {showFirstLastButtons && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(totalPages)}
-              disabled={!canGoLast}
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
               className="h-8 w-8"
-              title="หน้าสุดท้าย"
+              title="หน้าถัดไป"
             >
-              <ChevronsRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
-          )}
-        </div>
+
+            {showFirstLastButtons && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(totalPages)}
+                disabled={!canGoLast}
+                className="h-8 w-8"
+                title="หน้าสุดท้าย"
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Desktop Layout */}
@@ -192,74 +191,71 @@ export function Pagination({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* First Page Button - แสดงเฉพาะเมื่อ showFirstLastButtons = true */}
-          {showFirstLastButtons && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPageChange(1)}
-              disabled={!canGoFirst}
-              className="w-9"
-              title="หน้าแรก"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-          )}
-
-          {/* Previous Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="w-9"
-            title="หน้าก่อนหน้า"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-
-          {/* Page Numbers */}
-          <div className="flex items-center gap-1">
-            {getPageNumbers(false).map((pageNum) => (
+        {showNavigation && (
+          <div className="flex items-center gap-2">
+            {showFirstLastButtons && (
               <Button
-                key={pageNum}
-                variant={currentPage === pageNum ? 'default' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => onPageChange(pageNum)}
+                onClick={() => onPageChange(1)}
+                disabled={!canGoFirst}
                 className="w-9"
+                title="หน้าแรก"
               >
-                {pageNum}
+                <ChevronsLeft className="h-4 w-4" />
               </Button>
-            ))}
-          </div>
+            )}
 
-          {/* Next Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="w-9"
-            title="หน้าถัดไป"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-
-          {/* Last Page Button - แสดงเฉพาะเมื่อ showFirstLastButtons = true */}
-          {showFirstLastButtons && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(totalPages)}
-              disabled={!canGoLast}
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
               className="w-9"
-              title="หน้าสุดท้าย"
+              title="หน้าก่อนหน้า"
             >
-              <ChevronsRight className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          )}
-        </div>
+
+            <div className="flex items-center gap-1">
+              {getPageNumbers(false).map((pageNum) => (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => onPageChange(pageNum)}
+                  className="w-9"
+                >
+                  {pageNum}
+                </Button>
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="w-9"
+              title="หน้าถัดไป"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+
+            {showFirstLastButtons && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(totalPages)}
+                disabled={!canGoLast}
+                className="w-9"
+                title="หน้าสุดท้าย"
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

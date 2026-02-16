@@ -590,6 +590,11 @@ export async function getActiveClasses(branchId?: string): Promise<Class[]> {
   }
 }
 
+// Normalize time string to HH:mm format for consistent comparison
+function normalizeTime(time: string): string {
+  return time.substring(0, 5); // "10:30:00" -> "10:30", "10:30" -> "10:30"
+}
+
 // Check room availability for a time slot
 export async function checkRoomAvailability(
   branchId: string,
@@ -603,6 +608,8 @@ export async function checkRoomAvailability(
 ): Promise<{ available: boolean; conflicts?: any[] }> {
   try {
     const conflicts: any[] = [];
+    const normStart = normalizeTime(startTime);
+    const normEnd = normalizeTime(endTime);
 
     const classes = await getClassesByBranch(branchId);
 
@@ -621,11 +628,11 @@ export async function checkRoomAvailability(
       );
       if (!dateOverlap) return false;
 
-      const timeOverlap = (
-        (startTime >= cls.startTime && startTime < cls.endTime) ||
-        (endTime > cls.startTime && endTime <= cls.endTime) ||
-        (startTime <= cls.startTime && endTime >= cls.endTime)
-      );
+      const clsStart = normalizeTime(cls.startTime);
+      const clsEnd = normalizeTime(cls.endTime);
+
+      // Times that are exactly adjacent (e.g. 08:30-10:30 and 10:30-12:30) do NOT overlap
+      const timeOverlap = normStart < clsEnd && normEnd > clsStart;
 
       return timeOverlap;
     });
@@ -636,8 +643,8 @@ export async function checkRoomAvailability(
         classId: cls.id,
         className: cls.name,
         classCode: cls.code,
-        startTime: cls.startTime,
-        endTime: cls.endTime,
+        startTime: normalizeTime(cls.startTime),
+        endTime: normalizeTime(cls.endTime),
         daysOfWeek: cls.daysOfWeek,
       });
     });
