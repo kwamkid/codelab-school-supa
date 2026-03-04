@@ -5,7 +5,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 
 export default function HomePage() {
   const router = useRouter();
@@ -25,10 +25,7 @@ export default function HomePage() {
   
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-red-500" />
-        <p className="text-gray-600">กำลังโหลด...</p>
-      </div>
+      <SectionLoading text="กำลังโหลด..." />
     </div>
   );
 }

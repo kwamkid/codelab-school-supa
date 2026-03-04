@@ -7,6 +7,8 @@ import { getActiveBranches } from '@/lib/services/branches';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Calendar, Edit, Trash2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
+import { EmptyState } from '@/components/ui/empty-state';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from '@/lib/utils';
@@ -204,14 +206,7 @@ export default function HolidaysPage() {
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   return (
@@ -345,20 +340,24 @@ export default function HolidaysPage() {
       {/* Holidays by Month */}
       {Object.keys(holidaysByMonth).length === 0 ? (
         <Card>
-          <CardContent className="text-center py-12">
-            <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">ยังไม่มีวันหยุด</h3>
-            <p className="text-gray-600 mb-4">เริ่มต้นด้วยการเพิ่มวันหยุดแรก</p>
-            <PermissionGuard action="create">
-              <ActionButton 
-                action="create"
-                onClick={handleAddHoliday}
-                className="bg-red-500 hover:bg-red-600"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                เพิ่มวันหยุด
-              </ActionButton>
-            </PermissionGuard>
+          <CardContent>
+            <EmptyState
+              icon={Calendar}
+              title="ยังไม่มีวันหยุด"
+              description="เริ่มต้นด้วยการเพิ่มวันหยุดแรก"
+              action={
+                <PermissionGuard action="create">
+                  <ActionButton
+                    action="create"
+                    onClick={handleAddHoliday}
+                    className="bg-red-500 hover:bg-red-600"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    เพิ่มวันหยุด
+                  </ActionButton>
+                </PermissionGuard>
+              }
+            />
           </CardContent>
         </Card>
       ) : (

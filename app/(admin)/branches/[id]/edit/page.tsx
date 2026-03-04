@@ -7,6 +7,7 @@ import { getBranch } from '@/lib/services/branches';
 import BranchForm from '@/components/branches/branch-form';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
+import { SectionLoading } from '@/components/ui/loading';
 
 export default function EditBranchPage() {
   const params = useParams();
@@ -31,14 +32,7 @@ export default function EditBranchPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   if (!branch) {

@@ -601,12 +601,7 @@ function ScheduleContent() {
       
       {/* Loading Overlay */}
       {isSubmitting && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm font-medium">กำลังบันทึกการลาเรียน...</p>
-          </div>
-        </div>
+        <PageLoading text="กำลังบันทึกการลาเรียน..." />
       )}
     </div>
   )

@@ -51,7 +51,7 @@ export function CancelBookingDialog({
       setReason('');
       onClose();
     } catch (error: any) {
-      setError(error.message || 'เกิดข้อผิดพลาดในการยกเลิกการจอง');
+      setError(error.message || 'เกิดข้อผิดพลาดในการยกเลิกทดลองเรียน');
     } finally {
       setLoading(false);
     }
@@ -70,12 +70,12 @@ export function CancelBookingDialog({
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>ยืนยันการยกเลิกการจอง</DialogTitle>
+            <DialogTitle>ยืนยันการยกเลิกทดลองเรียน</DialogTitle>
             <DialogDescription>
               {bookingName ? (
-                <>คุณต้องการยกเลิกการจองของ <strong>{bookingName}</strong> ใช่หรือไม่?</>
+                <>คุณต้องการยกเลิกทดลองเรียนของ <strong>{bookingName}</strong> ใช่หรือไม่?</>
               ) : (
-                'คุณต้องการยกเลิกการจองนี้ใช่หรือไม่?'
+                'คุณต้องการยกเลิกทดลองเรียนนี้ใช่หรือไม่?'
               )}
             </DialogDescription>
           </DialogHeader>

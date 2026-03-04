@@ -7,13 +7,14 @@ import { getRoomsByBranch } from '@/lib/services/rooms';
 import { getBranches, getActiveBranches } from '@/lib/services/branches';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Plus, 
-  Edit, 
-  DoorOpen, 
+import {
+  Plus,
+  Edit,
+  DoorOpen,
   MapPin,
-  Search
+  Search,
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import {
   Table,
@@ -24,8 +25,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchInput } from '@/components/ui/search-input';
+import { EmptyState } from '@/components/ui/empty-state';
 import RoomDialog from '@/components/rooms/room-dialog';
 import { useBranch } from '@/contexts/BranchContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -177,14 +179,7 @@ export default function RoomsPage() {
   ).length;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   return (
@@ -228,15 +223,11 @@ export default function RoomsPage() {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="ค้นหาชื่อห้อง, สาขา, ชั้น..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <SearchInput
+                placeholder="ค้นหาชื่อห้อง, สาขา, ชั้น..."
+                value={searchTerm}
+                onChange={setSearchTerm}
+              />
             </div>
             {/* Show branch filter only if not viewing a specific branch */}
             {!selectedBranchId && branches.length > 1 && (
@@ -267,14 +258,14 @@ export default function RoomsPage() {
         </CardHeader>
         <CardContent>
           {filteredRooms.length === 0 ? (
-            <div className="text-center py-12">
-              {allRooms.length === 0 ? (
-                <>
-                  <DoorOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">ยังไม่มีห้องเรียน</h3>
-                  <p className="text-gray-600 mb-4">เริ่มต้นด้วยการเพิ่มห้องเรียนแรก</p>
+            allRooms.length === 0 ? (
+              <EmptyState
+                icon={DoorOpen}
+                title="ยังไม่มีห้องเรียน"
+                description="เริ่มต้นด้วยการเพิ่มห้องเรียนแรก"
+                action={
                   <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-                    <ActionButton 
+                    <ActionButton
                       action="create"
                       onClick={handleAddRoom}
                       className="bg-red-500 hover:bg-red-600"
@@ -283,15 +274,15 @@ export default function RoomsPage() {
                       เพิ่มห้องเรียน
                     </ActionButton>
                   </PermissionGuard>
-                </>
-              ) : (
-                <>
-                  <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">ไม่พบข้อมูลที่ค้นหา</h3>
-                  <p className="text-gray-600">ลองปรับเงื่อนไขการค้นหาใหม่</p>
-                </>
-              )}
-            </div>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={Search}
+                title="ไม่พบข้อมูลที่ค้นหา"
+                description="ลองปรับเงื่อนไขการค้นหาใหม่"
+              />
+            )
           ) : (
             <Table>
               <TableHeader>
@@ -314,7 +305,7 @@ export default function RoomsPage() {
                           <MapPin className="h-4 w-4 text-gray-400" />
                           <div>
                             <div className="font-medium">{room.branchName}</div>
-                            <div className="text-xs text-gray-500">{room.branchCode}</div>
+                            <div className="text-gray-500">{room.branchCode}</div>
                           </div>
                         </div>
                       </TableCell>

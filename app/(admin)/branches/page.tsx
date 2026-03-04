@@ -39,6 +39,7 @@ import {
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 import { useAuth } from '@/hooks/useAuth';
+import { SectionLoading } from '@/components/ui/loading';
 
 interface BranchWithStats extends Branch {
   roomCount?: number;
@@ -126,14 +127,7 @@ export default function BranchesPage() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   // Statistics

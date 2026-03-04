@@ -7,8 +7,9 @@ import { getActiveBranches } from '@/lib/services/branches';
 import { getActiveSubjects } from '@/lib/services/subjects';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Plus, Edit, Phone, Mail, MapPin, BookOpen, Users, Key, Trash2, Search } from 'lucide-react';
+import { SearchInput } from '@/components/ui/search-input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Plus, Edit, Phone, Mail, MapPin, BookOpen, Users, Key, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency } from '@/lib/utils';
 import { useBranch } from '@/contexts/BranchContext';
+import { SectionLoading } from '@/components/ui/loading';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 import { getClient } from '@/lib/supabase/client';
@@ -163,14 +165,7 @@ export default function TeachersPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   const activeTeachers = teachers.filter(t => t.isActive);
@@ -250,16 +245,12 @@ export default function TeachersPage() {
       </div>
 
       {/* Search */}
-      <div className="relative max-w-md mb-6">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-        <Input
-          type="text"
-          placeholder="ค้นหาชื่อ, ชื่อเล่น, เบอร์โทร, อีเมล, วิชา..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+      <SearchInput
+        placeholder="ค้นหาชื่อ, ชื่อเล่น, เบอร์โทร, อีเมล, วิชา..."
+        value={searchTerm}
+        onChange={setSearchTerm}
+        className="max-w-md mb-6"
+      />
 
       {/* Teachers Table */}
       <Card>
@@ -280,25 +271,23 @@ export default function TeachersPage() {
         </CardHeader>
         <CardContent>
           {filteredTeachers.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchTerm ? 'ไม่พบครูที่ตรงกับคำค้นหา' : !isAllBranches ? 'ไม่มีครูที่สอนในสาขานี้' : 'ยังไม่มีครูผู้สอน'}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm ? 'ลองเปลี่ยนคำค้นหาใหม่' : !isAllBranches ? 'ครูจะแสดงเมื่อกำหนดให้สอนในสาขานี้' : 'เริ่มต้นด้วยการเพิ่มครูคนแรก'}
-              </p>
-              {!searchTerm && isAllBranches && (
-                <PermissionGuard action="create">
-                  <Link href="/teachers/new">
-                    <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
-                      <Plus className="h-4 w-4 mr-2" />
-                      เพิ่มครูใหม่
-                    </ActionButton>
-                  </Link>
-                </PermissionGuard>
-              )}
-            </div>
+            <EmptyState
+              icon={Users}
+              title={searchTerm ? 'ไม่พบครูที่ตรงกับคำค้นหา' : !isAllBranches ? 'ไม่มีครูที่สอนในสาขานี้' : 'ยังไม่มีครูผู้สอน'}
+              description={searchTerm ? 'ลองเปลี่ยนคำค้นหาใหม่' : !isAllBranches ? 'ครูจะแสดงเมื่อกำหนดให้สอนในสาขานี้' : 'เริ่มต้นด้วยการเพิ่มครูคนแรก'}
+              action={
+                !searchTerm && isAllBranches ? (
+                  <PermissionGuard action="create">
+                    <Link href="/teachers/new">
+                      <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
+                        <Plus className="h-4 w-4 mr-2" />
+                        เพิ่มครูใหม่
+                      </ActionButton>
+                    </Link>
+                  </PermissionGuard>
+                ) : undefined
+              }
+            />
           ) : (
             <>
             <div className="overflow-x-auto">
@@ -321,17 +310,17 @@ export default function TeachersPage() {
                         <div>
                           <p className="font-medium">{teacher.name}</p>
                           {teacher.nickname && (
-                            <p className="text-sm text-gray-500">({teacher.nickname})</p>
+                            <p className="text-gray-500">({teacher.nickname})</p>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1 text-sm">
+                          <div className="flex items-center gap-1">
                             <Phone className="h-3 w-3" />
                             {teacher.phone}
                           </div>
-                          <div className="flex items-center gap-1 text-sm">
+                          <div className="flex items-center gap-1">
                             <Mail className="h-3 w-3" />
                             {teacher.email}
                           </div>

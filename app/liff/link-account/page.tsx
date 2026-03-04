@@ -8,18 +8,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { 
-  AlertCircle, 
-  CheckCircle, 
-  Loader2, 
+import {
+  AlertCircle,
+  CheckCircle,
+  Loader2,
   User,
   Phone,
   Users,
   Link as LinkIcon
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { useLiff } from '@/components/liff/liff-provider';
 import { toast } from 'sonner';
-import TechLoadingAnimation from '@/components/liff/tech-loading-animation'
 
 function LinkAccountContent() {
   const router = useRouter();
@@ -185,16 +185,7 @@ function LinkAccountContent() {
   if (!isLoggedIn || !profile) {
     return (
       <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-              <p className="text-sm text-muted-foreground">
-                กำลังตรวจสอบการเข้าสู่ระบบ...
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <SectionLoading text="กำลังตรวจสอบการเข้าสู่ระบบ..." />
       </div>
     );
   }
@@ -404,7 +395,7 @@ function LinkAccountContent() {
 
 export default function LinkAccountPage() {
   return (
-    <Suspense fallback={<TechLoadingAnimation />}>
+    <Suspense fallback={<SectionLoading text="กำลังโหลด..." />}>
       <LinkAccountContent />
     </Suspense>
   );

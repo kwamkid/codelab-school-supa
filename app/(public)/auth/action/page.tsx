@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 
 function FirebaseAuthActionContent() {
   const router = useRouter();
@@ -27,10 +27,7 @@ function FirebaseAuthActionContent() {
   }, [router, searchParams]);
   
   return (
-    <div className="text-center">
-      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-      <p>กำลังดำเนินการ...</p>
-    </div>
+    <SectionLoading text="กำลังดำเนินการ..." />
   );
 }
 
@@ -38,10 +35,7 @@ export default function FirebaseAuthActionPage() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <Suspense fallback={
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>กำลังโหลด...</p>
-        </div>
+        <SectionLoading text="กำลังโหลด..." />
       }>
         <FirebaseAuthActionContent />
       </Suspense>

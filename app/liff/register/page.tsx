@@ -18,21 +18,22 @@ import { GradeLevelCombobox } from "@/components/ui/grade-level-combobox";
 import { SchoolNameCombobox } from "@/components/ui/school-name-combobox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Loader2, 
-  ChevronRight, 
+import {
+  Loader2,
+  ChevronRight,
   ChevronLeft,
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Plus, 
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Plus,
   X,
   School,
   Users,
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import { getActiveBranches } from '@/lib/services/branches';
 import { Branch } from '@/types/models';
@@ -118,10 +119,7 @@ function RegisterContent() {
   if (isLoading || !isReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">กำลังโหลด...</p>
-        </div>
+        <SectionLoading text="กำลังโหลด..." />
       </div>
     );
   }

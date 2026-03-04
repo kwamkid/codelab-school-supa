@@ -27,6 +27,7 @@ import {
 } from '@/lib/services/settings';
 import { useAuth } from '@/hooks/useAuth';
 import FactoryResetDialog from './factory-reset-dialog';
+import { SectionLoading } from '@/components/ui/loading';
 
 export default function GeneralSettingsComponent() {
   const { user } = useAuth();
@@ -115,11 +116,7 @@ export default function GeneralSettingsComponent() {
   };
   
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-      </div>
-    );
+    return <SectionLoading />;
   }
   
   if (!settings) {

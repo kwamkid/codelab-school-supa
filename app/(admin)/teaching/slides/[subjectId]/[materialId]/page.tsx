@@ -6,7 +6,7 @@ import { getSubject } from '@/lib/services/subjects';
 import { getTeachingMaterial } from '@/lib/services/teaching-materials';
 import { Subject, TeachingMaterial } from '@/types/models';
 import SecureSlideViewer from '@/components/teaching/secure-slide-viewer';
-import { Loader2 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 
 export default function SlideViewerPage() {
@@ -61,14 +61,7 @@ export default function SlideViewerPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto" />
-          <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   if (!subject || !material) {

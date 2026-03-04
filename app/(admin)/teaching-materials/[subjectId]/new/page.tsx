@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import TeachingMaterialForm from '@/components/teaching-materials/teaching-material-form';
 import { getSubject } from '@/lib/services/subjects';
 import { Subject } from '@/types/models';
@@ -31,14 +32,7 @@ export default function NewTeachingMaterialPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto" />
-          <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   return (

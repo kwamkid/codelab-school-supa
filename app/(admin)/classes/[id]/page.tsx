@@ -49,6 +49,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import RescheduleHistoryDialog from '@/components/classes/reschedule-history-dialog';
+import { SectionLoading } from '@/components/ui/loading';
 
 const statusColors = {
   'draft': 'bg-gray-100 text-gray-700',
@@ -228,14 +229,7 @@ export default function ClassDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   if (!classData || !branch || !subject || !teacher || !room) {

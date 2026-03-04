@@ -15,6 +15,7 @@ import {
 import { Database, Download, Loader2, RefreshCw, CheckCircle, XCircle, HardDrive, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import RestoreDialog from './restore-dialog';
+import { SectionLoading } from '@/components/ui/loading';
 
 interface BackupLog {
   id: string;
@@ -197,9 +198,7 @@ export default function BackupLogsTab() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
+            <SectionLoading />
           ) : logs.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               ยังไม่มีประวัติ Backup

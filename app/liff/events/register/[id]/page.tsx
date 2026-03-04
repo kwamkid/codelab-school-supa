@@ -21,10 +21,10 @@ import {
 } from "@/components/ui/select";
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
 import { SchoolNameCombobox } from '@/components/ui/school-name-combobox';
-import { 
-  Calendar, 
-  MapPin, 
-  Users, 
+import {
+  Calendar,
+  MapPin,
+  Users,
   ChevronLeft,
   AlertCircle,
   CheckCircle,
@@ -37,6 +37,7 @@ import {
   Clock,
   CalendarDays
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { formatDate, formatPhoneNumber } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -506,10 +507,7 @@ export default function EventRegistrationPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
+        <SectionLoading text="กำลังโหลดข้อมูล..." />
       </div>
     );
   }

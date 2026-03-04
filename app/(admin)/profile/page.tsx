@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  User, 
-  Mail, 
-  Phone, 
+import {
+  User,
+  Mail,
+  Phone,
   Calendar,
   Building2,
   BookOpen,
@@ -19,10 +19,10 @@ import {
   CreditCard,
   Key,
   Edit,
-  Loader2,
   Shield,
   UserCog
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { getTeacher } from '@/lib/services/teachers';
 import { getBranches } from '@/lib/services/branches';
 import { getSubjects } from '@/lib/services/subjects';
@@ -111,14 +111,7 @@ export default function ProfilePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-500" />
-          <p className="text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   // ถ้าไม่ใช่ teacher แสดงข้อมูล admin

@@ -8,11 +8,11 @@ import { getActiveBranches } from '@/lib/services/branches';
 import { getClasses } from '@/lib/services/classes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination, usePagination } from '@/components/ui/pagination';
 import {
   Plus,
-  Search,
   Users,
   Phone,
   Mail,
@@ -444,15 +444,12 @@ export default function ParentsPage() {
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="ค้นหาชื่อผู้ปกครอง, นักเรียน, เบอร์โทร, อีเมล..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <SearchInput
+          placeholder="ค้นหาชื่อผู้ปกครอง, นักเรียน, เบอร์โทร, อีเมล..."
+          value={searchTerm}
+          onChange={setSearchTerm}
+          className="flex-1"
+        />
 
         <Select value={filterBranch} onValueChange={setFilterBranch}>
           <SelectTrigger className="w-[200px]">
@@ -510,17 +507,13 @@ export default function ParentsPage() {
         </CardHeader>
         <CardContent className="p-0">
           {paginatedParents.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchTerm ? 'ไม่พบข้อมูลที่ค้นหา' : 
-                 filterBranch !== 'all' ? 'ไม่มีผู้ปกครองในสาขานี้' : 'ยังไม่มีผู้ปกครอง'}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm ? 'ลองค้นหาด้วยคำค้นอื่น' : 
-                 filterBranch !== 'all' ? 'ไม่มีผู้ปกครองที่เรียนหรือสนใจสาขานี้' : 'เริ่มต้นด้วยการเพิ่มผู้ปกครองคนแรก'}
-              </p>
-              {!searchTerm && filterBranch === 'all' && (
+            <EmptyState
+              icon={Users}
+              title={searchTerm ? 'ไม่พบข้อมูลที่ค้นหา' :
+                filterBranch !== 'all' ? 'ไม่มีผู้ปกครองในสาขานี้' : 'ยังไม่มีผู้ปกครอง'}
+              description={searchTerm ? 'ลองค้นหาด้วยคำค้นอื่น' :
+                filterBranch !== 'all' ? 'ไม่มีผู้ปกครองที่เรียนหรือสนใจสาขานี้' : 'เริ่มต้นด้วยการเพิ่มผู้ปกครองคนแรก'}
+              action={!searchTerm && filterBranch === 'all' ? (
                 <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
                   <Link href="/parents/new">
                     <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
@@ -529,8 +522,8 @@ export default function ParentsPage() {
                     </ActionButton>
                   </Link>
                 </PermissionGuard>
-              )}
-            </div>
+              ) : undefined}
+            />
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -588,13 +581,13 @@ export default function ParentsPage() {
                           <TableCell>
                             <div className="space-y-1">
                               {parent.phone && (
-                                <div className="flex items-center gap-1 text-sm">
+                                <div className="flex items-center gap-1">
                                   <Phone className="h-3 w-3" />
                                   {parent.phone}
                                 </div>
                               )}
                               {parent.email && (
-                                <div className="flex items-center gap-1 text-sm">
+                                <div className="flex items-center gap-1">
                                   <Mail className="h-3 w-3" />
                                   <span className="truncate max-w-[150px]" title={parent.email}>
                                     {parent.email}
@@ -609,7 +602,7 @@ export default function ParentsPage() {
                                 {parent.activeStudentCount || 0} คน
                               </Badge>
                               {parent.students && parent.students.length !== parent.activeStudentCount && (
-                                <div className="text-xs text-gray-500">
+                                <div className="text-gray-500">
                                   (ทั้งหมด {parent.students.length})
                                 </div>
                               )}
@@ -632,7 +625,7 @@ export default function ParentsPage() {
                                 <Badge variant="outline">
                                   {getBranchName(parent.preferredBranchId)}
                                 </Badge>
-                                <span className="text-xs text-blue-600">สนใจ</span>
+                                <span className="text-blue-600">สนใจ</span>
                               </div>
                             ) : (
                               <span className="text-gray-400">-</span>
@@ -661,7 +654,7 @@ export default function ParentsPage() {
                                     </Badge>
                                   ))
                                 ) : (
-                                  <span className="text-gray-400 text-sm">ยังไม่ลงคอร์ส</span>
+                                  <span className="text-gray-400">ยังไม่ลงคอร์ส</span>
                                 );
                               })()}
                             </div>
@@ -751,7 +744,7 @@ export default function ParentsPage() {
                                         )}
                                         <div>
                                           <p className="font-medium">{student.name}</p>
-                                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                                          <div className="flex items-center gap-4 text-gray-600">
                                             <span>{student.nickname || '-'}</span>
                                             <Badge 
                                               className={student.gender === 'M' 
@@ -805,7 +798,7 @@ export default function ParentsPage() {
                                               กำลังเรียน
                                             </Badge>
                                             {student.enrollments && student.enrollments.length > 0 && !loadingClasses && (
-                                              <div className="text-xs text-gray-600 max-w-[300px]">
+                                              <div className="text-gray-600 max-w-[300px]">
                                                 {student.enrollments
                                                   .filter(e => e.status === 'active')
                                                   .map(e => getClassInfo(e.classId)?.name || e.classId)

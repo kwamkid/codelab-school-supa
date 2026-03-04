@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
+import {
   TestTube,
   ArrowLeft,
   Phone,
@@ -48,7 +48,8 @@ import {
   Save,
   X as XIcon,
   Building2,
-  Baby
+  Baby,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
@@ -91,6 +92,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageLoading } from '@/components/ui/loading';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 
 const statusConfig = {
@@ -134,6 +145,8 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TrialSession | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<string>('');
+  const [savingSessionId, setSavingSessionId] = useState<string | null>(null);
+  const [cancelSessionId, setCancelSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -308,7 +321,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
     await cancelTrialBooking(booking.id, reason);
     
     setBooking({ ...booking, status: 'cancelled' });
-    toast.success('ยกเลิกการจองเรียบร้อย');
+    toast.success('ยกเลิกทดลองเรียนเรียบร้อย');
     
     loadData();
   };
@@ -704,64 +717,80 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                                         size="sm"
                                         variant="outline"
                                         className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+                                        disabled={savingSessionId === session.id}
                                         onClick={async () => {
+                                          setSavingSessionId(session.id);
                                           try {
                                             await updateTrialSession(session.id, {
                                               status: 'attended',
                                               attended: true
                                             });
-                                            
-                                            const updatedSessions = sessions.map(s => 
+
+                                            const updatedSessions = sessions.map(s =>
                                               s.id === session.id ? { ...s, status: 'attended' as const } : s
                                             );
-                                            const allCompleted = updatedSessions.every(s => 
+                                            const allCompleted = updatedSessions.every(s =>
                                               s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted
                                             );
-                                            
+
                                             if (allCompleted) {
                                               await updateBookingStatus(booking.id, 'completed');
                                             }
-                                            
+
                                             toast.success('บันทึกการเข้าเรียนสำเร็จ');
                                             loadData();
                                           } catch (error) {
                                             toast.error('เกิดข้อผิดพลาดในการบันทึก');
+                                          } finally {
+                                            setSavingSessionId(null);
                                           }
                                         }}
                                       >
-                                        <CheckCircle className="h-4 w-4 mr-1" />
+                                        {savingSessionId === session.id ? (
+                                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                        ) : (
+                                          <CheckCircle className="h-4 w-4 mr-1" />
+                                        )}
                                         มาเรียน
                                       </Button>
                                       <Button
                                         size="sm"
                                         variant="outline"
                                         className="bg-red-50 hover:bg-red-100 text-red-700 border-red-300"
+                                        disabled={savingSessionId === session.id}
                                         onClick={async () => {
+                                          setSavingSessionId(session.id);
                                           try {
                                             await updateTrialSession(session.id, {
                                               status: 'absent',
                                               attended: false
                                             });
-                                            
-                                            const updatedSessions = sessions.map(s => 
+
+                                            const updatedSessions = sessions.map(s =>
                                               s.id === session.id ? { ...s, status: 'absent' as const } : s
                                             );
-                                            const allCompleted = updatedSessions.every(s => 
+                                            const allCompleted = updatedSessions.every(s =>
                                               s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted
                                             );
-                                            
+
                                             if (allCompleted) {
                                               await updateBookingStatus(booking.id, 'completed');
                                             }
-                                            
+
                                             toast.success('บันทึกว่าไม่มาเรียน');
                                             loadData();
                                           } catch (error) {
                                             toast.error('เกิดข้อผิดพลาดในการบันทึก');
+                                          } finally {
+                                            setSavingSessionId(null);
                                           }
                                         }}
                                       >
-                                        <XCircle className="h-4 w-4 mr-1" />
+                                        {savingSessionId === session.id ? (
+                                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                        ) : (
+                                          <XCircle className="h-4 w-4 mr-1" />
+                                        )}
                                         ไม่มา
                                       </Button>
                                     </div>
@@ -934,19 +963,9 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                                       {session.status === 'scheduled' && !isPast && (
                                         <>
                                           <DropdownMenuSeparator />
-                                          <DropdownMenuItem 
+                                          <DropdownMenuItem
                                             className="text-red-600 focus:text-red-600"
-                                            onSelect={async () => {
-                                              if (confirm('ยืนยันการยกเลิกนัดหมาย?')) {
-                                                try {
-                                                  await cancelTrialSession(session.id, 'ยกเลิกโดย Admin');
-                                                  toast.success('ยกเลิกนัดหมายสำเร็จ');
-                                                  loadData();
-                                                } catch (error) {
-                                                  toast.error('เกิดข้อผิดพลาดในการยกเลิก');
-                                                }
-                                              }
-                                            }}
+                                            onSelect={() => setCancelSessionId(session.id)}
                                           >
                                             <XCircle className="h-4 w-4 mr-2" />
                                             ยกเลิกนัดหมาย
@@ -1102,7 +1121,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                       className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      ยกเลิกการจอง
+                      ยกเลิกทดลองเรียน
                     </Button>
                   </div>
                 </>
@@ -1172,6 +1191,37 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
         onConfirm={handleCancelBooking}
         bookingName={booking?.parentName}
       />
+
+      <AlertDialog open={!!cancelSessionId} onOpenChange={(open) => !open && setCancelSessionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการยกเลิกนัดหมาย</AlertDialogTitle>
+            <AlertDialogDescription>
+              การยกเลิกนัดหมายทดลองเรียนนี้ไม่สามารถย้อนกลับได้ ต้องการดำเนินการต่อหรือไม่?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600"
+              onClick={async () => {
+                if (!cancelSessionId) return;
+                try {
+                  await cancelTrialSession(cancelSessionId, 'ยกเลิกโดย Admin');
+                  toast.success('ยกเลิกนัดหมายสำเร็จ');
+                  loadData();
+                } catch (error) {
+                  toast.error('เกิดข้อผิดพลาดในการยกเลิก');
+                } finally {
+                  setCancelSessionId(null);
+                }
+              }}
+            >
+              ยืนยันยกเลิก
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

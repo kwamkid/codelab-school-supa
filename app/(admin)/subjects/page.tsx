@@ -6,6 +6,7 @@ import { getSubjects } from '@/lib/services/subjects';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, BookOpen, Code, Cpu, Sparkles } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -84,16 +86,8 @@ export default function SubjectsPage() {
     return acc;
   }, {} as Record<string, number>);
 
-  if (loading) { 
-    return (
-      
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+  if (loading) {
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   return (
@@ -170,21 +164,21 @@ export default function SubjectsPage() {
         </CardHeader>
         <CardContent>
           {filteredSubjects.length === 0 ? (
-            <div className="text-center py-12">
-              <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {selectedCategory === 'all' ? 'ยังไม่มีวิชา' : `ยังไม่มีวิชา ${selectedCategory}`}
-              </h3>
-              <p className="text-gray-600 mb-4">เริ่มต้นด้วยการเพิ่มวิชาแรก</p>
-              <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-                <Link href="/subjects/new">
-                  <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
-                    <Plus className="h-4 w-4 mr-2" />
-                    เพิ่มวิชาใหม่
-                  </ActionButton>
-                </Link>
-              </PermissionGuard>
-            </div>
+            <EmptyState
+              icon={BookOpen}
+              title={selectedCategory === 'all' ? 'ยังไม่มีวิชา' : `ยังไม่มีวิชา ${selectedCategory}`}
+              description="เริ่มต้นด้วยการเพิ่มวิชาแรก"
+              action={
+                <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+                  <Link href="/subjects/new">
+                    <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
+                      <Plus className="h-4 w-4 mr-2" />
+                      เพิ่มวิชาใหม่
+                    </ActionButton>
+                  </Link>
+                </PermissionGuard>
+              }
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -247,7 +241,7 @@ export default function SubjectsPage() {
                           </Link>
                         </PermissionGuard>
                         {!isSuperAdmin() && adminUser?.role !== 'branch_admin' && (
-                          <span className="text-gray-400 text-xs">ดูอย่างเดียว</span>
+                          <span className="text-gray-400">ดูอย่างเดียว</span>
                         )}
                       </TableCell>
                     </TableRow>

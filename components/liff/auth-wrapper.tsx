@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLiff } from '@/components/liff/liff-provider';
-import { Loader2 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -41,10 +41,7 @@ export default function AuthWrapper({ children, requireAuth = true }: AuthWrappe
   if (isLoading || (requireAuth && isChecking)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">กำลังตรวจสอบสิทธิ์...</p>
-        </div>
+        <SectionLoading text="กำลังตรวจสอบสิทธิ์..." />
       </div>
     );
   }
@@ -53,10 +50,7 @@ export default function AuthWrapper({ children, requireAuth = true }: AuthWrappe
   if (requireAuth && !isLoggedIn) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">กำลังนำไปหน้าเข้าสู่ระบบ...</p>
-        </div>
+        <SectionLoading text="กำลังนำไปหน้าเข้าสู่ระบบ..." />
       </div>
     );
   }

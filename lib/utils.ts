@@ -151,6 +151,12 @@ export function getDayName(dayIndex: number): string {
   return days[dayIndex] || '';
 }
 
+// Get short day name in Thai (1 char)
+export function getShortDayName(dayIndex: number): string {
+  const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  return days[dayIndex] || '';
+}
+
 // Get short day name in English (3 letters)
 export function getShortDayNameEN(dayIndex: number): string {
   const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];

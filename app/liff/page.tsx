@@ -4,18 +4,18 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { 
-  Calendar, 
-  Users, 
-  CalendarOff, 
-  UserPlus, 
-  Link as LinkIcon, 
-  Loader2,
+import {
+  Calendar,
+  Users,
+  CalendarOff,
+  UserPlus,
+  Link as LinkIcon,
   MessageCircle,
   Sparkles,
   School,
   MessageSquare
 } from 'lucide-react'
+import { SectionLoading } from '@/components/ui/loading'
 import { getGeneralSettings } from '@/lib/services/settings'
 import { getParentByLineId } from '@/lib/services/parents'
 import { LiffProvider } from '@/components/liff/liff-provider'
@@ -244,12 +244,7 @@ function LiffHome() {
   if (isLoading || checking || navigating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">
-            {navigating ? `กำลังไปหน้า${selectedMenu}...` : 'กำลังโหลด...'}
-          </p>
-        </div>
+        <SectionLoading text={navigating ? `กำลังไปหน้า${selectedMenu}...` : 'กำลังโหลด...'} />
       </div>
     )
   }

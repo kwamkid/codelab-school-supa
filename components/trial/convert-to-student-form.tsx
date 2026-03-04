@@ -44,6 +44,7 @@ import { getBranches } from '@/lib/services/branches';
 import { getParentByPhone, getStudentsByParent } from '@/lib/services/parents';
 import { formatCurrency, calculateAge } from '@/lib/utils';
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
+import { SectionLoading } from '@/components/ui/loading';
 
 interface ConvertToStudentFormProps {
   booking: TrialBooking;
@@ -469,11 +470,7 @@ export default function ConvertToStudentForm({
   const currentBranch = branches.find(b => b.id === session.branchId);
 
   if (loadingClasses || checkingPhone) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-      </div>
-    );
+    return <SectionLoading />;
   }
 
   return (

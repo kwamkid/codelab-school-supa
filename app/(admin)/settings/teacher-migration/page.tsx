@@ -16,12 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { 
-  Shield, 
-  Users, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle, 
+import {
+  Shield,
+  Users,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
   Loader2,
   RefreshCw,
   UserPlus,
@@ -29,6 +29,7 @@ import {
   Info,
   Play
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { getTeachers, syncTeachersToAdminUsers } from '@/lib/services/teachers';
 import { getAdminUsers } from '@/lib/services/admin-users';
 import { Teacher, AdminUser, MigrationResult } from '@/types/models';
@@ -210,11 +211,7 @@ export default function TeacherMigrationPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-      </div>
-    );
+    return <SectionLoading />;
   }
 
   return (

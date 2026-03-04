@@ -39,6 +39,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import LineWebhookTest from './line-webhook-test';
+import { SectionLoading } from '@/components/ui/loading';
 
 export default function LineSettingsComponent() {
   const { user } = useAuth();
@@ -262,11 +263,7 @@ export default function LineSettingsComponent() {
   };
   
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-      </div>
-    );
+    return <SectionLoading />;
   }
   
   if (!settings) {

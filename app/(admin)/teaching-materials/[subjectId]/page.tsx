@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { 
+import {
   Plus,
   ArrowLeft,
   MoreHorizontal,
@@ -40,13 +40,13 @@ import {
   Eye,
   EyeOff,
   Play,
-  Loader2,
   ArrowUp,
   ArrowDown,
   Clock,
   BookOpen,
   Hash
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { getSubject } from '@/lib/services/subjects';
 import { 
   getTeachingMaterials, 
@@ -191,14 +191,7 @@ export default function SubjectMaterialsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto" />
-          <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   if (!subject) {

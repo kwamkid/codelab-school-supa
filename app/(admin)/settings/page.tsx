@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ShieldAlert, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
+import { SectionLoading } from '@/components/ui/loading';
 
 export default function Page() {
   const { adminUser, canManageSettings, loading } = useAuth();
@@ -22,14 +23,7 @@ export default function Page() {
   }, [loading, canManageSettings]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังตรวจสอบสิทธิ์...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังตรวจสอบสิทธิ์..." />;
   }
 
   // ถ้าไม่มีสิทธิ์ แสดงหน้า Access Denied

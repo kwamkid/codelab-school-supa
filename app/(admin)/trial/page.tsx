@@ -7,15 +7,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -35,30 +26,27 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Pagination, usePagination } from '@/components/ui/pagination';
-import { 
-  TestTube, 
-  Plus, 
+import {
+  TestTube,
+  Plus,
   Phone,
-  Mail,
   Calendar,
-  Search,
   AlertCircle,
   Check,
   X,
   UserPlus,
   PhoneCall,
   CalendarCheck,
-  Trash2,
-  Eye,
   Building2,
   Clock,
-  XCircle,
   Baby
 } from 'lucide-react';
 import { CancelBookingDialog } from '@/components/trial/cancel-booking-dialog';
+import { ContactNoteDialog } from '@/components/trial/contact-note-dialog';
+import { TrialFunnelPipeline } from '@/components/trial/trial-funnel-pipeline';
+import { BookingActionButtons } from '@/components/trial/booking-action-buttons';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { TrialBooking, Branch } from '@/types/models';
+import { TrialBooking } from '@/types/models';
 import { 
   getTrialBookings, 
   getTrialBookingStats, 
@@ -67,11 +55,13 @@ import {
 } from '@/lib/services/trial-bookings';
 import { getActiveBranches } from '@/lib/services/branches';
 import { getSubjects } from '@/lib/services/subjects';
-import { formatDate, calculateAge } from '@/lib/utils';
+import { formatDate, calculateAge, getShortDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useBranch } from '@/contexts/BranchContext';
 import { PermissionGuard } from '@/components/auth/permission-guard';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SearchInput } from '@/components/ui/search-input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageSkeleton } from '@/components/ui/page-skeleton';
 
 const statusConfig = {
   new: { label: 'ใหม่', color: 'bg-blue-100 text-blue-700', icon: AlertCircle },
@@ -108,6 +98,8 @@ export default function TrialBookingsPage() {
   const [deleting, setDeleting] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<TrialBooking | null>(null);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [bookingToContact, setBookingToContact] = useState<TrialBooking | null>(null);
   
   // ใช้ usePagination hook
   const {
@@ -275,6 +267,17 @@ export default function TrialBookingsPage() {
     }
   };
 
+  const handleContactClick = (booking: TrialBooking) => {
+    setBookingToContact(booking);
+    setContactDialogOpen(true);
+  };
+
+  const handleContactSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialBookings(selectedBranchId) });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialStats(selectedBranchId) });
+    window.dispatchEvent(new CustomEvent('trial-booking-changed'));
+  };
+
   const handleCancelClick = (booking: TrialBooking) => {
     setBookingToCancel(booking);
     setCancelDialogOpen(true);
@@ -285,7 +288,7 @@ export default function TrialBookingsPage() {
 
     try {
       await cancelTrialBooking(bookingToCancel.id, reason);
-      toast.success('ยกเลิกการจองเรียบร้อย');
+      toast.success('ยกเลิกทดลองเรียนเรียบร้อย');
 
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialBookings(selectedBranchId) });
@@ -295,7 +298,7 @@ export default function TrialBookingsPage() {
       window.dispatchEvent(new CustomEvent('trial-booking-changed'));
     } catch (error) {
       console.error('Error cancelling booking:', error);
-      toast.error('ไม่สามารถยกเลิกการจองได้');
+      toast.error('ไม่สามารถยกเลิกทดลองเรียนได้');
     } finally {
       setCancelDialogOpen(false);
       setBookingToCancel(null);
@@ -306,51 +309,7 @@ export default function TrialBookingsPage() {
   const isLoading = loadingBookings || loadingStats;
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        {/* Header Skeleton */}
-        <div className="flex justify-between items-center">
-          <div>
-            <Skeleton className="h-10 w-64 mb-2" />
-            <Skeleton className="h-5 w-80" />
-          </div>
-          <Skeleton className="h-10 w-40" />
-        </div>
-
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <Skeleton className="h-8 w-16 mb-2" />
-                <Skeleton className="h-4 w-20" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Filters Skeleton */}
-        <Card>
-          <CardContent className="p-4">
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-        </Card>
-
-        {/* Tabs Skeleton */}
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full max-w-2xl" />
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
+    return <PageSkeleton statsCount={5} rowCount={5} />;
   }
 
   return (
@@ -378,263 +337,163 @@ export default function TrialBookingsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <p className="text-sm text-gray-600">ทั้งหมด</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-600">
-                {stats.byStatus.new || 0}
-              </div>
-              <p className="text-sm text-gray-600">รอติดต่อ</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-purple-600">
-                {stats.byStatus.scheduled || 0}
-              </div>
-              <p className="text-sm text-gray-600">นัดหมายแล้ว</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-green-600">
-                {stats.byStatus.converted || 0}
-              </div>
-              <p className="text-sm text-gray-600">ลงทะเบียนแล้ว</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-emerald-600">
-                {stats.conversionRate.toFixed(1)}%
-              </div>
-              <p className="text-sm text-gray-600">อัตราการแปลง</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Filters */}
+      {/* Funnel Pipeline */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="ค้นหาชื่อผู้ปกครอง, นักเรียน หรือเบอร์โทร..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-          </div>
+          <TrialFunnelPipeline
+            statusCounts={statusCounts}
+            selectedStatus={selectedStatus}
+            onStatusClick={setSelectedStatus}
+          />
         </CardContent>
       </Card>
 
-      {/* Status Filter - Dropdown on mobile, Tabs on desktop */}
-      <Tabs value={selectedStatus} onValueChange={setSelectedStatus}>
-        {/* Mobile: Dropdown */}
-        <div className="md:hidden">
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">ทั้งหมด ({statusCounts.all})</SelectItem>
-              <SelectItem value="new">ใหม่ ({statusCounts.new})</SelectItem>
-              <SelectItem value="contacted">ติดต่อแล้ว ({statusCounts.contacted})</SelectItem>
-              <SelectItem value="scheduled">นัดหมายแล้ว ({statusCounts.scheduled})</SelectItem>
-              <SelectItem value="completed">เรียนแล้ว ({statusCounts.completed})</SelectItem>
-              <SelectItem value="converted">ลงทะเบียน ({statusCounts.converted})</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-3">
+          <SearchInput
+            placeholder="ค้นหาชื่อผู้ปกครอง, นักเรียน หรือเบอร์โทร..."
+            value={searchTerm}
+            onChange={setSearchTerm}
+          />
+        </CardContent>
+      </Card>
 
-        {/* Desktop: Tabs */}
-        <TabsList className="hidden md:inline-flex">
-          <TabsTrigger value="all">ทั้งหมด ({statusCounts.all})</TabsTrigger>
-          <TabsTrigger value="new">ใหม่ ({statusCounts.new})</TabsTrigger>
-          <TabsTrigger value="contacted">ติดต่อแล้ว ({statusCounts.contacted})</TabsTrigger>
-          <TabsTrigger value="scheduled">นัดหมายแล้ว ({statusCounts.scheduled})</TabsTrigger>
-          <TabsTrigger value="completed">เรียนแล้ว ({statusCounts.completed})</TabsTrigger>
-          <TabsTrigger value="converted">ลงทะเบียน ({statusCounts.converted})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={selectedStatus} className="mt-6">
-          <Card>
-            <CardContent className="p-0">
-              {filteredBookings.length === 0 ? (
-                <div className="text-center py-12">
-                  <TestTube className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    {searchTerm ? 'ไม่พบข้อมูลที่ค้นหา' : 'ยังไม่มีการจองทดลองเรียน'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[140px]">วันที่/เวลา</TableHead>
-                          <TableHead className="w-[80px]">ช่องทาง</TableHead>
-                          {isAllBranches && <TableHead className="w-[120px]">สาขา</TableHead>}
-                          <TableHead className="w-[180px]">ผู้ปกครอง</TableHead>
-                          <TableHead className="w-[200px]">นักเรียน</TableHead>
-                          <TableHead className="w-[180px]">วิชาที่สนใจ</TableHead>
-                          <TableHead className="w-[100px]">สถานะ</TableHead>
-                          <TableHead className="w-[100px] text-center">จัดการ</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedBookings.map((booking) => (
-                          <TableRow key={booking.id}>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1 font-medium text-sm">
-                                  <Calendar className="h-3 w-3 text-gray-400" />
-                                  {formatDate(booking.createdAt)}
-                                </div>
-                                <div className="flex items-center gap-1 text-xs text-gray-500">
-                                  <Clock className="h-3 w-3" />
-                                  {formatDate(booking.createdAt, 'time')}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {getSourceBadge(booking.source)}
-                            </TableCell>
-                            {isAllBranches && (
-                              <TableCell>
-                                {getBranchBadge(booking.branchId)}
-                              </TableCell>
-                            )}
-                            <TableCell>
-                              <div>
-                                <div className="font-medium text-sm">{booking.parentName}</div>
-                                <div className="text-xs text-gray-600 flex items-center gap-1 mt-1">
-                                  <Phone className="h-3 w-3" />
-                                  {booking.parentPhone}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-2">
-                                {booking.students.map((student, idx) => (
-                                  <div key={idx} className="text-sm">
-                                    <div className="font-medium">{student.name}</div>
-                                    <div className="space-y-0.5">
-                                      {student.birthdate && (
-                                        <div className="text-xs text-gray-600 flex items-center gap-1">
-                                          <Baby className="h-3 w-3" />
-                                          {formatDate(student.birthdate)} ({calculateAge(student.birthdate)} ปี)
-                                        </div>
-                                      )}
-                                      {student.schoolName && (
-                                        <div className="text-xs text-gray-600">
-                                          {student.schoolName}
-                                          {student.gradeLevel && ` (${student.gradeLevel})`}
-                                        </div>
-                                      )}
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {filteredBookings.length === 0 ? (
+            <EmptyState
+              icon={TestTube}
+              title={searchTerm ? 'ไม่พบข้อมูลที่ค้นหา' : 'ยังไม่มีการจองทดลองเรียน'}
+            />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table className="table-fixed w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">วันที่</TableHead>
+                      <TableHead className="w-[68px]">ช่องทาง</TableHead>
+                      {isAllBranches && <TableHead className="w-[90px] pl-3">สาขา</TableHead>}
+                      <TableHead className="w-[14%] pl-3">ผู้ปกครอง</TableHead>
+                      <TableHead className="w-[16%]">นักเรียน</TableHead>
+                      <TableHead className="w-[13%]">วิชา</TableHead>
+                      <TableHead className="w-[95px]">สถานะ</TableHead>
+                      <TableHead className="w-[150px] text-right pr-4">จัดการ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedBookings.map((booking) => (
+                      <TableRow key={booking.id} className="cursor-pointer hover:bg-gray-50" onClick={() => router.push(`/trial/${booking.id}`)}>
+                        <TableCell className="text-sm text-gray-600">
+                          <div className="whitespace-nowrap">
+                            <div>{(() => {
+                              const d = booking.createdAt instanceof Date ? booking.createdAt
+                                : typeof booking.createdAt === 'string' ? new Date(booking.createdAt)
+                                : booking.createdAt?.toDate ? booking.createdAt.toDate()
+                                : booking.createdAt?.seconds ? new Date(booking.createdAt.seconds * 1000)
+                                : null;
+                              return d ? `${getShortDayName(d.getDay())} ${formatDate(booking.createdAt)}` : formatDate(booking.createdAt);
+                            })()}</div>
+                            <div className="text-xs text-gray-400">{formatDate(booking.createdAt, 'time')}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getSourceBadge(booking.source)}
+                        </TableCell>
+                        {isAllBranches && (
+                          <TableCell className="pl-3">
+                            {getBranchBadge(booking.branchId)}
+                          </TableCell>
+                        )}
+                        <TableCell className="pl-3">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{booking.parentName}</div>
+                            <div className="text-xs text-gray-600 flex items-center gap-1 mt-1">
+                              <Phone className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{booking.parentPhone}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-2 min-w-0">
+                            {booking.students.map((student, idx) => (
+                              <div key={idx} className="min-w-0">
+                                <div className="font-medium truncate">{student.name}</div>
+                                <div className="space-y-0.5">
+                                  {student.birthdate && (
+                                    <div className="text-xs text-gray-600 flex items-center gap-1">
+                                      <Baby className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">{calculateAge(student.birthdate)} ปี</span>
                                     </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-2">
-                                {booking.students.map((student, idx) => (
-                                  <div key={idx} className="flex flex-wrap gap-1">
-                                    {student.subjectInterests.map(subjectId => {
-                                      const subject = subjectsMap.get(subjectId);
-                                      return subject ? (
-                                        <Badge 
-                                          key={subjectId} 
-                                          className="text-xs h-5 px-1.5"
-                                          style={{ 
-                                            backgroundColor: `${subject.color}20`,
-                                            color: subject.color,
-                                            borderColor: subject.color
-                                          }}
-                                        >
-                                          {subject.name}
-                                        </Badge>
-                                      ) : null;
-                                    })}
-                                  </div>
-                                ))}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(booking.status)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-center gap-2">
-                                <Link href={`/trial/${booking.id}`}>
-                                  <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </Link>
-                                
-                                <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-                                  {/* แสดงปุ่มยกเลิกสำหรับสถานะ new, contacted, scheduled */}
-                                  {(booking.status === 'new' || booking.status === 'contacted' || booking.status === 'scheduled') && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleCancelClick(booking)}
-                                      className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
-                                    >
-                                      <XCircle className="h-4 w-4" />
-                                    </Button>
                                   )}
-                                  
-                                  {/* แสดงปุ่มลบสำหรับสถานะ new และ cancelled เท่านั้น */}
-                                  {(booking.status === 'new' || booking.status === 'cancelled') && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleDeleteClick(booking)}
-                                      className="text-gray-600 hover:text-gray-700 h-8 w-8 p-0"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                  {student.schoolName && (
+                                    <div className="text-xs text-gray-600 truncate" title={`${student.schoolName}${student.gradeLevel ? ` (${student.gradeLevel})` : ''}`}>
+                                      {student.schoolName}
+                                      {student.gradeLevel && ` (${student.gradeLevel})`}
+                                    </div>
                                   )}
-                                </PermissionGuard>
+                                </div>
                               </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1 min-w-0">
+                            {booking.students.map((student, idx) => (
+                              <div key={idx} className="flex flex-wrap gap-1">
+                                {student.subjectInterests.map(subjectId => {
+                                  const subject = subjectsMap.get(subjectId);
+                                  return subject ? (
+                                    <Badge
+                                      key={subjectId}
+                                      className="text-[11px] h-5 px-1.5 truncate max-w-full"
+                                      style={{
+                                        backgroundColor: `${subject.color}20`,
+                                        color: subject.color,
+                                        borderColor: subject.color
+                                      }}
+                                      title={subject.name}
+                                    >
+                                      {subject.name}
+                                    </Badge>
+                                  ) : null;
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(booking.status)}
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <BookingActionButtons
+                            booking={booking}
+                            onContact={handleContactClick}
+                            onCancel={handleCancelClick}
+                            onDelete={handleDeleteClick}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-                  {/* Pagination Component */}
-                  <Pagination
-                    currentPage={currentPage}
-                    totalPages={calculatedTotalPages}
-                    pageSize={pageSize}
-                    totalItems={filteredBookings.length}
-                    onPageChange={handlePageChange}
-                    onPageSizeChange={handlePageSizeChange}
-                  />
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              {/* Pagination Component */}
+              <Pagination
+                currentPage={currentPage}
+                totalPages={calculatedTotalPages}
+                pageSize={pageSize}
+                totalItems={filteredBookings.length}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -659,6 +518,17 @@ export default function TrialBookingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Contact Note Dialog */}
+      <ContactNoteDialog
+        isOpen={contactDialogOpen}
+        onClose={() => {
+          setContactDialogOpen(false);
+          setBookingToContact(null);
+        }}
+        booking={bookingToContact}
+        onSuccess={handleContactSuccess}
+      />
 
       {/* Cancel Booking Dialog */}
       <CancelBookingDialog

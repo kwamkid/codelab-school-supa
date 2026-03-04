@@ -6,11 +6,12 @@ import { Student, Branch } from '@/types/models';
 import { getAllStudentsWithParents, deleteStudent } from '@/lib/services/parents';
 import { getActiveBranches } from '@/lib/services/branches';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { TableRowsSkeleton } from '@/components/ui/page-skeleton';
 import { Button } from '@/components/ui/button';
 import { Pagination, usePagination } from '@/components/ui/pagination';
 import {
-  Search,
   User,
   Cake,
   School,
@@ -59,44 +60,6 @@ type StudentWithInfo = Student & {
   parentName: string; 
   parentPhone: string;
 };
-
-// ============================================
-// 🎨 Mini Skeleton Components
-// ============================================
-const TableRowSkeleton = () => (
-  <TableRow>
-    <TableCell>
-      <div className="flex items-start gap-3">
-        <Skeleton className="w-12 h-12 rounded-full flex-shrink-0" />
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-3 w-24" />
-        </div>
-      </div>
-    </TableCell>
-    <TableCell>
-      <div className="space-y-2">
-        <Skeleton className="h-5 w-12" />
-        <Skeleton className="h-4 w-16" />
-      </div>
-    </TableCell>
-    <TableCell>
-      <Skeleton className="h-4 w-28" />
-    </TableCell>
-    <TableCell>
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-3 w-20" />
-      </div>
-    </TableCell>
-    <TableCell>
-      <Skeleton className="h-5 w-12 mx-auto" />
-    </TableCell>
-    <TableCell>
-      <Skeleton className="h-8 w-8 ml-auto" />
-    </TableCell>
-  </TableRow>
-);
 
 // Cache keys
 const QUERY_KEYS = {
@@ -341,16 +304,13 @@ export default function StudentsPage() {
 
       {/* Filters - แสดงทันที */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="ค้นหาชื่อ, ชื่อเล่น, ผู้ปกครอง, โรงเรียน..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-            disabled={loadingStudents}
-          />
-        </div>
+        <SearchInput
+          placeholder="ค้นหาชื่อ, ชื่อเล่น, ผู้ปกครอง, โรงเรียน..."
+          value={searchTerm}
+          onChange={setSearchTerm}
+          disabled={loadingStudents}
+          className="flex-1"
+        />
         
         <Select value={filterGender} onValueChange={setFilterGender} disabled={loadingStudents}>
           <SelectTrigger className="w-[150px]">
@@ -417,24 +377,20 @@ export default function StudentsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[...Array(5)].map((_, i) => (
-                    <TableRowSkeleton key={i} />
-                  ))}
+                  <TableRowsSkeleton columns={6} rows={5} />
                 </TableBody>
               </Table>
             </div>
           ) : paginatedStudents.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                ไม่พบข้อมูลนักเรียน
-              </h3>
-              <p className="text-gray-600">
-                {searchTerm || filterGender !== 'all' || filterStatus !== 'active' || filterAllergy !== 'all'
-                  ? 'ลองปรับเงื่อนไขการค้นหา' 
-                  : 'ยังไม่มีนักเรียนในระบบ'}
-              </p>
-            </div>
+            <EmptyState
+              icon={Users}
+              title="ไม่พบข้อมูลนักเรียน"
+              description={
+                searchTerm || filterGender !== 'all' || filterStatus !== 'active' || filterAllergy !== 'all'
+                  ? 'ลองปรับเงื่อนไขการค้นหา'
+                  : 'ยังไม่มีนักเรียนในระบบ'
+              }
+            />
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -467,7 +423,7 @@ export default function StudentsPage() {
                             )}
                             <div className="min-w-0">
                               <p className="font-medium truncate">{student.name}</p>
-                              <p className="text-sm text-gray-600 truncate">{student.nickname || '-'}</p>
+                              <p className="text-gray-600 truncate">{student.nickname || '-'}</p>
                               {!student.isActive && (
                                 <Badge variant="destructive" className="text-xs mt-1">ไม่ใช้งาน</Badge>
                               )}
@@ -484,7 +440,7 @@ export default function StudentsPage() {
                             >
                               {student.gender === 'M' ? 'ชาย' : 'หญิง'}
                             </Badge>
-                            <p className="text-sm flex items-center gap-1">
+                            <p className="flex items-center gap-1">
                               <Cake className="h-3 w-3 text-gray-400" />
                               {calculateAge(student.birthdate)} ปี
                             </p>
@@ -493,12 +449,12 @@ export default function StudentsPage() {
                         <TableCell>
                           {student.schoolName ? (
                             <div>
-                              <p className="text-sm font-medium flex items-center gap-1" title={student.schoolName}>
+                              <p className="font-medium flex items-center gap-1" title={student.schoolName}>
                                 <School className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                 <span className="truncate">{student.schoolName}</span>
                               </p>
                               {student.gradeLevel && (
-                                <p className="text-xs text-gray-500 truncate">{student.gradeLevel}</p>
+                                <p className="text-gray-500 truncate">{student.gradeLevel}</p>
                               )}
                             </div>
                           ) : (
@@ -509,12 +465,12 @@ export default function StudentsPage() {
                           <div className="min-w-0">
                             <Link 
                               href={`/parents/${student.parentId}`}
-                              className="text-sm font-medium text-blue-600 hover:underline block truncate"
+                              className="font-medium text-blue-600 hover:underline block truncate"
                               title={student.parentName}
                             >
                               {student.parentName}
                             </Link>
-                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <p className="text-gray-500 flex items-center gap-1">
                               <Phone className="h-3 w-3 flex-shrink-0" />
                               <span className="truncate">{student.parentPhone}</span>
                             </p>

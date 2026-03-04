@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 
 function ResetPasswordContent() {
   const router = useRouter();
@@ -72,10 +73,7 @@ function ResetPasswordContent() {
 
   if (verifying) {
     return (
-      <div className="text-center">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-        <p>กำลังตรวจสอบลิงก์...</p>
-      </div>
+      <SectionLoading text="กำลังตรวจสอบลิงก์..." />
     );
   }
 
@@ -137,10 +135,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Suspense fallback={
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>กำลังโหลด...</p>
-        </div>
+        <SectionLoading text="กำลังโหลด..." />
       }>
         <ResetPasswordContent />
       </Suspense>

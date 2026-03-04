@@ -68,6 +68,7 @@ interface NavigationItem {
   requiredRole?: ('super_admin' | 'branch_admin' | 'teacher')[];
   requiredPermission?: string;
   isDivider?: boolean;
+  sectionLabel?: string;
 }
 
 // MenuLink props type
@@ -335,67 +336,100 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
   // ใช้ useMemo สำหรับ navigation array
   const navigation = useMemo<NavigationItem[]>(() => [
-    { 
-      name: 'Dashboard', 
-      href: '/dashboard', 
+    {
+      name: 'Dashboard',
+      href: '/dashboard',
       icon: Home,
       iconColor: 'text-blue-500'
     },
-    { 
+    {
       name: 'divider-1',
-      isDivider: true 
+      isDivider: true
+    },
+    // --- งานหลัก (Sales & Operations) ---
+    {
+      name: 'ทดลองเรียน',
+      href: '/trial',
+      icon: TestTube,
+      iconColor: 'text-cyan-600',
+      badge: newTrialCount > 0 ? newTrialCount : undefined,
+      requiredRole: ['super_admin', 'branch_admin']
     },
     {
-      name: 'ผู้ใช้งาน และครู',
+      name: 'ลงทะเบียนเรียน',
+      href: '/enrollments',
+      icon: Calendar,
+      iconColor: 'text-green-600',
+      requiredRole: ['super_admin', 'branch_admin']
+    },
+    {
+      name: 'ลาและชดเชย',
+      href: '/makeup',
+      icon: Repeat,
+      iconColor: 'text-yellow-600',
+      badge: pendingMakeupCount > 0 ? pendingMakeupCount : undefined
+    },
+    {
+      name: 'ลูกค้า',
       icon: Users,
-      iconColor: 'text-orange-500',
-      requiredRole: ['super_admin', 'branch_admin'],
+      iconColor: 'text-blue-600',
       subItems: [
-        { 
-          name: 'ผู้ดูแลระบบ', 
-          href: '/users', 
-          icon: Shield,
-          iconColor: 'text-red-500',
-          requiredRole: ['super_admin']
+        {
+          name: 'ผู้ปกครอง',
+          href: '/parents',
+          icon: Users,
+          iconColor: 'text-sky-500',
+          requiredRole: ['super_admin', 'branch_admin']
         },
-        { 
-          name: 'ครูผู้สอน', 
-          href: '/teachers', 
-          icon: UserCog,
-          iconColor: 'text-purple-500',
+        {
+          name: 'นักเรียน',
+          href: '/students',
+          icon: UserCheck,
+          iconColor: 'text-purple-600',
           requiredRole: ['super_admin', 'branch_admin']
         },
       ]
+    },
+    {
+      name: 'divider-2',
+      isDivider: true
+    },
+    // --- ข้อมูลพื้นฐาน & จัดการ ---
+    {
+      name: 'คลาสเรียน',
+      href: '/classes',
+      icon: GraduationCap,
+      iconColor: 'text-orange-600'
     },
     {
       name: 'ข้อมูลพื้นฐาน',
       icon: Building,
       iconColor: 'text-cyan-500',
       subItems: [
-        { 
-          name: 'สาขา', 
-          href: '/branches', 
+        {
+          name: 'สาขา',
+          href: '/branches',
           icon: Building2,
           iconColor: 'text-teal-500',
           requiredRole: ['super_admin']
         },
-        { 
-          name: 'ห้องเรียน', 
-          href: '/rooms', 
+        {
+          name: 'ห้องเรียน',
+          href: '/rooms',
           icon: School,
           iconColor: 'text-indigo-500',
           requiredRole: ['super_admin', 'branch_admin']
         },
-        { 
-          name: 'วันหยุด', 
-          href: '/holidays', 
+        {
+          name: 'วันหยุด',
+          href: '/holidays',
           icon: CalendarDays,
           iconColor: 'text-pink-500',
           requiredRole: ['super_admin', 'branch_admin']
         },
-        { 
-          name: 'วิชา', 
-          href: '/subjects', 
+        {
+          name: 'วิชา',
+          href: '/subjects',
           icon: BookOpen,
           iconColor: 'text-green-500',
           requiredRole: ['super_admin', 'branch_admin']
@@ -403,102 +437,74 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       ]
     },
     {
-      name: 'divider-2',
-      isDivider: true 
+      name: 'ผู้ใช้งาน และครู',
+      icon: Users,
+      iconColor: 'text-orange-500',
+      requiredRole: ['super_admin', 'branch_admin'],
+      subItems: [
+        {
+          name: 'ผู้ดูแลระบบ',
+          href: '/users',
+          icon: Shield,
+          iconColor: 'text-red-500',
+          requiredRole: ['super_admin']
+        },
+        {
+          name: 'ครูผู้สอน',
+          href: '/teachers',
+          icon: UserCog,
+          iconColor: 'text-purple-500',
+          requiredRole: ['super_admin', 'branch_admin']
+        },
+      ]
     },
-   {
+    {
+      name: 'กิจกรรม',
+      href: '/events',
+      icon: CalendarDays,
+      iconColor: 'text-pink-600',
+      requiredRole: ['super_admin', 'branch_admin']
+    },
+    {
+      name: 'divider-3',
+      isDivider: true,
+      sectionLabel: 'สำหรับครู'
+    },
+    // --- สำหรับครู ---
+    {
       name: 'การสอน',
       icon: GraduationCap,
       iconColor: 'text-amber-500',
       requiredRole: ['super_admin', 'teacher'],
       subItems: [
-        { 
-          name: 'สื่อการสอน', 
-          href: '/teaching-materials', 
+        {
+          name: 'สื่อการสอน',
+          href: '/teaching-materials',
           icon: Layers,
           iconColor: 'text-violet-500',
           requiredRole: ['super_admin']
         },
-        { 
-          name: 'Slides & เนื้อหา', 
-          href: '/teaching/slides', 
+        {
+          name: 'Slides & เนื้อหา',
+          href: '/teaching/slides',
           icon: Play,
           iconColor: 'text-rose-500',
           requiredRole: ['super_admin', 'teacher']
         },
       ]
     },
-    { 
-      name: 'เช็คชื่อ', 
-      href: '/attendance', 
+    {
+      name: 'เช็คชื่อ',
+      href: '/attendance',
       icon: UserCheck,
       iconColor: 'text-emerald-500',
-      requiredRole: ['super_admin', 'branch_admin','teacher']
-    },
-    { 
-      name: 'divider-3',
-      isDivider: true 
+      requiredRole: ['super_admin', 'branch_admin', 'teacher']
     },
     {
-      name: 'ลูกค้า',
-      icon: Users,
-      iconColor: 'text-blue-600',
-      subItems: [
-        { 
-          name: 'ผู้ปกครอง', 
-          href: '/parents', 
-          icon: Users,
-          iconColor: 'text-sky-500',
-          requiredRole: ['super_admin', 'branch_admin']
-        },
-        { 
-          name: 'นักเรียน', 
-          href: '/students', 
-          icon: UserCheck,
-          iconColor: 'text-purple-600',
-          requiredRole: ['super_admin', 'branch_admin']
-        },
-      ]
-    },
-    { 
-      name: 'คลาสเรียน', 
-      href: '/classes', 
-      icon: GraduationCap,
-      iconColor: 'text-orange-600'
-    },
-    { 
-      name: 'ลงทะเบียนเรียน', 
-      href: '/enrollments', 
-      icon: Calendar,
-      iconColor: 'text-green-600',
-      requiredRole: ['super_admin', 'branch_admin']
-    },
-    { 
-      name: 'ลาและชดเชย', 
-      href: '/makeup', 
-      icon: Repeat,
-      iconColor: 'text-yellow-600',
-      badge: pendingMakeupCount > 0 ? pendingMakeupCount : undefined
-    },
-    { 
-      name: 'ทดลองเรียน', 
-      href: '/trial', 
-      icon: TestTube,
-      iconColor: 'text-cyan-600',
-      badge: newTrialCount > 0 ? newTrialCount : undefined,
-      requiredRole: ['super_admin', 'branch_admin']
-    },
-    { 
-      name: 'กิจกรรม', 
-      href: '/events', 
-      icon: CalendarDays,
-      iconColor: 'text-pink-600',
-      requiredRole: ['super_admin', 'branch_admin']
-    },
-    { 
       name: 'divider-4',
-      isDivider: true 
+      isDivider: true
     },
+    // --- รายงาน & ตั้งค่า ---
     {
       name: 'รายงาน',
       icon: BarChart3,
@@ -516,6 +522,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           href: '/reports/enrollment',
           icon: UserCheck,
           iconColor: 'text-green-600'
+        },
+        {
+          name: 'ตารางสอน',
+          href: '/reports/schedule',
+          icon: CalendarDays,
+          iconColor: 'text-orange-600'
         },
         {
           name: 'ห้องและครูว่าง',
@@ -537,9 +549,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         },
       ]
     },
-    { 
-      name: 'ตั้งค่า', 
-      href: '/settings', 
+    {
+      name: 'ตั้งค่า',
+      href: '/settings',
       icon: Settings,
       iconColor: 'text-gray-600',
       requiredPermission: 'canManageSettings'
@@ -687,7 +699,13 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 return (
                   <div key={item.name} className={item.isDivider ? '' : 'mb-2'}>
                     {item.isDivider ? (
-                      <div className="my-3 border-t border-gray-200" />
+                      <div className="my-3 border-t border-gray-200">
+                        {item.sectionLabel && (
+                          <div className="pt-2 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            {item.sectionLabel}
+                          </div>
+                        )}
+                      </div>
                     ) : item.subItems ? (
                       <>
                         <button

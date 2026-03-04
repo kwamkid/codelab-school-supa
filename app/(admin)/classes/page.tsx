@@ -9,13 +9,12 @@ import { getActiveSubjects } from '@/lib/services/subjects';
 import { getActiveTeachers } from '@/lib/services/teachers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Plus, 
-  Calendar, 
-  Trash2, 
-  Edit, 
+import {
+  Plus,
+  Calendar,
+  Trash2,
+  Edit,
   Eye,
-  Search,
   MoreHorizontal,
   RefreshCw,
   CheckCircle,
@@ -45,7 +44,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from '@/components/ui/search-input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { InlineTextSkeleton } from '@/components/ui/page-skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,13 +75,6 @@ const statusLabels = {
   'completed': 'จบแล้ว',
   'cancelled': 'ยกเลิก',
 };
-
-// ============================================
-// 🎨 Mini Skeleton Components
-// ============================================
-const InlineTextSkeleton = ({ width = "w-20" }: { width?: string }) => (
-  <Skeleton className={`h-4 ${width}`} />
-);
 
 export default function ClassesPage() {
   const { selectedBranchId, isAllBranches } = useBranch();
@@ -455,16 +449,12 @@ export default function ClassesPage() {
       {/* Search + Subject Chips */}
       <div className="flex flex-col gap-3 mb-6">
         {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            type="text"
-            placeholder="ค้นหาชื่อคลาส, รหัส, ครู, สาขา..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <SearchInput
+          placeholder="ค้นหาชื่อคลาส, รหัส, ครู, สาขา..."
+          value={searchTerm}
+          onChange={setSearchTerm}
+          className="max-w-md"
+        />
 
         {/* Subject Chips */}
         {usedSubjects.length > 1 && (
@@ -504,15 +494,11 @@ export default function ClassesPage() {
       <Card>
         <CardContent className="p-0">
           {filteredClasses.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {classes.length === 0 ? 'ยังไม่มีคลาสเรียน' : 'ไม่พบคลาสที่ตรงกับเงื่อนไข'}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {classes.length === 0 ? 'เริ่มต้นด้วยการสร้างคลาสแรก' : 'ลองปรับเงื่อนไขการค้นหาใหม่'}
-              </p>
-              {classes.length === 0 && (
+            <EmptyState
+              icon={Calendar}
+              title={classes.length === 0 ? 'ยังไม่มีคลาสเรียน' : 'ไม่พบคลาสที่ตรงกับเงื่อนไข'}
+              description={classes.length === 0 ? 'เริ่มต้นด้วยการสร้างคลาสแรก' : 'ลองปรับเงื่อนไขการค้นหาใหม่'}
+              action={classes.length === 0 ? (
                 <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
                   <Link href="/classes/new">
                     <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
@@ -521,8 +507,8 @@ export default function ClassesPage() {
                     </ActionButton>
                   </Link>
                 </PermissionGuard>
-              )}
-            </div>
+              ) : undefined}
+            />
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -555,7 +541,7 @@ export default function ClassesPage() {
                               />
                               <div className="min-w-0">
                                 <div className="font-medium truncate group-hover:text-red-600 transition-colors" title={cls.name}>{cls.name}</div>
-                                <div className="text-xs text-gray-500">{cls.code}</div>
+                                <div className="text-gray-500">{cls.code}</div>
                               </div>
                             </Link>
                           </TableCell>
@@ -587,13 +573,13 @@ export default function ClassesPage() {
                               <div className="leading-tight break-words">
                                 {cls.daysOfWeek.map(d => getDayName(d)).join(', ')}
                               </div>
-                              <div className="text-xs text-gray-500">{cls.startTime}-{cls.endTime}</div>
+                              <div className="text-gray-500">{cls.startTime}-{cls.endTime}</div>
                             </div>
                           </TableCell>
                           <TableCell className="text-center align-top">
                             <div>
-                              <div className="text-sm">{formatDate(cls.startDate, 'short')}</div>
-                              <div className="text-xs text-gray-500">-{formatDate(cls.endDate, 'short')}</div>
+                              <div>{formatDate(cls.startDate, 'short')}</div>
+                              <div className="text-gray-500">-{formatDate(cls.endDate, 'short')}</div>
                               <div className="font-medium">{cls.totalSessions} ครั้ง</div>
                             </div>
                           </TableCell>

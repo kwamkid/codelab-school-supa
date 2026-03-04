@@ -28,6 +28,7 @@ import { getSubjects } from '@/lib/services/subjects';
 import { getActiveTeachers } from '@/lib/services/teachers';
 import { createEnrollment, checkDuplicateEnrollment, checkAvailableSeats } from '@/lib/services/enrollments';
 import { toast } from 'sonner';
+import { SectionLoading } from '@/components/ui/loading';
 import { formatCurrency, formatDate, getDayName, calculateAge } from '@/lib/utils';
 import {
   Select,
@@ -356,14 +357,7 @@ export default function EnrollmentForm() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   return (

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -24,16 +24,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { 
-  Shield, 
-  Plus, 
-  Search, 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Shield,
+  Plus,
   MoreHorizontal,
   Edit,
   Key,
   Ban,
   CheckCircle,
-  Loader2,
   Users,
   Building2,
   Trash2,
@@ -41,6 +49,7 @@ import {
   UserCog,
   ChevronLeft
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { AdminUser } from '@/types/models';
 import { getAdminUsers, updateAdminUser, sendPasswordReset, deleteAdminUser } from '@/lib/services/admin-users';
 import { getBranches } from '@/lib/services/branches';
@@ -69,6 +78,8 @@ export default function UsersPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAddRightsDialog, setShowAddRightsDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<AdminUser | null>(null);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<AdminUser | null>(null);
 
   // Check permission - redirect หลังจาก auth loading เสร็จ และ adminUser โหลดแล้ว
   useEffect(() => {
@@ -120,9 +131,7 @@ export default function UsersPage() {
     }
   };
 
-  const handleResetPassword = async (user: AdminUser) => {
-    if (!confirm(`ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ ${user.email}?`)) return;
-    
+  const handleResetPasswordConfirm = async (user: AdminUser) => {
     try {
       await sendPasswordReset(user.email);
       toast.success('ส่งลิงก์รีเซ็ตรหัสผ่านเรียบร้อย');
@@ -132,16 +141,15 @@ export default function UsersPage() {
     }
   };
 
-  const handleDelete = async (user: AdminUser) => {
+  const handleDelete = (user: AdminUser) => {
     if (user.id === adminUser?.id) {
       toast.error('ไม่สามารถลบตัวเองได้');
       return;
     }
+    setDeleteUserTarget(user);
+  };
 
-    if (!confirm(`ต้องการลบผู้ใช้ ${user.displayName} (${user.email}) ใช่หรือไม่?\n\nการลบจะไม่สามารถยกเลิกได้`)) {
-      return;
-    }
-    
+  const handleDeleteConfirm = async (user: AdminUser) => {
     try {
       await deleteAdminUser(user.id, adminUser?.id || '');
       toast.success('ลบผู้ใช้งานเรียบร้อย');
@@ -219,14 +227,7 @@ export default function UsersPage() {
 
   // Show loading while checking auth
   if (authLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500 mx-auto" />
-          <p className="mt-4 text-gray-600">กำลังตรวจสอบสิทธิ์...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังตรวจสอบสิทธิ์..." />;
   }
 
   // Show access denied if not super admin
@@ -259,11 +260,7 @@ export default function UsersPage() {
 
   // Show loading data
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-      </div>
-    );
+    return <SectionLoading />;
   }
 
   return (
@@ -355,15 +352,12 @@ export default function UsersPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="ค้นหาชื่อหรืออีเมล..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <SearchInput
+              placeholder="ค้นหาชื่อหรืออีเมล..."
+              value={searchTerm}
+              onChange={setSearchTerm}
+              className="flex-1 max-w-sm"
+            />
             
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
@@ -411,7 +405,7 @@ export default function UsersPage() {
                   <TableCell>
                     <div>
                       <div className="font-medium">{user.displayName}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="text-gray-500">{user.email}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -423,7 +417,7 @@ export default function UsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm">
+                    <div>
                       {getBranchNames(user.branchIds)}
                     </div>
                   </TableCell>
@@ -443,7 +437,7 @@ export default function UsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-gray-500">
                       {user.updatedAt ? formatDate(user.updatedAt, 'short') : '-'}
                     </div>
                   </TableCell>
@@ -467,8 +461,8 @@ export default function UsersPage() {
                           <Edit className="h-4 w-4 mr-2" />
                           แก้ไขข้อมูล
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleResetPassword(user)}
+                        <DropdownMenuItem
+                          onClick={() => setResetPasswordUser(user)}
                         >
                           <Key className="h-4 w-4 mr-2" />
                           รีเซ็ตรหัสผ่าน
@@ -538,6 +532,57 @@ export default function UsersPage() {
         branches={branches}
         onSuccess={loadData}
       />
+
+      {/* Reset Password Confirmation Dialog */}
+      <AlertDialog open={!!resetPasswordUser} onOpenChange={(open) => !open && setResetPasswordUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>รีเซ็ตรหัสผ่าน</AlertDialogTitle>
+            <AlertDialogDescription>
+              ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ {resetPasswordUser?.email}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (resetPasswordUser) {
+                  handleResetPasswordConfirm(resetPasswordUser);
+                }
+              }}
+            >
+              ยืนยัน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={!!deleteUserTarget} onOpenChange={(open) => !open && setDeleteUserTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบผู้ใช้งาน</AlertDialogTitle>
+            <AlertDialogDescription>
+              ต้องการลบผู้ใช้ {deleteUserTarget?.displayName} ({deleteUserTarget?.email}) ใช่หรือไม่?
+              <br /><br />
+              การลบจะไม่สามารถยกเลิกได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (deleteUserTarget) {
+                  handleDeleteConfirm(deleteUserTarget);
+                }
+              }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

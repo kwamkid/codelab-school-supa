@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Pagination, usePagination } from '@/components/ui/pagination'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import {
   Table,
@@ -95,8 +96,14 @@ export default function TrialReportPage() {
   const [stats, setStats] = useState<TrialStats | null>(null)
   const [sessions, setSessions] = useState<TrialSession[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const pageSize = 50
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    resetPagination,
+    totalPages,
+  } = usePagination(50)
 
   const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>(getDefault7Days)
 
@@ -107,7 +114,7 @@ export default function TrialReportPage() {
       if (dateRange?.from) params.append('startDate', dateRange.from)
       if (dateRange?.to) params.append('endDate', dateRange.to)
       if (selectedBranchId) params.append('branchId', selectedBranchId)
-      params.append('page', page.toString())
+      params.append('page', currentPage.toString())
       params.append('pageSize', pageSize.toString())
 
       const response = await fetch(`/api/reports/trial?${params}`)
@@ -127,11 +134,11 @@ export default function TrialReportPage() {
 
   useEffect(() => {
     loadData()
-  }, [dateRange, selectedBranchId, page])
+  }, [dateRange, selectedBranchId, currentPage, pageSize])
 
   const handleDateRangeChange = (range: { from: string; to: string } | undefined) => {
     setDateRange(range)
-    setPage(1)
+    resetPagination()
   }
 
   const getStatusBadge = (session: TrialSession) => {
@@ -177,8 +184,6 @@ export default function TrialReportPage() {
         return '-'
     }
   }
-
-  const totalPages = Math.ceil(total / pageSize)
 
   return (
     <div className="space-y-6 p-6">
@@ -499,31 +504,14 @@ export default function TrialReportPage() {
           )}
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                หน้า {page} จาก {totalPages}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  ก่อนหน้า
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                >
-                  ถัดไป
-                </Button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages(total)}
+            pageSize={pageSize}
+            totalItems={total}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </CardContent>
       </Card>
     </div>

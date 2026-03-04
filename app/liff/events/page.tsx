@@ -8,18 +8,18 @@ import { useLiff } from '@/components/liff/liff-provider';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Calendar, 
-  MapPin, 
-  Users, 
+import {
+  Calendar,
+  MapPin,
+  Users,
   Clock,
   ChevronRight,
   ChevronLeft,
   AlertCircle,
   Sparkles,
-  CalendarX,
-  Loader2
+  CalendarX
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { formatDate } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -89,10 +89,7 @@ export default function LiffEventsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
+        <SectionLoading text="กำลังโหลดข้อมูล..." />
       </div>
     );
   }

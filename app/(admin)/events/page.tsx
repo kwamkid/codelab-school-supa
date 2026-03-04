@@ -10,7 +10,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBranch } from '@/contexts/BranchContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Table,
   TableBody,
@@ -37,9 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { 
-  Plus, 
-  Search, 
+import {
+  Plus,
   Calendar,
   MapPin,
   Users,
@@ -47,10 +47,10 @@ import {
   Trash2,
   Eye,
   CalendarX,
-  Loader2,
   Link as LinkIcon,
   CheckCircle2
 } from 'lucide-react';
+import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/utils';
 import { PermissionGuard } from '@/components/auth/permission-guard';
@@ -182,14 +182,7 @@ export default function EventsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
 
   return (
@@ -255,15 +248,12 @@ export default function EventsPage() {
       {/* Filters */}
       <div className="mb-6 space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="ค้นหาชื่อ Event หรือสถานที่..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          <SearchInput
+            placeholder="ค้นหาชื่อ Event หรือสถานที่..."
+            value={searchTerm}
+            onChange={setSearchTerm}
+            className="flex-1"
+          />
           
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full md:w-[180px]">
@@ -298,29 +288,31 @@ export default function EventsPage() {
       <Card>
         <CardContent className="p-0">
           {filteredEvents.length === 0 ? (
-            <div className="text-center py-12">
-              <CalendarX className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
-                  ? 'ไม่พบ Event ที่ค้นหา' 
-                  : 'ยังไม่มี Event'}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
+            <EmptyState
+              icon={CalendarX}
+              title={
+                searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
+                  ? 'ไม่พบ Event ที่ค้นหา'
+                  : 'ยังไม่มี Event'
+              }
+              description={
+                searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
                   ? 'ลองค้นหาด้วยคำค้นอื่น'
-                  : 'เริ่มต้นด้วยการสร้าง Event ใหม่'}
-              </p>
-              {!searchTerm && statusFilter === 'all' && typeFilter === 'all' && (
-                <PermissionGuard action="create">
-                  <Link href="/events/new">
-                    <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
-                      <Plus className="h-4 w-4 mr-2" />
-                      สร้าง Event ใหม่
-                    </ActionButton>
-                  </Link>
-                </PermissionGuard>
-              )}
-            </div>
+                  : 'เริ่มต้นด้วยการสร้าง Event ใหม่'
+              }
+              action={
+                !searchTerm && statusFilter === 'all' && typeFilter === 'all' ? (
+                  <PermissionGuard action="create">
+                    <Link href="/events/new">
+                      <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
+                        <Plus className="h-4 w-4 mr-2" />
+                        สร้าง Event ใหม่
+                      </ActionButton>
+                    </Link>
+                  </PermissionGuard>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -341,7 +333,7 @@ export default function EventsPage() {
                       <TableCell>
                         <div>
                           <p className="font-medium">{event.name}</p>
-                          <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
+                          <div className="flex items-center gap-1 text-gray-500 mt-1">
                             <MapPin className="h-3 w-3" />
                             {event.location}
                           </div>
@@ -353,7 +345,7 @@ export default function EventsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">
+                        <div>
                           <p>{formatDate(event.registrationStartDate, 'short')}</p>
                           <p className="text-gray-500">
                             ถึง {formatDate(event.registrationEndDate, 'short')}
@@ -361,7 +353,7 @@ export default function EventsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">
+                        <div>
                           <p>เปิด: {formatDate(event.registrationStartDate, 'short')}</p>
                           <p className="text-gray-500">
                             ปิด: {formatDate(event.registrationEndDate, 'short')}

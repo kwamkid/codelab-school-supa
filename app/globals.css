@@ -53,8 +53,35 @@
   * {
     @apply border-border;
   }
+
+  /* Global Typography */
+  html {
+    font-size: 16px;
+  }
+
   body {
     @apply bg-background text-foreground;
+    @apply text-base leading-relaxed;
+  }
+
+  h1 {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  h3 {
+    @apply text-xl font-semibold;
+  }
+
+  h4 {
+    @apply text-lg font-medium;
+  }
+
+  p {
+    @apply leading-relaxed;
   }
 
   /* Prevent unwanted scrolling */
