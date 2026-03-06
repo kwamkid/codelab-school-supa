@@ -15,6 +15,8 @@ interface CreditNoteRow {
   customer_name: string;
   customer_phone: string | null;
   customer_email: string | null;
+  customer_address: any;
+  customer_tax_id: string | null;
   billing_type: string;
   billing_name: string | null;
   billing_address: any;
@@ -42,6 +44,8 @@ function mapToCreditNote(row: CreditNoteRow): CreditNote {
     customerName: row.customer_name,
     customerPhone: row.customer_phone || undefined,
     customerEmail: row.customer_email || undefined,
+    customerAddress: row.customer_address || undefined,
+    customerTaxId: row.customer_tax_id || undefined,
     billingType: row.billing_type as 'personal' | 'company',
     billingName: row.billing_name || undefined,
     billingAddress: row.billing_address || undefined,
@@ -105,6 +109,8 @@ export async function createCreditNote(data: {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerAddress?: Record<string, string>;
+  customerTaxId?: string;
   billingType?: 'personal' | 'company';
   billingName?: string;
   billingAddress?: Record<string, string>;
@@ -130,6 +136,8 @@ export async function createCreditNote(data: {
       customer_name: data.customerName,
       customer_phone: data.customerPhone || null,
       customer_email: data.customerEmail || null,
+      customer_address: data.customerAddress || {},
+      customer_tax_id: data.customerTaxId || null,
       billing_type: data.billingType || 'personal',
       billing_name: data.billingName || null,
       billing_address: data.billingAddress || {},

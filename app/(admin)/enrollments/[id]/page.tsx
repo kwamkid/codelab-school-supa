@@ -384,6 +384,8 @@ export default function EnrollmentDetailPage() {
             customerName: parent?.name || '',
             customerPhone: parent?.phone || undefined,
             customerEmail: parent?.email || undefined,
+            customerAddress: firstInvoice?.customer_address || undefined,
+            customerTaxId: firstInvoice?.customer_tax_id || undefined,
             items: [{
               description: `ชำระค่าเรียนเพิ่มเติม${refLabel}`,
               studentName,

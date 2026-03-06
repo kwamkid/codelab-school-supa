@@ -20,6 +20,8 @@ interface InvoiceRow {
   customer_name: string;
   customer_phone: string | null;
   customer_email: string | null;
+  customer_address: any;
+  customer_tax_id: string | null;
   items: any;
   subtotal: number;
   discount_type: string | null;
@@ -54,6 +56,8 @@ function mapToInvoice(row: InvoiceRow): Invoice {
     customerName: row.customer_name,
     customerPhone: row.customer_phone || undefined,
     customerEmail: row.customer_email || undefined,
+    customerAddress: row.customer_address || undefined,
+    customerTaxId: row.customer_tax_id || undefined,
     items: row.items || [],
     subtotal: row.subtotal,
     discountType: row.discount_type || undefined,
@@ -132,6 +136,8 @@ export async function createInvoice(data: {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerAddress?: Record<string, string>;
+  customerTaxId?: string;
   items: { description: string; studentName: string; className: string; amount: number }[];
   subtotal: number;
   discountType?: string;
@@ -164,6 +170,8 @@ export async function createInvoice(data: {
       customer_name: data.customerName,
       customer_phone: data.customerPhone || null,
       customer_email: data.customerEmail || null,
+      customer_address: data.customerAddress || {},
+      customer_tax_id: data.customerTaxId || null,
       items: data.items,
       subtotal: data.subtotal,
       discount_type: data.discountType || null,

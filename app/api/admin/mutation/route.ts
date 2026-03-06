@@ -36,6 +36,11 @@ const ALLOWED_TABLES = [
   'invoice_companies',
   'invoices',
   'credit_notes',
+  'chat_channels',
+  'chat_contacts',
+  'chat_conversations',
+  'chat_messages',
+  'chat_quick_replies',
 ]
 
 export async function POST(request: NextRequest) {

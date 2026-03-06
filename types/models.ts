@@ -280,6 +280,8 @@ export interface Invoice {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerAddress?: Record<string, string>;
+  customerTaxId?: string;
   items: { description: string; studentName: string; className: string; amount: number }[];
   subtotal: number;
   discountType?: string;
@@ -309,6 +311,8 @@ export interface CreditNote {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerAddress?: Record<string, string>;
+  customerTaxId?: string;
   billingType: 'personal' | 'company';
   billingName?: string;
   billingAddress?: {
@@ -766,4 +770,89 @@ export interface EventRegistration {
   // Additional
   specialRequest?: string;               // ความต้องการพิเศษ
   referralSource?: string;               // รู้จักงานนี้จากที่ไหน
+}
+
+// === Chat Types ===
+export type ChatChannelType = 'line' | 'facebook' | 'instagram';
+export type ChatMessageDirection = 'inbound' | 'outbound';
+export type ChatMessageType = 'text' | 'image' | 'sticker' | 'file' | 'audio' | 'video' | 'location' | 'template' | 'system';
+export type ChatConversationStatus = 'open' | 'assigned' | 'resolved' | 'archived';
+
+export interface ChatChannel {
+  id: string;
+  type: ChatChannelType;
+  name: string;
+  platformId?: string;
+  platformName?: string;
+  platformAvatarUrl?: string;
+  credentials: Record<string, string>;
+  webhookSecret?: string;
+  webhookVerified: boolean;
+  isActive: boolean;
+  branchId?: string;
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+export interface ChatContact {
+  id: string;
+  channelId: string;
+  platformUserId: string;
+  displayName?: string;
+  avatarUrl?: string;
+  parentId?: string;
+  phone?: string;
+  email?: string;
+  tags: string[];
+  customData?: Record<string, any>;
+  lastMessageAt?: Date;
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+export interface ChatConversation {
+  id: string;
+  channelId: string;
+  contactId: string;
+  status: ChatConversationStatus;
+  assignedTo?: string;
+  unreadCount: number;
+  lastMessagePreview?: string;
+  lastMessageAt?: Date;
+  trialBookingId?: string;
+  enrollmentId?: string;
+  createdAt: Date;
+  updatedAt?: Date;
+  // Joined data
+  contact?: ChatContact;
+  channel?: ChatChannel;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  direction: ChatMessageDirection;
+  senderType: 'contact' | 'admin' | 'system';
+  senderId?: string;
+  senderName?: string;
+  messageType: ChatMessageType;
+  content?: string;
+  mediaUrl?: string;
+  mediaMetadata?: Record<string, any>;
+  platformMessageId?: string;
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  errorMessage?: string;
+  metadata?: Record<string, any>;
+  createdAt: Date;
+}
+
+export interface ChatQuickReply {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdBy?: string;
+  createdAt: Date;
 }

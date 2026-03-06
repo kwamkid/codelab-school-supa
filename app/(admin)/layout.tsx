@@ -45,6 +45,7 @@ import {
   FileText,
   Receipt,
   CreditCard,
+  MessageCircle,
   LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,6 +58,7 @@ import { getMakeupClasses } from '@/lib/services/makeup';
 import { getTrialBookings } from '@/lib/services/trial-bookings';
 import { getUnreadNotifications, markNotificationAsRead } from '@/lib/services/notifications';
 import { formatDate } from '@/lib/utils';
+import { getTotalUnreadCount } from '@/lib/services/chat';
 import { Badge } from '@/components/ui/badge';
 import { Notification } from '@/types/models';
 
@@ -143,6 +145,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   // Trial booking badge state
   const [newTrialCount, setNewTrialCount] = useState(0);
   
+  // Chat unread badge state
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
   // Notifications state
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -255,6 +260,24 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     }
   }, [user, selectedBranchId]);
 
+  // Load chat unread count
+  useEffect(() => {
+    const loadChatUnread = async () => {
+      try {
+        const count = await getTotalUnreadCount();
+        setChatUnreadCount(count);
+      } catch (error) {
+        console.error('Error loading chat unread count:', error);
+      }
+    };
+
+    if (user) {
+      loadChatUnread();
+      const interval = setInterval(loadChatUnread, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
   // Load notifications
   useEffect(() => {
     const loadNotifications = async () => {
@@ -363,6 +386,14 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       href: '/enrollments',
       icon: Calendar,
       iconColor: 'text-green-600',
+      requiredRole: ['super_admin', 'branch_admin']
+    },
+    {
+      name: 'แชท',
+      href: '/chat',
+      icon: MessageCircle,
+      iconColor: 'text-purple-500',
+      badge: chatUnreadCount > 0 ? chatUnreadCount : undefined,
       requiredRole: ['super_admin', 'branch_admin']
     },
     {
@@ -576,12 +607,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         { name: 'ลาและชดเชย', href: '/settings/makeup' },
         { name: 'การชำระเงิน', href: '/settings/payment' },
         { name: 'บริษัท (ออกบิล)', href: '/settings/invoice-company' },
-        { name: 'LINE', href: '/settings/line' },
+        { name: 'เชื่อมแชท', href: '/settings/chat' },
         { name: 'Facebook Ads', href: '/settings/facebook' },
         { name: 'Backup', href: '/settings/backup' },
       ]
     },
-  ], [pendingMakeupCount, newTrialCount]); // dependencies สำหรับ badges
+  ], [pendingMakeupCount, newTrialCount, chatUnreadCount]); // dependencies สำหรับ badges
 
   // ใช้ useMemo เพื่อ filter navigation
   const filteredNavigation = useMemo(

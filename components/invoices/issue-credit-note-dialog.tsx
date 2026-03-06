@@ -61,6 +61,8 @@ export default function IssueCreditNoteDialog({
         customerName: selectedInvoice.customer_name,
         customerPhone: selectedInvoice.customer_phone,
         customerEmail: selectedInvoice.customer_email,
+        customerAddress: selectedInvoice.customer_address,
+        customerTaxId: selectedInvoice.customer_tax_id,
         billingType: selectedInvoice.billing_type,
         billingName: selectedInvoice.billing_name,
         billingAddress: selectedInvoice.billing_address,

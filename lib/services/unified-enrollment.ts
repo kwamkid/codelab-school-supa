@@ -274,6 +274,8 @@ export async function processUnifiedEnrollment(
         customerName: data.parentName,
         customerPhone: data.parentPhone,
         customerEmail: data.parentEmail,
+        customerAddress: data.address as any,
+        customerTaxId: data.billingTaxId,
         items: invoiceItems,
         subtotal,
         discountType: isFullPayment ? data.discountType : undefined,

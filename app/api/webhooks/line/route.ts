@@ -2,135 +2,154 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { getLineSettings } from '@/lib/supabase/services/line-settings'
+import { processInboundMessage, getChannelByPlatform } from '@/lib/services/chat-webhook'
 
-// Force dynamic rendering
 export const dynamic = 'force-dynamic';
-
-// Simple in-memory storage for webhook logs (for development)
-const webhookLogs: any[] = [];
-const MAX_LOGS = 20;
 
 // LINE Webhook endpoint
 export async function POST(request: NextRequest) {
-  console.log('=== Webhook POST received ===');
-  
   try {
-    // Get request body as text for signature validation
     const body = await request.text();
-    console.log('Webhook body length:', body.length);
-    
-    // สำหรับ webhook verification จาก LINE
-    // LINE จะส่ง request มาโดยไม่มี events
+
+    // Empty body = verification request
     if (!body || body === '{}') {
-      console.log('Empty body - verification request');
       return NextResponse.json({ success: true });
     }
-    
-    // Parse body
+
     let webhookBody;
     try {
       webhookBody = JSON.parse(body);
-    } catch (e) {
-      console.error('Failed to parse body:', e);
+    } catch {
       return NextResponse.json({ success: true });
     }
-    
-    // ถ้าไม่มี events ให้ return 200 OK
+
     if (!webhookBody.events || webhookBody.events.length === 0) {
-      console.log('No events in webhook body');
       return NextResponse.json({ success: true });
     }
-    
-    // Get LINE settings
-    let settings;
-    try {
-      settings = await getLineSettings();
-      console.log('Got LINE settings, has secret:', !!settings.messagingChannelSecret);
-    } catch (error) {
-      console.error('Failed to get LINE settings:', error);
-      // Return 200 to prevent LINE from retrying
+
+    // Get LINE channel from chat_channels table
+    const channel = await getChannelByPlatform('line');
+    if (!channel) {
+      console.error('No active LINE chat channel configured');
       return NextResponse.json({ success: true });
     }
-    
-    // Skip signature validation if no secret configured
-    if (!settings.messagingChannelSecret) {
-      console.log('No channel secret configured, skipping signature validation');
-    } else {
-      // Validate signature
+
+    const channelSecret = channel.credentials.channelSecret;
+
+    // Validate signature if secret is configured
+    if (channelSecret) {
       const signature = request.headers.get('x-line-signature') || '';
-      console.log('Signature present:', !!signature);
-      
-      try {
-        const hash = crypto
-          .createHmac('sha256', settings.messagingChannelSecret)
-          .update(body)
-          .digest('base64');
-        
-        if (hash !== signature) {
-          console.error('Invalid signature');
-          console.log('Expected:', hash);
-          console.log('Received:', signature);
-          // Return 200 anyway to prevent retries
-          return NextResponse.json({ success: true });
-        }
-        console.log('Signature valid');
-      } catch (error) {
-        console.error('Signature validation error:', error);
-        // Return 200 anyway
+      const hash = crypto
+        .createHmac('sha256', channelSecret)
+        .update(body)
+        .digest('base64');
+
+      if (hash !== signature) {
+        console.error('LINE webhook: invalid signature');
         return NextResponse.json({ success: true });
       }
     }
-    
+
     // Process events
-    console.log('Processing', webhookBody.events.length, 'events');
-    
-    // Store logs
-    if (webhookBody.events && webhookBody.events.length > 0) {
-      for (const event of webhookBody.events) {
-        const log = {
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: new Date(),
-          type: event.type,
-          userId: event.source?.userId || 'unknown',
-          message: event.message?.text || '',
-          data: event
-        };
-        
-        webhookLogs.unshift(log);
-        if (webhookLogs.length > MAX_LOGS) {
-          webhookLogs.pop();
-        }
+    const accessToken = channel.credentials.accessToken;
+
+    for (const event of webhookBody.events) {
+      if (event.type !== 'message') continue;
+
+      const userId = event.source?.userId;
+      if (!userId) continue;
+
+      // Get user profile from LINE
+      let displayName: string | undefined;
+      let avatarUrl: string | undefined;
+      if (accessToken) {
+        try {
+          const profileRes = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            displayName = profile.displayName;
+            avatarUrl = profile.pictureUrl;
+          }
+        } catch {}
       }
+
+      // Map LINE message type
+      const msg = event.message;
+      let messageType = 'text';
+      let content: string | undefined;
+      let mediaUrl: string | undefined;
+      const metadata: Record<string, any> = {};
+
+      switch (msg.type) {
+        case 'text':
+          messageType = 'text';
+          content = msg.text;
+          break;
+        case 'image':
+          messageType = 'image';
+          // Image content URL requires LINE API to download
+          mediaUrl = `https://api-data.line.me/v2/bot/message/${msg.id}/content`;
+          break;
+        case 'sticker':
+          messageType = 'sticker';
+          metadata.stickerId = msg.stickerId;
+          metadata.packageId = msg.packageId;
+          content = `[สติกเกอร์]`;
+          break;
+        case 'audio':
+          messageType = 'audio';
+          mediaUrl = `https://api-data.line.me/v2/bot/message/${msg.id}/content`;
+          break;
+        case 'video':
+          messageType = 'video';
+          mediaUrl = `https://api-data.line.me/v2/bot/message/${msg.id}/content`;
+          break;
+        case 'location':
+          messageType = 'location';
+          content = msg.title || msg.address || 'ตำแหน่ง';
+          metadata.latitude = msg.latitude;
+          metadata.longitude = msg.longitude;
+          metadata.address = msg.address;
+          break;
+        case 'file':
+          messageType = 'file';
+          content = msg.fileName;
+          mediaUrl = `https://api-data.line.me/v2/bot/message/${msg.id}/content`;
+          metadata.fileName = msg.fileName;
+          metadata.fileSize = msg.fileSize;
+          break;
+        default:
+          messageType = 'text';
+          content = `[${msg.type}]`;
+      }
+
+      await processInboundMessage({
+        channelId: channel.id,
+        platformUserId: userId,
+        senderName: displayName,
+        senderAvatar: avatarUrl,
+        messageType,
+        content,
+        mediaUrl,
+        platformMessageId: msg.id,
+        metadata,
+      });
     }
-    
-    // Always return 200 OK
+
     return NextResponse.json({ success: true });
-    
   } catch (error) {
-    console.error('Webhook error:', error);
-    // Always return 200 to prevent LINE from retrying
+    console.error('LINE webhook error:', error);
     return NextResponse.json({ success: true });
   }
 }
 
-// GET request for webhook verification and logs
-export async function GET(request: NextRequest) {
-  try {
-    // Return webhook logs
-    return NextResponse.json({
-      status: 'ok',
-      message: 'LINE webhook endpoint is active',
-      timestamp: new Date().toISOString(),
-      logs: webhookLogs,
-      count: webhookLogs.length
-    });
-    
-  } catch (error) {
-    console.error('Webhook GET error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+// GET for health check
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    message: 'LINE webhook endpoint is active',
+    timestamp: new Date().toISOString(),
+  });
 }
