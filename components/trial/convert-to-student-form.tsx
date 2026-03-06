@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +45,7 @@ import { getParentByPhone, getStudentsByParent } from '@/lib/services/parents';
 import { formatCurrency, calculateAge } from '@/lib/utils';
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
 import { SectionLoading } from '@/components/ui/loading';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 interface ConvertToStudentFormProps {
   booking: TrialBooking;
@@ -834,18 +835,15 @@ export default function ConvertToStudentForm({
                     <Label htmlFor="studentGender">
                       เพศ <span className="text-red-500">*</span>
                     </Label>
-                    <Select 
+                    <FormSelect
                       value={formData.studentGender}
-                      onValueChange={(value: 'M' | 'F') => setFormData(prev => ({ ...prev, studentGender: value }))}
-                    >
-                      <SelectTrigger className={errors.studentGender ? 'border-red-500' : ''}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="M">ชาย</SelectItem>
-                        <SelectItem value="F">หญิง</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      onValueChange={(value: string) => setFormData(prev => ({ ...prev, studentGender: value as 'M' | 'F' }))}
+                      className={errors.studentGender ? 'border-red-500' : ''}
+                      options={[
+                        { value: 'M', label: 'ชาย' },
+                        { value: 'F', label: 'หญิง' },
+                      ]}
+                    />
                   </div>
                   
                   <div className="space-y-2">
@@ -853,13 +851,12 @@ export default function ConvertToStudentForm({
                       <Calendar className="inline h-4 w-4 mr-1" />
                       วันเกิด <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      id="studentBirthdate"
-                      type="date"
+                    <DateRangePicker
+                      mode="single"
                       value={formData.studentBirthdate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, studentBirthdate: e.target.value }))}
-                      className={errors.studentBirthdate ? 'border-red-500' : ''}
-                      required
+                      onChange={(date) => setFormData(prev => ({ ...prev, studentBirthdate: date || '' }))}
+                      maxDate={new Date()}
+                      placeholder="เลือกวันที่"
                     />
                     {errors.studentBirthdate && (
                       <p className="text-sm text-red-500">{errors.studentBirthdate}</p>
@@ -1007,36 +1004,17 @@ export default function ConvertToStudentForm({
                 
                 <div className="space-y-2">
                   <Label>กรองตามวิชา</Label>
-                  <Select
+                  <FormSelect
                     value={selectedSubjectFilter}
                     onValueChange={setSelectedSubjectFilter}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-gray-400" />
-                          ทุกวิชา ({classes.length} คลาส)
-                        </div>
-                      </SelectItem>
-                      {subjects.map((subject) => {
-                        const subjectClassCount = classes.filter(c => c.subjectId === subject.id).length;
-                        return (
-                          <SelectItem key={subject.id} value={subject.id}>
-                            <div className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: subject.color }}
-                              />
-                              {subject.name} ({subjectClassCount} คลาส)
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      { value: 'all', label: `ทุกวิชา (${classes.length} คลาส)` },
+                      ...subjects.map((subject) => ({
+                        value: subject.id,
+                        label: `${subject.name} (${classes.filter(c => c.subjectId === subject.id).length} คลาส)`,
+                      })),
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -1152,20 +1130,16 @@ export default function ConvertToStudentForm({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>ประเภทส่วนลด</Label>
-                    <Select 
-                      value={formData.discountType} 
-                      onValueChange={(value: 'percentage' | 'fixed') => 
-                        setFormData(prev => ({ ...prev, discountType: value }))
+                    <FormSelect
+                      value={formData.discountType}
+                      onValueChange={(value: string) =>
+                        setFormData(prev => ({ ...prev, discountType: value as 'percentage' | 'fixed' }))
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="percentage">เปอร์เซ็นต์ (%)</SelectItem>
-                        <SelectItem value="fixed">จำนวนเงิน (บาท)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: 'percentage', label: 'เปอร์เซ็นต์ (%)' },
+                        { value: 'fixed', label: 'จำนวนเงิน (บาท)' },
+                      ]}
+                    />
                   </div>
                   
                   <div className="space-y-2">

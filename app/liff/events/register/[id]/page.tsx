@@ -37,6 +37,7 @@ import {
   Clock,
   CalendarDays
 } from 'lucide-react';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { SectionLoading } from '@/components/ui/loading';
 import { formatDate, formatPhoneNumber } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -848,10 +849,11 @@ export default function EventRegistrationPage() {
                             
                             <div className="space-y-1">
                               <Label className="text-xs">วันเกิด *</Label>
-                              <Input
-                                type="date"
+                              <DateRangePicker
+                                mode="single"
                                 value={student.birthdate}
-                                onChange={(e) => handleUpdateStudent(index, 'birthdate', e.target.value)}
+                                onChange={(date) => handleUpdateStudent(index, 'birthdate', date || '')}
+                                placeholder="เลือกวันที่"
                               />
                             </div>
                             

@@ -6,8 +6,9 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -15,8 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { 
-  CalendarIcon, 
-  Clock, 
+  CalendarIcon,
   MapPin,
   User,
   Loader2,
@@ -336,124 +336,62 @@ export default function RescheduleTrialDialog({
               </Popover>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label>เวลาเริ่ม</Label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>เวลาสิ้นสุด</Label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label>เวลา</Label>
+              <TimeRangePicker
+                startTime={startTime}
+                endTime={endTime}
+                onStartTimeChange={setStartTime}
+                onEndTimeChange={setEndTime}
+              />
             </div>
           </div>
 
           {/* Teacher */}
           <div className="space-y-2">
             <Label>เลือกครู</Label>
-            <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-              <SelectTrigger>
-                <SelectValue placeholder="เลือกครู" />
-              </SelectTrigger>
-              <SelectContent>
-                {getAvailableTeachers().length === 0 ? (
-                  <div className="p-2 text-sm text-gray-500 text-center">
-                    ไม่มีครูที่สอนวิชานี้ในสาขาที่เลือก
-                  </div>
-                ) : (
-                  getAvailableTeachers().map((teacher) => (
-                    <SelectItem key={teacher.id} value={teacher.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        <span>{teacher.nickname || teacher.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            <FormSelect
+              value={selectedTeacher}
+              onValueChange={setSelectedTeacher}
+              placeholder="เลือกครู"
+              options={getAvailableTeachers().map((teacher) => ({
+                value: teacher.id,
+                label: teacher.nickname || teacher.name,
+              }))}
+            />
           </div>
 
           {/* Branch & Room */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>สาขา</Label>
-              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                <SelectTrigger>
-                  <SelectValue placeholder="เลือกสาขา" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        <span>{branch.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormSelect
+                value={selectedBranch}
+                onValueChange={setSelectedBranch}
+                placeholder="เลือกสาขา"
+                options={branches.map((branch) => ({
+                  value: branch.id,
+                  label: branch.name,
+                }))}
+              />
             </div>
 
             <div className="space-y-2">
               <Label>ห้องเรียน</Label>
-              <Select 
-                value={selectedRoom} 
+              <FormSelect
+                value={selectedRoom}
                 onValueChange={setSelectedRoom}
                 disabled={!selectedBranch || rooms.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={
-                    !selectedBranch ? "เลือกสาขาก่อน" : 
-                    rooms.length === 0 ? "ไม่มีห้อง" : 
-                    "เลือกห้อง"
-                  } />
-                </SelectTrigger>
-                <SelectContent>
-                  {rooms.map((room) => {
-                    const isChecking = checkingAvailability && selectedRoom === room.id;
-                    const hasConflict = availabilityError && selectedRoom === room.id;
-                    
-                    return (
-                      <SelectItem key={room.id} value={room.id}>
-                        <div className="flex items-center gap-2 w-full">
-                          <span>{room.name} (จุ {room.capacity} คน)</span>
-                          {selectedDate && startTime && endTime && (
-                            <>
-                              {isChecking && (
-                                <Loader2 className="h-3 w-3 animate-spin text-gray-500 ml-auto" />
-                              )}
-                              {!isChecking && selectedRoom === room.id && (
-                                hasConflict ? (
-                                  <XCircle className="h-3 w-3 text-red-500 ml-auto" />
-                                ) : (
-                                  <CheckCircle className="h-3 w-3 text-green-500 ml-auto" />
-                                )
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+                placeholder={
+                  !selectedBranch ? "เลือกสาขาก่อน" :
+                  rooms.length === 0 ? "ไม่มีห้อง" :
+                  "เลือกห้อง"
+                }
+                options={rooms.map((room) => ({
+                  value: room.id,
+                  label: `${room.name} (จุ ${room.capacity} คน)`,
+                }))}
+              />
               {selectedDate && startTime && endTime && selectedRoom && (
                 <p className="text-xs text-gray-500">
                   {checkingAvailability ? (

@@ -1,5 +1,6 @@
 import { Subject } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 import { Database } from '@/types/supabase';
 
 const TABLE_NAME = 'subjects';
@@ -112,10 +113,10 @@ export async function getSubject(id: string): Promise<Subject | null> {
 // Create new subject
 export async function createSubject(subjectData: Omit<Subject, 'id'>): Promise<string> {
   try {
-    const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert({
+    const result = await adminMutation({
+      table: 'subjects',
+      operation: 'insert',
+      data: {
         code: subjectData.code,
         name: subjectData.name,
         category: subjectData.category,
@@ -127,14 +128,12 @@ export async function createSubject(subjectData: Omit<Subject, 'id'>): Promise<s
         prerequisites: subjectData.prerequisites || [],
         icon: subjectData.icon,
         is_active: subjectData.isActive,
-      })
-      .select()
-      .single();
+      },
+      options: { select: true, single: true }
+    });
 
-    if (error) throw error;
-    if (!data) throw new Error('No data returned from insert');
-
-    return data.id;
+    if (!result) throw new Error('No data returned from insert');
+    return result.id;
   } catch (error) {
     console.error('Error creating subject:', error);
     throw error;
@@ -144,10 +143,7 @@ export async function createSubject(subjectData: Omit<Subject, 'id'>): Promise<s
 // Update subject
 export async function updateSubject(id: string, subjectData: Partial<Subject>): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
-
     if (subjectData.code !== undefined) updateData.code = subjectData.code;
     if (subjectData.name !== undefined) updateData.name = subjectData.name;
     if (subjectData.category !== undefined) updateData.category = subjectData.category;
@@ -166,12 +162,12 @@ export async function updateSubject(id: string, subjectData: Partial<Subject>): 
       return;
     }
 
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'subjects',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
   } catch (error) {
     console.error('Error updating subject:', error);
     throw error;
@@ -181,13 +177,12 @@ export async function updateSubject(id: string, subjectData: Partial<Subject>): 
 // Delete subject (soft delete)
 export async function deleteSubject(id: string): Promise<void> {
   try {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update({ is_active: false })
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'subjects',
+      operation: 'update',
+      data: { is_active: false },
+      match: { id }
+    });
   } catch (error) {
     console.error('Error deleting subject:', error);
     throw error;

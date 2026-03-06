@@ -1,5 +1,6 @@
 import { Parent, Student } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 const TABLE_NAME = 'parents';
 
@@ -165,22 +166,18 @@ export async function getParentByPhone(phone: string): Promise<Parent | null> {
 // Create new parent
 export async function createParent(parentData: Omit<Parent, 'id' | 'createdAt' | 'lastLoginAt'>): Promise<string> {
   try {
-    const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert({
+    const result = await adminMutation({
+      table: 'parents',
+      operation: 'insert',
+      data: {
         display_name: parentData.displayName,
         phone: parentData.phone,
         line_user_id: parentData.lineUserId || null,
         email: parentData.email || null,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    if (!data) throw new Error('No data returned from insert');
-
-    return data.id;
+      },
+      options: { select: true, single: true }
+    })
+    return result.id;
   } catch (error) {
     console.error('Error creating parent:', error);
     throw error;
@@ -218,12 +215,7 @@ export async function updateParent(id: string, parentData: Partial<Parent>): Pro
       }
     }
 
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({ table: 'parents', operation: 'update', data: updateData, match: { id } })
 
     // Trigger FB re-send if phone or email changed
     const phoneChanged = parentData.phone !== undefined && parentData.phone !== oldPhone;
@@ -351,10 +343,10 @@ export async function createStudent(
   studentData: Omit<Student, 'id' | 'parentId'>
 ): Promise<string> {
   try {
-    const supabase = getClient();
-    const { data, error } = await supabase
-      .from('students')
-      .insert({
+    const result = await adminMutation({
+      table: 'students',
+      operation: 'insert',
+      data: {
         parent_id: parentId,
         name: studentData.name,
         nickname: studentData.nickname,
@@ -368,14 +360,10 @@ export async function createStudent(
         emergency_contact: studentData.emergencyContact || null,
         emergency_phone: studentData.emergencyPhone || null,
         is_active: studentData.isActive ?? true,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    if (!data) throw new Error('No data returned from insert');
-
-    return data.id;
+      },
+      options: { select: true, single: true }
+    })
+    return result.id;
   } catch (error) {
     console.error('Error creating student:', error);
     throw error;
@@ -389,8 +377,6 @@ export async function updateStudent(
   data: Partial<Student>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
 
     if (data.name !== undefined) updateData.name = data.name;
@@ -410,13 +396,7 @@ export async function updateStudent(
       return;
     }
 
-    const { error } = await supabase
-      .from('students')
-      .update(updateData)
-      .eq('id', studentId)
-      .eq('parent_id', parentId);
-
-    if (error) throw error;
+    await adminMutation({ table: 'students', operation: 'update', data: updateData, match: { id: studentId, parent_id: parentId } })
   } catch (error) {
     console.error('Error updating student:', error);
     throw error;
@@ -517,6 +497,104 @@ export async function searchParents(searchTerm: string): Promise<Parent[]> {
   } catch (error) {
     console.error('Error searching parents:', error);
     throw error;
+  }
+}
+
+// Unified search: parents + students by name/phone/child name
+export interface ParentSearchResult {
+  parent: Parent;
+  students: Student[];
+  matchedVia: 'parent_name' | 'parent_phone' | 'student_name';
+}
+
+export async function searchParentsUnified(searchTerm: string): Promise<ParentSearchResult[]> {
+  try {
+    const supabase = getClient();
+    const term = searchTerm.trim();
+    if (!term) return [];
+
+    const cleanPhone = term.replace(/[-\s]/g, '');
+    const isPhoneSearch = /^[0-9]{3,}$/.test(cleanPhone);
+
+    // Search parents by name or phone
+    let parentQuery = supabase
+      .from('parents')
+      .select(`
+        *,
+        students (*)
+      `);
+
+    if (isPhoneSearch) {
+      parentQuery = parentQuery.ilike('phone', `%${cleanPhone}%`);
+    } else {
+      parentQuery = parentQuery.ilike('display_name', `%${term}%`);
+    }
+
+    const { data: parentMatches, error: parentError } = await parentQuery.limit(10);
+    if (parentError) throw parentError;
+
+    const results: ParentSearchResult[] = [];
+    const seenParentIds = new Set<string>();
+
+    // Add parent matches
+    for (const row of (parentMatches || []) as any[]) {
+      seenParentIds.add(row.id);
+      results.push({
+        parent: mapToParent(row as ParentRow),
+        students: (row.students || []).map((s: any) => ({
+          id: s.id,
+          parentId: s.parent_id,
+          name: s.name,
+          nickname: s.nickname,
+          birthdate: new Date(s.birthdate),
+          gender: s.gender,
+          schoolName: s.school_name,
+          gradeLevel: s.grade_level,
+          profileImage: s.profile_image,
+          allergies: s.allergies,
+          specialNeeds: s.special_needs,
+          emergencyContact: s.emergency_contact,
+          emergencyPhone: s.emergency_phone,
+          isActive: s.is_active ?? true,
+        })),
+        matchedVia: isPhoneSearch ? 'parent_phone' : 'parent_name',
+      });
+    }
+
+    // Also search by student name/nickname (only if not phone search)
+    if (!isPhoneSearch) {
+      const { data: studentMatches, error: studentError } = await supabase
+        .from('students')
+        .select(`
+          *,
+          parents:parent_id (*)
+        `)
+        .or(`name.ilike.%${term}%,nickname.ilike.%${term}%`)
+        .limit(10);
+
+      if (!studentError && studentMatches) {
+        for (const row of studentMatches as any[]) {
+          const parentRow = row.parents as any;
+          if (!parentRow || seenParentIds.has(parentRow.id)) continue;
+
+          seenParentIds.add(parentRow.id);
+
+          // Load all students for this parent
+          const siblings = await getStudentsByParent(parentRow.id);
+
+          results.push({
+            parent: mapToParent(parentRow as ParentRow),
+            students: siblings,
+            matchedVia: 'student_name',
+          });
+        }
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Error in unified parent search:', error);
+    return [];
   }
 }
 

@@ -11,18 +11,14 @@ import { getTeachersByBranch } from '@/lib/services/teachers';
 import { getActiveRoomsByBranch } from '@/lib/services/rooms';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { Label } from '@/components/ui/label';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import SubjectSearchSelect from '@/components/ui/subject-search-select';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormSelect } from '@/components/ui/form-select';
 import { toast } from 'sonner';
 import { Loader2, Save, X, Calendar, AlertCircle, Plus, Info, CheckCircle, Lock } from 'lucide-react';
 import Link from 'next/link';
@@ -449,34 +445,25 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="branch">{renderFieldLabel('สาขา *', editableFields.resources)}</Label>
-                <Select
-                  value={formData.branchId}
-                  onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                  disabled={!editableFields.resources}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกสาขา" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.length === 0 ? (
-                      <div className="p-2 text-center">
-                        <p className="text-sm text-gray-500 mb-2">ยังไม่มีสาขา</p>
-                        <Link href="/branches/new">
-                          <Button size="sm" className="w-full bg-red-500 hover:bg-red-600">
-                            <Plus className="h-3 w-3 mr-1" />
-                            เพิ่มสาขา
-                          </Button>
-                        </Link>
-                      </div>
-                    ) : (
-                      branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                {branches.length === 0 ? (
+                  <div className="p-4 border rounded-md text-center">
+                    <p className="text-sm text-gray-500 mb-2">ยังไม่มีสาขา</p>
+                    <Link href="/branches/new">
+                      <Button size="sm" className="bg-red-500 hover:bg-red-600">
+                        <Plus className="h-3 w-3 mr-1" />
+                        เพิ่มสาขา
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <FormSelect
+                    value={formData.branchId}
+                    onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                    placeholder="เลือกสาขา"
+                    disabled={!editableFields.resources}
+                    options={branches.map(b => ({ value: b.id, label: b.name }))}
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
@@ -545,54 +532,42 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startTime">{renderFieldLabel('เวลาเริ่ม *', editableFields.schedule)}</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  disabled={!editableFields.schedule}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="endTime">{renderFieldLabel('เวลาจบ *', editableFields.schedule)}</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  disabled={!editableFields.schedule}
-                  required
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>{renderFieldLabel('เวลา *', editableFields.schedule)}</Label>
+              <TimeRangePicker
+                startTime={formData.startTime}
+                endTime={formData.endTime}
+                onStartTimeChange={(v) => setFormData({ ...formData, startTime: v })}
+                onEndTimeChange={(v) => setFormData({ ...formData, endTime: v })}
+                disabled={!editableFields.schedule}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="startDate">{renderFieldLabel('วันเริ่มเรียน *', editableFields.schedule)}</Label>
                 <div className="relative">
-                  <Input
-                    id="startDate"
-                    type="date"
+                  <DateRangePicker
+                    mode="single"
                     value={formData.startDate}
-                    onChange={(e) => {
-                      const selectedDate = new Date(e.target.value);
+                    onChange={(date) => {
+                      if (!date) {
+                        setFormData({ ...formData, startDate: '' });
+                        return;
+                      }
+                      const selectedDate = new Date(date);
                       const selectedDay = selectedDate.getDay();
-                      
+
                       // Check if selected date matches allowed days
                       if (formData.daysOfWeek.length > 0 && !formData.daysOfWeek.includes(selectedDay)) {
                         toast.error(`กรุณาเลือกวัน${formData.daysOfWeek.map(d => getDayName(d)).join(', ')}เท่านั้น`);
                         return;
                       }
-                      
-                      setFormData({ ...formData, startDate: e.target.value });
+
+                      setFormData({ ...formData, startDate: date });
                     }}
                     disabled={!editableFields.schedule}
-                    required
+                    placeholder="เลือกวันที่"
                   />
                   {formData.daysOfWeek.length > 0 && (
                     <p className="text-xs text-gray-500 mt-1">
@@ -617,12 +592,12 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
 
               <div className="space-y-2">
                 <Label htmlFor="endDate">วันจบ (คำนวณอัตโนมัติ)</Label>
-                <Input
-                  id="endDate"
-                  type="date"
+                <DateRangePicker
+                  mode="single"
                   value={formData.endDate}
-                  readOnly
-                  className="bg-gray-50"
+                  onChange={() => {}}
+                  disabled={true}
+                  placeholder="คำนวณอัตโนมัติ"
                 />
                 <p className="text-xs text-gray-500">
                   * ระบบจะหลบวันหยุดให้อัตโนมัติ
@@ -634,66 +609,48 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
               <div className="space-y-2">
                 <Label htmlFor="teacher">{renderFieldLabel('ครูผู้สอน *', editableFields.resources)}</Label>
-                <Select
-                  value={formData.teacherId}
-                  onValueChange={(value) => setFormData({ ...formData, teacherId: value })}
-                  disabled={!formData.branchId || !editableFields.resources}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={formData.branchId ? "เลือกครู" : "เลือกสาขาก่อน"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teachers.length === 0 ? (
-                      <div className="p-2 text-center">
-                        <p className="text-sm text-gray-500 mb-2">ยังไม่มีครูในสาขานี้</p>
-                        <Link href="/teachers/new">
-                          <Button size="sm" className="w-full bg-red-500 hover:bg-red-600">
-                            <Plus className="h-3 w-3 mr-1" />
-                            เพิ่มครู
-                          </Button>
-                        </Link>
-                      </div>
-                    ) : (
-                      teachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.nickname || teacher.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                {formData.branchId && teachers.length === 0 ? (
+                  <div className="p-4 border rounded-md text-center">
+                    <p className="text-sm text-gray-500 mb-2">ยังไม่มีครูในสาขานี้</p>
+                    <Link href="/teachers/new">
+                      <Button size="sm" className="bg-red-500 hover:bg-red-600">
+                        <Plus className="h-3 w-3 mr-1" />
+                        เพิ่มครู
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <FormSelect
+                    value={formData.teacherId}
+                    onValueChange={(value) => setFormData({ ...formData, teacherId: value })}
+                    placeholder={formData.branchId ? "เลือกครู" : "เลือกสาขาก่อน"}
+                    disabled={!formData.branchId || !editableFields.resources}
+                    options={teachers.map(t => ({ value: t.id, label: t.nickname || t.name }))}
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="room">{renderFieldLabel('ห้องเรียน *', editableFields.resources)}</Label>
-                <Select
-                  value={formData.roomId}
-                  onValueChange={(value) => setFormData({ ...formData, roomId: value })}
-                  disabled={!formData.branchId || !editableFields.resources}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={formData.branchId ? "เลือกห้อง" : "เลือกสาขาก่อน"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rooms.length === 0 ? (
-                      <div className="p-2 text-center">
-                        <p className="text-sm text-gray-500 mb-2">ยังไม่มีห้องในสาขานี้</p>
-                        <Link href={`/branches/${formData.branchId}/rooms`}>
-                          <Button size="sm" className="w-full bg-red-500 hover:bg-red-600">
-                            <Plus className="h-3 w-3 mr-1" />
-                            เพิ่มห้อง
-                          </Button>
-                        </Link>
-                      </div>
-                    ) : (
-                      rooms.map((room) => (
-                        <SelectItem key={room.id} value={room.id}>
-                          {room.name} (จุ {room.capacity} คน)
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                {formData.branchId && rooms.length === 0 ? (
+                  <div className="p-4 border rounded-md text-center">
+                    <p className="text-sm text-gray-500 mb-2">ยังไม่มีห้องในสาขานี้</p>
+                    <Link href={`/branches/${formData.branchId}/rooms`}>
+                      <Button size="sm" className="bg-red-500 hover:bg-red-600">
+                        <Plus className="h-3 w-3 mr-1" />
+                        เพิ่มห้อง
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <FormSelect
+                    value={formData.roomId}
+                    onValueChange={(value) => setFormData({ ...formData, roomId: value })}
+                    placeholder={formData.branchId ? "เลือกห้อง" : "เลือกสาขาก่อน"}
+                    disabled={!formData.branchId || !editableFields.resources}
+                    options={rooms.map(r => ({ value: r.id, label: `${r.name} (จุ ${r.capacity} คน)` }))}
+                  />
+                )}
               </div>
             </div>
 
@@ -875,26 +832,20 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
           <CardContent>
             <div className="space-y-2">
               <Label htmlFor="status">{renderFieldLabel('สถานะคลาส', editableFields.status)}</Label>
-              <Select
+              <FormSelect
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value as Class['status'] })}
                 disabled={!editableFields.status}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">ร่าง</SelectItem>
-                  <SelectItem value="published">เปิดรับสมัคร</SelectItem>
-                  <SelectItem value="started">กำลังเรียน</SelectItem>
-                  {isEdit && (
-                    <>
-                      <SelectItem value="completed">จบแล้ว</SelectItem>
-                      <SelectItem value="cancelled">ยกเลิก</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: 'draft', label: 'ร่าง' },
+                  { value: 'published', label: 'เปิดรับสมัคร' },
+                  { value: 'started', label: 'กำลังเรียน' },
+                  ...(isEdit ? [
+                    { value: 'completed', label: 'จบแล้ว' },
+                    { value: 'cancelled', label: 'ยกเลิก' },
+                  ] : []),
+                ]}
+              />
               {formData.status === 'draft' && classData?.status === 'draft' && (
                 <p className="text-xs text-gray-500 mt-1">
                   สถานะ &quot;ร่าง&quot; สามารถแก้ไขข้อมูลได้ทุกอย่าง แม้วันเริ่มจะผ่านไปแล้ว

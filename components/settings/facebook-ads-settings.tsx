@@ -6,13 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { FormSelect } from '@/components/ui/form-select'
 import {
   Table,
   TableBody,
@@ -957,30 +951,32 @@ export default function FacebookAdsSettingsComponent() {
 
           {/* Filters */}
           <div className="flex gap-3 flex-wrap">
-            <Select value={logEventFilter} onValueChange={setLogEventFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="ประเภท Event" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทุกประเภท</SelectItem>
-                <SelectItem value="register">สมัครสมาชิก</SelectItem>
-                <SelectItem value="trial">ทดลองเรียน</SelectItem>
-                <SelectItem value="event_join">เข้าร่วม Event</SelectItem>
-                <SelectItem value="purchase">สมัครเรียน</SelectItem>
-              </SelectContent>
-            </Select>
+            <FormSelect
+              value={logEventFilter}
+              onValueChange={setLogEventFilter}
+              placeholder="ประเภท Event"
+              className="w-[180px]"
+              options={[
+                { value: 'all', label: 'ทุกประเภท' },
+                { value: 'register', label: 'สมัครสมาชิก' },
+                { value: 'trial', label: 'ทดลองเรียน' },
+                { value: 'event_join', label: 'เข้าร่วม Event' },
+                { value: 'purchase', label: 'สมัครเรียน' },
+              ]}
+            />
 
-            <Select value={logStatusFilter} onValueChange={setLogStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="สถานะ" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทุกสถานะ</SelectItem>
-                <SelectItem value="sent">สำเร็จ</SelectItem>
-                <SelectItem value="failed">ล้มเหลว</SelectItem>
-                <SelectItem value="pending">รอดำเนินการ</SelectItem>
-              </SelectContent>
-            </Select>
+            <FormSelect
+              value={logStatusFilter}
+              onValueChange={setLogStatusFilter}
+              placeholder="สถานะ"
+              className="w-[150px]"
+              options={[
+                { value: 'all', label: 'ทุกสถานะ' },
+                { value: 'sent', label: 'สำเร็จ' },
+                { value: 'failed', label: 'ล้มเหลว' },
+                { value: 'pending', label: 'รอดำเนินการ' },
+              ]}
+            />
           </div>
 
           {/* Logs Table */}

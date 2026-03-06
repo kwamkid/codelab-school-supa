@@ -1,14 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Branch } from '@/types/models';
+import { Branch, InvoiceCompany } from '@/types/models';
 import { createBranch, updateBranch, checkBranchCodeExists } from '@/lib/services/branches';
+import { getInvoiceCompanies } from '@/lib/services/invoice-companies';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, Save, X } from 'lucide-react';
 import Link from 'next/link';
@@ -31,6 +40,7 @@ const DAYS_OF_WEEK = [
 export default function BranchForm({ branch, isEdit = false }: BranchFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [invoiceCompanies, setInvoiceCompanies] = useState<InvoiceCompany[]>([]);
   const [formData, setFormData] = useState({
     name: branch?.name || '',
     code: branch?.code || '',
@@ -43,7 +53,14 @@ export default function BranchForm({ branch, isEdit = false }: BranchFormProps) 
     managerName: branch?.managerName || '',
     managerPhone: branch?.managerPhone || '',
     lineGroupUrl: branch?.lineGroupUrl || '',
+    invoiceCompanyId: branch?.invoiceCompanyId || '',
   });
+
+  useEffect(() => {
+    getInvoiceCompanies()
+      .then(companies => setInvoiceCompanies(companies.filter(c => c.isActive)))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +99,7 @@ export default function BranchForm({ branch, isEdit = false }: BranchFormProps) 
         toast.success('เพิ่มสาขาใหม่เรียบร้อยแล้ว');
       }
       
-      router.push('/branches');
+      router.push('/settings/branches');
     } catch (error) {
       console.error('Error saving branch:', error);
       toast.error(isEdit ? 'ไม่สามารถอัปเดตข้อมูลได้' : 'ไม่สามารถเพิ่มสาขาได้');
@@ -165,26 +182,16 @@ export default function BranchForm({ branch, isEdit = false }: BranchFormProps) 
             <div className="space-y-4">
               <h3 className="font-medium text-lg">เวลาทำการ</h3>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="openTime">เวลาเปิด</Label>
-                  <Input
-                    id="openTime"
-                    type="time"
-                    value={formData.openTime}
-                    onChange={(e) => setFormData({ ...formData, openTime: e.target.value })}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="closeTime">เวลาปิด</Label>
-                  <Input
-                    id="closeTime"
-                    type="time"
-                    value={formData.closeTime}
-                    onChange={(e) => setFormData({ ...formData, closeTime: e.target.value })}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>เวลาทำการ</Label>
+                <TimeRangePicker
+                  startTime={formData.openTime}
+                  endTime={formData.closeTime}
+                  onStartTimeChange={(v) => setFormData({ ...formData, openTime: v })}
+                  onEndTimeChange={(v) => setFormData({ ...formData, closeTime: v })}
+                  startPlaceholder="เวลาเปิด"
+                  endPlaceholder="เวลาปิด"
+                />
               </div>
 
               <div className="space-y-2">
@@ -245,6 +252,35 @@ export default function BranchForm({ branch, isEdit = false }: BranchFormProps) 
                 />
               </div>
             </div>
+
+            {/* Invoice Company */}
+            {invoiceCompanies.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">บริษัทออกบิล</h3>
+                <div className="space-y-2">
+                  <Label>เลือกบริษัทที่ออกใบเสร็จ/ใบกำกับภาษี</Label>
+                  <Select
+                    value={formData.invoiceCompanyId || 'none'}
+                    onValueChange={(v) => setFormData({ ...formData, invoiceCompanyId: v === 'none' ? '' : v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="เลือกบริษัท" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">-- ไม่ระบุ --</SelectItem>
+                      {invoiceCompanies.map(company => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name} ({company.invoicePrefix})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    เลือกบริษัทที่จะออกใบเสร็จสำหรับสาขานี้ (ตั้งค่าได้ที่ ตั้งค่า → บริษัท)
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Status */}
             <div className="flex items-center space-x-2">

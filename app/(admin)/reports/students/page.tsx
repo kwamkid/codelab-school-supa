@@ -6,13 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { FormSelect } from '@/components/ui/form-select'
 import {
   Table,
   TableBody,
@@ -339,16 +333,16 @@ export default function StudentReportPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={statusFilter} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">ทั้งหมด</SelectItem>
-              <SelectItem value="active">กำลังเรียน</SelectItem>
-              <SelectItem value="inactive">ไม่ได้เรียน</SelectItem>
-            </SelectContent>
-          </Select>
+          <FormSelect
+            value={statusFilter}
+            onValueChange={handleStatusChange}
+            className="w-[160px]"
+            options={[
+              { value: 'all', label: 'ทั้งหมด' },
+              { value: 'active', label: 'กำลังเรียน' },
+              { value: 'inactive', label: 'ไม่ได้เรียน' },
+            ]}
+          />
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </Button>

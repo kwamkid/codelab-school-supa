@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Loading } from '@/components/ui/loading'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { useLiff } from '@/components/liff/liff-provider'
@@ -275,12 +276,13 @@ function EditStudentContent() {
                 name="birthdate"
                 control={control}
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    id="birthdate"
-                    type="date"
-                    max={today}
-                    min={minDateStr}
+                  <DateRangePicker
+                    mode="single"
+                    value={field.value}
+                    onChange={(date) => field.onChange(date || '')}
+                    maxDate={new Date()}
+                    minDate={minDate}
+                    placeholder="เลือกวันที่"
                   />
                 )}
               />

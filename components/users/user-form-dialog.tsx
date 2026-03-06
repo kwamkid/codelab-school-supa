@@ -23,13 +23,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
@@ -332,21 +326,15 @@ export default function UserFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>บทบาท</FormLabel>
-                    <Select 
-                      value={field.value} 
+                    <FormSelect
+                      value={field.value}
                       onValueChange={field.onChange}
                       disabled={isEditing && editingUser?.id === adminUser?.id}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="super_admin">Super Admin</SelectItem>
-                        <SelectItem value="branch_admin">Branch Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: 'super_admin', label: 'Super Admin' },
+                        { value: 'branch_admin', label: 'Branch Admin' },
+                      ]}
+                    />
                     <FormDescription>
                       {field.value === 'super_admin' && 'มีสิทธิ์เข้าถึงและจัดการทุกอย่างในระบบ'}
                       {field.value === 'branch_admin' && 'จัดการเฉพาะสาขาที่ได้รับมอบหมาย'}

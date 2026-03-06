@@ -33,6 +33,7 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import { getActiveBranches } from '@/lib/services/branches';
@@ -542,11 +543,11 @@ function RegisterContent() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label>วันเกิด *</Label>
-                      <Input
-                        type="date"
+                      <DateRangePicker
+                        mode="single"
                         value={student.birthdate}
-                        onChange={(e) => handleStudentChange(index, 'birthdate', e.target.value)}
-                        required
+                        onChange={(date) => handleStudentChange(index, 'birthdate', date || '')}
+                        placeholder="เลือกวันที่"
                       />
                     </div>
                     <div>

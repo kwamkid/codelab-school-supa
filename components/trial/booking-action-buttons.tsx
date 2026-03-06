@@ -16,6 +16,8 @@ import { TrialBooking } from '@/types/models';
 interface BookingActionButtonsProps {
   booking: TrialBooking;
   onContact: (booking: TrialBooking) => void;
+  onSchedule?: (booking: TrialBooking) => void;
+  onMarkAttended?: (booking: TrialBooking) => void;
   onCancel: (booking: TrialBooking) => void;
   onDelete: (booking: TrialBooking) => void;
 }
@@ -36,6 +38,8 @@ const primaryActions: Record<string, {
 export function BookingActionButtons({
   booking,
   onContact,
+  onSchedule,
+  onMarkAttended,
   onCancel,
   onDelete,
 }: BookingActionButtonsProps) {
@@ -59,6 +63,38 @@ export function BookingActionButtons({
               {primary.label}
             </Button>
           </PermissionGuard>
+        ) : booking.status === 'contacted' && onSchedule ? (
+          <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+            <Button
+              size="sm"
+              className={`h-7 gap-1 text-sm px-2.5 ${primary.color}`}
+              onClick={() => onSchedule(booking)}
+            >
+              <primary.icon className="h-3.5 w-3.5" />
+              {primary.label}
+            </Button>
+          </PermissionGuard>
+        ) : booking.status === 'scheduled' && onMarkAttended ? (
+          <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+            <Button
+              size="sm"
+              className={`h-7 gap-1 text-sm px-2.5 ${primary.color}`}
+              onClick={() => onMarkAttended(booking)}
+            >
+              <primary.icon className="h-3.5 w-3.5" />
+              {primary.label}
+            </Button>
+          </PermissionGuard>
+        ) : booking.status === 'completed' ? (
+          <Link href={`/enrollments/new?from=trial&bookingId=${booking.id}`}>
+            <Button
+              size="sm"
+              className={`h-7 gap-1 text-sm px-2.5 ${primary.color}`}
+            >
+              <primary.icon className="h-3.5 w-3.5" />
+              {primary.label}
+            </Button>
+          </Link>
         ) : (
           <Link href={`/trial/${booking.id}`}>
             <Button

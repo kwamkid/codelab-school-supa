@@ -318,8 +318,9 @@ export default function EnrollmentForm() {
           ...(formData.promotionCode && { promotionCode: formData.promotionCode })
         },
         payment: {
-          method: formData.paymentMethod,
-          status: 'pending' as const, // Default to pending
+          method: formData.paymentMethod as any,
+          type: 'full' as const,
+          status: 'pending' as const,
           paidAmount: 0,
         },
       };

@@ -76,6 +76,7 @@ export interface Branch {
   managerName?: string;
   managerPhone?: string;
   lineGroupUrl?: string;
+  invoiceCompanyId?: string;
   createdAt: Date;
 }
 
@@ -200,6 +201,137 @@ export interface StudentFeedback {
   createdAt: Date;
 }
 
+// ===== Payment Types =====
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'promptpay' | 'credit_card' | 'online';
+export type PaymentType = 'full' | 'deposit' | 'installment';
+export type PaymentStatus = 'pending' | 'partial' | 'paid';
+
+export interface PaymentTransaction {
+  id: string;
+  enrollmentId: string;
+  amount: number;
+  method: PaymentMethod;
+  transactionDate: Date;
+  receiptNumber?: string;
+  note?: string;
+  recordedBy?: string;
+  createdAt: Date;
+}
+
+export interface BranchPaymentSettings {
+  id: string;
+  branchId: string;
+  enabledMethods: PaymentMethod[];
+  bankAccounts: { bankName: string; accountNumber: string; accountName: string }[];
+  promptpayNumber?: string;
+  promptpayName?: string;
+  onlinePaymentEnabled: boolean;
+  onlinePaymentProvider?: string;
+  onlinePaymentConfig?: Record<string, unknown>;
+}
+
+// Invoice Types
+export interface InvoiceCompany {
+  id: string;
+  name: string;
+  taxId?: string;
+  address?: {
+    houseNumber: string;
+    street: string;
+    subDistrict: string;
+    district: string;
+    province: string;
+    postalCode: string;
+  };
+  branchLabel: string;
+  phone?: string;
+  email?: string;
+  invoicePrefix: string;
+  nextInvoiceNumber: number;
+  creditNotePrefix: string;
+  nextCreditNoteNumber: number;
+  currentInvoiceMonth: string;
+  currentCreditNoteMonth: string;
+  isVatRegistered: boolean;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  invoiceCompanyId: string;
+  enrollmentId?: string;
+  branchId: string;
+  billingType: 'personal' | 'company';
+  billingName: string;
+  billingAddress?: {
+    houseNumber: string;
+    street: string;
+    subDistrict: string;
+    district: string;
+    province: string;
+    postalCode: string;
+  };
+  billingTaxId?: string;
+  billingCompanyBranch?: string;
+  wantTaxInvoice: boolean;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  items: { description: string; studentName: string; className: string; amount: number }[];
+  subtotal: number;
+  discountType?: string;
+  discountValue?: number;
+  discountAmount?: number;
+  promotionCode?: string;
+  totalAmount: number;
+  paymentMethod?: string;
+  paymentType?: string;
+  paidAmount?: number;
+  status: 'draft' | 'issued' | 'paid' | 'cancelled' | 'voided';
+  issuedAt?: Date;
+  note?: string;
+  createdBy?: string;
+  linkedCreditNotes?: { id: string; creditNoteNumber: string; refundType: string; refundAmount: number; status: string }[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreditNote {
+  id: string;
+  creditNoteNumber: string;
+  invoiceCompanyId: string;
+  originalInvoiceId?: string;
+  enrollmentId?: string;
+  branchId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  billingType: 'personal' | 'company';
+  billingName?: string;
+  billingAddress?: {
+    houseNumber: string;
+    street: string;
+    subDistrict: string;
+    district: string;
+    province: string;
+    postalCode: string;
+  };
+  billingTaxId?: string;
+  billingCompanyBranch?: string;
+  items: { description: string; amount: number }[];
+  refundAmount: number;
+  reason: string;
+  refundType: 'full' | 'partial';
+  status: 'issued' | 'voided';
+  issuedDate?: string;
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Enrollment & Payment Types
 export interface Enrollment {
   id: string;
@@ -217,8 +349,9 @@ export interface Enrollment {
     promotionCode?: string;
   };
   payment: {
-    method: 'cash' | 'transfer' | 'credit';
-    status: 'pending' | 'partial' | 'paid';
+    method: PaymentMethod;
+    type: PaymentType;
+    status: PaymentStatus;
     paidAmount: number;
     paidDate?: Date;
     receiptNumber?: string;

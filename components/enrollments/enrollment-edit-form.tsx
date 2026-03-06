@@ -190,6 +190,7 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
         },
         payment: {
           method: formData.paymentMethod,
+          type: enrollment.payment.type || 'full',
           status: formData.paymentStatus,
           paidAmount: formData.paidAmount,
         }
@@ -589,8 +590,8 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
               <Label>วิธีการชำระเงิน</Label>
               <Select 
                 value={formData.paymentMethod}
-                onValueChange={(value: 'cash' | 'transfer' | 'credit') => 
-                  setFormData(prev => ({ ...prev, paymentMethod: value }))
+                onValueChange={(value: string) =>
+                  setFormData(prev => ({ ...prev, paymentMethod: value as any }))
                 }
               >
                 <SelectTrigger>

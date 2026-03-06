@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -440,11 +441,17 @@ export default function AvailabilityReportPage() {
             </div>
 
             {/* วันที่ */}
-            <input
-              type="date"
+            <DateRangePicker
+              mode="single"
               value={formatDateForInput(selectedDate)}
-              onChange={handleDateChange}
-              className="w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              onChange={(date) => {
+                if (!date) return;
+                const [year, month, day] = date.split('-').map(Number);
+                const newDate = new Date(year, month - 1, day);
+                newDate.setHours(0, 0, 0, 0);
+                setSelectedDate(newDate);
+              }}
+              placeholder="เลือกวันที่"
             />
 
             {/* ช่วงเวลา */}

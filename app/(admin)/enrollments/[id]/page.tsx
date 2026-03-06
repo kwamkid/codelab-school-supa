@@ -50,6 +50,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,16 +60,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -76,10 +67,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getMakeupClassesByStudent } from '@/lib/services/makeup';
+import { getPaymentSummary, createPaymentTransaction, deletePaymentTransaction } from '@/lib/services/payment-transactions';
+import { getBranchPaymentSettings } from '@/lib/services/branch-payment-settings';
+import { PaymentTransaction, PaymentMethod, BranchPaymentSettings } from '@/types/models';
+import PaymentSummaryCard from '@/components/enrollments/payment/payment-summary-card';
+import PaymentTransactionList from '@/components/enrollments/payment/payment-transaction-list';
+import AddPaymentDialog from '@/components/enrollments/payment/add-payment-dialog';
 import { useBranch } from '@/contexts/BranchContext';
 import { useAuth } from '@/hooks/useAuth';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
+import { Invoice } from '@/types/models';
+import { createInvoice } from '@/lib/services/invoices';
+import ReceiptPrintDialog from '@/components/invoices/receipt-print-dialog';
+import CreditNotePrintDialog from '@/components/invoices/credit-note-print-dialog';
+import IssueCreditNoteDialog from '@/components/invoices/issue-credit-note-dialog';
 
 const statusColors = {
   'active': 'bg-green-100 text-green-700',
@@ -107,8 +109,13 @@ const paymentStatusLabels = {
   'paid': 'ชำระแล้ว',
 };
 
-const paymentMethodLabels = {
+const paymentMethodLabels: Record<string, string> = {
   'cash': 'เงินสด',
+  'bank_transfer': 'โอนเงิน',
+  'promptpay': 'PromptPay',
+  'credit_card': 'บัตรเครดิต',
+  'online': 'ชำระออนไลน์',
+  // Legacy
   'transfer': 'โอนเงิน',
   'credit': 'บัตรเครดิต',
 };
@@ -130,22 +137,34 @@ export default function EnrollmentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [cancelRefundType, setCancelRefundType] = useState<'none' | 'full' | 'partial'>('full');
+  const [cancelRefundAmount, setCancelRefundAmount] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [makeupClasses, setMakeupClasses] = useState<any[]>([]);
 
-  
-  // Quick payment update states
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [paymentUpdating, setPaymentUpdating] = useState(false);
-  const [quickPayment, setQuickPayment] = useState({
-    status: 'pending' as 'pending' | 'partial' | 'paid',
-    paidAmount: 0,
-    receiptNumber: ''
-  });
+  // Payment transaction states
+  const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
+  const [paymentTotalPaid, setPaymentTotalPaid] = useState(0);
+  const [paymentRemaining, setPaymentRemaining] = useState(0);
+  const [paymentSettings, setPaymentSettings] = useState<BranchPaymentSettings>({ id: '', branchId: '', enabledMethods: ['cash', 'bank_transfer'], bankAccounts: [], onlinePaymentEnabled: false });
+  const [showAddPaymentDialog, setShowAddPaymentDialog] = useState(false);
+
+  // Invoice states
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [printInvoiceId, setPrintInvoiceId] = useState<string>('');
+
+  // Credit note states
+  const [creditNotes, setCreditNotes] = useState<any[]>([]);
+  const [showIssueCNDialog, setShowIssueCNDialog] = useState(false);
+  const [showCNPrintDialog, setShowCNPrintDialog] = useState(false);
+  const [printCNId, setPrintCNId] = useState<string>('');
 
   useEffect(() => {
-    loadEnrollmentDetails();
-  }, [enrollmentId]);
+    if (adminUser) {
+      loadEnrollmentDetails();
+    }
+  }, [enrollmentId, adminUser]);
 
   const loadEnrollmentDetails = async () => {
     if (!enrollmentId) {
@@ -205,7 +224,37 @@ export default function EnrollmentDetailPage() {
       setSubject(subjectInfo);
       setTeacher(teacherInfo);
       setMakeupClasses(makeupData.filter(m => m.originalClassId === enrollmentData.classId));
-      
+
+      // Load payment data + invoices
+      try {
+        const [paymentSummary, settings] = await Promise.all([
+          getPaymentSummary(enrollmentId),
+          getBranchPaymentSettings(classInfo.branchId),
+        ]);
+        setPaymentTransactions(paymentSummary.transactions);
+        setPaymentTotalPaid(paymentSummary.totalPaid);
+        setPaymentRemaining(paymentSummary.remaining);
+        setPaymentSettings(settings);
+      } catch (error) {
+        console.error('Error loading payment data:', error);
+      }
+
+      // Load invoices + credit notes
+      try {
+        const [invoiceRes, cnRes] = await Promise.all([
+          fetch(`/api/admin/invoices?enrollmentId=${enrollmentId}`),
+          fetch(`/api/admin/credit-notes?enrollmentId=${enrollmentId}`),
+        ]);
+        if (invoiceRes.ok) {
+          setInvoices(await invoiceRes.json() || []);
+        }
+        if (cnRes.ok) {
+          setCreditNotes(await cnRes.json() || []);
+        }
+      } catch (error) {
+        console.error('Error loading invoices/credit notes:', error);
+      }
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading enrollment details:', error);
@@ -219,18 +268,66 @@ export default function EnrollmentDetailPage() {
       toast.error('กรุณาระบุเหตุผลในการยกเลิก');
       return;
     }
-    
+
     setCancelling(true);
     try {
       await cancelEnrollment(enrollmentId, cancelReason);
       toast.success('ยกเลิกการลงทะเบียนเรียบร้อยแล้ว');
-      loadEnrollmentDetails(); // Reload data
+
+      // Auto-create credit note if refund is selected and invoices exist
+      if (cancelRefundType !== 'none' && invoices.length > 0) {
+        try {
+          const { createCreditNote } = await import('@/lib/services/credit-notes');
+          const inv = invoices[0]; // Use first invoice as reference
+          const maxRefund = inv.paid_amount || inv.total_amount || 0;
+          const refundAmt = cancelRefundType === 'full'
+            ? maxRefund
+            : Math.min(Number(cancelRefundAmount) || 0, maxRefund);
+
+          if (refundAmt > 0) {
+            const cnId = await createCreditNote({
+              invoiceCompanyId: inv.invoice_company_id,
+              originalInvoiceId: inv.id,
+              enrollmentId,
+              branchId: enrollment!.branchId,
+              customerName: inv.customer_name,
+              customerPhone: inv.customer_phone,
+              customerEmail: inv.customer_email,
+              billingType: inv.billing_type,
+              billingName: inv.billing_name,
+              billingAddress: inv.billing_address,
+              billingTaxId: inv.billing_tax_id,
+              billingCompanyBranch: inv.billing_company_branch,
+              items: [{
+                description: `คืนเงิน${cancelRefundType === 'partial' ? 'บางส่วน' : ''} - ${inv.invoice_number}`,
+                amount: refundAmt,
+              }],
+              refundAmount: refundAmt,
+              reason: cancelReason,
+              refundType: cancelRefundType === 'full' ? 'full' : 'partial',
+              createdBy: adminUser?.id,
+            });
+
+            // Open credit note print dialog
+            setPrintCNId(cnId);
+            setShowCNPrintDialog(true);
+            toast.success('สร้างใบลดหนี้เรียบร้อย');
+          }
+        } catch (cnError) {
+          console.error('Error creating credit note:', cnError);
+          toast.error('ยกเลิกสำเร็จ แต่ไม่สามารถสร้างใบลดหนี้ได้');
+        }
+      }
+
+      loadEnrollmentDetails();
     } catch (error) {
       console.error('Error cancelling enrollment:', error);
       toast.error('ไม่สามารถยกเลิกการลงทะเบียนได้');
     } finally {
       setCancelling(false);
       setCancelReason('');
+      setCancelRefundType('full');
+      setCancelRefundAmount('');
     }
   };
 
@@ -248,43 +345,93 @@ export default function EnrollmentDetailPage() {
     }
   };
 
-  const handleQuickPaymentUpdate = async () => {
-    setPaymentUpdating(true);
+  const handleAddPayment = async (data: {
+    amount: number;
+    method: PaymentMethod;
+    note?: string;
+  }) => {
     try {
-      const updateData: Partial<Enrollment> = {
-        payment: {
-          ...enrollment!.payment,
-          status: quickPayment.status,
-          paidAmount: quickPayment.paidAmount,
-          method: enrollment!.payment.method
+      // 1. Record payment transaction
+      await createPaymentTransaction({
+        enrollmentId,
+        amount: data.amount,
+        method: data.method,
+        transactionDate: new Date(),
+        note: data.note,
+        recordedBy: adminUser?.id,
+      });
+
+      // 2. Auto-create invoice for this payment
+      if (branch?.invoiceCompanyId && enrollment) {
+        try {
+          const firstInvoice = invoices[0];
+          const studentName = student?.nickname || student?.firstName || '';
+          const className = classData?.name || '';
+          const refLabel = firstInvoice
+            ? ` (อ้างอิง ${firstInvoice.invoice_number})`
+            : '';
+
+          await createInvoice({
+            invoiceCompanyId: branch.invoiceCompanyId,
+            enrollmentId,
+            branchId: enrollment.branchId,
+            billingType: (firstInvoice?.billing_type as 'personal' | 'company') || 'personal',
+            billingName: firstInvoice?.billing_name || parent?.name || '',
+            billingAddress: firstInvoice?.billing_address || undefined,
+            billingTaxId: firstInvoice?.billing_tax_id || undefined,
+            billingCompanyBranch: firstInvoice?.billing_company_branch || undefined,
+            wantTaxInvoice: firstInvoice?.want_tax_invoice || false,
+            customerName: parent?.name || '',
+            customerPhone: parent?.phone || undefined,
+            customerEmail: parent?.email || undefined,
+            items: [{
+              description: `ชำระค่าเรียนเพิ่มเติม${refLabel}`,
+              studentName,
+              className,
+              amount: data.amount,
+            }],
+            subtotal: data.amount,
+            totalAmount: data.amount,
+            paymentMethod: data.method,
+            paymentType: 'deposit',
+            paidAmount: data.amount,
+            createdBy: adminUser?.id,
+          });
+        } catch (invoiceError) {
+          console.error('Error creating invoice:', invoiceError);
+          // Payment was recorded successfully, just invoice creation failed
+          toast.error('บันทึกการชำระสำเร็จ แต่ออกใบเสร็จไม่ได้');
         }
-      };
-
-      // Add receipt number if provided
-      if (quickPayment.receiptNumber) {
-        updateData.payment!.receiptNumber = quickPayment.receiptNumber;
       }
 
-      // Set paid date if status is paid
-      if (quickPayment.status === 'paid' && enrollment!.payment.status !== 'paid') {
-        updateData.payment!.paidDate = new Date();
-      }
-
-      await updateEnrollment(enrollmentId, updateData);
-      toast.success('อัพเดทการชำระเงินเรียบร้อยแล้ว');
-      setShowPaymentDialog(false);
-      loadEnrollmentDetails(); // Reload data
+      toast.success('บันทึกการชำระเงิน + ออกใบเสร็จเรียบร้อย');
+      loadEnrollmentDetails();
     } catch (error) {
-      console.error('Error updating payment:', error);
-      toast.error('ไม่สามารถอัพเดทการชำระเงินได้');
-    } finally {
-      setPaymentUpdating(false);
+      console.error('Error adding payment:', error);
+      toast.error('ไม่สามารถบันทึกการชำระเงินได้');
+      throw error;
     }
   };
 
-  const handlePrintReceipt = () => {
-    // TODO: Implement print receipt
-    toast.info('ฟังก์ชันพิมพ์ใบเสร็จจะเพิ่มในภายหลัง');
+  const handleDeleteTransaction = async (txId: string) => {
+    try {
+      await deletePaymentTransaction(txId, enrollmentId);
+      toast.success('ลบรายการชำระเงินเรียบร้อย');
+      loadEnrollmentDetails();
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      toast.error('ไม่สามารถลบรายการได้');
+    }
+  };
+
+  const handlePrintReceipt = (invoiceId?: string) => {
+    const id = invoiceId || invoices[0]?.id;
+    if (!id) {
+      toast.error('ไม่พบใบเสร็จ');
+      return;
+    }
+    setPrintInvoiceId(id);
+    setShowReceiptDialog(true);
   };
 
   if (loading) {
@@ -317,28 +464,18 @@ export default function EnrollmentDetailPage() {
         </Link>
         
         <div className="flex gap-2">
-          {/* Quick Payment Update Button */}
-          <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-            {enrollment.payment.status !== 'paid' && (
-              <Button 
-                variant="outline" 
-                className="text-green-600"
-                onClick={() => {
-                  setQuickPayment({
-                    status: enrollment.payment.status,
-                    paidAmount: enrollment.payment.paidAmount,
-                    receiptNumber: enrollment.payment.receiptNumber || ''
-                  });
-                  setShowPaymentDialog(true);
-                }}
-              >
-                <CreditCard className="h-4 w-4 mr-2" />
-                อัพเดทการชำระ
-              </Button>
-            )}
-          </PermissionGuard>
+          {/* Print Receipt Button */}
+          {invoices.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => handlePrintReceipt()}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              พิมพ์ใบเสร็จ
+            </Button>
+          )}
 
-          {/* Actions Dropdown */}
+{/* Actions Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
@@ -348,13 +485,6 @@ export default function EnrollmentDetailPage() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>จัดการ</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              
-              {enrollment.payment.status === 'paid' && (
-                <DropdownMenuItem onClick={handlePrintReceipt}>
-                  <Printer className="h-4 w-4 mr-2" />
-                  พิมพ์ใบเสร็จ
-                </DropdownMenuItem>
-              )}
               
               {isActive && (
                 <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
@@ -382,18 +512,62 @@ export default function EnrollmentDetailPage() {
                           คุณแน่ใจหรือไม่ที่จะยกเลิกการลงทะเบียนของ {student.nickname} ({student.name})?
                         </AlertDialogDescription>
                       </AlertDialogHeader>
-                      <div className="my-4">
-                        <label className="text-sm font-medium">เหตุผลในการยกเลิก</label>
-                        <Textarea
-                          placeholder="กรุณาระบุเหตุผล..."
-                          value={cancelReason}
-                          onChange={(e) => setCancelReason(e.target.value)}
-                          className="mt-2"
-                        />
+                      <div className="my-4 space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">เหตุผลในการยกเลิก</label>
+                          <Textarea
+                            placeholder="กรุณาระบุเหตุผล..."
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            className="mt-2"
+                          />
+                        </div>
+
+                        {/* Refund options - only show if has invoices */}
+                        {invoices.length > 0 && (
+                          <div>
+                            <label className="text-sm font-medium">การคืนเงิน</label>
+                            <Select value={cancelRefundType} onValueChange={(v) => setCancelRefundType(v as any)}>
+                              <SelectTrigger className="mt-2">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="full">
+                                  คืนเต็มจำนวน ({formatCurrency(invoices[0]?.paid_amount || invoices[0]?.total_amount || 0)})
+                                </SelectItem>
+                                <SelectItem value="partial">คืนบางส่วน</SelectItem>
+                                <SelectItem value="none">ไม่คืนเงิน</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {cancelRefundType === 'partial' && (
+                              <div className="mt-2">
+                                <label className="text-xs text-gray-500">
+                                  จำนวนเงินคืน (สูงสุด {formatCurrency(invoices[0]?.paid_amount || invoices[0]?.total_amount || 0)})
+                                </label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={invoices[0]?.paid_amount || invoices[0]?.total_amount || 0}
+                                  value={cancelRefundAmount}
+                                  onChange={(e) => setCancelRefundAmount(e.target.value)}
+                                  placeholder="0"
+                                  className="mt-1"
+                                />
+                              </div>
+                            )}
+
+                            {cancelRefundType !== 'none' && (
+                              <p className="text-xs text-orange-600 mt-2">
+                                * ระบบจะออกใบลดหนี้อัตโนมัติ
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <AlertDialogFooter>
                         <AlertDialogCancel>ไม่ยกเลิก</AlertDialogCancel>
-                        <AlertDialogAction 
+                        <AlertDialogAction
                           onClick={handleCancelEnrollment}
                           className="bg-red-500 hover:bg-red-600"
                           disabled={cancelling || !cancelReason.trim()}
@@ -459,9 +633,14 @@ export default function EnrollmentDetailPage() {
             <h1 className="text-xl sm:text-3xl font-bold text-gray-900">รายละเอียดการลงทะเบียน</h1>
             <p className="text-gray-600 mt-2">วันที่ลงทะเบียน: {formatDate(enrollment.enrolledAt, 'long')}</p>
           </div>
-          <Badge className={statusColors[enrollment.status]}>
-            {statusLabels[enrollment.status]}
-          </Badge>
+          {(() => {
+            const isUpcoming = enrollment.status === 'active' && classData?.startDate && new Date(classData.startDate) > new Date();
+            return (
+              <Badge className={isUpcoming ? 'bg-yellow-100 text-yellow-700' : statusColors[enrollment.status]}>
+                {isUpcoming ? 'รอเริ่มเรียน' : statusLabels[enrollment.status]}
+              </Badge>
+            );
+          })()}
         </div>
       </div>
 
@@ -668,103 +847,157 @@ export default function EnrollmentDetailPage() {
 
         {/* Side Info */}
         <div className="space-y-6">
+          {/* Unified Payment Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                ข้อมูลการชำระเงิน
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  การชำระเงิน
+                </span>
+                <Badge className={paymentStatusColors[enrollment.payment.status as keyof typeof paymentStatusColors] || ''}>
+                  {paymentStatusLabels[enrollment.payment.status as keyof typeof paymentStatusLabels] || enrollment.payment.status}
+                </Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">สถานะ</span>
-                  <Badge className={paymentStatusColors[enrollment.payment.status]}>
-                    {paymentStatusLabels[enrollment.payment.status]}
-                  </Badge>
+            <CardContent className="space-y-4">
+              {/* Pricing Summary */}
+              <div className="space-y-2 text-base">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">ค่าเรียนปกติ</span>
+                  <span>{formatCurrency(enrollment.pricing.originalPrice)}</span>
                 </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">ค่าเรียนปกติ</span>
-                    <span>{formatCurrency(enrollment.pricing.originalPrice)}</span>
+                {enrollment.pricing.discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>
+                      ส่วนลด
+                      {enrollment.pricing.discountType === 'percentage'
+                        ? ` (${enrollment.pricing.discount}%)`
+                        : ''}
+                    </span>
+                    <span>-{formatCurrency(
+                      enrollment.pricing.discountType === 'percentage'
+                        ? enrollment.pricing.originalPrice * (enrollment.pricing.discount / 100)
+                        : enrollment.pricing.discount
+                    )}</span>
                   </div>
-                  
-                  {enrollment.pricing.discount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span className="text-sm">
-                        ส่วนลด 
-                        {enrollment.pricing.discountType === 'percentage' 
-                          ? ` (${enrollment.pricing.discount}%)`
-                          : ''
-                        }
-                      </span>
-                      <span>-{formatCurrency(
-                        enrollment.pricing.discountType === 'percentage'
-                          ? enrollment.pricing.originalPrice * (enrollment.pricing.discount / 100)
-                          : enrollment.pricing.discount
-                      )}</span>
-                    </div>
-                  )}
-                  
-                  <div className="pt-2 border-t flex justify-between font-semibold">
-                    <span>ยอดที่ต้องชำระ</span>
-                    <span className="text-lg">{formatCurrency(enrollment.pricing.finalPrice)}</span>
+                )}
+                {enrollment.pricing.promotionCode && (
+                  <div className="text-sm text-gray-500">
+                    โปรโมชั่น: <span className="font-medium">{enrollment.pricing.promotionCode}</span>
                   </div>
-                  
-                  {enrollment.payment.paidAmount > 0 && (
-                    <>
-                      <div className="pt-2 border-t flex justify-between">
-                        <span className="text-sm text-gray-500">ชำระแล้ว</span>
-                        <span className="text-green-600">
-                          {formatCurrency(enrollment.payment.paidAmount)}
-                        </span>
-                      </div>
-                      
-                      {enrollment.payment.paidAmount < enrollment.pricing.finalPrice && (
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-500">คงเหลือ</span>
-                          <span className="text-red-600">
-                            {formatCurrency(enrollment.pricing.finalPrice - enrollment.payment.paidAmount)}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-                
-                <div className="pt-4 border-t space-y-3">
-                  <div>
-                    <p className="text-sm text-gray-500">วิธีการชำระเงิน</p>
-                    <p className="font-medium">
-                      {paymentMethodLabels[enrollment.payment.method]}
-                    </p>
-                  </div>
-                  
-                  {enrollment.payment.paidDate && (
-                    <div>
-                      <p className="text-sm text-gray-500">วันที่ชำระ</p>
-                      <p className="font-medium">
-                        {formatDate(enrollment.payment.paidDate, 'long')}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {enrollment.payment.receiptNumber && (
-                    <div>
-                      <p className="text-sm text-gray-500">เลขที่ใบเสร็จ</p>
-                      <p className="font-medium">{enrollment.payment.receiptNumber}</p>
-                    </div>
-                  )}
-                  
-                  {enrollment.pricing.promotionCode && (
-                    <div>
-                      <p className="text-sm text-gray-500">รหัสโปรโมชั่น</p>
-                      <p className="font-medium">{enrollment.pricing.promotionCode}</p>
-                    </div>
-                  )}
+                )}
+                <div className="pt-2 border-t flex justify-between font-semibold">
+                  <span>ยอดที่ต้องชำระ</span>
+                  <span>{formatCurrency(enrollment.pricing.finalPrice)}</span>
                 </div>
               </div>
+
+              {/* Invoice List */}
+              {invoices.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-500">ใบเสร็จ / Invoice</p>
+                  {invoices.map((inv: any) => (
+                    <div key={inv.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-base">{inv.invoice_number}</span>
+                          <span className="font-semibold text-base">{formatCurrency(inv.total_amount)}</span>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {formatDate(inv.issued_at || inv.created_at, 'short')}
+                          {inv.payment_method && ` · ${paymentMethodLabels[inv.payment_method] || inv.payment_method}`}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePrintReceipt(inv.id)}
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Payment Summary */}
+              <div className="pt-2 border-t space-y-1 text-base">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">ชำระแล้ว</span>
+                  <span className="text-green-600 font-medium">{formatCurrency(paymentTotalPaid)}</span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span>คงเหลือ</span>
+                  <span className={paymentRemaining <= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {paymentRemaining <= 0 ? (
+                      <span className="flex items-center gap-1">
+                        <CheckCircle className="h-4 w-4" /> ชำระครบแล้ว
+                      </span>
+                    ) : (
+                      formatCurrency(paymentRemaining)
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Add Payment Button */}
+              {enrollment.payment.status !== 'paid' && enrollment.status !== 'dropped' && (
+                <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700 text-base"
+                    onClick={() => setShowAddPaymentDialog(true)}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    รับชำระเพิ่ม
+                  </Button>
+                </PermissionGuard>
+              )}
+
+              {/* Credit Notes */}
+              {creditNotes.length > 0 && (
+                <div className="pt-2 border-t space-y-2">
+                  <p className="text-sm font-medium text-red-600">ใบลดหนี้ / Credit Note</p>
+                  {creditNotes.map((cn: any) => (
+                    <div key={cn.id} className="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-base text-red-600">{cn.credit_note_number}</span>
+                          <span className="font-semibold text-base text-red-600">-{formatCurrency(cn.refund_amount)}</span>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {formatDate(cn.issued_date || cn.created_at, 'short')}
+                          {cn.reason && ` · ${cn.reason}`}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setPrintCNId(cn.id);
+                          setShowCNPrintDialog(true);
+                        }}
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Issue Credit Note Button */}
+              {enrollment.status === 'dropped' && invoices.length > 0 && (
+                <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+                  <Button
+                    variant="outline"
+                    className="w-full text-red-600 border-red-300 hover:bg-red-50 text-base"
+                    onClick={() => setShowIssueCNDialog(true)}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    ออกใบลดหนี้เพิ่ม
+                  </Button>
+                </PermissionGuard>
+              )}
             </CardContent>
           </Card>
 
@@ -804,113 +1037,43 @@ export default function EnrollmentDetailPage() {
         </div>
       </div>
 
-      {/* Quick Payment Update Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>อัพเดทการชำระเงิน</DialogTitle>
-            <DialogDescription>
-              อัพเดทสถานะการชำระเงินสำหรับ {student?.nickname} ({student?.name})
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label>สถานะการชำระ</Label>
-              <Select 
-                value={quickPayment.status}
-                onValueChange={(value: 'pending' | 'partial' | 'paid') => 
-                  setQuickPayment(prev => ({ ...prev, status: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">รอชำระ</SelectItem>
-                  <SelectItem value="partial">ชำระบางส่วน</SelectItem>
-                  <SelectItem value="paid">ชำระแล้ว</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label>ยอดที่ชำระแล้ว</Label>
-              <Input
-                type="number"
-                value={quickPayment.paidAmount || ''}
-                onChange={(e) => setQuickPayment(prev => ({ 
-                  ...prev, 
-                  paidAmount: parseFloat(e.target.value) || 0 
-                }))}
-                placeholder="0"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                ยอดที่ต้องชำระทั้งหมด: {formatCurrency(enrollment?.pricing.finalPrice || 0)}
-              </p>
-            </div>
-            
-            <div>
-              <Label>เลขที่ใบเสร็จ (ถ้ามี)</Label>
-              <Input
-                value={quickPayment.receiptNumber}
-                onChange={(e) => setQuickPayment(prev => ({ 
-                  ...prev, 
-                  receiptNumber: e.target.value 
-                }))}
-                placeholder="RC2025-001"
-              />
-            </div>
-            
-            {/* Show summary */}
-            {quickPayment.paidAmount > 0 && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>ยอดที่ต้องชำระ:</span>
-                    <span>{formatCurrency(enrollment?.pricing.finalPrice || 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>ชำระแล้ว:</span>
-                    <span className="text-green-600">{formatCurrency(quickPayment.paidAmount)}</span>
-                  </div>
-                  {quickPayment.paidAmount < (enrollment?.pricing.finalPrice || 0) && (
-                    <div className="flex justify-between font-medium pt-2 border-t">
-                      <span>คงเหลือ:</span>
-                      <span className="text-red-600">
-                        {formatCurrency((enrollment?.pricing.finalPrice || 0) - quickPayment.paidAmount)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
-              ยกเลิก
-            </Button>
-            <Button 
-              onClick={handleQuickPaymentUpdate}
-              disabled={paymentUpdating || quickPayment.paidAmount < 0}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {paymentUpdating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  กำลังบันทึก...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  บันทึก
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Add Payment Dialog */}
+      <AddPaymentDialog
+        open={showAddPaymentDialog}
+        onOpenChange={setShowAddPaymentDialog}
+        enrollmentId={enrollmentId}
+        remaining={paymentRemaining}
+        paymentSettings={paymentSettings}
+        onSubmit={handleAddPayment}
+      />
+
+      {/* Receipt Print Dialog */}
+      <ReceiptPrintDialog
+        open={showReceiptDialog}
+        onOpenChange={setShowReceiptDialog}
+        invoiceId={printInvoiceId}
+      />
+
+      {/* Issue Credit Note Dialog */}
+      <IssueCreditNoteDialog
+        open={showIssueCNDialog}
+        onOpenChange={setShowIssueCNDialog}
+        enrollmentId={enrollmentId}
+        branchId={enrollment.branchId}
+        invoices={invoices}
+        onSuccess={(creditNoteId) => {
+          setPrintCNId(creditNoteId);
+          setShowCNPrintDialog(true);
+          loadEnrollmentDetails(); // Reload to show new CN
+        }}
+      />
+
+      {/* Credit Note Print Dialog */}
+      <CreditNotePrintDialog
+        open={showCNPrintDialog}
+        onOpenChange={setShowCNPrintDialog}
+        creditNoteId={printCNId}
+      />
     </div>
   );
 }

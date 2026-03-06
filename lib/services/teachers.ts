@@ -1,6 +1,7 @@
 import { Teacher } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
 import { createAdminUserSimple } from './admin-users';
+import { adminMutation } from '@/lib/admin-mutation';
 
 const TABLE_NAME = 'teachers';
 
@@ -197,10 +198,10 @@ export async function createTeacher(
 
     // ถ้าไม่มี password ให้สร้างแบบเดิม (สำหรับ backward compatibility)
     // 1. สร้าง Teacher ใน teachers table ก่อน
-    const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert({
+    const result = await adminMutation({
+      table: 'teachers',
+      operation: 'insert',
+      data: {
         name: teacherData.name,
         nickname: teacherData.nickname || null,
         email: teacherData.email || null,
@@ -213,14 +214,13 @@ export async function createTeacher(
         bank_account_number: teacherData.bankAccount?.accountNumber || null,
         bank_account_name: teacherData.bankAccount?.accountName || null,
         is_active: teacherData.isActive,
-      } as any)
-      .select()
-      .single();
+      },
+      options: { select: true, single: true }
+    });
 
-    if (error) throw error;
-    if (!data) throw new Error('No data returned from insert');
+    if (!result) throw new Error('No data returned from insert');
 
-    const teacherId = (data as any).id;
+    const teacherId = result.id;
 
     // 2. สร้าง AdminUser ด้วย ID เดียวกัน (Dual Creation)
     try {
@@ -257,8 +257,6 @@ export async function createTeacher(
 // Update teacher WITH dual update AND Supabase Auth update
 export async function updateTeacher(id: string, teacherData: Partial<Teacher>): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {
       updated_at: new Date().toISOString(),
     };
@@ -284,12 +282,12 @@ export async function updateTeacher(id: string, teacherData: Partial<Teacher>): 
     }
 
     // 1. Update teacher document
-    const { error } = await (supabase
-      .from(TABLE_NAME) as any)
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'teachers',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
 
     // 2. Update adminUser ถ้ามีการเปลี่ยนแปลงข้อมูลที่เกี่ยวข้อง
     try {
@@ -313,15 +311,12 @@ export async function updateTeacher(id: string, teacherData: Partial<Teacher>): 
       }
 
       if (Object.keys(adminUpdateData).length > 2) {
-        const { error: adminError } = await (supabase
-          .from('admin_users') as any)
-          .update(adminUpdateData)
-          .eq('id', id);
-
-        if (adminError) {
-          console.error('Error updating admin user:', adminError);
-          // Don't throw - teacher update succeeded
-        }
+        await adminMutation({
+          table: 'admin_users',
+          operation: 'update',
+          data: adminUpdateData,
+          match: { id }
+        });
       }
     } catch (adminError) {
       console.error('Error updating admin user for teacher:', adminError);

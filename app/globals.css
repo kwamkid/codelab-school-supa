@@ -200,6 +200,96 @@ button[aria-busy="true"]::after,
   }
 }
 
+/* DateRangePicker calendar overrides */
+.datepicker-custom {
+  font-size: 14px;
+}
+
+/* Toggle icon - position properly */
+.datepicker-custom > div > button.absolute {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+}
+
+/* Hide the arrow/caret triangle at top of calendar popup */
+.datepicker-custom .rotate-45 {
+  display: none !important;
+}
+
+/* Remove gap where arrow was */
+.datepicker-custom .mt-2\.5.shadow-sm {
+  margin-top: 0 !important;
+}
+
+/* Calendar popup z-index (inside dialog) */
+.datepicker-custom > div > div.absolute {
+  z-index: 100;
+}
+
+/* Mobile: center calendar popup on screen */
+@media (max-width: 640px) {
+  .datepicker-custom > div > div.absolute {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    right: auto !important;
+    bottom: auto !important;
+    max-width: calc(100vw - 2rem);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border-radius: 0.75rem;
+  }
+
+  /* Backdrop for mobile calendar */
+  .datepicker-custom > div > div.absolute::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: -1;
+  }
+}
+
+/* Day-of-week headers: uppercase */
+.datepicker-custom .grid.grid-cols-7 > div.tracking-wide {
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+/* Month/year header: bold + bigger */
+.datepicker-custom .flex.flex-1.items-center button {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+/* Calendar day cells */
+.datepicker-custom .grid.grid-cols-7 > button {
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  font-size: 14px;
+}
+
+/* Hide 6th row when it's all next-month overflow dates (gray text in positions 36+) */
+.datepicker-custom .grid.grid-cols-7 > button.text-gray-400:nth-child(n+36) {
+  display: none !important;
+}
+
+/* Calendar navigation arrows */
+.datepicker-custom .flex.items-center button {
+  padding: 4px;
+}
+
+/* Calendar body - remove fixed min-height so popup auto-shrinks */
+.datepicker-custom [class*="min-h-"] {
+  min-height: auto !important;
+}
+
 /* Ripple effect */
 @keyframes ripple {
   0% {
@@ -221,3 +311,4 @@ button[aria-busy="true"]::after,
   animation: ripple 0.6s;
   pointer-events: none;
 }
+

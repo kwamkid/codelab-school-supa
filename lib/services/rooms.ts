@@ -1,5 +1,6 @@
 import { Room } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 const TABLE_NAME = 'rooms';
 
@@ -100,10 +101,10 @@ export async function createRoom(
   roomData: Omit<Room, 'id' | 'branchId'>
 ): Promise<string> {
   try {
-    const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert({
+    const result = await adminMutation({
+      table: 'rooms',
+      operation: 'insert',
+      data: {
         branch_id: branchId,
         name: roomData.name,
         capacity: roomData.capacity,
@@ -111,14 +112,12 @@ export async function createRoom(
         has_projector: roomData.hasProjector,
         has_whiteboard: roomData.hasWhiteboard,
         is_active: roomData.isActive,
-      })
-      .select()
-      .single();
+      },
+      options: { select: true, single: true }
+    });
 
-    if (error) throw error;
-    if (!data) throw new Error('No data returned from insert');
-
-    return data.id;
+    if (!result) throw new Error('No data returned from insert');
+    return result.id;
   } catch (error) {
     console.error('Error creating room:', error);
     throw error;
@@ -132,10 +131,7 @@ export async function updateRoom(
   roomData: Partial<Room>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
-
     if (roomData.name !== undefined) updateData.name = roomData.name;
     if (roomData.capacity !== undefined) updateData.capacity = roomData.capacity;
     if (roomData.floor !== undefined) updateData.floor = roomData.floor;
@@ -147,13 +143,12 @@ export async function updateRoom(
       return;
     }
 
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update(updateData)
-      .eq('id', roomId)
-      .eq('branch_id', branchId);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'rooms',
+      operation: 'update',
+      data: updateData,
+      match: { id: roomId, branch_id: branchId }
+    });
   } catch (error) {
     console.error('Error updating room:', error);
     throw error;
@@ -163,14 +158,12 @@ export async function updateRoom(
 // Delete room (soft delete)
 export async function deleteRoom(branchId: string, roomId: string): Promise<void> {
   try {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update({ is_active: false })
-      .eq('id', roomId)
-      .eq('branch_id', branchId);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'rooms',
+      operation: 'update',
+      data: { is_active: false },
+      match: { id: roomId, branch_id: branchId }
+    });
   } catch (error) {
     console.error('Error deleting room:', error);
     throw error;

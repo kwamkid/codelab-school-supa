@@ -1,6 +1,7 @@
 // lib/services/trial-bookings.ts
 
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 import { TrialBooking, TrialSession } from '@/types/models';
 import { checkParentPhoneExists } from './parents';
 
@@ -166,13 +167,192 @@ export async function getTrialBooking(id: string): Promise<TrialBooking | null> 
   }
 }
 
+// Get trial booking by phone (most recent)
+export async function getTrialBookingByPhone(phone: string): Promise<TrialBooking | null> {
+  try {
+    const supabase = getClient();
+    const cleanPhone = phone.replace(/[-\s]/g, '');
+
+    const { data, error } = await supabase
+      .from('trial_bookings')
+      .select(`
+        *,
+        trial_booking_students (
+          id,
+          name,
+          school_name,
+          grade_level,
+          birthdate,
+          subject_interests
+        )
+      `)
+      .eq('parent_phone', cleanPhone)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      source: data.source,
+      parentName: data.parent_name,
+      parentPhone: data.parent_phone,
+      parentEmail: data.parent_email,
+      students: (data.trial_booking_students || []).map((s: any) => ({
+        name: s.name,
+        schoolName: s.school_name,
+        gradeLevel: s.grade_level,
+        birthdate: s.birthdate ? new Date(s.birthdate) : undefined,
+        subjectInterests: s.subject_interests || []
+      })),
+      branchId: data.branch_id,
+      status: data.status,
+      assignedTo: data.assigned_to,
+      contactedAt: data.contacted_at ? new Date(data.contacted_at) : undefined,
+      contactNote: data.contact_note,
+      createdAt: new Date(data.created_at),
+      updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
+    };
+  } catch (error) {
+    console.error('Error getting trial booking by phone:', error);
+    return null;
+  }
+}
+
+// Search trial bookings by parent name, phone, or student name
+export interface TrialBookingSearchResult {
+  booking: TrialBooking;
+  matchedVia: 'parent_name' | 'parent_phone' | 'student_name';
+}
+
+export async function searchTrialBookings(searchTerm: string): Promise<TrialBookingSearchResult[]> {
+  try {
+    const supabase = getClient();
+    const term = searchTerm.trim();
+    if (!term) return [];
+
+    const cleanPhone = term.replace(/[-\s]/g, '');
+    const isPhoneSearch = /^[0-9]{3,}$/.test(cleanPhone);
+
+    // Search by parent name or phone
+    let query = supabase
+      .from('trial_bookings')
+      .select(`
+        *,
+        trial_booking_students (
+          id, name, school_name, grade_level, birthdate, subject_interests
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (isPhoneSearch) {
+      query = query.ilike('parent_phone', `%${cleanPhone}%`);
+    } else {
+      query = query.ilike('parent_name', `%${term}%`);
+    }
+
+    const { data: bookingMatches, error } = await query.limit(10);
+    if (error) throw error;
+
+    const results: TrialBookingSearchResult[] = [];
+    const seenBookingIds = new Set<string>();
+
+    for (const booking of (bookingMatches || []) as any[]) {
+      seenBookingIds.add(booking.id);
+      results.push({
+        booking: {
+          id: booking.id,
+          source: booking.source,
+          parentName: booking.parent_name,
+          parentPhone: booking.parent_phone,
+          parentEmail: booking.parent_email,
+          students: (booking.trial_booking_students || []).map((s: any) => ({
+            name: s.name,
+            schoolName: s.school_name,
+            gradeLevel: s.grade_level,
+            birthdate: s.birthdate ? new Date(s.birthdate) : undefined,
+            subjectInterests: s.subject_interests || [],
+          })),
+          branchId: booking.branch_id,
+          status: booking.status,
+          assignedTo: booking.assigned_to,
+          contactedAt: booking.contacted_at ? new Date(booking.contacted_at) : undefined,
+          contactNote: booking.contact_note,
+          createdAt: new Date(booking.created_at),
+          updatedAt: booking.updated_at ? new Date(booking.updated_at) : undefined,
+        },
+        matchedVia: isPhoneSearch ? 'parent_phone' : 'parent_name',
+      });
+    }
+
+    // Also search by student name if not phone search
+    if (!isPhoneSearch) {
+      const { data: studentMatches, error: sError } = await supabase
+        .from('trial_booking_students')
+        .select(`
+          *,
+          trial_bookings:booking_id (
+            *,
+            trial_booking_students (
+              id, name, school_name, grade_level, birthdate, subject_interests
+            )
+          )
+        `)
+        .ilike('name', `%${term}%`)
+        .limit(10);
+
+      if (!sError && studentMatches) {
+        for (const row of studentMatches as any[]) {
+          const b = row.trial_bookings as any;
+          if (!b || seenBookingIds.has(b.id)) continue;
+          seenBookingIds.add(b.id);
+
+          results.push({
+            booking: {
+              id: b.id,
+              source: b.source,
+              parentName: b.parent_name,
+              parentPhone: b.parent_phone,
+              parentEmail: b.parent_email,
+              students: (b.trial_booking_students || []).map((s: any) => ({
+                name: s.name,
+                schoolName: s.school_name,
+                gradeLevel: s.grade_level,
+                birthdate: s.birthdate ? new Date(s.birthdate) : undefined,
+                subjectInterests: s.subject_interests || [],
+              })),
+              branchId: b.branch_id,
+              status: b.status,
+              assignedTo: b.assigned_to,
+              contactedAt: b.contacted_at ? new Date(b.contacted_at) : undefined,
+              contactNote: b.contact_note,
+              createdAt: new Date(b.created_at),
+              updatedAt: b.updated_at ? new Date(b.updated_at) : undefined,
+            },
+            matchedVia: 'student_name',
+          });
+        }
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Error searching trial bookings:', error);
+    return [];
+  }
+}
+
 // Create trial booking
 export async function createTrialBooking(
   data: Omit<TrialBooking, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<string> {
   try {
-    const supabase = getClient();
-
     // Create the booking first
     const bookingData: any = {
       source: data.source || 'online',
@@ -183,15 +363,15 @@ export async function createTrialBooking(
       status: data.status || 'new',
       assigned_to: data.assignedTo,
       contact_note: data.contactNote,
+      contacted_at: data.contactedAt ? data.contactedAt.toISOString() : null,
     };
 
-    const { data: booking, error: bookingError } = await supabase
-      .from('trial_bookings')
-      .insert(bookingData)
-      .select()
-      .single();
-
-    if (bookingError) throw bookingError;
+    const booking = await adminMutation({
+      table: 'trial_bookings',
+      operation: 'insert',
+      data: bookingData,
+      options: { select: true, single: true }
+    });
 
     // Create student records
     if (data.students && data.students.length > 0) {
@@ -204,11 +384,11 @@ export async function createTrialBooking(
         subject_interests: student.subjectInterests || []
       }));
 
-      const { error: studentsError } = await supabase
-        .from('trial_booking_students')
-        .insert(studentsData);
-
-      if (studentsError) throw studentsError;
+      await adminMutation({
+        table: 'trial_booking_students',
+        operation: 'insert',
+        data: studentsData
+      });
     }
 
     return booking.id;
@@ -224,8 +404,6 @@ export async function updateTrialBooking(
   data: Partial<TrialBooking>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     // Prepare update data
     const updateData: any = {};
 
@@ -240,20 +418,21 @@ export async function updateTrialBooking(
     if (data.contactNote !== undefined) updateData.contact_note = data.contactNote;
 
     // Update booking
-    const { error: bookingError } = await supabase
-      .from('trial_bookings')
-      .update(updateData)
-      .eq('id', id);
-
-    if (bookingError) throw bookingError;
+    await adminMutation({
+      table: 'trial_bookings',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
 
     // Update students if provided
     if (data.students) {
       // Delete existing students
-      await supabase
-        .from('trial_booking_students')
-        .delete()
-        .eq('booking_id', id);
+      await adminMutation({
+        table: 'trial_booking_students',
+        operation: 'delete',
+        match: { booking_id: id }
+      });
 
       // Insert new students
       if (data.students.length > 0) {
@@ -262,19 +441,89 @@ export async function updateTrialBooking(
           name: student.name,
           school_name: student.schoolName,
           grade_level: student.gradeLevel,
-          birthdate: student.birthdate ? student.birthdate.toISOString().split('T')[0] : null,
+          birthdate: student.birthdate
+            ? (typeof student.birthdate === 'string'
+                ? student.birthdate.slice(0, 10)
+                : student.birthdate.toISOString().split('T')[0])
+            : null,
           subject_interests: student.subjectInterests || []
         }));
 
-        const { error: studentsError } = await supabase
-          .from('trial_booking_students')
-          .insert(studentsData);
-
-        if (studentsError) throw studentsError;
+        await adminMutation({
+          table: 'trial_booking_students',
+          operation: 'insert',
+          data: studentsData
+        });
       }
     }
   } catch (error) {
     console.error('Error updating trial booking:', error);
+    throw error;
+  }
+}
+
+// Deduplicate students for a booking (fix for earlier bug)
+export async function deduplicateBookingStudents(bookingId: string): Promise<number> {
+  try {
+    const supabase = getClient();
+
+    const { data: students, error } = await supabase
+      .from('trial_booking_students')
+      .select('*')
+      .eq('booking_id', bookingId)
+      .order('id', { ascending: true });
+
+    if (error) throw error;
+    if (!students || students.length <= 1) return 0;
+
+    // Group by name to find unique students
+    const seen = new Map<string, string>(); // name -> first id
+    const idsToDelete: string[] = [];
+
+    for (const student of students) {
+      const key = student.name;
+      if (seen.has(key)) {
+        idsToDelete.push(student.id);
+      } else {
+        seen.set(key, student.id);
+      }
+    }
+
+    if (idsToDelete.length === 0) return 0;
+
+    await adminMutation({
+      table: 'trial_booking_students',
+      operation: 'delete',
+      filters: [{ column: 'id', op: 'in', value: idsToDelete }]
+    });
+
+    return idsToDelete.length;
+  } catch (error) {
+    console.error('Error deduplicating students:', error);
+    throw error;
+  }
+}
+
+// Delete a student from a booking
+// Uses API route to bypass RLS restrictions
+export async function deleteBookingStudent(
+  bookingId: string,
+  studentIndex: number
+): Promise<void> {
+  try {
+    const response = await fetch(`/api/admin/trial-booking/${bookingId}/student`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentIndex }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete student');
+    }
+  } catch (error) {
+    console.error('Error deleting booking student:', error);
     throw error;
   }
 }
@@ -285,14 +534,12 @@ export async function updateBookingBranch(
   branchId: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
-    const { error } = await supabase
-      .from('trial_bookings')
-      .update({ branch_id: branchId })
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'trial_bookings',
+      operation: 'update',
+      data: { branch_id: branchId },
+      match: { id }
+    });
   } catch (error) {
     console.error('Error updating booking branch:', error);
     throw error;
@@ -306,8 +553,6 @@ export async function updateBookingStatus(
   note?: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = { status };
 
     if (status === 'contacted') {
@@ -318,12 +563,12 @@ export async function updateBookingStatus(
       updateData.contact_note = note;
     }
 
-    const { error } = await supabase
-      .from('trial_bookings')
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'trial_bookings',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
   } catch (error) {
     console.error('Error updating booking status:', error);
     throw error;
@@ -336,8 +581,6 @@ export async function cancelTrialBooking(
   reason?: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     // Get booking first to check if it can be cancelled
     const booking = await getTrialBooking(id);
     if (!booking) {
@@ -360,27 +603,27 @@ export async function cancelTrialBooking(
       updateData.contact_note = reason;
     }
 
-    const { error: bookingError } = await supabase
-      .from('trial_bookings')
-      .update(updateData)
-      .eq('id', id);
-
-    if (bookingError) throw bookingError;
+    await adminMutation({
+      table: 'trial_bookings',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
 
     // Cancel all associated trial sessions
     const sessions = await getTrialSessionsByBooking(id);
 
     for (const session of sessions) {
       if (session.status === 'scheduled') {
-        const { error: sessionError } = await supabase
-          .from('trial_sessions')
-          .update({
+        await adminMutation({
+          table: 'trial_sessions',
+          operation: 'update',
+          data: {
             status: 'cancelled',
             feedback: reason || 'ยกเลิกการจอง'
-          })
-          .eq('id', session.id);
-
-        if (sessionError) throw sessionError;
+          },
+          match: { id: session.id }
+        });
       }
     }
   } catch (error) {
@@ -607,50 +850,36 @@ export async function getTrialSession(id: string): Promise<TrialSession | null> 
   }
 }
 
-// Create trial session
+// Create trial session (uses API route to bypass RLS)
 export async function createTrialSession(
   data: Omit<TrialSession, 'id' | 'createdAt'>
 ): Promise<string> {
   try {
-    const supabase = getClient();
+    const response = await fetch('/api/admin/trial-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bookingId: data.bookingId,
+        studentName: data.studentName,
+        subjectId: data.subjectId,
+        scheduledDate: data.scheduledDate.toISOString().split('T')[0],
+        startTime: data.startTime,
+        endTime: data.endTime,
+        teacherId: data.teacherId,
+        branchId: data.branchId,
+        roomId: data.roomId,
+        roomName: data.roomName,
+        status: data.status || 'scheduled',
+      }),
+    });
 
-    const sessionData = {
-      booking_id: data.bookingId,
-      student_name: data.studentName,
-      subject_id: data.subjectId,
-      scheduled_date: data.scheduledDate.toISOString().split('T')[0],
-      start_time: data.startTime,
-      end_time: data.endTime,
-      teacher_id: data.teacherId,
-      branch_id: data.branchId,
-      room_id: data.roomId,
-      room_name: data.roomName,
-      status: data.status || 'scheduled',
-      attended: data.attended,
-      feedback: data.feedback,
-      teacher_note: data.teacherNote,
-      interested_level: data.interestedLevel,
-      converted: data.converted,
-      converted_to_class_id: data.convertedToClassId,
-      conversion_note: data.conversionNote,
-      completed_at: data.completedAt?.toISOString(),
-    };
+    const result = await response.json();
 
-    const { data: session, error } = await supabase
-      .from('trial_sessions')
-      .insert(sessionData)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Update booking status to scheduled if needed
-    const booking = await getTrialBooking(data.bookingId);
-    if (booking && booking.status === 'new') {
-      await updateBookingStatus(data.bookingId, 'scheduled');
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to create trial session');
     }
 
-    return session.id;
+    return result.id;
   } catch (error) {
     console.error('Error creating trial session:', error);
     throw error;
@@ -663,8 +892,6 @@ export async function updateTrialSession(
   data: Partial<TrialSession>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
 
     if (data.studentName !== undefined) updateData.student_name = data.studentName;
@@ -690,15 +917,15 @@ export async function updateTrialSession(
       updateData.completed_at = new Date().toISOString();
     }
 
-    const { error } = await supabase
-      .from('trial_sessions')
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'trial_sessions',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
 
     // Auto-update booking status based on all sessions
-    if (data.status === 'attended' || data.status === 'absent' || data.status === 'cancelled') {
+    if (data.status === 'attended' || data.status === 'absent' || data.status === 'cancelled' || data.converted === true) {
       const session = await getTrialSession(id);
       if (session) {
         await checkAndUpdateBookingStatus(session.bookingId);
@@ -762,14 +989,11 @@ export async function cancelTrialSession(id: string, reason?: string): Promise<v
 // Delete trial session
 export async function deleteTrialSession(id: string): Promise<void> {
   try {
-    const supabase = getClient();
-
-    const { error } = await supabase
-      .from('trial_sessions')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'trial_sessions',
+      operation: 'delete',
+      match: { id }
+    });
   } catch (error) {
     console.error('Error deleting trial session:', error);
     throw error;
@@ -792,8 +1016,6 @@ export async function rescheduleTrialSession(
   rescheduledBy: string = 'admin'
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     // Get current session data
     const currentSession = await getTrialSession(sessionId);
     if (!currentSession) {
@@ -811,11 +1033,11 @@ export async function rescheduleTrialSession(
       rescheduled_by: rescheduledBy,
     };
 
-    const { error: historyError } = await supabase
-      .from('trial_reschedule_history')
-      .insert(historyEntry);
-
-    if (historyError) throw historyError;
+    await adminMutation({
+      table: 'trial_reschedule_history',
+      operation: 'insert',
+      data: historyEntry
+    });
 
     // Update the session
     const updateData: any = {
@@ -833,12 +1055,12 @@ export async function rescheduleTrialSession(
       interested_level: null,
     };
 
-    const { error: updateError } = await supabase
-      .from('trial_sessions')
-      .update(updateData)
-      .eq('id', sessionId);
-
-    if (updateError) throw updateError;
+    await adminMutation({
+      table: 'trial_sessions',
+      operation: 'update',
+      data: updateData,
+      match: { id: sessionId }
+    });
 
     // Also update booking status back to scheduled if needed
     const booking = await getTrialBooking(currentSession.bookingId);
@@ -1043,6 +1265,7 @@ export async function convertTrialToEnrollment(
       pricing: conversionData.pricing,
       payment: {
         method: 'cash',
+        type: 'full',
         status: 'pending',
         paidAmount: 0,
       },

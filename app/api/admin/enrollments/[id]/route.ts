@@ -36,8 +36,21 @@ export async function DELETE(
 
     if (deleteError) throw deleteError
 
-    // Note: enrolled_count is updated automatically by database trigger on enrollments table
-    // Do NOT manually decrement here to avoid double-counting
+    // Decrement enrolled_count on the class if enrollment was active
+    if (enrollment.status === 'active') {
+      const { data: classData } = await supabase
+        .from('classes')
+        .select('id, enrolled_count')
+        .eq('id', enrollment.class_id)
+        .single()
+
+      if (classData) {
+        await supabase
+          .from('classes')
+          .update({ enrolled_count: Math.max(0, (classData.enrolled_count || 0) - 1) })
+          .eq('id', enrollment.class_id)
+      }
+    }
 
     console.log('Enrollment deleted successfully:', id)
 

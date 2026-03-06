@@ -41,6 +41,7 @@ import {
   ChevronLeft,
   Edit3
 } from 'lucide-react'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { SectionLoading } from '@/components/ui/loading'
 import { toast } from 'sonner'
 import { Branch, Subject } from '@/types/models'
@@ -913,19 +914,17 @@ export default function TrialBookingPage() {
                           <Cake className="inline h-4 w-4 mr-1" />
                           วันเกิด
                         </Label>
-                        <Input
-                          id={`students.${idx}.birthdate`}
-                          data-field={`students.${idx}.birthdate`}
-                          type="date"
+                        <DateRangePicker
+                          mode="single"
                           value={student.birthdate}
-                          onChange={(e) => {
-                            updateStudent(idx, 'birthdate', e.target.value)
+                          onChange={(date) => {
+                            updateStudent(idx, 'birthdate', date || '')
                             if (fieldErrors[`students.${idx}.birthdate`]) {
                               setFieldErrors(prev => { const n = {...prev}; delete n[`students.${idx}.birthdate`]; return n })
                             }
                           }}
-                          max={new Date().toISOString().split('T')[0]}
-                          className={fieldErrors[`students.${idx}.birthdate`] ? 'border-red-500' : ''}
+                          maxDate={new Date()}
+                          placeholder="เลือกวันที่"
                         />
                         {student.birthdate && !fieldErrors[`students.${idx}.birthdate`] && (
                           <p className="text-xs text-gray-500 mt-1">

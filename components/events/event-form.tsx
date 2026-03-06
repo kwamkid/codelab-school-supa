@@ -8,16 +8,11 @@ import { createEvent, updateEvent, createEventSchedule, updateEventSchedule, del
 import { getActiveBranches } from '@/lib/services/branches';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimePicker } from '@/components/ui/time-range-picker';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormSelect } from '@/components/ui/form-select';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -46,6 +41,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate, formatTime } from '@/lib/utils';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 interface EventFormProps {
   event?: Event;
@@ -405,21 +401,17 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
               
               <div className="space-y-2">
                 <Label htmlFor="eventType">ประเภท Event *</Label>
-                <Select
+                <FormSelect
                   value={formData.eventType}
                   onValueChange={(value) => setFormData({ ...formData, eventType: value as Event['eventType'] })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open-house">Open House</SelectItem>
-                    <SelectItem value="parent-meeting">Parent Meeting</SelectItem>
-                    <SelectItem value="showcase">Showcase</SelectItem>
-                    <SelectItem value="workshop">Workshop</SelectItem>
-                    <SelectItem value="other">อื่นๆ</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: 'open-house', label: 'Open House' },
+                    { value: 'parent-meeting', label: 'Parent Meeting' },
+                    { value: 'showcase', label: 'Showcase' },
+                    { value: 'workshop', label: 'Workshop' },
+                    { value: 'other', label: 'อื่นๆ' },
+                  ]}
+                />
               </div>
             </div>
 
@@ -607,42 +599,36 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="registrationStartDate">วันเปิดรับลงทะเบียน *</Label>
-                <Input
-                  id="registrationStartDate"
-                  type="date"
+                <DateRangePicker
+                  mode="single"
                   value={formData.registrationStartDate}
-                  onChange={(e) => setFormData({ ...formData, registrationStartDate: e.target.value })}
-                  required
+                  onChange={(date) => setFormData({ ...formData, registrationStartDate: date || '' })}
+                  placeholder="เลือกวันที่"
                 />
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="registrationEndDate">วันปิดรับลงทะเบียน *</Label>
-                <Input
-                  id="registrationEndDate"
-                  type="date"
+                <DateRangePicker
+                  mode="single"
                   value={formData.registrationEndDate}
-                  onChange={(e) => setFormData({ ...formData, registrationEndDate: e.target.value })}
-                  required
+                  onChange={(date) => setFormData({ ...formData, registrationEndDate: date || '' })}
+                  placeholder="เลือกวันที่"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="countingMethod">วิธีนับจำนวน *</Label>
-              <Select
+              <FormSelect
                 value={formData.countingMethod}
                 onValueChange={(value) => setFormData({ ...formData, countingMethod: value as Event['countingMethod'] })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="registrations">นับจำนวนการลงทะเบียน</SelectItem>
-                  <SelectItem value="students">นับจำนวนนักเรียน</SelectItem>
-                  <SelectItem value="parents">นับจำนวนผู้ปกครอง</SelectItem>
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: 'registrations', label: 'นับจำนวนการลงทะเบียน' },
+                  { value: 'students', label: 'นับจำนวนนักเรียน' },
+                  { value: 'parents', label: 'นับจำนวนผู้ปกครอง' },
+                ]}
+              />
               <p className="text-xs text-gray-500">
                 {formData.countingMethod === 'registrations' && 'นับทุกการลงทะเบียนเป็น 1'}
                 {formData.countingMethod === 'students' && 'นับจำนวนนักเรียนที่ลงทะเบียน'}
@@ -675,28 +661,25 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                   {schedules.map((schedule) => (
                     <TableRow key={schedule.tempId}>
                       <TableCell>
-                        <Input
-                          type="date"
+                        <DateRangePicker
+                          mode="single"
                           value={schedule.date}
-                          onChange={(e) => handleUpdateSchedule(schedule.tempId, 'date', e.target.value)}
-                          min={new Date().toISOString().split('T')[0]}
-                          className="h-9"
+                          onChange={(date) => handleUpdateSchedule(schedule.tempId, 'date', date || '')}
+                          minDate={new Date()}
+                          placeholder="เลือกวันที่"
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="time"
+                        <TimePicker
                           value={schedule.startTime}
-                          onChange={(e) => handleUpdateSchedule(schedule.tempId, 'startTime', e.target.value)}
-                          className="h-9"
+                          onChange={(v) => handleUpdateSchedule(schedule.tempId, 'startTime', v)}
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="time"
+                        <TimePicker
                           value={schedule.endTime}
-                          onChange={(e) => handleUpdateSchedule(schedule.tempId, 'endTime', e.target.value)}
-                          className="h-9"
+                          onChange={(v) => handleUpdateSchedule(schedule.tempId, 'endTime', v)}
+                          min={schedule.startTime}
                         />
                       </TableCell>
                       <TableCell>
@@ -895,11 +878,9 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                 
                 <div className="space-y-2">
                   <Label htmlFor="reminderTime">เวลาที่ส่ง</Label>
-                  <Input
-                    id="reminderTime"
-                    type="time"
+                  <TimePicker
                     value={formData.reminderTime}
-                    onChange={(e) => setFormData({ ...formData, reminderTime: e.target.value })}
+                    onChange={(v) => setFormData({ ...formData, reminderTime: v })}
                   />
                 </div>
               </div>
@@ -915,24 +896,18 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
           <CardContent>
             <div className="space-y-2">
               <Label htmlFor="status">สถานะ Event</Label>
-              <Select
+              <FormSelect
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value as Event['status'] })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">ร่าง</SelectItem>
-                  <SelectItem value="published">เผยแพร่</SelectItem>
-                  {isEdit && (
-                    <>
-                      <SelectItem value="completed">จบแล้ว</SelectItem>
-                      <SelectItem value="cancelled">ยกเลิก</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: 'draft', label: 'ร่าง' },
+                  { value: 'published', label: 'เผยแพร่' },
+                  ...(isEdit ? [
+                    { value: 'completed', label: 'จบแล้ว' },
+                    { value: 'cancelled', label: 'ยกเลิก' },
+                  ] : []),
+                ]}
+              />
               <p className="text-xs text-gray-500">
                 {formData.status === 'draft' && 'Event จะยังไม่แสดงให้ผู้ใช้เห็น'}
                 {formData.status === 'published' && 'Event จะแสดงและเปิดรับลงทะเบียน'}

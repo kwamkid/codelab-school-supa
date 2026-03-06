@@ -10,13 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormSelect } from '@/components/ui/form-select';
 import { toast } from 'sonner';
 import { Loader2, Save, X } from 'lucide-react';
 import Link from 'next/link';
@@ -180,40 +174,20 @@ export default function SubjectForm({ subject, isEdit = false }: SubjectFormProp
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="category">หมวดหมู่ *</Label>
-                  <Select
+                  <FormSelect
                     value={formData.category}
                     onValueChange={(value) => setFormData({ ...formData, category: value as Subject['category'] })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={CATEGORIES}
+                  />
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="level">ระดับความยาก *</Label>
-                  <Select
+                  <FormSelect
                     value={formData.level}
                     onValueChange={(value) => setFormData({ ...formData, level: value as Subject['level'] })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LEVELS.map((lvl) => (
-                        <SelectItem key={lvl.value} value={lvl.value}>
-                          {lvl.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={LEVELS}
+                  />
                 </div>
               </div>
 

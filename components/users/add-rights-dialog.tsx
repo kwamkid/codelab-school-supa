@@ -23,13 +23,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Info } from 'lucide-react';
@@ -197,18 +191,15 @@ export default function AddRightsDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>บทบาท</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="super_admin">Super Admin</SelectItem>
-                      <SelectItem value="branch_admin">Branch Admin</SelectItem>
-                      <SelectItem value="teacher">Teacher</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormSelect
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={[
+                      { value: 'super_admin', label: 'Super Admin' },
+                      { value: 'branch_admin', label: 'Branch Admin' },
+                      { value: 'teacher', label: 'Teacher' },
+                    ]}
+                  />
                   <FormMessage />
                 </FormItem>
               )}

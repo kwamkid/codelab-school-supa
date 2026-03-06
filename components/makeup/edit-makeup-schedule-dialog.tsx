@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { Label } from "@/components/ui/label";
 import { Calendar, Clock, User, MapPin, Save, X, AlertCircle, CalendarDays, AlertTriangle, CheckCircle2, Users } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
@@ -31,6 +32,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { useBranch } from '@/contexts/BranchContext';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 interface EditMakeupScheduleDialogProps {
   open: boolean;
@@ -282,35 +284,24 @@ export default function EditMakeupScheduleDialog({
             {/* Date */}
             <div className="space-y-2">
               <Label htmlFor="date">วันที่นัดใหม่ *</Label>
-              <Input
-                id="date"
-                type="date"
+              <DateRangePicker
+                mode="single"
                 value={formData.date}
-                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                min={new Date().toISOString().split('T')[0]}
+                onChange={(date) => setFormData(prev => ({ ...prev, date: date || '' }))}
+                minDate={new Date()}
+                placeholder="เลือกวันที่"
               />
             </div>
 
             {/* Time */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startTime">เวลาเริ่ม *</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="endTime">เวลาจบ *</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>เวลา *</Label>
+              <TimeRangePicker
+                startTime={formData.startTime}
+                endTime={formData.endTime}
+                onStartTimeChange={(v) => setFormData(prev => ({ ...prev, startTime: v }))}
+                onEndTimeChange={(v) => setFormData(prev => ({ ...prev, endTime: v }))}
+              />
             </div>
 
             {/* Teacher */}

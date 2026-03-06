@@ -8,7 +8,6 @@ import {
   getEnrollmentStats,
   getEnrollments,
   deleteEnrollment,
-  updateEnrollment,
   cancelEnrollment,
   PaginatedEnrollments,
   EnrollmentStats
@@ -31,7 +30,6 @@ import {
   Trash2,
   MoreVertical,
   CreditCard,
-  CheckCircle,
   Loader2,
   Printer,
 } from 'lucide-react';
@@ -185,14 +183,7 @@ export default function EnrollmentsPage() {
   
   // Other states
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
-  const [paymentUpdating, setPaymentUpdating] = useState(false);
-  const [quickPayment, setQuickPayment] = useState({
-    status: 'pending' as 'pending' | 'partial' | 'paid',
-    paidAmount: 0,
-    receiptNumber: ''
-  });
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
@@ -417,41 +408,6 @@ export default function EnrollmentsPage() {
     }
   };
 
-  const handleQuickPaymentUpdate = async () => {
-    if (!selectedEnrollment) return;
-    
-    setPaymentUpdating(true);
-    try {
-      const updateData: Partial<Enrollment> = {
-        payment: {
-          ...selectedEnrollment.payment,
-          status: quickPayment.status,
-          paidAmount: quickPayment.paidAmount,
-          method: selectedEnrollment.payment.method
-        }
-      };
-
-      if (quickPayment.receiptNumber) {
-        updateData.payment!.receiptNumber = quickPayment.receiptNumber;
-      }
-
-      if (quickPayment.status === 'paid' && selectedEnrollment.payment.status !== 'paid') {
-        updateData.payment!.paidDate = new Date();
-      }
-
-      await updateEnrollment(selectedEnrollment.id, updateData);
-      toast.success('อัพเดทการชำระเงินเรียบร้อยแล้ว');
-      setShowPaymentDialog(false);
-      queryClient.invalidateQueries({ queryKey: ['enrollments-paginated'] });
-      queryClient.invalidateQueries({ queryKey: ['enrollments-all'] });
-      queryClient.invalidateQueries({ queryKey: ['enrollment-stats'] });
-    } catch (error) {
-      console.error('Error updating payment:', error);
-      toast.error('ไม่สามารถอัพเดทการชำระเงินได้');
-    } finally {
-      setPaymentUpdating(false);
-    }
-  };
 
   const handleCancelEnrollment = async () => {
     if (!selectedEnrollment || !cancelReason.trim()) {
@@ -773,9 +729,14 @@ export default function EnrollmentsPage() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div>
-                              <Badge className={statusColors[enrollment.status]}>
-                                {statusLabels[enrollment.status]}
-                              </Badge>
+                              {(() => {
+                                const isUpcoming = enrollment.status === 'active' && classInfo?.startDate && new Date(classInfo.startDate) > new Date();
+                                return (
+                                  <Badge className={isUpcoming ? 'bg-yellow-100 text-yellow-700' : statusColors[enrollment.status]}>
+                                    {isUpcoming ? 'รอเริ่มเรียน' : statusLabels[enrollment.status]}
+                                  </Badge>
+                                );
+                              })()}
                               {enrollment.status === 'dropped' && enrollment.droppedReason && (
                                 <p className="text-xs text-red-500 mt-1">
                                   {enrollment.droppedReason}
@@ -810,21 +771,12 @@ export default function EnrollmentsPage() {
                                 
                                 <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
                                   {enrollment.payment.status !== 'paid' && (
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        setSelectedEnrollment(enrollment);
-                                        setQuickPayment({
-                                          status: enrollment.payment.status,
-                                          paidAmount: enrollment.payment.paidAmount,
-                                          receiptNumber: enrollment.payment.receiptNumber || ''
-                                        });
-                                        setShowPaymentDialog(true);
-                                      }}
-                                      className="text-green-600"
-                                    >
-                                      <CreditCard className="h-4 w-4 mr-2" />
-                                      อัพเดทการชำระ
-                                    </DropdownMenuItem>
+                                    <Link href={`/enrollments/${enrollment.id}`}>
+                                      <DropdownMenuItem className="text-green-600">
+                                        <CreditCard className="h-4 w-4 mr-2" />
+                                        ชำระเพิ่ม
+                                      </DropdownMenuItem>
+                                    </Link>
                                   )}
                                   
                                   <Link href={`/enrollments/${enrollment.id}/edit`}>
@@ -919,112 +871,6 @@ export default function EnrollmentsPage() {
         </CardContent>
       </Card>
 
-      {/* Payment Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>อัพเดทการชำระเงิน</DialogTitle>
-            <DialogDescription>
-              อัพเดทสถานะการชำระเงินสำหรับ {selectedEnrollment && getStudentInfo(selectedEnrollment.studentId)?.nickname}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label>สถานะการชำระ</Label>
-              <Select 
-                value={quickPayment.status}
-                onValueChange={(value: 'pending' | 'partial' | 'paid') => 
-                  setQuickPayment(prev => ({ ...prev, status: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">รอชำระ</SelectItem>
-                  <SelectItem value="partial">ชำระบางส่วน</SelectItem>
-                  <SelectItem value="paid">ชำระแล้ว</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label>ยอดที่ชำระแล้ว</Label>
-              <Input
-                type="number"
-                value={quickPayment.paidAmount || ''}
-                onChange={(e) => setQuickPayment(prev => ({ 
-                  ...prev, 
-                  paidAmount: parseFloat(e.target.value) || 0 
-                }))}
-                placeholder="0"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                ยอดที่ต้องชำระทั้งหมด: {formatCurrency(selectedEnrollment?.pricing.finalPrice || 0)}
-              </p>
-            </div>
-            
-            <div>
-              <Label>เลขที่ใบเสร็จ (ถ้ามี)</Label>
-              <Input
-                value={quickPayment.receiptNumber}
-                onChange={(e) => setQuickPayment(prev => ({ 
-                  ...prev, 
-                  receiptNumber: e.target.value 
-                }))}
-                placeholder="RC2025-001"
-              />
-            </div>
-            
-            {quickPayment.paidAmount > 0 && selectedEnrollment && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>ยอดที่ต้องชำระ:</span>
-                    <span>{formatCurrency(selectedEnrollment.pricing.finalPrice)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>ชำระแล้ว:</span>
-                    <span className="text-green-600">{formatCurrency(quickPayment.paidAmount)}</span>
-                  </div>
-                  {quickPayment.paidAmount < selectedEnrollment.pricing.finalPrice && (
-                    <div className="flex justify-between font-medium pt-2 border-t">
-                      <span>คงเหลือ:</span>
-                      <span className="text-red-600">
-                        {formatCurrency(selectedEnrollment.pricing.finalPrice - quickPayment.paidAmount)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
-              ยกเลิก
-            </Button>
-            <Button 
-              onClick={handleQuickPaymentUpdate}
-              disabled={paymentUpdating || quickPayment.paidAmount < 0}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {paymentUpdating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  กำลังบันทึก...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  บันทึก
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Cancel Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>

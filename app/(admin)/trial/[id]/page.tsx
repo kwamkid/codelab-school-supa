@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   Popover,
   PopoverContent,
@@ -54,15 +55,17 @@ import {
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
 import { TrialBooking, TrialSession, Subject, Teacher, Branch, Room } from '@/types/models';
-import { 
-  getTrialBooking, 
+import {
+  getTrialBooking,
   getTrialSessionsByBooking,
   updateBookingStatus,
   updateTrialSession,
   cancelTrialSession,
   updateTrialBooking,
   updateBookingBranch,
-  cancelTrialBooking
+  cancelTrialBooking,
+  deduplicateBookingStudents,
+  deleteBookingStudent
 } from '@/lib/services/trial-bookings';
 import { getSubjects } from '@/lib/services/subjects';
 import { getTeachers } from '@/lib/services/teachers';
@@ -75,6 +78,7 @@ import ConvertToStudentDialog from '@/components/trial/convert-to-student-dialog
 import RescheduleTrialDialog from '@/components/trial/reschedule-trial-dialog';
 import { CancelBookingDialog } from '@/components/trial/cancel-booking-dialog';
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
+import { SchoolNameCombobox } from '@/components/ui/school-name-combobox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,6 +96,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageLoading } from '@/components/ui/loading';
+import { useAuth } from '@/hooks/useAuth';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,6 +127,8 @@ const sourceConfig = {
 export default function TrialBookingDetailPage({ params }: { params: { id: string } }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { adminUser } = useAuth();
+  const isSuperAdmin = adminUser?.role === 'super_admin';
   const [booking, setBooking] = useState<TrialBooking | null>(null);
   const [sessions, setSessions] = useState<TrialSession[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -147,6 +154,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
   const [selectedStudent, setSelectedStudent] = useState<string>('');
   const [savingSessionId, setSavingSessionId] = useState<string | null>(null);
   const [cancelSessionId, setCancelSessionId] = useState<string | null>(null);
+  const [deleteStudentIndex, setDeleteStudentIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -172,19 +180,22 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
   const loadData = async () => {
     try {
       setLoading(true);
+      // Auto-fix duplicate students from earlier bug
+      await deduplicateBookingStudents(params.id).catch(() => {});
+
       const [bookingData, subjectsData, teachersData, branchesData] = await Promise.all([
         getTrialBooking(params.id),
         getSubjects(),
         getTeachers(),
         getBranches()
       ]);
-      
+
       if (!bookingData) {
         toast.error('ไม่พบข้อมูลการจอง');
         router.push('/trial');
         return;
       }
-      
+
       setBooking(bookingData);
       setSubjects(subjectsData.filter(s => s.isActive));
       setTeachers(teachersData.filter(t => t.isActive));
@@ -292,6 +303,21 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
     } catch (error) {
       console.error('Error updating student:', error);
       toast.error('ไม่สามารถบันทึกข้อมูลได้');
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!booking || deleteStudentIndex === null) return;
+    try {
+      await deleteBookingStudent(params.id, deleteStudentIndex);
+      const updatedStudents = booking.students.filter((_, i) => i !== deleteStudentIndex);
+      setBooking({ ...booking, students: updatedStudents });
+      toast.success('ลบนักเรียนเรียบร้อย');
+    } catch (error: any) {
+      console.error('Error deleting student:', error);
+      toast.error(error?.message || 'ไม่สามารถลบนักเรียนได้');
+    } finally {
+      setDeleteStudentIndex(null);
     }
   };
 
@@ -504,97 +530,111 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                   {booking.students.map((student, idx) => (
                     <div key={idx} className="border rounded-lg p-3 hover:shadow-md transition-shadow">
                       {editingStudent === idx ? (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           <Input
                             placeholder="ชื่อ-นามสกุล"
                             value={tempStudentData.name}
                             onChange={(e) => setTempStudentData(prev => ({ ...prev, name: e.target.value }))}
-                            className="h-8 text-sm"
+                            className="text-base"
                           />
                           <div>
-                            <Input
-                              type="date"
-                              placeholder="วันเกิด"
+                            <DateRangePicker
+                              mode="single"
                               value={tempStudentData.birthdate}
-                              onChange={(e) => setTempStudentData(prev => ({ ...prev, birthdate: e.target.value }))}
-                              max={new Date().toISOString().split('T')[0]}
-                              className="h-8 text-sm"
+                              onChange={(date) => setTempStudentData(prev => ({ ...prev, birthdate: date || '' }))}
+                              maxDate={new Date()}
+                              placeholder="เลือกวันที่"
                             />
                             {tempStudentData.birthdate && (
-                              <p className="text-xs text-gray-500 mt-1">
+                              <p className="text-sm text-gray-500 mt-1">
                                 อายุ: {calculateAge(new Date(tempStudentData.birthdate))} ปี
                               </p>
                             )}
                           </div>
-                          <Input
+                          <SchoolNameCombobox
                             placeholder="โรงเรียน"
                             value={tempStudentData.schoolName}
-                            onChange={(e) => setTempStudentData(prev => ({ ...prev, schoolName: e.target.value }))}
-                            className="h-8 text-sm"
+                            onChange={(value) => setTempStudentData(prev => ({ ...prev, schoolName: value }))}
+                            className="text-base"
                           />
                           <GradeLevelCombobox
                             value={tempStudentData.gradeLevel}
                             onChange={(value) => setTempStudentData(prev => ({ ...prev, gradeLevel: value }))}
                             placeholder="ระดับชั้น..."
+                            className="text-base"
                           />
-                          <div className="flex gap-1">
-                            <Button size="sm" onClick={handleStudentSave} className="text-xs h-7">บันทึก</Button>
-                            <Button size="sm" variant="outline" onClick={() => setEditingStudent(null)} className="text-xs h-7">ยกเลิก</Button>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleStudentSave} className="text-base">บันทึก</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditingStudent(null)} className="text-base">ยกเลิก</Button>
                           </div>
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-sm">{student.name}</h4>
-                              <div className="space-y-0.5 mt-1">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 space-y-1">
+                              {/* Row 1: Name + Birthday */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-base">{student.name}</span>
                                 {student.birthdate && (
-                                  <p className="text-xs text-gray-600 flex items-center gap-1">
-                                    <Baby className="h-3 w-3" />
-                                    {formatDate(student.birthdate)} (อายุ {calculateAge(student.birthdate)} ปี)
-                                  </p>
-                                )}
-                                {student.schoolName && (
-                                  <p className="text-xs text-gray-600 flex items-center gap-1">
-                                    <School className="h-3 w-3" />
-                                    {student.schoolName}
-                                  </p>
-                                )}
-                                {student.gradeLevel && (
-                                  <p className="text-xs text-gray-600">
-                                    ระดับชั้น: {student.gradeLevel}
-                                  </p>
+                                  <span className="text-base text-gray-500">
+                                    ({calculateAge(student.birthdate)} ปี)
+                                  </span>
                                 )}
                               </div>
+                              {/* Row 2: School + Grade */}
+                              {(student.schoolName || student.gradeLevel) && (
+                                <div className="flex items-center gap-2 text-base text-gray-600">
+                                  {student.schoolName && (
+                                    <span className="flex items-center gap-1">
+                                      <School className="h-4 w-4" />
+                                      {student.schoolName}
+                                    </span>
+                                  )}
+                                  {student.gradeLevel && (
+                                    <span>{student.gradeLevel}</span>
+                                  )}
+                                </div>
+                              )}
+                              {/* Row 3: Subject interests */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-base text-gray-500">วิชาที่สนใจ:</span>
+                                {student.subjectInterests.map(subjectId => {
+                                  const subject = subjects.find(s => s.id === subjectId);
+                                  return subject ? (
+                                    <Badge
+                                      key={subjectId}
+                                      className="text-sm h-6 px-2"
+                                      style={{
+                                        backgroundColor: `${subject.color}20`,
+                                        color: subject.color,
+                                        borderColor: subject.color
+                                      }}
+                                    >
+                                      {subject.name}
+                                    </Badge>
+                                  ) : null;
+                                })}
+                              </div>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleStudentEdit(idx)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-xs text-gray-500">วิชาที่สนใจ:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {student.subjectInterests.map(subjectId => {
-                                const subject = subjects.find(s => s.id === subjectId);
-                                return subject ? (
-                                  <Badge 
-                                    key={subjectId} 
-                                    className="text-xs h-5 px-1.5"
-                                    style={{ 
-                                      backgroundColor: `${subject.color}20`,
-                                      color: subject.color,
-                                      borderColor: subject.color
-                                    }}
-                                  >
-                                    {subject.name}
-                                  </Badge>
-                                ) : null;
-                              })}
+                            <div className="flex items-center gap-0.5">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => handleStudentEdit(idx)}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              {isSuperAdmin && booking.students.length > 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => setDeleteStudentIndex(idx)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </>
@@ -647,17 +687,17 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                   )}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
+                <div>
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>นักเรียน</TableHead>
-                        <TableHead>วิชา</TableHead>
-                        <TableHead>วันที่และเวลา</TableHead>
-                        <TableHead>สาขา/ครู/ห้อง</TableHead>
-                        <TableHead className="text-center">การเข้าเรียน</TableHead>
-                        <TableHead>ประวัติ</TableHead>
-                        <TableHead className="text-right">จัดการ</TableHead>
+                        <TableHead className="w-[14%]">นักเรียน</TableHead>
+                        <TableHead className="w-[10%]">วิชา</TableHead>
+                        <TableHead className="w-[18%]">วันที่และเวลา</TableHead>
+                        <TableHead className="w-[20%]">สาขา/ครู/ห้อง</TableHead>
+                        <TableHead className="w-[14%] text-center">การเข้าเรียน</TableHead>
+                        <TableHead className="w-[14%]">ประวัติ</TableHead>
+                        <TableHead className="w-[10%] text-right">จัดการ</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -671,13 +711,15 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                         return (
                           <TableRow key={session.id} className={session.status === 'cancelled' ? 'opacity-60' : ''}>
                             <TableCell>
-                              <div className="font-medium">{session.studentName}</div>
-                              {session.converted && (
-                                <Badge className="mt-1 bg-emerald-100 text-emerald-700" variant="outline">
-                                  <UserPlus className="h-3 w-3 mr-1" />
-                                  ลงทะเบียนแล้ว
-                                </Badge>
-                              )}
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{session.studentName}</div>
+                                {session.converted && (
+                                  <Badge className="mt-1 bg-emerald-100 text-emerald-700" variant="outline">
+                                    <UserPlus className="h-3 w-3 mr-1" />
+                                    ลงทะเบียนแล้ว
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Badge style={{ backgroundColor: subject?.color || '#EF4444' }}>
@@ -688,17 +730,17 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                               <div>
                                 <div className="font-medium">{formatDate(session.scheduledDate)}</div>
                                 <div className="text-sm text-gray-600">
-                                  {session.startTime} - {session.endTime}
+                                  {session.startTime?.slice(0, 5)} - {session.endTime?.slice(0, 5)}
                                 </div>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div>
-                                <div className="font-medium">{branch?.name}</div>
-                                <div className="text-sm text-gray-600">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{branch?.name}</div>
+                                <div className="text-sm text-gray-600 truncate">
                                   ครู{teacher?.nickname || teacher?.name}
                                 </div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-gray-600 truncate" title={`ห้อง ${session.roomName || room?.name || session.roomId}`}>
                                   ห้อง {session.roomName || room?.name || session.roomId}
                                 </div>
                               </div>
@@ -890,9 +932,6 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56 z-50">
-                                  <DropdownMenuLabel>จัดการ</DropdownMenuLabel>
-                                  <DropdownMenuSeparator />
-                                  
                                   {session.converted ? (
                                     <DropdownMenuItem disabled className="text-gray-400">
                                       <CheckCircle className="h-4 w-4 mr-2" />
@@ -932,15 +971,14 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                                       )}
                                       
                                       {!session.converted && (
-                                        <DropdownMenuItem 
+                                        <DropdownMenuItem
                                           onSelect={() => {
-                                            setSelectedSession(session);
-                                            setConvertModalOpen(true);
+                                            router.push(`/enrollments/new?from=trial&bookingId=${booking.id}&sessionId=${session.id}`);
                                           }}
                                           className="text-green-600 focus:text-green-600"
                                         >
                                           <UserPlus className="h-4 w-4 mr-2" />
-                                          แปลงเป็นนักเรียน
+                                          ลงทะเบียนเรียน
                                         </DropdownMenuItem>
                                       )}
                                       
@@ -1218,6 +1256,27 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
               }}
             >
               ยืนยันยกเลิก
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Student Confirmation */}
+      <AlertDialog open={deleteStudentIndex !== null} onOpenChange={(open) => !open && setDeleteStudentIndex(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบนักเรียน</AlertDialogTitle>
+            <AlertDialogDescription>
+              ต้องการลบ &quot;{deleteStudentIndex !== null ? booking?.students[deleteStudentIndex]?.name : ''}&quot; ออกจากการจองนี้หรือไม่? การลบไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600"
+              onClick={handleDeleteStudent}
+            >
+              ยืนยันลบ
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

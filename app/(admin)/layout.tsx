@@ -42,6 +42,9 @@ import {
   BarChart3,
   Key,
   User as UserIcon,
+  FileText,
+  Receipt,
+  CreditCard,
   LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -407,13 +410,6 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       iconColor: 'text-cyan-500',
       subItems: [
         {
-          name: 'สาขา',
-          href: '/branches',
-          icon: Building2,
-          iconColor: 'text-teal-500',
-          requiredRole: ['super_admin']
-        },
-        {
           name: 'ห้องเรียน',
           href: '/rooms',
           icon: School,
@@ -550,11 +546,40 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       ]
     },
     {
+      name: 'บัญชี',
+      icon: FileText,
+      iconColor: 'text-emerald-600',
+      requiredRole: ['super_admin', 'branch_admin'],
+      subItems: [
+        {
+          name: 'ใบเสร็จ',
+          href: '/accounting/invoices',
+          icon: Receipt,
+          iconColor: 'text-emerald-500'
+        },
+        {
+          name: 'ใบลดหนี้',
+          href: '/accounting/credit-notes',
+          icon: CreditCard,
+          iconColor: 'text-red-500'
+        },
+      ]
+    },
+    {
       name: 'ตั้งค่า',
-      href: '/settings',
       icon: Settings,
       iconColor: 'text-gray-600',
-      requiredPermission: 'canManageSettings'
+      requiredPermission: 'canManageSettings',
+      subItems: [
+        { name: 'สาขา', href: '/settings/branches' },
+        { name: 'ทั่วไป', href: '/settings/general' },
+        { name: 'ลาและชดเชย', href: '/settings/makeup' },
+        { name: 'การชำระเงิน', href: '/settings/payment' },
+        { name: 'บริษัท (ออกบิล)', href: '/settings/invoice-company' },
+        { name: 'LINE', href: '/settings/line' },
+        { name: 'Facebook Ads', href: '/settings/facebook' },
+        { name: 'Backup', href: '/settings/backup' },
+      ]
     },
   ], [pendingMakeupCount, newTrialCount]); // dependencies สำหรับ badges
 

@@ -2,6 +2,7 @@
 // Client-side Facebook Ads settings service (uses getClient())
 
 import { getClient } from '@/lib/supabase/client'
+import { adminMutation } from '@/lib/admin-mutation'
 
 const SETTINGS_KEY = 'facebook_ads'
 
@@ -83,23 +84,21 @@ export async function updateFacebookAdsSettings(
   userId: string
 ): Promise<void> {
   try {
-    const supabase = getClient()
-
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { updatedAt, updatedBy, ...settingsData } = settings
 
-    const { error } = await supabase.from('settings').upsert(
-      {
+    await adminMutation({
+      table: 'settings',
+      operation: 'upsert',
+      data: {
         key: SETTINGS_KEY,
         value: settingsData,
         description: 'Facebook Ads Integration (CAPI + Custom Audiences)',
         updated_by: userId,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'key' }
-    )
-
-    if (error) throw error
+      options: { onConflict: 'key' }
+    })
   } catch (error) {
     console.error('Error updating Facebook Ads settings:', error)
     throw error

@@ -1,6 +1,7 @@
 // lib/services/admin-users.ts
 import { AdminUser } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 // Type for database row
 interface AdminUserRow {
@@ -209,8 +210,6 @@ export async function updateAdminUser(
   updatedBy: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {
       updated_at: new Date().toISOString(),
       updated_by: updatedBy,
@@ -237,12 +236,7 @@ export async function updateAdminUser(
       }
     }
 
-    const { error } = await supabase
-      .from('admin_users')
-      .update(updateData)
-      .eq('id', userId);
-
-    if (error) throw error;
+    await adminMutation({ table: 'admin_users', operation: 'update', data: updateData, match: { id: userId } });
   } catch (error) {
     console.error('Error updating admin user:', error);
     throw error;
@@ -303,11 +297,10 @@ export async function createAdminUserSimple(
   createdBy: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
-    const { error } = await supabase
-      .from('admin_users')
-      .insert({
+    await adminMutation({
+      table: 'admin_users',
+      operation: 'insert',
+      data: {
         id: userId,
         auth_user_id: null,
         email: userData.email.toLowerCase(),
@@ -322,9 +315,8 @@ export async function createAdminUserSimple(
         is_active: userData.isActive,
         created_by: createdBy,
         updated_by: createdBy,
-      });
-
-    if (error) throw error;
+      }
+    });
   } catch (error) {
     console.error('Error creating admin user:', error);
     throw error;
@@ -337,18 +329,16 @@ export async function deleteAdminUser(
   deletedBy: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
-    const { error } = await supabase
-      .from('admin_users')
-      .update({
+    await adminMutation({
+      table: 'admin_users',
+      operation: 'update',
+      data: {
         is_active: false,
         updated_at: new Date().toISOString(),
         updated_by: deletedBy,
-      })
-      .eq('id', userId);
-
-    if (error) throw error;
+      },
+      match: { id: userId }
+    });
   } catch (error) {
     console.error('Error deleting admin user:', error);
     throw error;

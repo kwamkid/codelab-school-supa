@@ -1,6 +1,7 @@
 // lib/services/line-settings.ts
 
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 // Types
 export interface LineSettings {
@@ -114,8 +115,6 @@ export async function updateLineSettings(
   userId: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     // First, get current settings to merge with new values
     const currentSettings = await getLineSettings();
 
@@ -130,40 +129,18 @@ export async function updateLineSettings(
 
     const now = new Date().toISOString();
 
-    // Check if record exists
-    const { data: existing } = await supabase
-      .from('settings')
-      .select('id')
-      .eq('key', SETTINGS_KEY)
-      .single();
-
-    if (existing) {
-      // Update existing record
-      const { error } = await supabase
-        .from('settings')
-        .update({
-          value: valueObject,
-          updated_at: now,
-          updated_by: userId
-        })
-        .eq('key', SETTINGS_KEY);
-
-      if (error) throw error;
-    } else {
-      // Insert new record
-      const { error } = await supabase
-        .from('settings')
-        .insert({
-          key: SETTINGS_KEY,
-          value: valueObject,
-          description: 'LINE Integration Settings',
-          updated_at: now,
-          updated_by: userId
-        });
-
-      if (error) throw error;
-    }
-
+    await adminMutation({
+      table: 'settings',
+      operation: 'upsert',
+      data: {
+        key: SETTINGS_KEY,
+        value: valueObject,
+        description: 'LINE Integration Settings',
+        updated_at: now,
+        updated_by: userId
+      },
+      options: { onConflict: 'key' }
+    });
   } catch (error) {
     console.error('Error updating LINE settings:', error);
     throw error;

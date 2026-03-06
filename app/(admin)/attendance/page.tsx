@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   Select,
   SelectContent,
@@ -469,11 +470,17 @@ export default function AttendancePage() {
             {/* Date Picker */}
             <div>
               <label className="text-sm font-medium mb-2 block">วันที่</label>
-              <input
-                type="date"
+              <DateRangePicker
+                mode="single"
                 value={formatDateForInput(selectedDate)}
-                onChange={handleDateChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent h-9"
+                onChange={(date) => {
+                  if (!date) return;
+                  const [year, month, day] = date.split('-').map(Number);
+                  const newDate = new Date(year, month - 1, day);
+                  newDate.setHours(0, 0, 0, 0);
+                  setSelectedDate(newDate);
+                }}
+                placeholder="เลือกวันที่"
               />
             </div>
             

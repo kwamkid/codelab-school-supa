@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -286,27 +287,25 @@ export default function HolidayDialog({
                 <Label htmlFor="date">
                   {isDateRange ? 'จากวันที่ *' : 'วันที่ *'}
                 </Label>
-                <Input
-                  id="date"
-                  type="date"
+                <DateRangePicker
+                  mode="single"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(date) => setFormData({ ...formData, date: date || '' })}
                   disabled={loading}
-                  required
+                  placeholder="เลือกวันที่"
                 />
               </div>
 
               {isDateRange && (
                 <div className="grid gap-2">
                   <Label htmlFor="endDate">ถึงวันที่ *</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
+                  <DateRangePicker
+                    mode="single"
                     value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    min={formData.date}
+                    onChange={(date) => setFormData({ ...formData, endDate: date || '' })}
+                    minDate={formData.date ? new Date(formData.date) : undefined}
                     disabled={loading}
-                    required={isDateRange}
+                    placeholder="เลือกวันที่"
                   />
                 </div>
               )}

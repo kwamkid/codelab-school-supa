@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { 
   TestTube, 
   ArrowLeft, 
@@ -21,7 +22,6 @@ import {
   User,
   Phone,
   Mail,
-  School,
   GraduationCap,
   AlertCircle,
   Building2,
@@ -33,6 +33,7 @@ import { getSubjects } from '@/lib/services/subjects';
 import { getBranches } from '@/lib/services/branches';
 import { createTrialBooking } from '@/lib/services/trial-bookings';
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
+import { SchoolNameCombobox } from '@/components/ui/school-name-combobox';
 import { useBranch } from '@/contexts/BranchContext';
 import { calculateAge } from '@/lib/utils';
 
@@ -215,16 +216,14 @@ export default function CreateTrialBookingPage() {
           
           return studentData;
         }),
-        status: 'new' as const
+        status: 'contacted' as const,
+        contactedAt: new Date(),
+        contactNote: contactNote.trim() || 'Walk-in - ติดต่อโดยตรง',
       };
-      
+
       // Add optional fields only if they have values
       if (parentEmail.trim()) {
         bookingData.parentEmail = parentEmail.trim();
-      }
-      
-      if (contactNote.trim()) {
-        bookingData.contactNote = contactNote.trim();
       }
       
       const bookingId = await createTrialBooking(bookingData);
@@ -289,21 +288,15 @@ export default function CreateTrialBookingPage() {
                 <Building2 className="inline h-4 w-4 mr-1" />
                 สาขา <span className="text-red-500">*</span>
               </Label>
-              <Select
+              <FormSelect
                 value={selectedBranch}
                 onValueChange={setSelectedBranch}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="เลือกสาขา" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="เลือกสาขา"
+                options={branches.map((branch) => ({
+                  value: branch.id,
+                  label: branch.name,
+                }))}
+              />
             </div>
           </CardContent>
         </Card>
@@ -424,11 +417,12 @@ export default function CreateTrialBookingPage() {
                       <Calendar className="inline h-4 w-4 mr-1" />
                       วันเกิด
                     </Label>
-                    <Input
-                      type="date"
+                    <DateRangePicker
+                      mode="single"
                       value={student.birthdate}
-                      onChange={(e) => updateStudent(idx, 'birthdate', e.target.value)}
-                      max={new Date().toISOString().split('T')[0]}
+                      onChange={(date) => updateStudent(idx, 'birthdate', date || '')}
+                      maxDate={new Date()}
+                      placeholder="เลือกวันที่"
                     />
                     {student.birthdate && (
                       <p className="text-xs text-gray-500">
@@ -439,15 +433,11 @@ export default function CreateTrialBookingPage() {
                   
                   <div className="space-y-2">
                     <Label>โรงเรียน</Label>
-                    <div className="relative">
-                      <School className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        value={student.schoolName}
-                        onChange={(e) => updateStudent(idx, 'schoolName', e.target.value)}
-                        placeholder="ชื่อโรงเรียน"
-                        className="pl-10"
-                      />
-                    </div>
+                    <SchoolNameCombobox
+                      value={student.schoolName}
+                      onChange={(value) => updateStudent(idx, 'schoolName', value)}
+                      placeholder="พิมพ์ชื่อโรงเรียน..."
+                    />
                   </div>
                   
                   <div className="space-y-2">
@@ -475,12 +465,16 @@ export default function CreateTrialBookingPage() {
                           key={subject.id}
                           onClick={() => toggleSubjectInterest(idx, subject.id)}
                           className={`
-                            p-3 rounded-lg border cursor-pointer transition-all
+                            p-3 rounded-lg border-2 cursor-pointer transition-all
                             ${isSelected
-                              ? 'border-green-500 bg-green-50'
-                              : 'border-gray-200 hover:border-gray-300'
+                              ? 'border-green-500 ring-2 ring-green-200'
+                              : 'hover:shadow-md'
                             }
                           `}
+                          style={{
+                            backgroundColor: isSelected ? undefined : `${subject.color}15`,
+                            borderColor: isSelected ? undefined : `${subject.color}40`,
+                          }}
                         >
                           <div className="font-medium text-sm">{subject.name}</div>
                           <div className="text-xs text-gray-500 mt-1">

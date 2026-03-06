@@ -17,13 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormSelect } from '@/components/ui/form-select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -400,53 +394,42 @@ export default function RegistrationList({
         </div>
         
         <div className="flex flex-col md:flex-row gap-4">
-          <Select 
-            value={mode === 'list' ? scheduleFilter : attendanceScheduleFilter} 
+          <FormSelect
+            value={mode === 'list' ? scheduleFilter : attendanceScheduleFilter}
             onValueChange={mode === 'list' ? setScheduleFilter : setAttendanceScheduleFilter}
-          >
-            <SelectTrigger className="w-full md:w-[200px]">
-              <SelectValue placeholder="รอบเวลาทั้งหมด" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">รอบเวลาทั้งหมด</SelectItem>
-              {schedules.map(schedule => (
-                <SelectItem key={schedule.id} value={schedule.id}>
-                  {formatDate(schedule.date, 'short')} {schedule.startTime}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select 
-            value={mode === 'list' ? branchFilter : attendanceBranchFilter} 
+            placeholder="รอบเวลาทั้งหมด"
+            className="w-full md:w-[200px]"
+            options={[
+              { value: 'all', label: 'รอบเวลาทั้งหมด' },
+              ...schedules.map(s => ({ value: s.id, label: `${formatDate(s.date, 'short')} ${s.startTime}` })),
+            ]}
+          />
+
+          <FormSelect
+            value={mode === 'list' ? branchFilter : attendanceBranchFilter}
             onValueChange={mode === 'list' ? setBranchFilter : setAttendanceBranchFilter}
-          >
-            <SelectTrigger className="w-full md:w-[200px]">
-              <SelectValue placeholder="สาขาทั้งหมด" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">สาขาทั้งหมด</SelectItem>
-              {branches.map(branch => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
+            placeholder="สาขาทั้งหมด"
+            className="w-full md:w-[200px]"
+            options={[
+              { value: 'all', label: 'สาขาทั้งหมด' },
+              ...branches.map(b => ({ value: b.id, label: b.name })),
+            ]}
+          />
+
           {mode === 'list' && (
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="สถานะทั้งหมด" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">สถานะทั้งหมด</SelectItem>
-                <SelectItem value="confirmed">ลงทะเบียนแล้ว</SelectItem>
-                <SelectItem value="cancelled">ยกเลิก</SelectItem>
-                <SelectItem value="attended">มางาน</SelectItem>
-                <SelectItem value="no-show">ไม่มา</SelectItem>
-              </SelectContent>
-            </Select>
+            <FormSelect
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+              placeholder="สถานะทั้งหมด"
+              className="w-full md:w-[200px]"
+              options={[
+                { value: 'all', label: 'สถานะทั้งหมด' },
+                { value: 'confirmed', label: 'ลงทะเบียนแล้ว' },
+                { value: 'cancelled', label: 'ยกเลิก' },
+                { value: 'attended', label: 'มางาน' },
+                { value: 'no-show', label: 'ไม่มา' },
+              ]}
+            />
           )}
           
           {mode === 'attendance' && (

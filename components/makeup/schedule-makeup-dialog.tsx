@@ -21,14 +21,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { MakeupClass, Teacher, Room } from '@/types/models';
@@ -39,6 +34,7 @@ import { checkAvailability, AvailabilityWarning } from '@/lib/utils/availability
 import { useAuth } from '@/hooks/useAuth';
 import { formatDate } from '@/lib/utils';
 import { useBranch } from '@/contexts/BranchContext';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 interface ScheduleMakeupDialogProps {
   open: boolean;
@@ -287,35 +283,23 @@ export default function ScheduleMakeupDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="date">วันที่นัด Makeup *</Label>
-                <Input
-                  id="date"
-                  type="date"
+                <DateRangePicker
+                  mode="single"
                   value={formData.date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                  min={new Date().toISOString().split('T')[0]}
-                  required
+                  onChange={(date) => setFormData(prev => ({ ...prev, date: date || '' }))}
+                  minDate={new Date()}
+                  placeholder="เลือกวันที่"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label>ช่วงเวลา *</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="time"
-                    value={formData.startTime}
-                    onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
-                    step="300"
-                    required
-                  />
-                  <Input
-                    type="time"
-                    value={formData.endTime}
-                    onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
-                    step="300"
-                    min={formData.startTime}
-                    required
-                  />
-                </div>
+                <TimeRangePicker
+                  startTime={formData.startTime}
+                  endTime={formData.endTime}
+                  onStartTimeChange={(v) => setFormData(prev => ({ ...prev, startTime: v }))}
+                  onEndTimeChange={(v) => setFormData(prev => ({ ...prev, endTime: v }))}
+                />
               </div>
             </div>
 
@@ -323,27 +307,15 @@ export default function ScheduleMakeupDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="teacher">ครูผู้สอน *</Label>
-                <Select
+                <FormSelect
                   value={formData.teacherId}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, teacherId: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกครู" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teachers.length === 0 ? (
-                      <div className="p-2 text-sm text-gray-500 text-center">
-                        ไม่มีครูที่สอนในสาขานี้
-                      </div>
-                    ) : (
-                      teachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.nickname || teacher.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                  placeholder="เลือกครู"
+                  options={teachers.map((teacher) => ({
+                    value: teacher.id,
+                    label: teacher.nickname || teacher.name,
+                  }))}
+                />
                 <p className="text-xs text-gray-500">
                   แสดงเฉพาะครูที่สอนในสาขา {makeupRequest.branchName}
                 </p>
@@ -351,27 +323,15 @@ export default function ScheduleMakeupDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="room">ห้องเรียน *</Label>
-                <Select
+                <FormSelect
                   value={formData.roomId}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, roomId: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกห้อง" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rooms.length === 0 ? (
-                      <div className="p-2 text-sm text-gray-500 text-center">
-                        ไม่มีห้องเรียนในสาขานี้
-                      </div>
-                    ) : (
-                      rooms.map((room) => (
-                        <SelectItem key={room.id} value={room.id}>
-                          {room.name} (จุ {room.capacity} คน)
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                  placeholder="เลือกห้อง"
+                  options={rooms.map((room) => ({
+                    value: room.id,
+                    label: `${room.name} (จุ ${room.capacity} คน)`,
+                  }))}
+                />
                 <p className="text-xs text-gray-500">
                   แสดงเฉพาะห้องในสาขา {makeupRequest.branchName}
                 </p>

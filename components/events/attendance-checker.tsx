@@ -10,13 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormSelect } from '@/components/ui/form-select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -208,33 +202,27 @@ export default function AttendanceChecker({
         </div>
         
         <div className="flex flex-col md:flex-row gap-4">
-          <Select value={scheduleFilter} onValueChange={setScheduleFilter}>
-            <SelectTrigger className="w-full md:w-[200px]">
-              <SelectValue placeholder="รอบเวลาทั้งหมด" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">รอบเวลาทั้งหมด</SelectItem>
-              {schedules.map(schedule => (
-                <SelectItem key={schedule.id} value={schedule.id}>
-                  {formatDate(schedule.date, 'short')} {schedule.startTime}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="w-full md:w-[200px]">
-              <SelectValue placeholder="สาขาทั้งหมด" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">สาขาทั้งหมด</SelectItem>
-              {branches.map(branch => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FormSelect
+            value={scheduleFilter}
+            onValueChange={setScheduleFilter}
+            placeholder="รอบเวลาทั้งหมด"
+            className="w-full md:w-[200px]"
+            options={[
+              { value: 'all', label: 'รอบเวลาทั้งหมด' },
+              ...schedules.map(s => ({ value: s.id, label: `${formatDate(s.date, 'short')} ${s.startTime}` })),
+            ]}
+          />
+
+          <FormSelect
+            value={branchFilter}
+            onValueChange={setBranchFilter}
+            placeholder="สาขาทั้งหมด"
+            className="w-full md:w-[200px]"
+            options={[
+              { value: 'all', label: 'สาขาทั้งหมด' },
+              ...branches.map(b => ({ value: b.id, label: b.name })),
+            ]}
+          />
           
           <div className="flex items-center space-x-2">
             <Checkbox

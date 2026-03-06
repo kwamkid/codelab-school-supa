@@ -3,6 +3,7 @@
 import { TeachingMaterial } from '@/types/models';
 import { convertCanvaToEmbedUrl } from '@/lib/utils/canva';
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 // Database row interface
 interface TeachingMaterialRow {
@@ -153,10 +154,10 @@ export async function createTeachingMaterial(
     // Auto-generate embed URL
     const embedUrl = convertCanvaToEmbedUrl(data.canvaUrl);
 
-    const supabase = getClient();
-    const { data: insertData, error } = await supabase
-      .from('teaching_materials')
-      .insert({
+    const result = await adminMutation({
+      table: 'teaching_materials',
+      operation: 'insert',
+      data: {
         subject_id: data.subjectId,
         session_number: data.sessionNumber,
         title: data.title,
@@ -172,12 +173,10 @@ export async function createTeachingMaterial(
         tags: data.tags || null,
         is_active: data.isActive ?? true,
         created_by: createdBy
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return insertData.id;
+      },
+      options: { select: true, single: true }
+    })
+    return result.id
   } catch (error) {
     console.error('Error creating teaching material:', error);
     throw error;
@@ -228,13 +227,7 @@ export async function updateTeachingMaterial(
       updateData.embed_url = convertCanvaToEmbedUrl(data.canvaUrl);
     }
 
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('teaching_materials')
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({ table: 'teaching_materials', operation: 'update', data: updateData, match: { id } })
   } catch (error) {
     console.error('Error updating teaching material:', error);
     throw error;
@@ -244,13 +237,7 @@ export async function updateTeachingMaterial(
 // Delete teaching material
 export async function deleteTeachingMaterial(id: string): Promise<void> {
   try {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('teaching_materials')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({ table: 'teaching_materials', operation: 'delete', match: { id } })
   } catch (error) {
     console.error('Error deleting teaching material:', error);
     throw error;
@@ -263,28 +250,18 @@ export async function reorderTeachingMaterials(
   materialIds: string[]
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
-    // Supabase doesn't have batch writes like Firebase
-    // Use Promise.all for better performance
     const updates = materialIds.map((materialId, index) => {
-      return supabase
-        .from('teaching_materials')
-        .update({
+      return adminMutation({
+        table: 'teaching_materials',
+        operation: 'update',
+        data: {
           session_number: index + 1,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', materialId);
-    });
-
-    const results = await Promise.all(updates);
-
-    // Check for errors
-    const errors = results.filter(r => r.error);
-    if (errors.length > 0) {
-      console.error('Errors reordering materials:', errors);
-      throw new Error('Failed to reorder some materials');
-    }
+        },
+        match: { id: materialId }
+      })
+    })
+    await Promise.all(updates)
   } catch (error) {
     console.error('Error reordering materials:', error);
     throw error;

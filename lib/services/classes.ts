@@ -4,6 +4,7 @@ import { Class, ClassSchedule } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
 import { getRoomsByBranch } from './rooms';
 import { getHolidaysForBranch } from './holidays';
+import { adminMutation } from '@/lib/admin-mutation';
 
 const TABLE_NAME = 'classes';
 
@@ -178,8 +179,6 @@ export async function createClass(
   classData: Omit<Class, 'id' | 'createdAt' | 'enrolledCount'>
 ): Promise<string> {
   try {
-    const supabase = getClient();
-
     // Validate status
     const validStatuses = ['draft', 'published', 'started', 'completed', 'cancelled'];
     if (!classData.status || !validStatuses.includes(classData.status)) {
@@ -200,9 +199,10 @@ export async function createClass(
     const holidayDates = holidays.map(h => h.date);
 
     // Insert class
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert({
+    const data = await adminMutation({
+      table: 'classes',
+      operation: 'insert',
+      data: {
         name: classData.name,
         code: classData.code,
         description: classData.description,
@@ -224,11 +224,10 @@ export async function createClass(
         material_fee: classData.pricing.materialFee,
         registration_fee: classData.pricing.registrationFee,
         status: classData.status || 'draft',
-      })
-      .select()
-      .single();
+      },
+      options: { select: true, single: true },
+    });
 
-    if (error) throw error;
     if (!data) throw new Error('No data returned from insert');
 
     const classId = data.id;
@@ -251,11 +250,11 @@ export async function createClass(
     }));
 
     if (scheduleInserts.length > 0) {
-      const { error: scheduleError } = await supabase
-        .from('class_schedules')
-        .insert(scheduleInserts);
-
-      if (scheduleError) throw scheduleError;
+      await adminMutation({
+        table: 'class_schedules',
+        operation: 'insert',
+        data: scheduleInserts,
+      });
     }
 
     return classId;
@@ -271,8 +270,6 @@ export async function updateClass(
   classData: Partial<Class>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
 
     if (classData.name !== undefined) updateData.name = classData.name;
@@ -311,12 +308,12 @@ export async function updateClass(
       return;
     }
 
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'classes',
+      operation: 'update',
+      data: updateData,
+      match: { id },
+    });
   } catch (error) {
     console.error('Error updating class:', error);
     throw error;
@@ -447,8 +444,6 @@ export async function updateClassSchedule(
   data: Partial<ClassSchedule>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     // Get current schedule data
     const currentSchedule = await getClassSchedule(classId, scheduleId);
     if (!currentSchedule) {
@@ -492,13 +487,12 @@ export async function updateClassSchedule(
       return;
     }
 
-    const { error } = await supabase
-      .from('class_schedules')
-      .update(updateData)
-      .eq('id', scheduleId)
-      .eq('class_id', classId);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'class_schedules',
+      operation: 'update',
+      data: updateData,
+      match: { id: scheduleId, class_id: classId },
+    });
   } catch (error) {
     console.error('Error updating class schedule:', error);
     throw error;
@@ -566,13 +560,12 @@ export async function updateClassStatus(id: string, status: Class['status']): Pr
       throw new Error(`Invalid status: ${status}`);
     }
 
-    const supabase = getClient();
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update({ status })
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'classes',
+      operation: 'update',
+      data: { status },
+      match: { id },
+    });
   } catch (error) {
     console.error('Error updating class status:', error);
     throw error;
@@ -722,27 +715,24 @@ export async function rescheduleSession(
   rescheduledBy?: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const currentSchedule = await getClassSchedule(classId, scheduleId);
     if (!currentSchedule) {
       throw new Error('Schedule not found');
     }
 
-    const { error } = await supabase
-      .from('class_schedules')
-      .update({
+    await adminMutation({
+      table: 'class_schedules',
+      operation: 'update',
+      data: {
         session_date: newDate.toISOString(),
         status: 'rescheduled',
         original_date: currentSchedule.sessionDate.toISOString(),
         rescheduled_at: new Date().toISOString(),
         rescheduled_by: rescheduledBy || '',
-        note: reason || ''
-      })
-      .eq('id', scheduleId)
-      .eq('class_id', classId);
-
-    if (error) throw error;
+        note: reason || '',
+      },
+      match: { id: scheduleId, class_id: classId },
+    });
   } catch (error) {
     console.error('Error rescheduling session:', error);
     throw error;
@@ -811,8 +801,6 @@ export async function batchUpdateSchedules(
   updates: Array<{ scheduleId: string; data: Partial<ClassSchedule> }>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     for (const { scheduleId, data } of updates) {
       const updateData: any = {};
 
@@ -823,13 +811,12 @@ export async function batchUpdateSchedules(
       if (data.note) updateData.note = data.note;
 
       if (Object.keys(updateData).length > 0) {
-        const { error } = await supabase
-          .from('class_schedules')
-          .update(updateData)
-          .eq('id', scheduleId)
-          .eq('class_id', classId);
-
-        if (error) throw error;
+        await adminMutation({
+          table: 'class_schedules',
+          operation: 'update',
+          data: updateData,
+          match: { id: scheduleId, class_id: classId },
+        });
       }
     }
   } catch (error) {
@@ -838,16 +825,47 @@ export async function batchUpdateSchedules(
   }
 }
 
+// Increment enrolled count by 1
+export async function incrementEnrolledCount(classId: string): Promise<void> {
+  try {
+    const classData = await getClass(classId);
+    if (!classData) return;
+    await adminMutation({
+      table: 'classes',
+      operation: 'update',
+      data: { enrolled_count: classData.enrolledCount + 1 },
+      match: { id: classId },
+    });
+  } catch (error) {
+    console.error('Error incrementing enrolled count:', error);
+  }
+}
+
+// Decrement enrolled count by 1
+export async function decrementEnrolledCount(classId: string): Promise<void> {
+  try {
+    const classData = await getClass(classId);
+    if (!classData) return;
+    await adminMutation({
+      table: 'classes',
+      operation: 'update',
+      data: { enrolled_count: Math.max(0, classData.enrolledCount - 1) },
+      match: { id: classId },
+    });
+  } catch (error) {
+    console.error('Error decrementing enrolled count:', error);
+  }
+}
+
 // Fix enrolled count
 export async function fixEnrolledCount(classId: string, newCount: number): Promise<void> {
   try {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update({ enrolled_count: newCount })
-      .eq('id', classId);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'classes',
+      operation: 'update',
+      data: { enrolled_count: newCount },
+      match: { id: classId },
+    });
   } catch (error) {
     console.error('Error fixing enrolled count:', error);
     throw error;
@@ -1015,13 +1033,14 @@ export async function updateClassStatusBasedOnDates(classId: string): Promise<vo
     if (!classDoc) return;
 
     const now = new Date();
-    const supabase = getClient();
 
     if (classDoc.status === 'published' && classDoc.startDate <= now) {
-      await supabase
-        .from(TABLE_NAME)
-        .update({ status: 'started' })
-        .eq('id', classId);
+      await adminMutation({
+        table: 'classes',
+        operation: 'update',
+        data: { status: 'started' },
+        match: { id: classId },
+      });
       return;
     }
 
@@ -1041,10 +1060,12 @@ export async function updateClassStatusBasedOnDates(classId: string): Promise<vo
         }
 
         if (allSessionsPassed) {
-          await supabase
-            .from(TABLE_NAME)
-            .update({ status: 'completed' })
-            .eq('id', classId);
+          await adminMutation({
+            table: 'classes',
+            operation: 'update',
+            data: { status: 'completed' },
+            match: { id: classId },
+          });
         }
       }
     }
@@ -1231,7 +1252,6 @@ export async function getEndClassPreview(classId: string): Promise<{
 // End a class immediately: set status to completed, update end_date, cancel future sessions
 export async function endClassNow(classId: string): Promise<{ newEndDate: string }> {
   try {
-    const supabase = getClient();
     const schedules = await getClassSchedules(classId);
     const today = getLocalDateString(new Date());
 
@@ -1250,27 +1270,24 @@ export async function endClassNow(classId: string): Promise<{ newEndDate: string
       .map(s => s.id);
 
     if (futureScheduleIds.length > 0) {
-      const { error: cancelError } = await supabase
-        .from('class_schedules')
-        .update({ status: 'cancelled' })
-        .in('id', futureScheduleIds);
-
-      if (cancelError) {
-        console.error('Error cancelling future sessions:', cancelError);
-        throw cancelError;
-      }
+      await adminMutation({
+        table: 'class_schedules',
+        operation: 'update',
+        data: { status: 'cancelled' },
+        filters: [{ column: 'id', op: 'in', value: futureScheduleIds }],
+      });
     }
 
     // Update class: set status to completed and update end_date
-    const { error: updateError } = await supabase
-      .from(TABLE_NAME)
-      .update({
+    await adminMutation({
+      table: 'classes',
+      operation: 'update',
+      data: {
         status: 'completed',
         end_date: newEndDate,
-      })
-      .eq('id', classId);
-
-    if (updateError) throw updateError;
+      },
+      match: { id: classId },
+    });
 
     return { newEndDate };
   } catch (error) {

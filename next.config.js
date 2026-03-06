@@ -69,7 +69,7 @@ const nextConfig = {
     ];
   },
 
-  // เพิ่ม webpack config
+  // webpack config (used in production build, Turbopack ignores this)
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
@@ -85,9 +85,15 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
 
-  // Disable scroll restoration warnings
   experimental: {
     scrollRestoration: true,
+    turbo: {
+      resolveAlias: {
+        fs: { browser: '' },
+        net: { browser: '' },
+        tls: { browser: '' },
+      },
+    },
   },
 
   // Suppress auto-scroll warnings in development

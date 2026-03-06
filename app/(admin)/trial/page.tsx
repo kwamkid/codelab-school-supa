@@ -47,14 +47,15 @@ import { TrialFunnelPipeline } from '@/components/trial/trial-funnel-pipeline';
 import { BookingActionButtons } from '@/components/trial/booking-action-buttons';
 import { useRouter } from 'next/navigation';
 import { TrialBooking } from '@/types/models';
-import { 
-  getTrialBookings, 
-  getTrialBookingStats, 
-  deleteTrialBooking, 
-  cancelTrialBooking 
+import {
+  getTrialBookings,
+  getTrialBookingStats,
+  deleteTrialBooking,
+  cancelTrialBooking
 } from '@/lib/services/trial-bookings';
 import { getActiveBranches } from '@/lib/services/branches';
 import { getSubjects } from '@/lib/services/subjects';
+import { getTeachers } from '@/lib/services/teachers';
 import { formatDate, calculateAge, getShortDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useBranch } from '@/contexts/BranchContext';
@@ -62,6 +63,8 @@ import { PermissionGuard } from '@/components/auth/permission-guard';
 import { SearchInput } from '@/components/ui/search-input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageSkeleton } from '@/components/ui/page-skeleton';
+import TrialSessionDialog from '@/components/trial/trial-session-dialog';
+import { MarkAttendedDialog } from '@/components/trial/mark-attended-dialog';
 
 const statusConfig = {
   new: { label: 'ใหม่', color: 'bg-blue-100 text-blue-700', icon: AlertCircle },
@@ -84,6 +87,7 @@ const QUERY_KEYS = {
   trialStats: (branchId?: string | null) => ['trialStats', branchId],
   branches: ['branches', 'active'],
   subjects: ['subjects', 'active'],
+  teachers: ['teachers'],
 };
 
 export default function TrialBookingsPage() {
@@ -100,6 +104,10 @@ export default function TrialBookingsPage() {
   const [bookingToCancel, setBookingToCancel] = useState<TrialBooking | null>(null);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [bookingToContact, setBookingToContact] = useState<TrialBooking | null>(null);
+  const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [bookingToSchedule, setBookingToSchedule] = useState<TrialBooking | null>(null);
+  const [attendedDialogOpen, setAttendedDialogOpen] = useState(false);
+  const [bookingToMarkAttended, setBookingToMarkAttended] = useState<TrialBooking | null>(null);
   
   // ใช้ usePagination hook
   const {
@@ -137,6 +145,12 @@ export default function TrialBookingsPage() {
       const allSubjects = await getSubjects();
       return allSubjects.filter(s => s.isActive);
     },
+    staleTime: 300000, // 5 minutes
+  });
+
+  const { data: teachers = [] } = useQuery({
+    queryKey: QUERY_KEYS.teachers,
+    queryFn: () => getTeachers(),
     staleTime: 300000, // 5 minutes
   });
 
@@ -305,6 +319,32 @@ export default function TrialBookingsPage() {
     }
   };
 
+  const handleScheduleClick = (booking: TrialBooking) => {
+    setBookingToSchedule(booking);
+    setSessionModalOpen(true);
+  };
+
+  const handleMarkAttendedClick = (booking: TrialBooking) => {
+    setBookingToMarkAttended(booking);
+    setAttendedDialogOpen(true);
+  };
+
+  const handleMarkAttendedSuccess = () => {
+    setAttendedDialogOpen(false);
+    setBookingToMarkAttended(null);
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialBookings(selectedBranchId) });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialStats(selectedBranchId) });
+    window.dispatchEvent(new CustomEvent('trial-booking-changed'));
+  };
+
+  const handleScheduleSuccess = () => {
+    setSessionModalOpen(false);
+    setBookingToSchedule(null);
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialBookings(selectedBranchId) });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.trialStats(selectedBranchId) });
+    window.dispatchEvent(new CustomEvent('trial-booking-changed'));
+  };
+
   // Loading state
   const isLoading = loadingBookings || loadingStats;
 
@@ -471,6 +511,8 @@ export default function TrialBookingsPage() {
                           <BookingActionButtons
                             booking={booking}
                             onContact={handleContactClick}
+                            onSchedule={handleScheduleClick}
+                            onMarkAttended={handleMarkAttendedClick}
                             onCancel={handleCancelClick}
                             onDelete={handleDeleteClick}
                           />
@@ -539,6 +581,35 @@ export default function TrialBookingsPage() {
         }}
         onConfirm={handleCancelConfirm}
         bookingName={bookingToCancel?.parentName}
+      />
+
+      {/* Trial Session Dialog (นัดหมาย from list) */}
+      {bookingToSchedule && (
+        <TrialSessionDialog
+          isOpen={sessionModalOpen}
+          onClose={() => {
+            setSessionModalOpen(false);
+            setBookingToSchedule(null);
+          }}
+          bookingId={bookingToSchedule.id}
+          students={bookingToSchedule.students}
+          subjects={subjects}
+          teachers={teachers}
+          branches={branches}
+          onSuccess={handleScheduleSuccess}
+        />
+      )}
+
+      {/* Mark Attended Dialog */}
+      <MarkAttendedDialog
+        isOpen={attendedDialogOpen}
+        onClose={() => {
+          setAttendedDialogOpen(false);
+          setBookingToMarkAttended(null);
+        }}
+        booking={bookingToMarkAttended}
+        subjectsMap={subjectsMap}
+        onSuccess={handleMarkAttendedSuccess}
       />
     </div>
   );

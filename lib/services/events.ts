@@ -1,6 +1,7 @@
 // lib/services/events.ts
 
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 import { Event, EventSchedule, EventRegistration } from '@/types/models';
 
 // ==================== Database Row Interfaces ====================
@@ -220,8 +221,6 @@ export async function createEvent(
   userId: string
 ): Promise<string> {
   try {
-    const supabase = getClient();
-
     const insertData = {
       name: eventData.name,
       description: eventData.description,
@@ -245,14 +244,13 @@ export async function createEvent(
       created_by: userId,
     };
 
-    const { data, error } = await supabase
-      .from('events')
-      .insert(insertData)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data.id;
+    const result = await adminMutation({
+      table: 'events',
+      operation: 'insert',
+      data: insertData,
+      options: { select: true, single: true }
+    });
+    return result.id;
   } catch (error) {
     console.error('Error creating event:', error);
     throw error;
@@ -266,8 +264,6 @@ export async function updateEvent(
   userId: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {
       updated_by: userId,
       updated_at: new Date().toISOString(),
@@ -298,12 +294,12 @@ export async function updateEvent(
     if (eventData.status !== undefined) updateData.status = eventData.status;
     if (eventData.isActive !== undefined) updateData.is_active = eventData.isActive;
 
-    const { error } = await supabase
-      .from('events')
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'events',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
   } catch (error) {
     console.error('Error updating event:', error);
     throw error;
@@ -372,8 +368,6 @@ export async function createEventSchedule(
   scheduleData: Omit<EventSchedule, 'id' | 'attendeesByBranch'>
 ): Promise<string> {
   try {
-    const supabase = getClient();
-
     const insertData = {
       event_id: scheduleData.eventId,
       date: scheduleData.date.toISOString().split('T')[0], // DATE format
@@ -384,14 +378,13 @@ export async function createEventSchedule(
       status: 'available',
     };
 
-    const { data, error } = await supabase
-      .from('event_schedules')
-      .insert(insertData)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data.id;
+    const result = await adminMutation({
+      table: 'event_schedules',
+      operation: 'insert',
+      data: insertData,
+      options: { select: true, single: true }
+    });
+    return result.id;
   } catch (error) {
     console.error('Error creating event schedule:', error);
     throw error;
@@ -404,8 +397,6 @@ export async function updateEventSchedule(
   scheduleData: Partial<EventSchedule>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
 
     if (scheduleData.date !== undefined) {
@@ -417,12 +408,12 @@ export async function updateEventSchedule(
     if (scheduleData.attendeesByBranch !== undefined) updateData.attendees_by_branch = scheduleData.attendeesByBranch;
     if (scheduleData.status !== undefined) updateData.status = scheduleData.status;
 
-    const { error } = await supabase
-      .from('event_schedules')
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'event_schedules',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
   } catch (error) {
     console.error('Error updating event schedule:', error);
     throw error;
@@ -438,13 +429,11 @@ export async function deleteEventSchedule(id: string): Promise<void> {
       throw new Error('ไม่สามารถลบรอบที่มีผู้ลงทะเบียนแล้วได้');
     }
 
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('event_schedules')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'event_schedules',
+      operation: 'delete',
+      match: { id }
+    });
   } catch (error) {
     console.error('Error deleting event schedule:', error);
     throw error;
@@ -623,13 +612,12 @@ export async function createEventRegistration(
       referral_source: registrationData.referralSource || null,
     };
 
-    const { data, error } = await supabase
-      .from('event_registrations')
-      .insert(insertData)
-      .select()
-      .single();
-
-    if (error) throw error;
+    const result = await adminMutation({
+      table: 'event_registrations',
+      operation: 'insert',
+      data: insertData,
+      options: { select: true, single: true }
+    });
 
     // Update schedule attendee count
     const currentBranchCount = schedule.attendeesByBranch[registrationData.branchId] || 0;
@@ -646,16 +634,16 @@ export async function createEventRegistration(
 
     console.log('[createEventRegistration] Updating schedule with:', scheduleUpdateData);
 
-    const { error: updateError } = await supabase
-      .from('event_schedules')
-      .update(scheduleUpdateData)
-      .eq('id', registrationData.scheduleId);
+    await adminMutation({
+      table: 'event_schedules',
+      operation: 'update',
+      data: scheduleUpdateData,
+      match: { id: registrationData.scheduleId }
+    });
 
-    if (updateError) throw updateError;
+    console.log('[createEventRegistration] Registration created successfully:', result.id);
 
-    console.log('[createEventRegistration] Registration created successfully:', data.id);
-
-    return data.id;
+    return result.id;
   } catch (error) {
     console.error('Error creating event registration:', error);
     throw error;
@@ -719,17 +707,17 @@ export async function cancelEventRegistration(
     console.log('[cancelEventRegistration] Current branch count:', currentBranchCount, 'New count:', newBranchCount);
 
     // Update registration
-    const { error: updateRegError } = await supabase
-      .from('event_registrations')
-      .update({
+    await adminMutation({
+      table: 'event_registrations',
+      operation: 'update',
+      data: {
         status: 'cancelled',
         cancelled_at: new Date().toISOString(),
         cancelled_by: cancelledBy,
         cancellation_reason: reason,
-      })
-      .eq('id', registrationId);
-
-    if (updateRegError) throw updateRegError;
+      },
+      match: { id: registrationId }
+    });
 
     // Update schedule attendee count
     const updatedAttendeesByBranch = {
@@ -742,12 +730,12 @@ export async function cancelEventRegistration(
       status: 'available', // Always available after cancellation
     };
 
-    const { error: updateScheduleError } = await supabase
-      .from('event_schedules')
-      .update(scheduleUpdateData)
-      .eq('id', registration.scheduleId);
-
-    if (updateScheduleError) throw updateScheduleError;
+    await adminMutation({
+      table: 'event_schedules',
+      operation: 'update',
+      data: scheduleUpdateData,
+      match: { id: registration.scheduleId }
+    });
 
     console.log('[cancelEventRegistration] Cancellation completed');
   } catch (error) {
@@ -766,32 +754,24 @@ export async function updateEventAttendance(
   checkedBy: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
     const now = new Date().toISOString();
 
-    // Supabase doesn't have batch writes like Firebase, so we do individual updates
-    // For better performance, we could use Promise.all
     const updates = attendanceData.map(({ registrationId, attended, note }) => {
-      return supabase
-        .from('event_registrations')
-        .update({
+      return adminMutation({
+        table: 'event_registrations',
+        operation: 'update',
+        data: {
           attended,
           attendance_checked_at: now,
           attendance_checked_by: checkedBy,
           attendance_note: note || null,
           status: attended ? 'attended' : 'no-show',
-        })
-        .eq('id', registrationId);
+        },
+        match: { id: registrationId }
+      });
     });
 
-    const results = await Promise.all(updates);
-
-    // Check for errors
-    const errors = results.filter(r => r.error);
-    if (errors.length > 0) {
-      console.error('Errors updating attendance:', errors);
-      throw new Error('Failed to update some attendance records');
-    }
+    await Promise.all(updates);
   } catch (error) {
     console.error('Error updating attendance:', error);
     throw error;

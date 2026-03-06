@@ -7,6 +7,7 @@ import { getStudentWithParent } from './parents';
 import { getBranch } from './branches';
 import { getSubject } from './subjects';
 import { sendMakeupNotification } from './line-notifications';
+import { adminMutation } from '@/lib/admin-mutation';
 
 // Helper function to convert database row to MakeupClass
 function dbRowToMakeupClass(row: any): MakeupClass {
@@ -314,12 +315,11 @@ export async function createMakeupRequest(
       getBranch(classData.branchId)
     ]);
 
-    const supabase = getClient();
-
     // Create makeup request with denormalized data
-    const { data: insertedData, error: insertError } = await supabase
-      .from('makeup_classes')
-      .insert({
+    const insertedData = await adminMutation<{ id: string }>({
+      table: 'makeup_classes',
+      operation: 'insert',
+      data: {
         // Original data
         type: data.type,
         original_class_id: data.originalClassId,
@@ -355,11 +355,9 @@ export async function createMakeupRequest(
         status: 'pending',
         notes: data.notes || null,
         created_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single();
-
-    if (insertError) throw insertError;
+      },
+      options: { select: 'id', single: true }
+    });
 
     // Update original schedule attendance
     if (schedule) {
@@ -418,12 +416,11 @@ export async function scheduleMakeupClass(
       import('./rooms').then(m => m.getRoom(scheduleData.branchId, scheduleData.roomId))
     ]);
 
-    const supabase = getClient();
-
     // Update with denormalized teacher/room names
-    const { error } = await supabase
-      .from('makeup_classes')
-      .update({
+    await adminMutation({
+      table: 'makeup_classes',
+      operation: 'update',
+      data: {
         status: 'scheduled',
         makeup_date: scheduleData.date.toISOString(),
         makeup_start_time: scheduleData.startTime,
@@ -436,10 +433,9 @@ export async function scheduleMakeupClass(
         makeup_confirmed_at: new Date().toISOString(),
         makeup_confirmed_by: scheduleData.confirmedBy,
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', makeupId);
-
-    if (error) throw error;
+      },
+      match: { id: makeupId }
+    });
 
     // Send LINE notification
     try {
@@ -464,21 +460,19 @@ export async function recordMakeupAttendance(
   }
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
-    const { error } = await supabase
-      .from('makeup_classes')
-      .update({
+    await adminMutation({
+      table: 'makeup_classes',
+      operation: 'update',
+      data: {
         status: 'completed',
         attendance_status: attendance.status,
         attendance_checked_by: attendance.checkedBy,
         attendance_checked_at: new Date().toISOString(),
         attendance_note: attendance.note || null,
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', makeupId);
-
-    if (error) throw error;
+      },
+      match: { id: makeupId }
+    });
   } catch (error) {
     console.error('Error recording makeup attendance:', error);
     throw error;
@@ -492,18 +486,16 @@ export async function cancelMakeupClass(
   cancelledBy: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
-    const { error } = await supabase
-      .from('makeup_classes')
-      .update({
+    await adminMutation({
+      table: 'makeup_classes',
+      operation: 'update',
+      data: {
         status: 'cancelled',
         notes: reason,
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', makeupId);
-
-    if (error) throw error;
+      },
+      match: { id: makeupId }
+    });
   } catch (error) {
     console.error('Error cancelling makeup class:', error);
     throw error;
@@ -581,19 +573,18 @@ export async function updateMakeupAttendance(
       throw new Error('Can only update attendance for completed makeup classes');
     }
 
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('makeup_classes')
-      .update({
+    await adminMutation({
+      table: 'makeup_classes',
+      operation: 'update',
+      data: {
         attendance_status: attendance.status,
         attendance_checked_by: attendance.checkedBy,
         attendance_checked_at: new Date().toISOString(),
         attendance_note: attendance.note || null,
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', makeupId);
-
-    if (error) throw error;
+      },
+      match: { id: makeupId }
+    });
   } catch (error) {
     console.error('Error updating makeup attendance:', error);
     throw error;
@@ -616,12 +607,11 @@ export async function revertMakeupToScheduled(
       throw new Error('Can only revert completed makeup classes');
     }
 
-    const supabase = getClient();
-
     // Update makeup class
-    const { error: updateError } = await supabase
-      .from('makeup_classes')
-      .update({
+    await adminMutation({
+      table: 'makeup_classes',
+      operation: 'update',
+      data: {
         status: 'scheduled',
         attendance_status: null,
         attendance_checked_by: null,
@@ -629,29 +619,29 @@ export async function revertMakeupToScheduled(
         attendance_note: null,
         updated_at: new Date().toISOString(),
         notes: `${makeup.notes || ''}\n[${new Date().toLocaleDateString('th-TH')}] ยกเลิกการบันทึกเข้าเรียน: ${reason} (โดย ${revertedBy})`
-      })
-      .eq('id', makeupId);
-
-    if (updateError) throw updateError;
+      },
+      match: { id: makeupId }
+    });
 
     // Create audit log
-    const { error: logError } = await supabase
-      .from('audit_logs')
-      .insert({
-        type: 'makeup_attendance_reverted',
-        document_id: makeupId,
-        performed_by: revertedBy,
-        performed_at: new Date().toISOString(),
-        reason,
-        previous_data: {
-          status: makeup.status,
-          attendance: makeup.attendance
+    try {
+      await adminMutation({
+        table: 'audit_logs',
+        operation: 'insert',
+        data: {
+          type: 'makeup_attendance_reverted',
+          document_id: makeupId,
+          performed_by: revertedBy,
+          performed_at: new Date().toISOString(),
+          reason,
+          previous_data: {
+            status: makeup.status,
+            attendance: makeup.attendance
+          }
         }
       });
-
-    if (logError) {
+    } catch (logError) {
       console.error('Error creating audit log:', logError);
-      // Don't throw, just log the error
     }
   } catch (error) {
     console.error('Error reverting makeup status:', error);

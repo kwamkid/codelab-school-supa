@@ -1,5 +1,6 @@
 import { Branch } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 const TABLE_NAME = 'branches';
 
@@ -26,6 +27,7 @@ export async function getBranches(): Promise<Branch[]> {
       openDays: item.open_days || [],
       managerName: item.manager_name,
       managerPhone: item.manager_phone,
+      invoiceCompanyId: item.invoice_company_id || undefined,
       isActive: item.is_active,
       createdAt: new Date(item.created_at),
     }));
@@ -62,6 +64,7 @@ export async function getActiveBranches(): Promise<Branch[]> {
       openDays: item.open_days || [],
       managerName: item.manager_name,
       managerPhone: item.manager_phone,
+      invoiceCompanyId: item.invoice_company_id || undefined,
       isActive: item.is_active,
       createdAt: new Date(item.created_at),
     }));
@@ -103,6 +106,7 @@ export async function getBranch(id: string): Promise<Branch | null> {
       openDays: data.open_days || [],
       managerName: data.manager_name,
       managerPhone: data.manager_phone,
+      invoiceCompanyId: data.invoice_company_id || undefined,
       isActive: data.is_active,
       createdAt: new Date(data.created_at),
     };
@@ -115,24 +119,23 @@ export async function getBranch(id: string): Promise<Branch | null> {
 // Create new branch
 export async function createBranch(branchData: Omit<Branch, 'id' | 'createdAt'>): Promise<string> {
   try {
-    const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert({
+    const result = await adminMutation({
+      table: 'branches',
+      operation: 'insert',
+      data: {
         code: branchData.code,
         name: branchData.name,
         address: branchData.address,
         phone: branchData.phone,
         email: branchData.email,
         is_active: branchData.isActive,
-      })
-      .select()
-      .single();
+        invoice_company_id: branchData.invoiceCompanyId || null,
+      },
+      options: { select: true, single: true }
+    });
 
-    if (error) throw error;
-    if (!data) throw new Error('No data returned from insert');
-
-    return data.id;
+    if (!result) throw new Error('No data returned from insert');
+    return result.id;
   } catch (error) {
     console.error('Error creating branch:', error);
     throw error;
@@ -142,28 +145,25 @@ export async function createBranch(branchData: Omit<Branch, 'id' | 'createdAt'>)
 // Update branch
 export async function updateBranch(id: string, branchData: Partial<Branch>): Promise<void> {
   try {
-    const supabase = getClient();
-
-    // Remove id and createdAt from update data
     const updateData: any = {};
-
     if (branchData.code !== undefined) updateData.code = branchData.code;
     if (branchData.name !== undefined) updateData.name = branchData.name;
     if (branchData.address !== undefined) updateData.address = branchData.address;
     if (branchData.phone !== undefined) updateData.phone = branchData.phone;
     if (branchData.email !== undefined) updateData.email = branchData.email;
     if (branchData.isActive !== undefined) updateData.is_active = branchData.isActive;
+    if (branchData.invoiceCompanyId !== undefined) updateData.invoice_company_id = branchData.invoiceCompanyId || null;
 
     if (Object.keys(updateData).length === 0) {
-      return; // Nothing to update
+      return;
     }
 
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'branches',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
   } catch (error) {
     console.error('Error updating branch:', error);
     throw error;
@@ -173,13 +173,12 @@ export async function updateBranch(id: string, branchData: Partial<Branch>): Pro
 // Toggle branch active status
 export async function toggleBranchStatus(id: string, isActive: boolean): Promise<void> {
   try {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update({ is_active: isActive })
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'branches',
+      operation: 'update',
+      data: { is_active: isActive },
+      match: { id }
+    });
   } catch (error) {
     console.error('Error toggling branch status:', error);
     throw error;
@@ -238,6 +237,7 @@ export async function getBranchesByIds(ids: string[]): Promise<Branch[]> {
       openDays: item.open_days || [],
       managerName: item.manager_name,
       managerPhone: item.manager_phone,
+      invoiceCompanyId: item.invoice_company_id || undefined,
       isActive: item.is_active,
       createdAt: new Date(item.created_at),
     }));

@@ -1,6 +1,7 @@
 // lib/services/attendance.ts
 
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 // Attendance record interface
 export interface AttendanceRecord {
@@ -123,17 +124,19 @@ export async function saveAttendance(
 
       if (existingId) {
         // Update existing record
-        const { error } = await supabase
-          .from('attendance')
-          .update(rowData)
-          .eq('id', existingId);
-        if (error) throw error;
+        await adminMutation({
+          table: 'attendance',
+          operation: 'update',
+          data: rowData,
+          match: { id: existingId }
+        });
       } else {
         // Insert new record
-        const { error } = await supabase
-          .from('attendance')
-          .insert(rowData);
-        if (error) throw error;
+        await adminMutation({
+          table: 'attendance',
+          operation: 'insert',
+          data: rowData
+        });
       }
     }
 
@@ -142,11 +145,11 @@ export async function saveAttendance(
       .filter(row => !newStudentIds.includes(row.student_id));
 
     for (const row of toDelete) {
-      const { error } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('id', row.id);
-      if (error) throw error;
+      await adminMutation({
+        table: 'attendance',
+        operation: 'delete',
+        match: { id: row.id }
+      });
     }
   } catch (error) {
     console.error('Error saving attendance:', error);
@@ -167,8 +170,6 @@ export async function updateAttendanceRecord(
   }
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
     if (data.status !== undefined) updateData.status = data.status;
     if (data.note !== undefined) updateData.note = data.note;
@@ -176,13 +177,12 @@ export async function updateAttendanceRecord(
     if (data.checkedAt !== undefined) updateData.checked_at = data.checkedAt.toISOString();
     if (data.checkedBy !== undefined) updateData.checked_by = data.checkedBy;
 
-    const { error } = await supabase
-      .from('attendance')
-      .update(updateData)
-      .eq('schedule_id', scheduleId)
-      .eq('student_id', studentId);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'attendance',
+      operation: 'update',
+      data: updateData,
+      match: { schedule_id: scheduleId, student_id: studentId }
+    });
   } catch (error) {
     console.error('Error updating attendance record:', error);
     throw error;
@@ -195,14 +195,11 @@ export async function deleteAttendanceRecord(
   studentId: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('attendance')
-      .delete()
-      .eq('schedule_id', scheduleId)
-      .eq('student_id', studentId);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'attendance',
+      operation: 'delete',
+      match: { schedule_id: scheduleId, student_id: studentId }
+    });
   } catch (error) {
     console.error('Error deleting attendance record:', error);
     throw error;
@@ -212,13 +209,11 @@ export async function deleteAttendanceRecord(
 // Delete all attendance for a schedule
 export async function deleteAttendanceBySchedule(scheduleId: string): Promise<void> {
   try {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('attendance')
-      .delete()
-      .eq('schedule_id', scheduleId);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'attendance',
+      operation: 'delete',
+      match: { schedule_id: scheduleId }
+    });
   } catch (error) {
     console.error('Error deleting attendance by schedule:', error);
     throw error;

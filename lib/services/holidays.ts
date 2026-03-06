@@ -1,5 +1,6 @@
 import { Holiday } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 const TABLE_NAME = 'holidays';
 
@@ -143,20 +144,19 @@ export async function addHoliday(
   holidayData: Omit<Holiday, 'id'>
 ): Promise<{ id: string }> {
   try {
-    const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert({
+    const data = await adminMutation({
+      table: TABLE_NAME,
+      operation: 'insert',
+      data: {
         name: holidayData.name,
         date: holidayData.date.toISOString().split('T')[0],
         type: holidayData.type,
         branches: holidayData.branches || [],
         description: holidayData.description || '',
-      })
-      .select()
-      .single();
+      },
+      options: { select: true, single: true },
+    });
 
-    if (error) throw error;
     if (!data) throw new Error('No data returned from insert');
 
     return { id: data.id };
@@ -172,8 +172,6 @@ export async function updateHoliday(
   holidayData: Partial<Holiday>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
 
     if (holidayData.name !== undefined) updateData.name = holidayData.name;
@@ -186,12 +184,12 @@ export async function updateHoliday(
       return;
     }
 
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: TABLE_NAME,
+      operation: 'update',
+      data: updateData,
+      match: { id },
+    });
   } catch (error) {
     console.error('Error updating holiday:', error);
     throw error;
@@ -219,19 +217,18 @@ export async function deleteHoliday(id: string): Promise<void> {
 // Delete all holidays for a specific year
 export async function deleteAllHolidays(year: number): Promise<number> {
   try {
-    const supabase = getClient();
-
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31`;
 
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .delete()
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .select();
-
-    if (error) throw error;
+    const data = await adminMutation<any[]>({
+      table: TABLE_NAME,
+      operation: 'delete',
+      filters: [
+        { column: 'date', op: 'gte', value: startDate },
+        { column: 'date', op: 'lte', value: endDate },
+      ],
+      options: { select: true },
+    });
 
     return (data || []).length;
   } catch (error) {

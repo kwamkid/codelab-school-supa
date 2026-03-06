@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { toast } from 'sonner';
 import { Loader2, Save, MapPin } from 'lucide-react';
 
@@ -185,22 +185,16 @@ export default function RoomDialog({
                 // Show dropdown when creating new room
                 <>
                   {branches.length > 0 ? (
-                    <Select 
-                      value={currentBranchId} 
+                    <FormSelect
+                      value={currentBranchId}
                       onValueChange={handleBranchChange}
-                      required
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="เลือกสาขาที่จะเพิ่มห้อง" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {branches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name} ({branch.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="เลือกสาขาที่จะเพิ่มห้อง"
+                      className="w-full"
+                      options={branches.map((branch) => ({
+                        value: branch.id,
+                        label: `${branch.name} (${branch.code})`,
+                      }))}
+                    />
                   ) : (
                     <div className="px-3 py-2 bg-yellow-50 text-yellow-800 rounded-md text-sm">
                       ไม่พบข้อมูลสาขา กรุณาสร้างสาขาก่อน

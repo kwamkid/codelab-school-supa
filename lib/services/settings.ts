@@ -1,6 +1,7 @@
 // lib/services/settings.ts
 
 import { getClient } from '@/lib/supabase/client';
+import { adminMutation } from '@/lib/admin-mutation';
 
 // Types
 export interface GeneralSettings {
@@ -74,23 +75,20 @@ export async function updateGeneralSettings(
   userId: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     // Remove metadata fields from settings object
     const { updatedAt, updatedBy, ...settingsData } = settings;
 
-    const { error } = await supabase
-      .from('settings')
-      .upsert({
+    await adminMutation({
+      table: 'settings',
+      operation: 'upsert',
+      data: {
         key: SETTINGS_KEY_GENERAL,
         value: settingsData,
         updated_by: userId,
         updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'key'
-      });
-
-    if (error) throw error;
+      },
+      options: { onConflict: 'key' }
+    });
   } catch (error) {
     console.error('Error updating general settings:', error);
     throw error;
@@ -238,23 +236,20 @@ export async function updateMakeupSettings(
   userId: string
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     // Remove metadata fields from settings object
     const { updatedAt, updatedBy, ...settingsData } = settings;
 
-    const { error } = await supabase
-      .from('settings')
-      .upsert({
+    await adminMutation({
+      table: 'settings',
+      operation: 'upsert',
+      data: {
         key: SETTINGS_KEY_MAKEUP,
         value: settingsData,
         updated_by: userId,
         updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'key'
-      });
-
-    if (error) throw error;
+      },
+      options: { onConflict: 'key' }
+    });
   } catch (error) {
     console.error('Error updating makeup settings:', error);
     throw error;

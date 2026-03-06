@@ -16,13 +16,7 @@ import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormSelect } from '@/components/ui/form-select';
 import { createMakeupRequest, getMakeupCount, checkMakeupExists } from '@/lib/services/makeup';
 import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -268,20 +262,16 @@ export default function MakeupClassDialog({
           {/* Request Type */}
           <div className="space-y-2">
             <Label>ประเภทการขอ</Label>
-            <Select
+            <FormSelect
               value={formData.type}
-              onValueChange={(value: 'scheduled' | 'ad-hoc') => 
-                setFormData(prev => ({ ...prev, type: value }))
+              onValueChange={(value) =>
+                setFormData(prev => ({ ...prev, type: value as 'scheduled' | 'ad-hoc' }))
               }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ad-hoc">ขอหลังขาดเรียน (Ad-hoc)</SelectItem>
-                <SelectItem value="scheduled">ขอล่วงหน้า (Scheduled)</SelectItem>
-              </SelectContent>
-            </Select>
+              options={[
+                { value: 'ad-hoc', label: 'ขอหลังขาดเรียน (Ad-hoc)' },
+                { value: 'scheduled', label: 'ขอล่วงหน้า (Scheduled)' },
+              ]}
+            />
             <p className="text-xs text-gray-500">
               {formData.type === 'ad-hoc' 
                 ? 'สำหรับกรณีขาดเรียนแบบกะทันหัน ไม่ได้แจ้งล่วงหน้า'

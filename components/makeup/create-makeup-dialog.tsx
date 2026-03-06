@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar, Save, X, User, AlertCircle, CalendarPlus, CheckCircle, Clock, XCircle, Info, ChevronRight, AlertTriangle, Users, CheckCircle2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
@@ -45,6 +46,7 @@ import { useBranch } from '@/contexts/BranchContext';
 import { useAuth } from '@/hooks/useAuth';
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 interface CreateMakeupDialogProps {
   open: boolean;
@@ -802,35 +804,24 @@ export default function CreateMakeupDialog({
                   {/* Makeup Date */}
                   <div className="space-y-2">
                     <Label htmlFor="makeup-date">วันที่นัด Makeup *</Label>
-                    <Input
-                      id="makeup-date"
-                      type="date"
+                    <DateRangePicker
+                      mode="single"
                       value={formData.makeupDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, makeupDate: e.target.value }))}
-                      min={new Date().toISOString().split('T')[0]}
+                      onChange={(date) => setFormData(prev => ({ ...prev, makeupDate: date || '' }))}
+                      minDate={new Date()}
+                      placeholder="เลือกวันที่"
                     />
                   </div>
 
                   {/* Time */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="makeup-start-time">เวลาเริ่ม *</Label>
-                      <Input
-                        id="makeup-start-time"
-                        type="time"
-                        value={formData.makeupStartTime}
-                        onChange={(e) => setFormData(prev => ({ ...prev, makeupStartTime: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="makeup-end-time">เวลาจบ *</Label>
-                      <Input
-                        id="makeup-end-time"
-                        type="time"
-                        value={formData.makeupEndTime}
-                        onChange={(e) => setFormData(prev => ({ ...prev, makeupEndTime: e.target.value }))}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>เวลา *</Label>
+                    <TimeRangePicker
+                      startTime={formData.makeupStartTime}
+                      endTime={formData.makeupEndTime}
+                      onStartTimeChange={(v) => setFormData(prev => ({ ...prev, makeupStartTime: v }))}
+                      onEndTimeChange={(v) => setFormData(prev => ({ ...prev, makeupEndTime: v }))}
+                    />
                   </div>
 
                   {/* Teacher */}

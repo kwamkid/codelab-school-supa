@@ -2,37 +2,26 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import SubjectSearchSelect from '@/components/ui/subject-search-select';
+import { FormSelect } from '@/components/ui/form-select';
+import { TimeRangePicker } from '@/components/ui/time-range-picker';
+import { cn } from '@/lib/utils';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { 
-  Loader2, 
-  AlertCircle, 
-  CheckCircle2, 
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
   XCircle,
-  User,
-  School,
-  GraduationCap,
-  ArrowLeft,
   Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Subject, Teacher, Branch, Room } from '@/types/models';
-import { getTeachers } from '@/lib/services/teachers';
-import { getSubjects } from '@/lib/services/subjects';
-import { getBranches } from '@/lib/services/branches';
 import { getRoomsByBranch } from '@/lib/services/rooms';
 import { createTrialSession } from '@/lib/services/trial-bookings';
 import { AvailabilityIssue } from '@/lib/utils/availability';
@@ -63,24 +52,18 @@ export default function TrialSessionDialog({
   branches: initialBranches,
   onSuccess
 }: TrialSessionDialogProps) {
-  // State for student selection
   const [selectedStudent, setSelectedStudent] = useState<string>('');
-  const [showStudentSelect, setShowStudentSelect] = useState(true);
-  
-  // State for form
   const [loading, setLoading] = useState(false);
-  const [teachers, setTeachers] = useState<Teacher[]>(initialTeachers);
-  const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
-  const [branches, setBranches] = useState<Branch[]>(initialBranches);
+  const submittingRef = useRef(false);
+  const [teachers] = useState<Teacher[]>(initialTeachers);
+  const [subjects] = useState<Subject[]>(initialSubjects);
+  const [branches] = useState<Branch[]>(initialBranches);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [availabilityIssues, setAvailabilityIssues] = useState<AvailabilityIssue[]>([]);
-  
-  // เพิ่ม state สำหรับนับจำนวนนักเรียนที่นัดในช่วงเวลาเดียวกัน
   const [existingTrialsCount, setExistingTrialsCount] = useState<number>(0);
   const [existingTrials, setExistingTrials] = useState<any[]>([]);
-  
-  // Form data
+
   const [formData, setFormData] = useState({
     subjectId: '',
     scheduledDate: '',
@@ -90,6 +73,34 @@ export default function TrialSessionDialog({
     branchId: '',
     roomId: '',
   });
+
+  const currentStudent = useMemo(
+    () => students.find(s => s.name === selectedStudent),
+    [students, selectedStudent]
+  );
+
+  // Auto-select student and reset form when dialog opens
+  useEffect(() => {
+    if (isOpen && students.length > 0) {
+      setSelectedStudent(students[0].name);
+      resetForm();
+    }
+  }, [isOpen]);
+
+  const resetForm = () => {
+    setFormData({
+      subjectId: '',
+      scheduledDate: '',
+      startTime: '10:00',
+      endTime: '11:00',
+      teacherId: '',
+      branchId: '',
+      roomId: '',
+    });
+    setAvailabilityIssues([]);
+    setExistingTrialsCount(0);
+    setExistingTrials([]);
+  };
 
   // Load rooms when branch changes
   useEffect(() => {
@@ -102,8 +113,7 @@ export default function TrialSessionDialog({
       try {
         const roomsData = await getRoomsByBranch(formData.branchId);
         setRooms(roomsData.filter(r => r.isActive));
-        
-        // Reset room selection if not in new branch
+
         if (!roomsData.some(r => r.id === formData.roomId)) {
           setFormData(prev => ({ ...prev, roomId: '' }));
         }
@@ -120,11 +130,10 @@ export default function TrialSessionDialog({
   useEffect(() => {
     if (formData.startTime) {
       const [hours, minutes] = formData.startTime.split(':').map(Number);
-      const endHour = hours + 1; // Default 1 hour session
+      const endHour = hours + 1;
       const endMinutes = minutes.toString().padStart(2, '0');
       const newEndTime = `${endHour.toString().padStart(2, '0')}:${endMinutes}`;
-      
-      // Only update if it's a valid time
+
       if (endHour < 24) {
         setFormData(prev => ({ ...prev, endTime: newEndTime }));
       }
@@ -133,8 +142,8 @@ export default function TrialSessionDialog({
 
   // Check availability when relevant fields change
   useEffect(() => {
-    const checkAvailability = async () => {
-      if (!formData.scheduledDate || !formData.startTime || !formData.endTime || 
+    const checkAvailabilityFn = async () => {
+      if (!formData.scheduledDate || !formData.startTime || !formData.endTime ||
           !formData.branchId || !formData.roomId || !formData.teacherId) {
         setAvailabilityIssues([]);
         return;
@@ -142,9 +151,8 @@ export default function TrialSessionDialog({
 
       setCheckingAvailability(true);
       try {
-        // Use the centralized availability checker
         const { checkAvailability } = await import('@/lib/utils/availability');
-        
+
         const result = await checkAvailability({
           date: new Date(formData.scheduledDate),
           startTime: formData.startTime,
@@ -167,69 +175,50 @@ export default function TrialSessionDialog({
       }
     };
 
-    const debounceTimer = setTimeout(checkAvailability, 500);
+    const debounceTimer = setTimeout(checkAvailabilityFn, 500);
     return () => clearTimeout(debounceTimer);
   }, [formData]);
 
-  // เพิ่ม useEffect สำหรับนับจำนวนนักเรียนที่นัดในช่วงเวลาเดียวกัน
+  // Check existing trials that overlap with selected time slot
   useEffect(() => {
     const checkExistingTrials = async () => {
-      if (!formData.scheduledDate || !formData.startTime || !formData.endTime || 
+      if (!formData.scheduledDate || !formData.startTime || !formData.endTime ||
           !formData.branchId || !formData.roomId) {
         setExistingTrialsCount(0);
         setExistingTrials([]);
         return;
       }
-      
+
       try {
-        // นับจำนวน trial sessions ในช่วงเวลาเดียวกัน
         const { getTrialSessions } = await import('@/lib/services/trial-bookings');
-        const allTrials = await getTrialSessions();
-        
-        const matchingTrials = allTrials.filter(trial =>
-          trial.status === 'scheduled' &&
-          trial.branchId === formData.branchId &&
-          trial.roomId === formData.roomId &&
-          new Date(trial.scheduledDate).toDateString() === new Date(formData.scheduledDate).toDateString() &&
-          trial.startTime === formData.startTime &&
-          trial.endTime === formData.endTime
-        );
-        
+        const allTrials = await getTrialSessions(formData.branchId);
+
+        // Check time overlap (not just exact match)
+        const matchingTrials = allTrials.filter(trial => {
+          if (trial.status !== 'scheduled') return false;
+          if (trial.roomId !== formData.roomId) return false;
+          if (new Date(trial.scheduledDate).toDateString() !== new Date(formData.scheduledDate).toDateString()) return false;
+          // Time overlap: startA < endB && endA > startB
+          return trial.startTime < formData.endTime && trial.endTime > formData.startTime;
+        });
+
         setExistingTrialsCount(matchingTrials.length);
         setExistingTrials(matchingTrials);
       } catch (error) {
         console.error('Error checking existing trials:', error);
       }
     };
-    
+
     checkExistingTrials();
   }, [formData.scheduledDate, formData.startTime, formData.endTime, formData.branchId, formData.roomId]);
 
-  const handleStudentSelect = (studentName: string) => {
-    setSelectedStudent(studentName);
-    setShowStudentSelect(false);
-  };
-
-  const handleBack = () => {
-    setSelectedStudent('');
-    setShowStudentSelect(true);
-    // Reset form
-    setFormData({
-      subjectId: '',
-      scheduledDate: '',
-      startTime: '10:00',
-      endTime: '11:00',
-      teacherId: '',
-      branchId: '',
-      roomId: '',
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate
-    if (!formData.subjectId || !formData.scheduledDate || !formData.startTime || 
+
+    // Ref-based guard to prevent double-submit (state update is async)
+    if (submittingRef.current) return;
+
+    if (!formData.subjectId || !formData.scheduledDate || !formData.startTime ||
         !formData.endTime || !formData.teacherId || !formData.branchId || !formData.roomId) {
       toast.error('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
@@ -240,11 +229,12 @@ export default function TrialSessionDialog({
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
 
     try {
       const selectedRoom = rooms.find(r => r.id === formData.roomId);
-      
+
       await createTrialSession({
         bookingId,
         studentName: selectedStudent,
@@ -262,65 +252,92 @@ export default function TrialSessionDialog({
       toast.success('นัดหมายทดลองเรียนสำเร็จ');
       onSuccess();
       onClose();
-      
-      // Reset state
-      handleBack();
     } catch (error) {
       console.error('Error creating trial session:', error);
       toast.error('เกิดข้อผิดพลาดในการนัดหมาย');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
 
   // Filter teachers based on subject and branch
   const getAvailableTeachers = () => {
-    return teachers.filter(teacher => 
+    return teachers.filter(teacher =>
       (!formData.subjectId || teacher.specialties.includes(formData.subjectId)) &&
       (!formData.branchId || teacher.availableBranches.includes(formData.branchId))
     );
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {
-      onClose();
-      handleBack();
-    }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={() => { onClose(); }}>
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>นัดหมายทดลองเรียน</DialogTitle>
         </DialogHeader>
-        
-        {showStudentSelect && students.length > 0 ? (
-          // Student Selection Screen
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">เลือกนักเรียนที่ต้องการนัดหมาย:</p>
-            <div className="grid gap-3">
-              {students.map((student, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleStudentSelect(student.name)}
-                  className="p-4 border rounded-lg hover:bg-gray-50 text-left transition-colors"
-                >
-                  <div className="font-medium">{student.name}</div>
-                  {student.schoolName && (
-                    <div className="text-sm text-gray-600 mt-1 flex items-center gap-1">
-                      <School className="h-3 w-3" />
-                      {student.schoolName}
-                      {student.gradeLevel && ` (${student.gradeLevel})`}
-                    </div>
+
+        {students.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            ไม่มีนักเรียนที่รอนัดหมาย
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Student pill tabs (multiple students only) */}
+            {students.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {students.map((student, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setSelectedStudent(student.name);
+                      resetForm();
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 text-sm rounded-full border transition-colors",
+                      selectedStudent === student.name
+                        ? "bg-gray-900 text-white border-gray-900"
+                        : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                    )}
+                  >
+                    {student.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Compact student info header */}
+            {currentStudent && (
+              <div className="pb-3 border-b">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-base">{selectedStudent}</span>
+                  {currentStudent.schoolName && (
+                    <>
+                      <span className="text-gray-300">|</span>
+                      <span className="text-gray-500">{currentStudent.schoolName}</span>
+                    </>
                   )}
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {student.subjectInterests.map(subjectId => {
+                  {currentStudent.gradeLevel && (
+                    <>
+                      <span className="text-gray-300">|</span>
+                      <span className="text-gray-500">{currentStudent.gradeLevel}</span>
+                    </>
+                  )}
+                </div>
+                {currentStudent.subjectInterests.length > 0 && (
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className="text-sm text-amber-600 font-medium">สนใจ:</span>
+                    {currentStudent.subjectInterests.map(subjectId => {
                       const subject = subjects.find(s => s.id === subjectId);
                       return subject ? (
-                        <Badge 
-                          key={subjectId} 
-                          className="text-xs"
-                          style={{ 
-                            backgroundColor: `${subject.color}20`,
+                        <Badge
+                          key={subjectId}
+                          variant="outline"
+                          className="text-sm"
+                          style={{
+                            backgroundColor: `${subject.color}15`,
                             color: subject.color,
-                            borderColor: subject.color
+                            borderColor: `${subject.color}40`,
                           }}
                         >
                           {subject.name}
@@ -328,230 +345,152 @@ export default function TrialSessionDialog({
                       ) : null;
                     })}
                   </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : selectedStudent ? (
-          // Trial Session Form
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Back button */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleBack}
-              className="mb-2"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              กลับ
-            </Button>
+                )}
+              </div>
+            )}
 
-            {/* Student Info */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-sm text-gray-600">นักเรียน:</p>
-              <p className="font-medium text-lg">{selectedStudent}</p>
-              {/* แสดงวิชาที่สนใจ */}
-              {(() => {
-                const currentStudent = students.find(s => s.name === selectedStudent);
-                if (currentStudent && currentStudent.subjectInterests.length > 0) {
-                  return (
-                    <div className="mt-2">
-                      <p className="text-xs text-gray-600 mb-1">วิชาที่สนใจ:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {currentStudent.subjectInterests.map(subjectId => {
-                          const subject = subjects.find(s => s.id === subjectId);
-                          return subject ? (
-                            <Badge 
-                              key={subjectId} 
-                              className="text-xs"
-                              style={{ 
-                                backgroundColor: `${subject.color}20`,
-                                color: subject.color,
-                                borderColor: subject.color
-                              }}
-                            >
-                              {subject.name}
-                            </Badge>
-                          ) : null;
-                        })}
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
-
-            <div className="space-y-4">
+            {/* Form fields */}
+            <div className="space-y-3">
               {/* Row 1: Branch and Subject */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Branch */}
-                <div className="space-y-2">
-                  <Label htmlFor="branch">สาขา *</Label>
-                  <Select
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>สาขา *</Label>
+                  <FormSelect
                     value={formData.branchId}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, branchId: value, subjectId: '' }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="เลือกสาขา" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="เลือกสาขา"
+                    options={branches.map((branch) => ({
+                      value: branch.id,
+                      label: branch.name,
+                    }))}
+                  />
                 </div>
 
-                {/* Subject */}
-                <div className="space-y-2">
-                  <Label htmlFor="subject">วิชา *</Label>
-                  <SubjectSearchSelect
-                    subjects={subjects}
+                <div className="space-y-1.5">
+                  <Label>วิชา *</Label>
+                  <FormSelect
                     value={formData.subjectId}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, subjectId: value }))}
                     disabled={!formData.branchId}
-                    required
-                    placeholder={formData.branchId ? "ค้นหาวิชา..." : "เลือกสาขาก่อน"}
+                    placeholder={formData.branchId ? "เลือกวิชา" : "เลือกสาขาก่อน"}
+                    options={subjects.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                      color: s.color,
+                    }))}
                   />
                 </div>
               </div>
 
               {/* Row 2: Date and Time */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Date */}
-                <div className="space-y-2">
-                  <Label htmlFor="date">วันที่ทดลองเรียน *</Label>
-                  <Input
-                    id="date"
-                    type="date"
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>วันที่ *</Label>
+                  <DateRangePicker
+                    mode="single"
                     value={formData.scheduledDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, scheduledDate: e.target.value }))}
-                    min={new Date().toISOString().split('T')[0]}
-                    required
+                    onChange={(date) => setFormData(prev => ({ ...prev, scheduledDate: date || '' }))}
+                    minDate={new Date()}
+                    placeholder="เลือกวันที่"
+                    disabled={!formData.branchId}
+                    popoverDirection="up"
                   />
                 </div>
 
-                {/* Time Range */}
-                <div className="space-y-2">
-                  <Label>ช่วงเวลา *</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      id="startTime"
-                      type="time"
-                      value={formData.startTime}
-                      onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
-                      step="300" // 5 minute intervals
-                      required
-                    />
-                    <Input
-                      id="endTime"
-                      type="time"
-                      value={formData.endTime}
-                      onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
-                      step="300" // 5 minute intervals
-                      min={formData.startTime}
-                      required
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label>เวลา *</Label>
+                  <TimeRangePicker
+                    startTime={formData.startTime}
+                    endTime={formData.endTime}
+                    onStartTimeChange={(v) => setFormData(prev => ({ ...prev, startTime: v }))}
+                    onEndTimeChange={(v) => setFormData(prev => ({ ...prev, endTime: v }))}
+                    disabled={!formData.branchId}
+                  />
                 </div>
               </div>
 
               {/* Row 3: Teacher and Room */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Teacher */}
-                <div className="space-y-2">
-                  <Label htmlFor="teacher">ครูผู้สอน *</Label>
-                  <Select
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>ครูผู้สอน *</Label>
+                  <FormSelect
                     value={formData.teacherId}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, teacherId: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="เลือกครู" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableTeachers().length === 0 ? (
-                        <div className="p-2 text-sm text-gray-500 text-center">
-                          ไม่มีครูที่สอนวิชานี้ในสาขาที่เลือก
-                        </div>
-                      ) : (
-                        getAvailableTeachers().map((teacher) => (
-                          <SelectItem key={teacher.id} value={teacher.id}>
-                            {teacher.nickname || teacher.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                    disabled={!formData.branchId}
+                    placeholder={formData.branchId ? "เลือกครู" : "เลือกสาขาก่อน"}
+                    options={getAvailableTeachers().map((teacher) => ({
+                      value: teacher.id,
+                      label: teacher.nickname || teacher.name,
+                    }))}
+                  />
                 </div>
 
-                {/* Room */}
-                <div className="space-y-2">
-                  <Label htmlFor="room">ห้องเรียน *</Label>
-                  <Select
+                <div className="space-y-1.5">
+                  <Label>ห้องเรียน *</Label>
+                  <FormSelect
                     value={formData.roomId}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, roomId: value }))}
                     disabled={!formData.branchId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={formData.branchId ? "เลือกห้อง" : "เลือกสาขาก่อน"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {rooms.map((room) => (
-                        <SelectItem key={room.id} value={room.id}>
-                          {room.name} (จุ {room.capacity} คน)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder={formData.branchId ? "เลือกห้อง" : "เลือกสาขาก่อน"}
+                    options={rooms.map((room) => ({
+                      value: room.id,
+                      label: `${room.name} (จุ ${room.capacity} คน)`,
+                    }))}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* แสดงจำนวนนักเรียนที่นัดในช่วงเวลาเดียวกัน */}
-            {existingTrialsCount > 0 && (
-              <Alert className="border-blue-200 bg-blue-50">
-                <Info className="h-4 w-4 text-blue-600" />
-                <AlertDescription>
-                  <div className="text-blue-800">
-                    <p className="font-medium mb-2">มีนักเรียน {existingTrialsCount} คนนัดทดลองเรียนในช่วงเวลานี้แล้ว</p>
-                    <div className="space-y-1">
-                      {existingTrials.map((trial, index) => {
-                        const trialSubject = subjects.find(s => s.id === trial.subjectId);
-                        return (
-                          <div key={trial.id} className="flex items-center gap-2 text-sm">
-                            <span className="text-blue-600">{index + 1}.</span>
-                            <span className="font-medium">{trial.studentName}</span>
-                            <span className="text-blue-600">ทดลองวิชา</span>
-                            <Badge 
-                              className="text-xs"
-                              style={{ 
-                                backgroundColor: trialSubject?.color || '#3B82F6',
-                                color: 'white',
-                                border: 'none'
-                              }}
-                            >
-                              {trialSubject?.name || 'ไม่ระบุวิชา'}
-                            </Badge>
-                          </div>
-                        );
-                      })}
+            {/* Existing trials in same time slot */}
+            {existingTrialsCount > 0 && (() => {
+              const selectedRoom = rooms.find(r => r.id === formData.roomId);
+              const capacity = selectedRoom?.capacity || 0;
+              const isFull = capacity > 0 && existingTrialsCount >= capacity;
+              return (
+                <Alert className={cn(
+                  isFull ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'
+                )}>
+                  <Info className={cn('h-4 w-4', isFull ? 'text-amber-600' : 'text-blue-600')} />
+                  <AlertDescription>
+                    <div className={isFull ? 'text-amber-800' : 'text-blue-800'}>
+                      <p className="font-medium mb-1">
+                        มีนัดทดลองเรียนในช่วงเวลานี้แล้ว {existingTrialsCount} คน
+                        {capacity > 0 && ` / ห้องจุ ${capacity} คน`}
+                        {isFull && ' (เต็ม)'}
+                      </p>
+                      <div className="space-y-0.5">
+                        {existingTrials.map((trial, index) => {
+                          const trialSubject = subjects.find(s => s.id === trial.subjectId);
+                          return (
+                            <div key={trial.id} className="flex items-center gap-2 text-sm">
+                              <span className={isFull ? 'text-amber-600' : 'text-blue-600'}>{index + 1}.</span>
+                              <span className="font-medium">{trial.studentName}</span>
+                              <Badge
+                                className="text-xs"
+                                style={{
+                                  backgroundColor: trialSubject?.color || '#3B82F6',
+                                  color: 'white',
+                                  border: 'none'
+                                }}
+                              >
+                                {trialSubject?.name || 'ไม่ระบุวิชา'}
+                              </Badge>
+                              <span className="text-xs opacity-70">{trial.startTime}-{trial.endTime}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
+                  </AlertDescription>
+                </Alert>
+              );
+            })()}
 
-            {/* Availability Check Result */}
+            {/* Availability Check */}
             {checkingAvailability ? (
               <Alert>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <AlertDescription>
-                  กำลังตรวจสอบห้องว่าง...
-                </AlertDescription>
+                <AlertDescription>กำลังตรวจสอบห้องว่าง...</AlertDescription>
               </Alert>
             ) : availabilityIssues.length > 0 ? (
               <Alert variant="destructive">
@@ -569,7 +508,7 @@ export default function TrialSessionDialog({
                 </AlertDescription>
               </Alert>
             ) : (
-              formData.scheduledDate && formData.startTime && formData.endTime && 
+              formData.scheduledDate && formData.startTime && formData.endTime &&
               formData.branchId && formData.roomId && formData.teacherId && (
                 <Alert className="border-green-200 bg-green-50">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -581,21 +520,22 @@ export default function TrialSessionDialog({
             )}
 
             {/* Actions */}
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 pt-1">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  onClose();
-                  handleBack();
-                }}
+                onClick={onClose}
                 disabled={loading}
               >
                 ยกเลิก
               </Button>
-              <Button 
-                type="submit" 
-                disabled={loading || checkingAvailability || availabilityIssues.length > 0}
+              <Button
+                type="submit"
+                disabled={
+                  loading || checkingAvailability || availabilityIssues.length > 0 ||
+                  !formData.subjectId || !formData.scheduledDate || !formData.startTime ||
+                  !formData.endTime || !formData.teacherId || !formData.branchId || !formData.roomId
+                }
                 className="bg-red-500 hover:bg-red-600"
               >
                 {loading ? (
@@ -609,11 +549,6 @@ export default function TrialSessionDialog({
               </Button>
             </div>
           </form>
-        ) : (
-          // No students
-          <div className="text-center py-8 text-gray-500">
-            ไม่มีนักเรียนที่รอนัดหมาย
-          </div>
         )}
       </DialogContent>
     </Dialog>

@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { getActiveBranches } from '@/lib/services/branches';
 import { Branch } from '@/types/models';
-import { MapPin } from 'lucide-react';
 
 interface BranchSelectorProps {
   value: string;
@@ -32,23 +31,18 @@ export default function BranchSelector({ value, onChange, showAllOption = true }
   };
 
   return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-[200px]">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
-          <SelectValue placeholder="เลือกสาขา" />
-        </div>
-      </SelectTrigger>
-      <SelectContent>
-        {showAllOption && (
-          <SelectItem value="all">ทุกสาขา</SelectItem>
-        )}
-        {branches.map((branch) => (
-          <SelectItem key={branch.id} value={branch.id}>
-            {branch.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <FormSelect
+      value={value}
+      onValueChange={onChange}
+      placeholder="เลือกสาขา"
+      className="w-[200px]"
+      options={[
+        ...(showAllOption ? [{ value: 'all', label: 'ทุกสาขา' }] : []),
+        ...branches.map((branch) => ({
+          value: branch.id,
+          label: branch.name,
+        })),
+      ]}
+    />
   );
 }

@@ -1,8 +1,9 @@
 import { Enrollment, Class } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
-import { getClassSchedules } from './classes';
+import { getClassSchedules, incrementEnrolledCount, decrementEnrolledCount } from './classes';
 import { createMakeupRequest } from './makeup';
 import { getClass } from './classes';
+import { adminMutation } from '@/lib/admin-mutation';
 
 const TABLE_NAME = 'enrollments';
 
@@ -22,8 +23,9 @@ interface EnrollmentRow {
   discount_type: 'percentage' | 'fixed';
   final_price: number;
   promotion_code: string | null;
-  payment_method: 'cash' | 'transfer' | 'credit';
-  payment_status: 'pending' | 'partial' | 'paid';
+  payment_method: string;
+  payment_type: string;
+  payment_status: string;
   paid_amount: number;
   paid_date: string | null;
   receipt_number: string | null;
@@ -51,8 +53,9 @@ function mapToEnrollment(row: EnrollmentRow): Enrollment {
       promotionCode: row.promotion_code || undefined,
     },
     payment: {
-      method: row.payment_method,
-      status: row.payment_status,
+      method: (row.payment_method || 'cash') as Enrollment['payment']['method'],
+      type: (row.payment_type || 'full') as Enrollment['payment']['type'],
+      status: (row.payment_status || 'pending') as Enrollment['payment']['status'],
       paidAmount: row.paid_amount,
       paidDate: row.paid_date ? new Date(row.paid_date) : undefined,
       receiptNumber: row.receipt_number || undefined,
@@ -424,8 +427,6 @@ export async function createEnrollment(
   enrollmentData: Omit<Enrollment, 'id' | 'enrolledAt'>
 ): Promise<string> {
   try {
-    const supabase = getClient();
-
     // Prepare enrollment data
     const insertData: any = {
       student_id: enrollmentData.studentId,
@@ -438,6 +439,7 @@ export async function createEnrollment(
       discount_type: enrollmentData.pricing.discountType,
       final_price: enrollmentData.pricing.finalPrice,
       payment_method: enrollmentData.payment.method,
+      payment_type: enrollmentData.payment.type || 'full',
       payment_status: enrollmentData.payment.status,
       paid_amount: enrollmentData.payment.paidAmount,
     };
@@ -457,19 +459,18 @@ export async function createEnrollment(
     }
 
     // Insert enrollment
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert(insertData)
-      .select()
-      .single();
+    const result = await adminMutation({
+      table: 'enrollments',
+      operation: 'insert',
+      data: insertData,
+      options: { select: true, single: true }
+    });
 
-    if (error) throw error;
-    if (!data) throw new Error('No data returned from insert');
+    if (!result) throw new Error('No data returned from insert');
+    const enrollmentId = result.id;
 
-    const enrollmentId = data.id;
-
-    // Note: enrolled_count is updated automatically by database trigger on enrollments table
-    // Do NOT manually increment here to avoid double-counting
+    // Increment enrolled count on class
+    await incrementEnrolledCount(enrollmentData.classId);
 
     // Create makeup requests for missed sessions
     await createMakeupForMissedSessions(
@@ -559,8 +560,6 @@ export async function updateEnrollment(
   enrollmentData: Partial<Enrollment>
 ): Promise<void> {
   try {
-    const supabase = getClient();
-
     const updateData: any = {};
 
     // Status
@@ -617,12 +616,12 @@ export async function updateEnrollment(
       return;
     }
 
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
+    await adminMutation({
+      table: 'enrollments',
+      operation: 'update',
+      data: updateData,
+      match: { id }
+    });
 
     // Fire-and-forget: notify FB audience sync when status changes to completed/dropped
     if (enrollmentData.status === 'completed' || enrollmentData.status === 'dropped') {
@@ -649,21 +648,19 @@ export async function cancelEnrollment(
     const enrollment = await getEnrollment(id);
     if (!enrollment) throw new Error('Enrollment not found');
 
-    const supabase = getClient();
-
     // Update enrollment status
-    const { error: enrollmentError } = await supabase
-      .from(TABLE_NAME)
-      .update({
+    await adminMutation({
+      table: 'enrollments',
+      operation: 'update',
+      data: {
         status: 'dropped',
         dropped_reason: reason
-      })
-      .eq('id', id);
+      },
+      match: { id }
+    });
 
-    if (enrollmentError) throw enrollmentError;
-
-    // Note: enrolled_count is updated automatically by database trigger on enrollments table
-    // Do NOT manually decrement here to avoid double-counting
+    // Decrement enrolled count on class
+    await decrementEnrolledCount(enrollment.classId);
 
     // Fire-and-forget: notify FB audience sync
     fetch('/api/fb/enrollment-status-change', {
@@ -721,33 +718,32 @@ export async function transferEnrollment(
     const enrollment = await getEnrollment(enrollmentId);
     if (!enrollment) throw new Error('Enrollment not found');
 
-    const supabase = getClient();
-
     // Create transfer history record
-    const { error: historyError } = await supabase
-      .from('enrollment_transfer_history')
-      .insert({
+    await adminMutation({
+      table: 'enrollment_transfer_history',
+      operation: 'insert',
+      data: {
         enrollment_id: enrollmentId,
         from_class_id: enrollment.classId,
         to_class_id: newClassId,
         reason: reason || 'Admin transfer'
-      });
-
-    if (historyError) throw historyError;
+      }
+    });
 
     // Update enrollment
-    const { error: enrollmentError } = await supabase
-      .from(TABLE_NAME)
-      .update({
+    await adminMutation({
+      table: 'enrollments',
+      operation: 'update',
+      data: {
         class_id: newClassId,
         status: 'active'
-      })
-      .eq('id', enrollmentId);
+      },
+      match: { id: enrollmentId }
+    });
 
-    if (enrollmentError) throw enrollmentError;
-
-    // Note: enrolled_count is updated automatically by database trigger on enrollments table
-    // The trigger handles class_id changes (decrement old, increment new)
+    // Update enrolled counts: decrement old class, increment new class
+    await decrementEnrolledCount(enrollment.classId);
+    await incrementEnrolledCount(newClassId);
   } catch (error) {
     console.error('Error transferring enrollment:', error);
     throw error;

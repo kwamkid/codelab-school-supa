@@ -5,13 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Pagination, usePagination } from '@/components/ui/pagination';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   Table,
@@ -219,28 +213,30 @@ export default function NotificationLogsPage() {
               placeholder="เลือกช่วงวันที่"
               className="w-full sm:w-auto sm:min-w-[300px]"
             />
-            <Select value={filterType || 'all'} onValueChange={(v) => handleFilterChange('type', v)}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="ประเภท: ทั้งหมด" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ประเภท: ทั้งหมด</SelectItem>
-                <SelectItem value="class-reminder">แจ้งเตือนคลาส</SelectItem>
-                <SelectItem value="makeup-reminder">แจ้งเตือน Makeup</SelectItem>
-                <SelectItem value="makeup-scheduled">ยืนยัน Makeup</SelectItem>
-                <SelectItem value="trial-confirmation">ยืนยันทดลองเรียน</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus || 'all'} onValueChange={(v) => handleFilterChange('status', v)}>
-              <SelectTrigger className="w-full sm:w-[160px]">
-                <SelectValue placeholder="สถานะ: ทั้งหมด" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">สถานะ: ทั้งหมด</SelectItem>
-                <SelectItem value="success">สำเร็จ</SelectItem>
-                <SelectItem value="failed">ล้มเหลว</SelectItem>
-              </SelectContent>
-            </Select>
+            <FormSelect
+              value={filterType || 'all'}
+              onValueChange={(v) => handleFilterChange('type', v)}
+              className="w-full sm:w-[180px]"
+              placeholder="ประเภท: ทั้งหมด"
+              options={[
+                { value: 'all', label: 'ประเภท: ทั้งหมด' },
+                { value: 'class-reminder', label: 'แจ้งเตือนคลาส' },
+                { value: 'makeup-reminder', label: 'แจ้งเตือน Makeup' },
+                { value: 'makeup-scheduled', label: 'ยืนยัน Makeup' },
+                { value: 'trial-confirmation', label: 'ยืนยันทดลองเรียน' },
+              ]}
+            />
+            <FormSelect
+              value={filterStatus || 'all'}
+              onValueChange={(v) => handleFilterChange('status', v)}
+              className="w-full sm:w-[160px]"
+              placeholder="สถานะ: ทั้งหมด"
+              options={[
+                { value: 'all', label: 'สถานะ: ทั้งหมด' },
+                { value: 'success', label: 'สำเร็จ' },
+                { value: 'failed', label: 'ล้มเหลว' },
+              ]}
+            />
             <Button variant="outline" size="sm" onClick={loadLogs} disabled={loading}>
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             </Button>

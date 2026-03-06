@@ -7,16 +7,11 @@ import { createStudent, updateStudent } from '@/lib/services/parents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormSelect } from '@/components/ui/form-select';
 import { GradeLevelCombobox } from "@/components/ui/grade-level-combobox";
 import { SchoolNameCombobox } from "@/components/ui/school-name-combobox";
 import { toast } from 'sonner';
@@ -147,30 +142,25 @@ export default function StudentForm({ parentId, student, isEdit = false }: Stude
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="birthdate">วันเกิด *</Label>
-                <Input
-                  id="birthdate"
-                  type="date"
+                <DateRangePicker
+                  mode="single"
                   value={formData.birthdate}
-                  onChange={(e) => setFormData({ ...formData, birthdate: e.target.value })}
-                  required
+                  onChange={(date) => setFormData({ ...formData, birthdate: date || '' })}
+                  placeholder="เลือกวันที่"
                 />
                 <p className="text-xs text-gray-500">นักเรียนต้องมีอายุ 4-18 ปี</p>
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="gender">เพศ *</Label>
-                <Select
+                <FormSelect
                   value={formData.gender}
                   onValueChange={(value) => setFormData({ ...formData, gender: value as 'M' | 'F' })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="M">ชาย</SelectItem>
-                    <SelectItem value="F">หญิง</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: 'M', label: 'ชาย' },
+                    { value: 'F', label: 'หญิง' },
+                  ]}
+                />
               </div>
             </div>
 

@@ -10,6 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { Label } from '@/components/ui/label';
 import {
   Table,
@@ -49,6 +50,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDate, formatTime } from '@/lib/utils';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 interface ScheduleManagerProps {
   eventId: string;
@@ -311,35 +313,23 @@ export default function ScheduleManager({ eventId, schedules, onUpdate }: Schedu
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="date">วันที่ *</Label>
-              <Input
-                id="date"
-                type="date"
+              <DateRangePicker
+                mode="single"
                 value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                min={new Date().toISOString().split('T')[0]}
+                onChange={(date) => setFormData({ ...formData, date: date || '' })}
+                minDate={new Date()}
+                placeholder="เลือกวันที่"
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startTime">เวลาเริ่ม *</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="endTime">เวลาจบ *</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>เวลา *</Label>
+              <TimeRangePicker
+                startTime={formData.startTime}
+                endTime={formData.endTime}
+                onStartTimeChange={(v) => setFormData({ ...formData, startTime: v })}
+                onEndTimeChange={(v) => setFormData({ ...formData, endTime: v })}
+              />
             </div>
             
             <div className="space-y-2">
