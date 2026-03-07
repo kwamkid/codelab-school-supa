@@ -802,19 +802,6 @@ export default function ChatChannelSettings() {
                 <Input readOnly value={`${baseUrl}/api/webhooks/facebook`} className="text-base font-mono" />
                 <Button size="icon" variant="outline" onClick={() => copyToClipboard(`${baseUrl}/api/webhooks/facebook`)}><Copy className="w-4 h-4" /></Button>
               </div>
-              {/* Show verify token from first FB channel */}
-              {(() => {
-                const firstFb = fbIgChannels.find((c) => c.type === 'facebook');
-                return firstFb?.credentials?.webhookVerifyToken ? (
-                  <div className="space-y-1">
-                    <Label className="text-sm text-gray-500">Verify Token</Label>
-                    <div className="flex gap-2">
-                      <Input readOnly value={firstFb.credentials.webhookVerifyToken} className="text-base font-mono" />
-                      <Button size="icon" variant="outline" onClick={() => copyToClipboard(firstFb.credentials.webhookVerifyToken)}><Copy className="w-4 h-4" /></Button>
-                    </div>
-                  </div>
-                ) : null;
-              })()}
             </CardContent>
           </Card>
         </TabsContent>
