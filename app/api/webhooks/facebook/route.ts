@@ -17,9 +17,15 @@ export async function GET(request: NextRequest) {
 
   // Check against env var first, then DB
   const envVerifyToken = process.env.FACEBOOK_WEBHOOK_VERIFY_TOKEN
-  let verifyToken = envVerifyToken
 
-  if (!verifyToken) {
+  if (mode === 'subscribe' && token) {
+    // Try env var
+    if (envVerifyToken && token === envVerifyToken) {
+      console.log('Facebook webhook verified (env)')
+      return new NextResponse(challenge, { status: 200 })
+    }
+
+    // Try DB-stored token
     try {
       const supabase = createServiceClient()
       const { data: channels } = await (supabase as any)
@@ -28,13 +34,12 @@ export async function GET(request: NextRequest) {
         .in('type', ['facebook', 'instagram'])
         .eq('is_active', true)
         .limit(1)
-      verifyToken = channels?.[0]?.credentials?.webhookVerifyToken
+      const dbToken = channels?.[0]?.credentials?.webhookVerifyToken
+      if (dbToken && token === dbToken) {
+        console.log('Facebook webhook verified (db)')
+        return new NextResponse(challenge, { status: 200 })
+      }
     } catch {}
-  }
-
-  if (mode === 'subscribe' && token && token === verifyToken) {
-    console.log('Facebook webhook verified')
-    return new NextResponse(challenge, { status: 200 })
   }
 
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 })

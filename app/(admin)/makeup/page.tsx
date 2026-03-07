@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MakeupClass } from '@/types/models';
-import { getMakeupClasses, deleteMakeupClass } from '@/lib/services/makeup';
+import { getMakeupClasses, deleteMakeupClass, recordMakeupAttendance } from '@/lib/services/makeup';
 import { getActiveBranches } from '@/lib/services/branches';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -118,6 +118,11 @@ export default function MakeupPage() {
   const [scheduleMakeup, setScheduleMakeup] = useState<MakeupClass | null>(null);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
 
+  // Attendance dialog
+  const [attendanceMakeup, setAttendanceMakeup] = useState<MakeupClass | null>(null);
+  const [showAttendanceDialog, setShowAttendanceDialog] = useState(false);
+  const [markingAttendance, setMarkingAttendance] = useState(false);
+
   // Delete dialog
   const [selectedMakeup, setSelectedMakeup] = useState<MakeupClass | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -226,6 +231,34 @@ export default function MakeupPage() {
   const handleSchedule = (makeup: MakeupClass) => {
     setScheduleMakeup(makeup);
     setShowScheduleDialog(true);
+  };
+
+  const handleMarkAttendance = (makeup: MakeupClass) => {
+    setAttendanceMakeup(makeup);
+    setShowAttendanceDialog(true);
+  };
+
+  const confirmMarkAttendance = async () => {
+    if (!attendanceMakeup || !user?.uid) {
+      toast.error('กรุณาเข้าสู่ระบบ');
+      return;
+    }
+    setMarkingAttendance(true);
+    try {
+      await recordMakeupAttendance(attendanceMakeup.id, {
+        status: 'present',
+        checkedBy: user.uid,
+      });
+      toast.success('บันทึกการเข้าเรียนเรียบร้อยแล้ว');
+      setShowAttendanceDialog(false);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.makeupClasses(selectedBranchId) });
+      window.dispatchEvent(new CustomEvent('makeup-changed'));
+    } catch (error: any) {
+      console.error('Error marking attendance:', error);
+      toast.error(error.message || 'เกิดข้อผิดพลาด');
+    } finally {
+      setMarkingAttendance(false);
+    }
   };
 
   const handleQuickDelete = (makeup: MakeupClass) => {
@@ -518,7 +551,7 @@ export default function MakeupPage() {
                                         เปลี่ยนวันนัด
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
-                                        onClick={() => handleViewDetail(makeup)}
+                                        onClick={() => handleMarkAttendance(makeup)}
                                         className="text-green-600"
                                       >
                                         <CheckCircle className="h-4 w-4 mr-2" />
@@ -606,6 +639,37 @@ export default function MakeupPage() {
               className="bg-red-500 hover:bg-red-600"
             >
               {deletingId === selectedMakeup?.id ? 'กำลังลบ...' : 'ยืนยันลบ'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Attendance Confirm Dialog */}
+      <AlertDialog open={showAttendanceDialog} onOpenChange={setShowAttendanceDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการบันทึกเข้าเรียน</AlertDialogTitle>
+            <AlertDialogDescription>
+              ยืนยันว่านักเรียนมาเรียนชดเชยแล้ว?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {attendanceMakeup && (
+            <div className="bg-gray-50 rounded p-3 text-sm space-y-1">
+              <p><strong>นักเรียน:</strong> {attendanceMakeup.studentNickname ? `${attendanceMakeup.studentNickname} (${attendanceMakeup.studentName.split(' ')[0]})` : attendanceMakeup.studentName}</p>
+              <p><strong>คลาส:</strong> {attendanceMakeup.className}</p>
+              {attendanceMakeup.makeupSchedule && (
+                <p><strong>วันที่นัด:</strong> {formatDate(attendanceMakeup.makeupSchedule.date)} {attendanceMakeup.makeupSchedule.startTime?.substring(0, 5)} - {attendanceMakeup.makeupSchedule.endTime?.substring(0, 5)}</p>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={markingAttendance}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmMarkAttendance}
+              disabled={markingAttendance}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {markingAttendance ? 'กำลังบันทึก...' : 'ยืนยัน มาเรียนแล้ว'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

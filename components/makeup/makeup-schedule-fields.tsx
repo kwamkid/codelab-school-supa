@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   AlertCircle, CheckCircle2, AlertTriangle,
   Clock, User, Users, Loader2
@@ -90,20 +90,6 @@ export default function MakeupScheduleFields({
     return () => { cancelled = true; };
   }, [branchId, canAccessBranch]);
 
-  // Auto-set end time when start time changes
-  useEffect(() => {
-    if (value.startTime) {
-      const [hours, minutes] = value.startTime.split(':').map(Number);
-      const endHour = hours + 1;
-      if (endHour < 24) {
-        const newEndTime = `${endHour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        if (newEndTime !== value.endTime) {
-          onChange({ ...value, endTime: newEndTime });
-        }
-      }
-    }
-  }, [value.startTime]);
-
   // Check availability
   useEffect(() => {
     if (!value.date || !value.startTime || !value.endTime ||
@@ -139,9 +125,17 @@ export default function MakeupScheduleFields({
     return () => clearTimeout(timer);
   }, [value.date, value.startTime, value.endTime, value.teacherId, value.roomId, branchId, excludeMakeupId]);
 
-  const update = (partial: Partial<ScheduleFormData>) => {
-    onChange({ ...value, ...partial });
-  };
+  // Use ref to track latest value so sequential synchronous calls
+  // (e.g. TimeRangePicker calling onStartTimeChange + onEndTimeChange)
+  // don't overwrite each other due to stale closure
+  const latestValueRef = useRef(value);
+  latestValueRef.current = value;
+
+  const update = useCallback((partial: Partial<ScheduleFormData>) => {
+    const newValue = { ...latestValueRef.current, ...partial };
+    latestValueRef.current = newValue;
+    onChange(newValue);
+  }, [onChange]);
 
   const getGroupedWarnings = () => {
     const roomWarnings = availabilityWarnings.filter(w => w.type === 'room_conflict');
@@ -154,9 +148,9 @@ export default function MakeupScheduleFields({
 
   return (
     <div className="space-y-4">
-      {/* Teacher and Room — first so date picker has room above for calendar */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
+      {/* Teacher and Room — same 5:7 ratio as date/time row for alignment */}
+      <div className="grid gap-4" style={{ gridTemplateColumns: '5fr 7fr' }}>
+        <div className="space-y-2 min-w-0">
           <Label>ครูผู้สอน *</Label>
           <Select
             value={value.teacherId}
@@ -176,14 +170,14 @@ export default function MakeupScheduleFields({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <Label>ห้องเรียน *</Label>
           <Select
             value={value.roomId}
             onValueChange={(v) => update({ roomId: v })}
             disabled={disabled || loadingData || rooms.length === 0}
           >
-            <SelectTrigger>
+            <SelectTrigger className="truncate">
               <SelectValue placeholder={loadingData ? 'กำลังโหลด...' : 'เลือกห้อง'} />
             </SelectTrigger>
             <SelectContent>
@@ -197,8 +191,8 @@ export default function MakeupScheduleFields({
         </div>
       </div>
 
-      {/* Date and Time — at bottom so popoverDirection="up" stays within modal */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Date and Time — give time picker more space (5fr vs 7fr) */}
+      <div className="grid gap-4" style={{ gridTemplateColumns: '5fr 7fr' }}>
         <div className="space-y-2">
           <Label>วันที่นัด Makeup *</Label>
           <DateRangePicker

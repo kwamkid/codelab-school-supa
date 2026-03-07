@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, CalendarCheck, User, BookOpen, MapPin, MessageSquare } from 'lucide-react';
+import { Loader2, CalendarCheck, User, BookOpen, MessageSquare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -125,59 +125,33 @@ export default function ScheduleMakeupDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Student & Class Info */}
-        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-          <div className="flex items-start gap-3">
-            <User className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500">นักเรียน</p>
-              <p className="font-medium text-base">
-                {makeupRequest.studentNickname
-                  ? `${makeupRequest.studentNickname} (${makeupRequest.studentName.split(' ')[0]})`
-                  : makeupRequest.studentName}
-              </p>
-            </div>
+        {/* Student & Class Info — compact */}
+        <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm space-y-1.5">
+          <div className="flex items-center gap-2">
+            <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+            <span className="font-medium truncate">
+              {makeupRequest.studentNickname
+                ? `${makeupRequest.studentNickname} (${makeupRequest.studentName.split(' ')[0]})`
+                : makeupRequest.studentName}
+            </span>
+            <Badge variant="outline" className="text-red-600 border-red-200 ml-auto shrink-0 text-xs">
+              {makeupRequest.branchName}
+            </Badge>
           </div>
-
-          <div className="flex items-start gap-3">
-            <BookOpen className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500">คลาส</p>
-              <p className="font-medium text-base">
-                {makeupRequest.className}
-                <span className="text-gray-500 font-normal ml-1.5">
-                  {makeupRequest.subjectName}
-                </span>
-              </p>
-              {makeupRequest.originalSessionNumber && (
-                <p className="text-sm text-gray-500">
-                  ครั้งที่ {makeupRequest.originalSessionNumber}
-                  {makeupRequest.originalSessionDate && (
-                    <span className="ml-1">
-                      ({formatDate(makeupRequest.originalSessionDate)})
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+            <span className="truncate">{makeupRequest.className}</span>
+            <span className="text-gray-400 shrink-0">{makeupRequest.subjectName}</span>
+            {makeupRequest.originalSessionNumber && (
+              <span className="text-gray-500 shrink-0">
+                ครั้งที่ {makeupRequest.originalSessionNumber}
+                {makeupRequest.originalSessionDate && ` (${formatDate(makeupRequest.originalSessionDate)})`}
+              </span>
+            )}
           </div>
-
-          <div className="flex items-start gap-3">
-            <MessageSquare className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500">เหตุผล</p>
-              <p className="text-sm">{makeupRequest.reason}</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <MapPin className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500">สาขา</p>
-              <Badge variant="outline" className="text-red-600 border-red-200">
-                {makeupRequest.branchName}
-              </Badge>
-            </div>
+          <div className="flex items-center gap-2 text-gray-600">
+            <MessageSquare className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+            <span className="truncate">{makeupRequest.reason}</span>
           </div>
         </div>
 
