@@ -21,7 +21,7 @@ interface IssueCreditNoteDialogProps {
   onOpenChange: (open: boolean) => void;
   enrollmentId: string;
   branchId: string;
-  invoices: any[]; // list of invoices for this enrollment
+  invoices: any[]; // list of tax invoices for this enrollment (CN ผูกกับ tax_invoices เท่านั้น)
   onSuccess: (creditNoteId: string) => void;
 }
 
@@ -53,9 +53,12 @@ export default function IssueCreditNoteDialog({
     try {
       const invoiceCompanyId = selectedInvoice.invoice_company_id;
 
+      const vatAmount = Math.round((actualRefundAmount - actualRefundAmount / 1.07) * 100) / 100;
+      const docNumber = selectedInvoice.tax_invoice_number || selectedInvoice.invoice_number;
+
       const creditNoteId = await createCreditNote({
         invoiceCompanyId,
-        originalInvoiceId: selectedInvoice.id,
+        taxInvoiceId: selectedInvoice.id,
         enrollmentId,
         branchId,
         customerName: selectedInvoice.customer_name,
@@ -69,10 +72,11 @@ export default function IssueCreditNoteDialog({
         billingTaxId: selectedInvoice.billing_tax_id,
         billingCompanyBranch: selectedInvoice.billing_company_branch,
         items: [{
-          description: `คืนเงิน${refundType === 'partial' ? 'บางส่วน' : ''} - ${selectedInvoice.invoice_number}`,
+          description: `คืนเงิน${refundType === 'partial' ? 'บางส่วน' : ''} - ${docNumber}`,
           amount: actualRefundAmount,
         }],
         refundAmount: actualRefundAmount,
+        vatAmount,
         reason: reason.trim(),
         refundType,
         createdBy: adminUser?.id,
@@ -104,15 +108,15 @@ export default function IssueCreditNoteDialog({
         <div className="space-y-4 py-2">
           {/* Select Invoice */}
           <div className="space-y-2">
-            <Label>เลือกใบเสร็จอ้างอิง</Label>
+            <Label>เลือกใบกำกับภาษีอ้างอิง</Label>
             <Select value={selectedInvoiceId} onValueChange={setSelectedInvoiceId}>
               <SelectTrigger>
-                <SelectValue placeholder="เลือกใบเสร็จ..." />
+                <SelectValue placeholder="เลือกใบกำกับภาษี..." />
               </SelectTrigger>
               <SelectContent>
                 {invoices.map((inv: any) => (
                   <SelectItem key={inv.id} value={inv.id}>
-                    {inv.invoice_number} — {formatCurrency(inv.total_amount)} ({formatDate(inv.issued_at || inv.created_at, 'short')})
+                    {inv.tax_invoice_number || inv.invoice_number} — {formatCurrency(inv.total_amount)} ({formatDate(inv.issued_at || inv.created_at, 'short')})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -165,8 +169,8 @@ export default function IssueCreditNoteDialog({
               {/* Summary */}
               <div className="bg-gray-50 rounded-lg p-4 space-y-1 text-base">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">ใบเสร็จอ้างอิง:</span>
-                  <span className="font-medium">{selectedInvoice.invoice_number}</span>
+                  <span className="text-gray-500">ใบกำกับภาษีอ้างอิง:</span>
+                  <span className="font-medium">{selectedInvoice.tax_invoice_number || selectedInvoice.invoice_number}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">ยอดคืน:</span>

@@ -34,13 +34,13 @@ export async function POST(request: NextRequest) {
   // Get unique company IDs, branch IDs, and original invoice IDs
   const companyIds = [...new Set(creditNotes.map((cn: any) => cn.invoice_company_id))]
   const branchIds = [...new Set(creditNotes.map((cn: any) => cn.branch_id))]
-  const invoiceIds = [...new Set(
+  const taxInvoiceIds = [...new Set(
     creditNotes
-      .map((cn: any) => cn.original_invoice_id)
+      .map((cn: any) => cn.tax_invoice_id)
       .filter(Boolean)
   )]
 
-  // Fetch companies, branches, and original invoices in parallel
+  // Fetch companies, branches, and tax invoices in parallel
   const promises: Promise<any>[] = [
     (supabase as any)
       .from('invoice_companies')
@@ -52,16 +52,16 @@ export async function POST(request: NextRequest) {
       .in('id', branchIds),
   ]
 
-  if (invoiceIds.length > 0) {
+  if (taxInvoiceIds.length > 0) {
     promises.push(
       (supabase as any)
-        .from('invoices')
-        .select('id, invoice_number, issued_at')
-        .in('id', invoiceIds)
+        .from('tax_invoices')
+        .select('id, tax_invoice_number, issued_at')
+        .in('id', taxInvoiceIds)
     )
   }
 
-  const [companiesRes, branchesRes, invoicesRes] = await Promise.all(promises)
+  const [companiesRes, branchesRes, taxInvoicesRes] = await Promise.all(promises)
 
   const companiesMap = new Map(
     (companiesRes.data || []).map((c: any) => [c.id, c])
@@ -70,7 +70,11 @@ export async function POST(request: NextRequest) {
     (branchesRes.data || []).map((b: any) => [b.id, b])
   )
   const invoicesMap = new Map(
-    (invoicesRes?.data || []).map((inv: any) => [inv.id, inv])
+    (taxInvoicesRes?.data || []).map((ti: any) => [ti.id, {
+      id: ti.id,
+      invoice_number: ti.tax_invoice_number,
+      issued_at: ti.issued_at,
+    }])
   )
 
   // Build results preserving input order
@@ -83,8 +87,8 @@ export async function POST(request: NextRequest) {
         creditNote,
         company: companiesMap.get(creditNote.invoice_company_id) || null,
         branch: branchesMap.get(creditNote.branch_id) || null,
-        originalInvoice: creditNote.original_invoice_id
-          ? invoicesMap.get(creditNote.original_invoice_id) || null
+        originalInvoice: creditNote.tax_invoice_id
+          ? invoicesMap.get(creditNote.tax_invoice_id) || null
           : null,
       }
     })

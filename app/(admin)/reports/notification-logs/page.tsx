@@ -279,7 +279,7 @@ export default function NotificationLogsPage() {
                   {logs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="whitespace-nowrap">
-                        {new Date(log.sent_at).toLocaleString('th-TH')}
+                        {new Date(log.sent_at).toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </TableCell>
                       <TableCell>
                         <Badge className={getTypeColor(log.type)} variant="secondary">
@@ -338,7 +338,7 @@ export default function NotificationLogsPage() {
                                 )}
                               </DialogTitle>
                               <DialogDescription>
-                                {new Date(log.sent_at).toLocaleString('th-TH')}
+                                {new Date(log.sent_at).toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                               </DialogDescription>
                             </DialogHeader>
                             <div className="mt-4 space-y-4">

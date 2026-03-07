@@ -139,7 +139,7 @@ export default function DataCleaningPage() {
           <Database className="h-8 w-8 text-orange-500" />
           Data Cleaning
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-gray-600 mt-1">
           ตรวจสอบและจัดการข้อมูลที่มีปัญหาในระบบ
         </p>
       </div>

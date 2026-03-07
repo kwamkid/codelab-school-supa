@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Printer, Receipt, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Printer, Receipt as ReceiptIcon, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { SectionLoading } from '@/components/ui/loading';
 import { useBranch } from '@/contexts/BranchContext';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { Invoice, InvoiceCompany } from '@/types/models';
-import { getInvoices } from '@/lib/services/invoices';
+import { Receipt, TaxInvoice, InvoiceCompany } from '@/types/models';
+import { getReceipts } from '@/lib/services/receipts';
+import { getTaxInvoices } from '@/lib/services/tax-invoices';
 import { getInvoiceCompanies } from '@/lib/services/invoice-companies';
 import ReceiptPrintDialog from '@/components/invoices/receipt-print-dialog';
 import {
@@ -22,6 +23,66 @@ import {
   openPrintWindow,
   formatAddress,
 } from '@/components/invoices/document-template';
+
+// Unified document type for display
+interface DocumentItem {
+  id: string;
+  documentType: 'receipt' | 'tax-invoice' | 'tax-invoice-receipt';
+  documentNumber: string;
+  invoiceCompanyId: string;
+  enrollmentId?: string;
+  branchId: string;
+  customerName: string;
+  customerPhone?: string;
+  totalAmount: number;
+  paidAmount: number;
+  status: string;
+  issuedAt?: Date;
+  createdAt: Date;
+  receiptId?: string; // for tax invoices
+  linkedCreditNotes?: { id: string; creditNoteNumber: string; refundType: string; refundAmount: number; status: string }[];
+  linkedTaxInvoices?: { id: string; taxInvoiceNumber: string }[];
+}
+
+function receiptToDoc(r: Receipt): DocumentItem {
+  return {
+    id: r.id,
+    documentType: 'receipt',
+    documentNumber: r.receiptNumber,
+    invoiceCompanyId: r.invoiceCompanyId,
+    enrollmentId: r.enrollmentId,
+    branchId: r.branchId,
+    customerName: r.customerName,
+    customerPhone: r.customerPhone,
+    totalAmount: r.totalAmount,
+    paidAmount: r.paidAmount,
+    status: r.status,
+    issuedAt: r.issuedAt,
+    createdAt: r.createdAt,
+    linkedTaxInvoices: r.linkedTaxInvoices,
+    linkedCreditNotes: r.linkedCreditNotes,
+  };
+}
+
+function taxInvoiceToDoc(t: TaxInvoice): DocumentItem {
+  return {
+    id: t.id,
+    documentType: t.receiptId ? 'tax-invoice' : 'tax-invoice-receipt',
+    documentNumber: t.taxInvoiceNumber,
+    invoiceCompanyId: t.invoiceCompanyId,
+    enrollmentId: t.enrollmentId,
+    branchId: t.branchId,
+    customerName: t.customerName,
+    customerPhone: t.customerPhone,
+    totalAmount: t.totalAmount,
+    paidAmount: t.paidAmount,
+    status: t.status,
+    issuedAt: t.issuedAt,
+    createdAt: t.createdAt,
+    receiptId: t.receiptId,
+    linkedCreditNotes: t.linkedCreditNotes,
+  };
+}
 
 const PAGE_SIZE = 20;
 
@@ -43,7 +104,7 @@ export default function InvoicesPage() {
   const [loadingCompanies, setLoadingCompanies] = useState(true);
 
   // Per-company lazy-loaded data stored in a Map
-  const [invoiceCache, setInvoiceCache] = useState<Map<string, Invoice[]>>(new Map());
+  const [invoiceCache, setInvoiceCache] = useState<Map<string, DocumentItem[]>>(new Map());
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -80,13 +141,20 @@ export default function InvoicesPage() {
 
     let cancelled = false;
     setLoadingInvoices(true);
-    getInvoices(selectedBranchId || undefined, activeCompanyId)
-      .then((inv) => {
+    Promise.all([
+      getReceipts(selectedBranchId || undefined, activeCompanyId),
+      getTaxInvoices(selectedBranchId || undefined, activeCompanyId),
+    ])
+      .then(([receipts, taxInvoices]) => {
         if (!cancelled) {
-          setInvoiceCache((prev) => new Map(prev).set(cacheKey, inv));
+          const merged = [
+            ...receipts.map(receiptToDoc),
+            ...taxInvoices.map(taxInvoiceToDoc),
+          ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+          setInvoiceCache((prev) => new Map(prev).set(cacheKey, merged));
         }
       })
-      .catch((error) => console.error('Error loading invoices:', error))
+      .catch((error) => console.error('Error loading documents:', error))
       .finally(() => { if (!cancelled) setLoadingInvoices(false); });
 
     return () => { cancelled = true; };
@@ -120,7 +188,7 @@ export default function InvoicesPage() {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      inv.invoiceNumber.toLowerCase().includes(q) ||
+      inv.documentNumber.toLowerCase().includes(q) ||
       inv.customerName.toLowerCase().includes(q) ||
       (inv.customerPhone && inv.customerPhone.includes(q))
     );
@@ -169,20 +237,26 @@ export default function InvoicesPage() {
         const { invoice, company, branch } = result;
 
         const isVatRegistered = company.is_vat_registered;
-        const isTaxInvoice = isVatRegistered;
+        const docType = result.documentType || invoice.documentType || 'receipt';
+        const isTaxInv = docType === 'tax-invoice' || docType === 'tax-invoice-receipt';
         const totalAmount = invoice.total_amount || 0;
-        const vatRate = 0.07;
-        const priceBeforeVat = isTaxInvoice ? totalAmount / (1 + vatRate) : totalAmount;
-        const vatAmount = isTaxInvoice ? totalAmount - priceBeforeVat : 0;
+        const vatAmount = invoice.vat_amount || 0;
+        const priceBeforeVat = totalAmount - vatAmount;
+        const showVat = isTaxInv || (isVatRegistered && vatAmount > 0);
         const remaining = totalAmount - (invoice.paid_amount || 0);
-        const showBillingDetails = invoice.want_tax_invoice;
+        const showBillingDetails = isTaxInv;
 
-        const documentTitle = isTaxInvoice
-          ? 'ใบกำกับภาษี/ใบเสร็จรับเงิน'
-          : 'ใบเสร็จรับเงิน / Receipt';
+        let documentTitle: string;
+        if (docType === 'tax-invoice') {
+          documentTitle = 'ใบกำกับภาษี / Tax Invoice';
+        } else if (docType === 'tax-invoice-receipt') {
+          documentTitle = 'ใบกำกับภาษี/ใบเสร็จรับเงิน';
+        } else {
+          documentTitle = 'ใบเสร็จรับเงิน / Receipt';
+        }
 
         const docData: DocumentData = {
-          documentType: isTaxInvoice ? 'tax-invoice-receipt' : 'receipt',
+          documentType: docType as any,
           documentTitle,
           company: {
             name: company.name || '-',
@@ -216,7 +290,7 @@ export default function InvoicesPage() {
               label: `ส่วนลด / Discount${invoice.discount_type === 'percentage' ? ` (${invoice.discount_value}%)` : ''}`,
               amount: invoice.discount_amount,
             } : undefined,
-            vatBreakdown: isTaxInvoice ? { priceBeforeVat, vatAmount } : undefined,
+            vatBreakdown: showVat ? { priceBeforeVat, vatAmount } : undefined,
             total: totalAmount,
             totalLabel: 'ยอดสุทธิ / Total',
           },
@@ -258,7 +332,7 @@ export default function InvoicesPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-6">ใบเสร็จ</h1>
         <div className="text-center py-12 text-gray-500">
-          <Receipt className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+          <ReceiptIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
           <p className="text-base">ยังไม่มีบริษัทออกใบเสร็จ</p>
         </div>
       </div>
@@ -336,7 +410,7 @@ export default function InvoicesPage() {
             <CardContent className="p-0">
               {filteredInvoices.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
-                  <Receipt className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                  <ReceiptIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
                   <p className="text-base">ไม่พบใบเสร็จ</p>
                 </div>
               ) : (
@@ -363,20 +437,28 @@ export default function InvoicesPage() {
                         onClick={() => inv.enrollmentId && router.push(`/enrollments/${inv.enrollmentId}`)}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-base text-gray-900">
-                              {inv.invoiceNumber}
+                              {inv.documentNumber}
                             </span>
-                            {inv.status === 'voided' && (
+                            {inv.documentType === 'tax-invoice' || inv.documentType === 'tax-invoice-receipt' ? (
+                              <Badge className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100">ใบกำกับภาษี</Badge>
+                            ) : (
+                              <Badge className="text-xs bg-green-100 text-green-700 hover:bg-green-100">ใบเสร็จ</Badge>
+                            )}
+                            {inv.documentType === 'tax-invoice' && inv.receiptId && (
+                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">ออกทีหลัง</Badge>
+                            )}
+                            {inv.status === 'void' && (
                               <Badge variant="secondary" className="text-xs">ยกเลิก</Badge>
                             )}
-                            {inv.status !== 'voided' && inv.paidAmount > 0 && inv.paidAmount < inv.totalAmount && (
+                            {inv.status !== 'void' && inv.paidAmount > 0 && inv.paidAmount < inv.totalAmount && (
                               <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">จ่ายบางส่วน</Badge>
                             )}
-                            {inv.status !== 'voided' && inv.paidAmount === 0 && inv.totalAmount > 0 && (
+                            {inv.status !== 'void' && inv.paidAmount === 0 && inv.totalAmount > 0 && (
                               <Badge variant="outline" className="text-xs text-red-600 border-red-300">ยังไม่ชำระ</Badge>
                             )}
-                            {inv.linkedCreditNotes && inv.linkedCreditNotes.some(cn => cn.status !== 'voided') && (
+                            {inv.linkedCreditNotes && inv.linkedCreditNotes.some(cn => cn.status !== 'void') && (
                               <Badge variant="outline" className="text-xs text-red-600 border-red-300 bg-red-50">มี CN</Badge>
                             )}
                           </div>

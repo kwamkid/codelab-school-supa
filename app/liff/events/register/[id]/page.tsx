@@ -656,7 +656,7 @@ export default function EventRegistrationPage() {
                           className="w-full"
                         >
                           <div className="flex items-center justify-between w-full gap-2">
-                            <span className="truncate">{formatDate(schedule.date, 'long')} • {schedule.startTime}-{schedule.endTime}</span>
+                            <span className="truncate">{formatDate(schedule.date, 'long')} • {schedule.startTime?.substring(0, 5)}-{schedule.endTime?.substring(0, 5)}</span>
                             <span className={`text-xs whitespace-nowrap ${available <= 2 && available > 0 ? 'text-red-600 font-semibold' : ''}`}>
                               {available <= 0 ? '(เต็ม)' : `(เหลือ ${available} ที่)`}
                             </span>

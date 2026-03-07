@@ -219,7 +219,7 @@ export default function HolidaysPage() {
               <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>
             )}
           </h1>
-          <p className="text-gray-600 mt-2">กำหนดวันหยุดประจำปีและวันหยุดพิเศษของแต่ละสาขา</p>
+          <p className="text-gray-600 mt-1">กำหนดวันหยุดประจำปีและวันหยุดพิเศษของแต่ละสาขา</p>
         </div>
         <div className="flex gap-2">
           <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>

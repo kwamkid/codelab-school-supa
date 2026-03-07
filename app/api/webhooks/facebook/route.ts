@@ -15,18 +15,24 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get('hub.verify_token')
   const challenge = searchParams.get('hub.challenge')
 
-  // Get verify token from any active FB/IG channel
-  const supabase = createServiceClient()
-  const { data: channels } = await (supabase as any)
-    .from('chat_channels')
-    .select('credentials')
-    .in('type', ['facebook', 'instagram'])
-    .eq('is_active', true)
-    .limit(1)
+  // Check against env var first, then DB
+  const envVerifyToken = process.env.FACEBOOK_WEBHOOK_VERIFY_TOKEN
+  let verifyToken = envVerifyToken
 
-  const verifyToken = channels?.[0]?.credentials?.webhookVerifyToken
+  if (!verifyToken) {
+    try {
+      const supabase = createServiceClient()
+      const { data: channels } = await (supabase as any)
+        .from('chat_channels')
+        .select('credentials')
+        .in('type', ['facebook', 'instagram'])
+        .eq('is_active', true)
+        .limit(1)
+      verifyToken = channels?.[0]?.credentials?.webhookVerifyToken
+    } catch {}
+  }
 
-  if (mode === 'subscribe' && token === verifyToken) {
+  if (mode === 'subscribe' && token && token === verifyToken) {
     console.log('Facebook webhook verified')
     return new NextResponse(challenge, { status: 200 })
   }
@@ -90,8 +96,13 @@ export async function POST(request: NextRequest) {
               const profile = await profileRes.json()
               displayName = profile.name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
               avatarUrl = profile.profile_pic
+            } else {
+              const errBody = await profileRes.text()
+              console.error(`FB profile fetch failed (${profileRes.status}):`, errBody)
             }
-          } catch {}
+          } catch (profileErr) {
+            console.error('FB profile fetch error:', profileErr)
+          }
         }
 
         // Process message

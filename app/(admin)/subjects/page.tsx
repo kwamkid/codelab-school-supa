@@ -95,7 +95,7 @@ export default function SubjectsPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-xl sm:text-3xl font-bold text-gray-900">จัดการวิชาเรียน</h1>
-          <p className="text-gray-600 mt-2">จัดการหลักสูตรและวิชาที่เปิดสอน</p>
+          <p className="text-gray-600 mt-1">จัดการหลักสูตรและวิชาที่เปิดสอน</p>
         </div>
         <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
           <Link href="/subjects/new">

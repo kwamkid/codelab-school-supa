@@ -14,6 +14,9 @@ interface InvoiceCompanyRow {
   email: string | null;
   invoice_prefix: string;
   next_invoice_number: number;
+  tax_invoice_prefix: string;
+  next_tax_invoice_number: number;
+  current_tax_invoice_month: string;
   credit_note_prefix: string;
   next_credit_note_number: number;
   current_invoice_month: string;
@@ -35,6 +38,9 @@ function mapToCompany(row: InvoiceCompanyRow): InvoiceCompany {
     email: row.email || undefined,
     invoicePrefix: row.invoice_prefix,
     nextInvoiceNumber: row.next_invoice_number,
+    taxInvoicePrefix: row.tax_invoice_prefix || 'TAX',
+    nextTaxInvoiceNumber: row.next_tax_invoice_number || 1,
+    currentTaxInvoiceMonth: row.current_tax_invoice_month || '',
     creditNotePrefix: row.credit_note_prefix || 'CN',
     nextCreditNoteNumber: row.next_credit_note_number || 1,
     currentInvoiceMonth: row.current_invoice_month || '',
@@ -80,6 +86,7 @@ export async function createInvoiceCompany(data: {
   phone?: string;
   email?: string;
   invoicePrefix?: string;
+  taxInvoicePrefix?: string;
   isVatRegistered?: boolean;
 }): Promise<string> {
   const result = await adminMutation<{ id: string }[]>({
@@ -93,6 +100,7 @@ export async function createInvoiceCompany(data: {
       phone: data.phone || null,
       email: data.email || null,
       invoice_prefix: data.invoicePrefix || 'INV',
+      tax_invoice_prefix: data.taxInvoicePrefix || 'TAX',
       is_vat_registered: data.isVatRegistered || false,
     },
     options: { select: 'id', single: true },
@@ -116,6 +124,7 @@ export async function updateInvoiceCompany(
   if (data.phone !== undefined) updateData.phone = data.phone || null;
   if (data.email !== undefined) updateData.email = data.email || null;
   if (data.invoicePrefix !== undefined) updateData.invoice_prefix = data.invoicePrefix;
+  if (data.taxInvoicePrefix !== undefined) updateData.tax_invoice_prefix = data.taxInvoicePrefix;
   if (data.isVatRegistered !== undefined) updateData.is_vat_registered = data.isVatRegistered;
   if (data.isActive !== undefined) updateData.is_active = data.isActive;
 

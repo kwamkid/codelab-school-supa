@@ -175,7 +175,7 @@ export default function EnrollmentsByClassPage() {
       {/* Class Info */}
       <div className="mb-8">
         <h1 className="text-xl sm:text-3xl font-bold text-gray-900">{classData.name}</h1>
-        <p className="text-gray-600 mt-2">รหัสคลาส: {classData.code}</p>
+        <p className="text-gray-600 mt-1">รหัสคลาส: {classData.code}</p>
       </div>
 
       {/* Summary Cards */}

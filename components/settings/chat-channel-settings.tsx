@@ -288,7 +288,7 @@ export default function ChatChannelSettings() {
     setConnectingFb(true);
 
     const redirectUri = `${window.location.origin}/settings/chat/facebook-callback`;
-    const scope = 'pages_messaging,pages_manage_metadata,pages_read_engagement,instagram_basic,instagram_manage_messages';
+    const scope = 'pages_messaging,pages_manage_metadata,pages_show_list,business_management,public_profile';
     const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${fbAppId.trim()}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
 
     const popup = window.open(oauthUrl, 'fb-oauth', 'width=600,height=700');

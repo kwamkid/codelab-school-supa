@@ -8,6 +8,7 @@ import { MessageBubble } from './message-bubble';
 interface MessageListProps {
   messages: ChatMessage[];
   loading: boolean;
+  channelId?: string;
 }
 
 function formatDateSeparator(date: Date): string {
@@ -30,7 +31,7 @@ function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
-export function MessageList({ messages, loading }: MessageListProps) {
+export function MessageList({ messages, loading, channelId }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -41,22 +42,22 @@ export function MessageList({ messages, loading }: MessageListProps) {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-base text-gray-400">{'\u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e25\u0e14...'}</p>
+      <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-slate-900">
+        <p className="text-base text-gray-400 dark:text-gray-500">กำลังโหลด...</p>
       </div>
     );
   }
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-base text-gray-400">{'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e04\u0e27\u0e32\u0e21'}</p>
+      <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-slate-900">
+        <p className="text-base text-gray-400 dark:text-gray-500">ยังไม่มีข้อความ</p>
       </div>
     );
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50 dark:bg-slate-900">
       <div className="flex flex-col gap-2">
         {messages.map((msg, index) => {
           const prevMsg = index > 0 ? messages[index - 1] : null;
@@ -72,16 +73,17 @@ export function MessageList({ messages, loading }: MessageListProps) {
             <div key={msg.id}>
               {showDateSeparator && (
                 <div className="flex items-center justify-center py-3">
-                  <div className="h-px flex-1 bg-gray-200" />
-                  <span className="px-3 text-xs text-gray-400">
+                  <div className="h-px flex-1 bg-gray-200 dark:bg-slate-700" />
+                  <span className="px-3 text-xs text-gray-400 dark:text-gray-500">
                     {formatDateSeparator(msg.createdAt)}
                   </span>
-                  <div className="h-px flex-1 bg-gray-200" />
+                  <div className="h-px flex-1 bg-gray-200 dark:bg-slate-700" />
                 </div>
               )}
               <MessageBubble
                 message={msg}
                 showSenderName={showSenderName}
+                channelId={channelId}
               />
             </div>
           );

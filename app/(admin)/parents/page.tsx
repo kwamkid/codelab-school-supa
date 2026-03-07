@@ -360,7 +360,7 @@ export default function ParentsPage() {
             <Globe className="h-8 w-8 text-blue-500" />
             ผู้ปกครอง
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-600 mt-1">
             ข้อมูลผู้ปกครองและนักเรียนทั้งหมด
             {(loadingBranches || loadingClasses) && (
               <span className="text-orange-500 ml-2">(กำลังโหลดข้อมูลเพิ่มเติม...)</span>

@@ -192,7 +192,7 @@ export default function EventsPage() {
           <h1 className="text-xl sm:text-3xl font-bold text-gray-900">
             จัดการ Events
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-600 mt-1">
             จัดการงานและกิจกรรมต่างๆ ของโรงเรียน
           </p>
         </div>

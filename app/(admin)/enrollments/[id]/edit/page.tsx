@@ -79,7 +79,7 @@ export default function EditEnrollmentPage() {
 
       <div className="mb-8">
         <h1 className="text-xl sm:text-3xl font-bold text-gray-900">แก้ไขข้อมูลการลงทะเบียน</h1>
-        <p className="text-gray-600 mt-2">แก้ไขข้อมูลการลงทะเบียนและการชำระเงิน</p>
+        <p className="text-gray-600 mt-1">แก้ไขข้อมูลการลงทะเบียนและการชำระเงิน</p>
       </div>
 
       <EnrollmentEditForm enrollment={enrollment} />

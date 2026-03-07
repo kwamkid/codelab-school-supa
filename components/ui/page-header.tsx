@@ -29,7 +29,7 @@ export function PageHeader({
           {badge}
         </h1>
         {description && (
-          <p className="text-gray-600 mt-2">{description}</p>
+          <p className="text-gray-600 mt-1">{description}</p>
         )}
       </div>
       {action && <div className="flex items-center gap-2">{action}</div>}

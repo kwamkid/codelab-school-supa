@@ -83,7 +83,23 @@ export async function getMakeupClasses(branchId?: string | null): Promise<Makeup
 
     if (error) throw error;
 
-    return (data || []).map(dbRowToMakeupClass);
+    // Fetch student school names in bulk
+    const studentIds = [...new Set((data || []).map((r: any) => r.student_id).filter(Boolean))];
+    let schoolMap = new Map<string, string>();
+    if (studentIds.length > 0) {
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, school_name')
+        .in('id', studentIds);
+      if (students) {
+        schoolMap = new Map(students.map((s: any) => [s.id, s.school_name || '']));
+      }
+    }
+
+    return (data || []).map((row: any) => ({
+      ...dbRowToMakeupClass(row),
+      studentSchoolName: schoolMap.get(row.student_id) || '',
+    }));
   } catch (error) {
     console.error('Error getting makeup classes:', error);
     throw error;

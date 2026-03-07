@@ -156,12 +156,10 @@ export default function CreditNotesPage() {
         if (!result?.creditNote || !result?.company) continue;
         const { creditNote, company, branch, originalInvoice } = result;
 
-        const isVatRegistered = company.is_vat_registered;
-        const isTaxCreditNote = isVatRegistered;
         const refundAmount = creditNote.refund_amount || 0;
-        const vatRate = 0.07;
-        const priceBeforeVat = isTaxCreditNote ? refundAmount / (1 + vatRate) : refundAmount;
-        const vatAmount = isTaxCreditNote ? refundAmount - priceBeforeVat : 0;
+        const vatAmount = creditNote.vat_amount || 0;
+        const priceBeforeVat = refundAmount - vatAmount;
+        const isTaxCreditNote = vatAmount > 0 || creditNote.tax_invoice_id;
         const showBillingDetails = creditNote.billing_tax_id || creditNote.billing_type === 'company';
 
         const documentTitle = isTaxCreditNote
@@ -350,7 +348,7 @@ export default function CreditNotesPage() {
                             <span className="font-semibold text-base text-red-600">
                               {cn.creditNoteNumber}
                             </span>
-                            {cn.status === 'voided' && (
+                            {cn.status === 'void' && (
                               <Badge variant="secondary" className="text-xs">ยกเลิก</Badge>
                             )}
                             <Badge variant="outline" className="text-xs">

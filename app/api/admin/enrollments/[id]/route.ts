@@ -28,6 +28,39 @@ export async function DELETE(
       return NextResponse.json({ error: 'ไม่พบข้อมูลการลงทะเบียน' }, { status: 404 })
     }
 
+    // Delete related data first (before deleting enrollment)
+    // 1. Delete payment transactions
+    await supabase
+      .from('payment_transactions' as any)
+      .delete()
+      .eq('enrollment_id', id)
+
+    // 2. Delete credit notes linked to invoices of this enrollment
+    const { data: relatedInvoices } = await supabase
+      .from('invoices' as any)
+      .select('id')
+      .eq('enrollment_id', id)
+
+    if (relatedInvoices && relatedInvoices.length > 0) {
+      const invoiceIds = relatedInvoices.map((inv: any) => inv.id)
+      await supabase
+        .from('credit_notes' as any)
+        .delete()
+        .in('original_invoice_id', invoiceIds)
+    }
+
+    // 3. Delete credit notes linked directly to enrollment
+    await supabase
+      .from('credit_notes' as any)
+      .delete()
+      .eq('enrollment_id', id)
+
+    // 4. Delete invoices
+    await supabase
+      .from('invoices' as any)
+      .delete()
+      .eq('enrollment_id', id)
+
     // Delete the enrollment
     const { error: deleteError } = await supabase
       .from('enrollments')
@@ -41,14 +74,14 @@ export async function DELETE(
       const { data: classData } = await supabase
         .from('classes')
         .select('id, enrolled_count')
-        .eq('id', enrollment.class_id)
+        .eq('id', (enrollment as any).class_id)
         .single()
 
       if (classData) {
         await supabase
           .from('classes')
-          .update({ enrolled_count: Math.max(0, (classData.enrolled_count || 0) - 1) })
-          .eq('id', enrollment.class_id)
+          .update({ enrolled_count: Math.max(0, ((classData as any).enrolled_count || 0) - 1) })
+          .eq('id', (enrollment as any).class_id)
       }
     }
 

@@ -153,7 +153,7 @@ export default function DashboardPage() {
               studentId: absent.studentId,
               studentName: absent.studentName || 'ไม่ระบุชื่อ',
               className: event.title,
-              classTime: `${event.extendedProps.startTime} - ${event.extendedProps.endTime}`,
+              classTime: `${event.extendedProps.startTime?.substring(0, 5)} - ${event.extendedProps.endTime?.substring(0, 5)}`,
               reason: absent.note,
               makeupStatus: makeupRequest?.status as any
             });

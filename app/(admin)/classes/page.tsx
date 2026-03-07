@@ -573,7 +573,7 @@ export default function ClassesPage() {
                               <div className="leading-tight break-words">
                                 {cls.daysOfWeek.map(d => getDayName(d)).join(', ')}
                               </div>
-                              <div className="text-gray-500">{cls.startTime}-{cls.endTime}</div>
+                              <div className="text-gray-500">{cls.startTime?.substring(0, 5)}-{cls.endTime?.substring(0, 5)}</div>
                             </div>
                           </TableCell>
                           <TableCell className="text-center align-top">

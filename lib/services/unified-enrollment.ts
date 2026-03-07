@@ -7,7 +7,9 @@ import { updateTrialSession } from './trial-bookings';
 import { PaymentMethod, PaymentType } from '@/types/models';
 import { getClass } from './classes';
 import { getBranch } from './branches';
-import { createInvoice } from './invoices';
+import { createReceipt } from './receipts';
+import { createTaxInvoice } from './tax-invoices';
+import { getInvoiceCompany } from './invoice-companies';
 
 export interface UnifiedEnrollmentData {
   // Source
@@ -195,13 +197,14 @@ export async function processUnifiedEnrollment(
     });
   }
 
-  // 7. Create invoice if branch has invoice company
+  // 7. Create receipt or tax invoice if branch has invoice company
   let invoiceId: string | undefined;
   try {
     const branchData = await getBranch(data.branchId);
     if (branchData?.invoiceCompanyId) {
-      // Build invoice based on payment type
-      // ใบเสร็จต้องออกตามยอดที่รับจริง ไม่ใช่ยอดเต็ม
+      const invoiceCompany = await getInvoiceCompany(branchData.invoiceCompanyId);
+      const isVat = invoiceCompany?.isVatRegistered || false;
+
       const isFullPayment = data.paymentType === 'full';
       const paidAmount = data.initialPaymentAmount || 0;
 
@@ -210,8 +213,27 @@ export async function processUnifiedEnrollment(
       let discountAmount: number;
       let totalAmount: number;
 
+      // Calculate full price for comparison
+      let fullPrice = 0;
       if (isFullPayment) {
-        // Full payment: invoice = full class price with discount
+        const tempItems: number[] = [];
+        for (const enrollment of enrollments) {
+          const classInfo = await getClass(
+            data.students.find(s =>
+              (s.mode === 'existing' ? s.existingStudentId === enrollment.studentId : true)
+            )?.classId || ''
+          );
+          tempItems.push(classInfo?.pricing.totalPrice || 0);
+        }
+        const tempSubtotal = tempItems.reduce((sum, a) => sum + a, 0);
+        const tempDiscount = data.discountType === 'percentage'
+          ? (tempSubtotal * data.discount) / 100
+          : data.discount;
+        fullPrice = Math.max(0, tempSubtotal - tempDiscount);
+      }
+
+      // Full payment AND actually paying the full amount → show full price with discount detail
+      if (isFullPayment && paidAmount >= fullPrice && fullPrice > 0) {
         invoiceItems = [];
         for (const enrollment of enrollments) {
           const classInfo = await getClass(
@@ -236,8 +258,10 @@ export async function processUnifiedEnrollment(
         }
         totalAmount = Math.max(0, subtotal - discountAmount);
       } else {
-        // Deposit/Installment: invoice = actual paid amount only
-        const paymentLabel = data.paymentType === 'deposit' ? 'มัดจำค่าเรียน' : 'ค่าเรียนงวดแรก';
+        // Partial payment / Deposit / Installment → invoice = actual paid amount only
+        const paymentLabel = isFullPayment
+          ? 'ชำระค่าเรียน'
+          : data.paymentType === 'deposit' ? 'มัดจำค่าเรียน' : 'ค่าเรียนงวดแรก';
         invoiceItems = [];
         for (const enrollment of enrollments) {
           const classInfo = await getClass(
@@ -261,23 +285,22 @@ export async function processUnifiedEnrollment(
         totalAmount = paidAmount;
       }
 
-      invoiceId = await createInvoice({
+      // Compute VAT: vat_amount = total - (total / 1.07) for VAT companies
+      const vatAmount = isVat ? Math.round((totalAmount - totalAmount / 1.07) * 100) / 100 : 0;
+      const netSubtotal = isVat ? Math.round((totalAmount / 1.07) * 100) / 100 : totalAmount;
+
+      const commonData = {
         invoiceCompanyId: branchData.invoiceCompanyId,
         enrollmentId: enrollments.length === 1 ? enrollments[0].enrollmentId : undefined,
         branchId: data.branchId,
-        billingType: data.billingType || 'personal',
-        billingName: data.billingName || data.parentName,
-        billingAddress: data.billingAddress as any,
-        billingTaxId: data.billingTaxId,
-        billingCompanyBranch: data.billingCompanyBranch,
-        wantTaxInvoice: data.wantTaxInvoice,
         customerName: data.parentName,
         customerPhone: data.parentPhone,
         customerEmail: data.parentEmail,
         customerAddress: data.address as any,
         customerTaxId: data.billingTaxId,
         items: invoiceItems,
-        subtotal,
+        subtotal: netSubtotal,
+        vatAmount,
         discountType: isFullPayment ? data.discountType : undefined,
         discountValue: isFullPayment ? data.discount : 0,
         discountAmount,
@@ -287,10 +310,25 @@ export async function processUnifiedEnrollment(
         paymentType: data.paymentType,
         paidAmount,
         createdBy: adminUserId,
-      });
+      };
+
+      if (data.wantTaxInvoice) {
+        // ขอใบกำกับภาษีตอนจ่าย → สร้าง tax_invoice เท่านั้น (ใบกำกับภาษี/ใบเสร็จ)
+        invoiceId = await createTaxInvoice({
+          ...commonData,
+          billingType: data.billingType || 'personal',
+          billingName: data.billingName || data.parentName,
+          billingAddress: data.billingAddress as any,
+          billingTaxId: data.billingTaxId,
+          billingCompanyBranch: data.billingCompanyBranch,
+        });
+      } else {
+        // ไม่ขอใบกำกับ → สร้าง receipt
+        invoiceId = await createReceipt(commonData);
+      }
     }
   } catch (error) {
-    console.error('Error creating invoice:', error);
+    console.error('Error creating document:', error);
     // Non-blocking - enrollment was already created successfully
   }
 

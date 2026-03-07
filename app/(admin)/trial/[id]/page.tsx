@@ -425,7 +425,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
               <TestTube className="h-8 w-8 text-red-500" />
               รายละเอียดการจองทดลองเรียน
             </h1>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-600 mt-1">
               จองเมื่อ {formatDate(booking.createdAt, 'full')}
             </p>
           </div>

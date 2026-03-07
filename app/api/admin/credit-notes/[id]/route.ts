@@ -44,15 +44,20 @@ export async function GET(
     .eq('id', creditNote.branch_id)
     .single()
 
-  // Get original invoice (if referenced)
+  // Get original tax invoice (if referenced)
   let originalInvoice = null
-  if (creditNote.original_invoice_id) {
-    const { data: inv } = await (supabase as any)
-      .from('invoices')
-      .select('invoice_number, issued_at')
-      .eq('id', creditNote.original_invoice_id)
+  if (creditNote.tax_invoice_id) {
+    const { data: ti } = await (supabase as any)
+      .from('tax_invoices')
+      .select('tax_invoice_number, issued_at')
+      .eq('id', creditNote.tax_invoice_id)
       .single()
-    originalInvoice = inv
+    if (ti) {
+      originalInvoice = {
+        invoice_number: ti.tax_invoice_number,
+        issued_at: ti.issued_at,
+      }
+    }
   }
 
   return NextResponse.json({

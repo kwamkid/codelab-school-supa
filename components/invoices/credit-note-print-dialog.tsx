@@ -57,22 +57,20 @@ export default function CreditNotePrintDialog({
         if (logoRes.ok) logoSvg = await logoRes.text();
       } catch {}
 
-      const isVatRegistered = company.is_vat_registered;
-      const isTaxCreditNote = isVatRegistered;
-
       const refundAmount = creditNote.refund_amount || 0;
-      const vatRate = 0.07;
-      const priceBeforeVat = isTaxCreditNote ? refundAmount / (1 + vatRate) : refundAmount;
-      const vatAmount = isTaxCreditNote ? refundAmount - priceBeforeVat : 0;
+      // Use vat_amount from DB (pre-computed)
+      const vatAmount = creditNote.vat_amount || 0;
+      const priceBeforeVat = refundAmount - vatAmount;
+      const showVat = vatAmount > 0;
 
-      const documentTitle = isTaxCreditNote
+      const documentTitle = showVat
         ? 'ใบลดหนี้/ใบกำกับภาษี'
         : 'ใบลดหนี้ / Credit Note';
 
       const showBillingDetails = creditNote.billing_tax_id || creditNote.billing_type === 'company';
 
       const docData: DocumentData = {
-        documentType: isTaxCreditNote ? 'credit-note-tax' : 'credit-note',
+        documentType: showVat ? 'credit-note-tax' : 'credit-note',
         documentTitle,
         company: {
           name: company.name || '-',
@@ -109,7 +107,7 @@ export default function CreditNotePrintDialog({
         })),
         summary: {
           subtotal: refundAmount,
-          vatBreakdown: isTaxCreditNote ? { priceBeforeVat, vatAmount } : undefined,
+          vatBreakdown: showVat ? { priceBeforeVat, vatAmount } : undefined,
           total: refundAmount,
           totalLabel: 'ยอดคืนสุทธิ / Total Refund',
         },

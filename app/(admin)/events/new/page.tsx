@@ -19,7 +19,7 @@ export default function NewEventPage() {
 
       <div className="mb-8">
         <h1 className="text-xl sm:text-3xl font-bold text-gray-900">สร้าง Event ใหม่</h1>
-        <p className="text-gray-600 mt-2">กรอกข้อมูลเพื่อสร้างงานหรือกิจกรรมใหม่</p>
+        <p className="text-gray-600 mt-1">กรอกข้อมูลเพื่อสร้างงานหรือกิจกรรมใหม่</p>
       </div>
 
       <EventForm />

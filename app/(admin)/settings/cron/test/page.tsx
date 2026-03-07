@@ -50,7 +50,7 @@ export default function TestCronPage() {
         message: data.message || (response.ok ? 'สำเร็จ' : 'ล้มเหลว'),
         sentCount: data.sentCount,
         details: data.details,
-        timestamp: new Date().toLocaleString('th-TH')
+        timestamp: new Date().toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       });
 
     } catch (error) {
@@ -58,7 +58,7 @@ export default function TestCronPage() {
       setRemindersResult({
         success: false,
         message: error instanceof Error ? error.message : 'เกิดข้อผิดพลาด',
-        timestamp: new Date().toLocaleString('th-TH')
+        timestamp: new Date().toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       });
     } finally {
       setLoadingReminders(false);
@@ -82,7 +82,7 @@ export default function TestCronPage() {
         success: response.ok,
         message: data.message || (response.ok ? 'สำเร็จ' : 'ล้มเหลว'),
         details: data.details,
-        timestamp: new Date().toLocaleString('th-TH')
+        timestamp: new Date().toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       });
 
     } catch (error) {
@@ -90,7 +90,7 @@ export default function TestCronPage() {
       setStatusResult({
         success: false,
         message: error instanceof Error ? error.message : 'เกิดข้อผิดพลาด',
-        timestamp: new Date().toLocaleString('th-TH')
+        timestamp: new Date().toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       });
     } finally {
       setLoadingStatus(false);

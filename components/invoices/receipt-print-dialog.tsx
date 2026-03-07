@@ -53,7 +53,7 @@ export default function ReceiptPrintDialog({
       if (!res.ok) throw new Error('Failed to load invoice');
       const result = await res.json();
 
-      const { invoice, company, branch, enrollment } = result;
+      const { invoice, documentType: docType, company, branch, enrollment, paymentSnapshot } = result;
       if (!invoice || !company) {
         onOpenChange(false);
         onClose?.();
@@ -68,21 +68,37 @@ export default function ReceiptPrintDialog({
       } catch {}
 
       const isVatRegistered = company.is_vat_registered;
-      const isTaxInvoice = isVatRegistered;
-      const showBillingDetails = invoice.want_tax_invoice;
+      const documentType = docType || 'receipt';
+      const isTaxInvoice = documentType === 'tax-invoice' || documentType === 'tax-invoice-receipt';
+      const showBillingDetails = isTaxInvoice;
 
       const totalAmount = invoice.total_amount || 0;
-      const vatRate = 0.07;
-      const priceBeforeVat = isTaxInvoice ? totalAmount / (1 + vatRate) : totalAmount;
-      const vatAmount = isTaxInvoice ? totalAmount - priceBeforeVat : 0;
-      const remaining = totalAmount - (invoice.paid_amount || 0);
+      // Use vat_amount from DB (pre-computed) instead of calculating
+      const vatAmount = invoice.vat_amount || 0;
+      const priceBeforeVat = totalAmount - vatAmount;
+      // Show VAT breakdown for tax invoices always, and for VAT-registered receipts
+      const showVat = isTaxInvoice || (documentType === 'receipt' && isVatRegistered && vatAmount > 0);
 
-      const documentTitle = isTaxInvoice
-        ? 'ใบกำกับภาษี/ใบเสร็จรับเงิน'
-        : 'ใบเสร็จรับเงิน / Receipt';
+      let documentTitle: string;
+      if (documentType === 'tax-invoice') {
+        documentTitle = 'ใบกำกับภาษี / Tax Invoice';
+      } else if (documentType === 'tax-invoice-receipt') {
+        documentTitle = 'ใบกำกับภาษี/ใบเสร็จรับเงิน';
+      } else {
+        documentTitle = 'ใบเสร็จรับเงิน / Receipt';
+      }
+
+      // Load reference invoice data (for standalone tax invoice issued later)
+      let referenceData: { number: string; date: string } | undefined;
+      if (documentType === 'tax-invoice' && result.referenceInvoice) {
+        referenceData = {
+          number: result.referenceInvoice.invoice_number,
+          date: formatDate(result.referenceInvoice.issued_at || result.referenceInvoice.created_at, 'long'),
+        };
+      }
 
       const docData: DocumentData = {
-        documentType: isTaxInvoice ? 'tax-invoice-receipt' : 'receipt',
+        documentType: documentType as any,
         documentTitle,
         company: {
           name: company.name || '-',
@@ -95,6 +111,11 @@ export default function ReceiptPrintDialog({
         },
         documentNumber: invoice.invoice_number,
         documentDate: formatDate(invoice.issued_at || invoice.created_at, 'long'),
+        reference: referenceData ? {
+          label: 'เอกสารอ้างอิง / Reference Document',
+          number: referenceData.number,
+          date: referenceData.date,
+        } : undefined,
         customer: {
           name: invoice.customer_name,
           address: invoice.customer_address ? formatAddress(invoice.customer_address) : undefined,
@@ -119,14 +140,15 @@ export default function ReceiptPrintDialog({
             label: `ส่วนลด / Discount${invoice.discount_type === 'percentage' ? ` (${invoice.discount_value}%)` : ''}`,
             amount: invoice.discount_amount,
           } : undefined,
-          vatBreakdown: isTaxInvoice ? { priceBeforeVat, vatAmount } : undefined,
+          vatBreakdown: showVat ? { priceBeforeVat, vatAmount } : undefined,
           total: totalAmount,
           totalLabel: 'ยอดสุทธิ / Total',
         },
         payment: {
           method: paymentMethodLabels[invoice.payment_method] || invoice.payment_method || '-',
           paidAmount: invoice.paid_amount || 0,
-          remaining: remaining > 0 ? remaining : undefined,
+          remainingBefore: paymentSnapshot?.remainingBefore ?? undefined,
+          remainingAfter: paymentSnapshot?.remainingAfter ?? undefined,
           enrollmentTotal: enrollment?.final_price || undefined,
         },
         signatures: {

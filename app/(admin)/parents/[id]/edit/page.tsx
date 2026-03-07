@@ -60,7 +60,7 @@ export default function EditParentPage() {
 
       <div className="mb-8">
         <h1 className="text-xl sm:text-3xl font-bold text-gray-900">แก้ไขข้อมูลผู้ปกครอง</h1>
-        <p className="text-gray-600 mt-2">แก้ไขข้อมูล {parent.displayName}</p>
+        <p className="text-gray-600 mt-1">แก้ไขข้อมูล {parent.displayName}</p>
       </div>
 
       <ParentForm parent={parent} isEdit />

@@ -182,7 +182,7 @@ export default function TeachersPage() {
               <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>
             )}
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-600 mt-1">
             {isAllBranches 
               ? 'จัดการข้อมูลครูผู้สอนทั้งหมด'
               : 'แสดงเฉพาะครูที่สอนในสาขานี้'

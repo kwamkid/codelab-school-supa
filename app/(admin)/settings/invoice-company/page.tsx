@@ -38,6 +38,7 @@ interface CompanyFormData {
   phone: string;
   email: string;
   invoicePrefix: string;
+  taxInvoicePrefix: string;
   isVatRegistered: boolean;
 }
 
@@ -56,6 +57,7 @@ const DEFAULT_FORM: CompanyFormData = {
   phone: '',
   email: '',
   invoicePrefix: 'INV',
+  taxInvoicePrefix: 'TAX',
   isVatRegistered: false,
 };
 
@@ -99,6 +101,7 @@ export default function InvoiceCompanySettingsPage() {
       phone: company.phone || '',
       email: company.email || '',
       invoicePrefix: company.invoicePrefix || 'INV',
+      taxInvoicePrefix: company.taxInvoicePrefix || 'TAX',
       isVatRegistered: company.isVatRegistered || false,
     });
     setDialogOpen(true);
@@ -121,6 +124,7 @@ export default function InvoiceCompanySettingsPage() {
           phone: formData.phone || undefined,
           email: formData.email || undefined,
           invoicePrefix: formData.invoicePrefix,
+          taxInvoicePrefix: formData.taxInvoicePrefix,
           isVatRegistered: formData.isVatRegistered,
         });
         toast.success('อัปเดตข้อมูลบริษัทเรียบร้อย');
@@ -133,6 +137,7 @@ export default function InvoiceCompanySettingsPage() {
           phone: formData.phone || undefined,
           email: formData.email || undefined,
           invoicePrefix: formData.invoicePrefix,
+          taxInvoicePrefix: formData.taxInvoicePrefix,
           isVatRegistered: formData.isVatRegistered,
         });
         toast.success('เพิ่มบริษัทใหม่เรียบร้อย');
@@ -209,7 +214,12 @@ export default function InvoiceCompanySettingsPage() {
                         {company.invoicePrefix}
                       </span>
                       {company.isVatRegistered && (
-                        <Badge className="bg-blue-100 text-blue-700">จด VAT</Badge>
+                        <>
+                          <span className="text-base text-gray-400 bg-blue-50 px-2 py-0.5 rounded">
+                            {company.taxInvoicePrefix}
+                          </span>
+                          <Badge className="bg-blue-100 text-blue-700">จด VAT</Badge>
+                        </>
                       )}
                     </div>
                     {company.taxId && (
@@ -315,18 +325,35 @@ export default function InvoiceCompanySettingsPage() {
               </div>
             </div>
 
-            <div>
-              <Label className="text-base">Prefix เลขบิล</Label>
-              <Input
-                value={formData.invoicePrefix}
-                onChange={e => setFormData(prev => ({ ...prev, invoicePrefix: e.target.value.toUpperCase() }))}
-                placeholder="INV"
-                className="text-base w-32"
-                maxLength={10}
-              />
-              <p className="text-base text-gray-400 mt-1">
-                ตัวอย่าง: {formData.invoicePrefix || 'INV'}-000001
-              </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-base">Prefix ใบเสร็จ</Label>
+                <Input
+                  value={formData.invoicePrefix}
+                  onChange={e => setFormData(prev => ({ ...prev, invoicePrefix: e.target.value.toUpperCase() }))}
+                  placeholder="REC"
+                  className="text-base"
+                  maxLength={10}
+                />
+                <p className="text-sm text-gray-400 mt-1">
+                  เช่น {formData.invoicePrefix || 'REC'}-2603-0001
+                </p>
+              </div>
+              {formData.isVatRegistered && (
+                <div>
+                  <Label className="text-base">Prefix ใบกำกับภาษี</Label>
+                  <Input
+                    value={formData.taxInvoicePrefix}
+                    onChange={e => setFormData(prev => ({ ...prev, taxInvoicePrefix: e.target.value.toUpperCase() }))}
+                    placeholder="TAX"
+                    className="text-base"
+                    maxLength={10}
+                  />
+                  <p className="text-sm text-gray-400 mt-1">
+                    เช่น {formData.taxInvoicePrefix || 'TAX'}-2603-0001
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3 border rounded-lg p-3">

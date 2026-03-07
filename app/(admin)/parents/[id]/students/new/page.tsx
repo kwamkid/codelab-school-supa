@@ -23,7 +23,7 @@ export default function NewStudentPage() {
 
       <div className="mb-8">
         <h1 className="text-xl sm:text-3xl font-bold text-gray-900">เพิ่มข้อมูลนักเรียน</h1>
-        <p className="text-gray-600 mt-2">กรอกข้อมูลนักเรียนใหม่</p>
+        <p className="text-gray-600 mt-1">กรอกข้อมูลนักเรียนใหม่</p>
       </div>
 
       <StudentForm parentId={parentId} />

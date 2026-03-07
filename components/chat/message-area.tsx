@@ -22,17 +22,17 @@ interface MessageAreaProps {
 }
 
 const statusLabels: Record<string, string> = {
-  open: '\u0e40\u0e1b\u0e34\u0e14',
-  assigned: '\u0e23\u0e31\u0e1a\u0e41\u0e25\u0e49\u0e27',
-  resolved: '\u0e41\u0e01\u0e49\u0e44\u0e02\u0e41\u0e25\u0e49\u0e27',
-  archived: '\u0e40\u0e01\u0e47\u0e1a\u0e16\u0e32\u0e27\u0e23',
+  open: 'เปิด',
+  assigned: 'รับแล้ว',
+  resolved: 'แก้ไขแล้ว',
+  archived: 'เก็บถาวร',
 };
 
 const statusColors: Record<string, string> = {
-  open: 'bg-green-100 text-green-700',
-  assigned: 'bg-blue-100 text-blue-700',
-  resolved: 'bg-gray-100 text-gray-700',
-  archived: 'bg-gray-100 text-gray-500',
+  open: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  assigned: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  resolved: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  archived: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
 };
 
 export default function MessageArea({
@@ -47,21 +47,21 @@ export default function MessageArea({
   // Empty state
   if (!conversation) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+      <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-slate-900">
         <MessageSquare className="w-16 h-16 mb-4 stroke-1" />
-        <p className="text-base">{'\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e41\u0e0a\u0e17\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e40\u0e23\u0e34\u0e48\u0e21\u0e2a\u0e19\u0e17\u0e19\u0e32'}</p>
+        <p className="text-base">เลือกแชทเพื่อเริ่มสนทนา</p>
       </div>
     );
   }
 
   const contact = conversation.contact;
   const channel = conversation.channel;
-  const displayName = contact?.displayName || '\u0e44\u0e21\u0e48\u0e17\u0e23\u0e32\u0e1a\u0e0a\u0e37\u0e48\u0e2d';
+  const displayName = contact?.displayName || 'ไม่ทราบชื่อ';
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-800">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-3 border-b bg-white">
+      <div className="flex items-center gap-2 px-3 py-3 border-b dark:border-slate-700 bg-white dark:bg-slate-800">
         {/* Mobile back button */}
         {onBack && (
           <Button
@@ -75,7 +75,7 @@ export default function MessageArea({
         )}
 
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <h2 className="text-base font-semibold text-gray-900 truncate">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate">
             {displayName}
           </h2>
           {channel && (
@@ -106,7 +106,7 @@ export default function MessageArea({
       </div>
 
       {/* Messages */}
-      <MessageList messages={messages} loading={loading} />
+      <MessageList messages={messages} loading={loading} channelId={conversation.channelId} />
 
       {/* Input */}
       <MessageInput onSend={onSend} disabled={sending} />

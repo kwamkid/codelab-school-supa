@@ -16,7 +16,7 @@ export default function SettingsPage() {
           <Settings className="h-8 w-8 text-red-500" />
           ตั้งค่าระบบ
         </h1>
-        <p className="text-gray-600 mt-2">จัดการการตั้งค่าต่างๆ ของระบบ</p>
+        <p className="text-gray-600 mt-1">จัดการการตั้งค่าต่างๆ ของระบบ</p>
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">

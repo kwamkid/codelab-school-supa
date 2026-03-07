@@ -17,7 +17,7 @@ export default function NewTeacherPage() {
 
       <div className="mb-8">
         <h1 className="text-xl sm:text-3xl font-bold text-gray-900">เพิ่มครูใหม่</h1>
-        <p className="text-gray-600 mt-2">กรอกข้อมูลเพื่อเพิ่มครูผู้สอนใหม่</p>
+        <p className="text-gray-600 mt-1">กรอกข้อมูลเพื่อเพิ่มครูผู้สอนใหม่</p>
       </div>
 
       <TeacherForm />

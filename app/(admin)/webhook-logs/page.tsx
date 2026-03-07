@@ -115,7 +115,7 @@ export default function WebhookLogsPage() {
             <MessageSquare className="h-8 w-8 text-red-500" />
             Webhook Logs & User IDs
           </h1>
-          <p className="text-gray-600 mt-2">ดู logs จาก LINE Webhook และค้นหา User ID</p>
+          <p className="text-gray-600 mt-1">ดู logs จาก LINE Webhook และค้นหา User ID</p>
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2">

@@ -155,7 +155,7 @@ export default function TestNotificationsPage() {
       setResult({
         success: result.success,
         message: result.message || (result.success ? 'สำเร็จ' : 'ล้มเหลว'),
-        timestamp: new Date().toLocaleString('th-TH')
+        timestamp: new Date().toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       });
 
     } catch (error) {
@@ -163,7 +163,7 @@ export default function TestNotificationsPage() {
       setResult({
         success: false,
         message: error instanceof Error ? error.message : 'เกิดข้อผิดพลาด',
-        timestamp: new Date().toLocaleString('th-TH')
+        timestamp: new Date().toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       });
     } finally {
       setLoading(false);
@@ -417,7 +417,7 @@ export default function TestNotificationsPage() {
                           <div className="text-sm text-muted-foreground space-y-1">
                             <p>📚 {classItem.subjectName}</p>
                             <p>📍 {classItem.branchName}</p>
-                            <p>🕐 {getDayNames(classItem.daysOfWeek)} • {classItem.startTime}-{classItem.endTime}</p>
+                            <p>🕐 {getDayNames(classItem.daysOfWeek)} • {classItem.startTime?.substring(0, 5)}-{classItem.endTime?.substring(0, 5)}</p>
                             <p className="text-xs">รหัส: {classItem.classCode}</p>
                           </div>
                         </div>
@@ -474,7 +474,7 @@ export default function TestNotificationsPage() {
                     {selectedClass.subjectName} • {selectedClass.branchName}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {getDayNames(selectedClass.daysOfWeek)} • {selectedClass.startTime}-{selectedClass.endTime}
+                    {getDayNames(selectedClass.daysOfWeek)} • {selectedClass.startTime?.substring(0, 5)}-{selectedClass.endTime?.substring(0, 5)}
                   </p>
                 </div>
               </div>

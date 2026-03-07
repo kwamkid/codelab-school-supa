@@ -1,5 +1,6 @@
 // components/invoices/document-template.ts
 // Shared template for all printed documents (Receipt, Tax Invoice, Credit Note)
+// Design based on pdfMake-style layout: ink-saving, no vertical table lines, corner triangle
 
 import { formatCurrency, formatDate } from '@/lib/utils';
 
@@ -68,6 +69,8 @@ export interface DocumentData {
     method: string;
     paidAmount: number;
     remaining?: number;
+    remainingBefore?: number;
+    remainingAfter?: number;
     enrollmentTotal?: number;
   };
 
@@ -81,100 +84,128 @@ export interface DocumentData {
   };
 }
 
+// Color themes per document type
+const THEME_COLORS: Record<string, string> = {
+  'receipt': '#15803d',
+  'tax-invoice-receipt': '#15803d',
+  'tax-invoice': '#2563eb',
+  'credit-note': '#dc2626',
+  'credit-note-tax': '#dc2626',
+};
+
 export function generatePrintStyles(): string {
   return `
-    @page { size: A4 portrait; margin: 15mm; }
+    @page { size: A4 portrait; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Sarabun', sans-serif; font-size: 12px; color: #111; padding: 0; }
-    @media print { body { padding: 0; } }
+    body { font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 11px; color: #1e293b; padding: 0; line-height: 1.4; }
+    @media print { body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 
     .doc-container { width: 100%; max-width: 210mm; margin: 0 auto; position: relative; }
     .doc-container + .doc-container { page-break-before: always; }
-    .doc-page { min-height: 100vh; display: flex; flex-direction: column; position: relative; }
-    .doc-content { flex: 1; }
+    .doc-page { width: 210mm; min-height: 297mm; display: flex; flex-direction: column; position: relative; padding: 0; overflow: hidden; }
+    .doc-content { flex: 1; padding: 14mm 14mm 0 14mm; }
 
-    /* Corner triangle accent — top-right of content area */
-    .corner-accent { position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 28mm 28mm 0; border-color: transparent; border-right-color: var(--accent-color, #ef443a); z-index: 0; }
+    /* Corner triangle — absolute top-right of PAGE, small inset from edge */
+    .corner-triangle {
+      position: absolute; top: 12px; right: 12px; width: 72px; height: 72px; z-index: 0;
+    }
+    .corner-triangle svg { display: block; }
+
+    /* Copy label — under doc title */
+    .copy-label { font-size: 10px; font-weight: 600; margin-top: 0; margin-bottom: 8px; }
+    .copy-label.original { color: #15803d; }
+    .copy-label.duplicate { color: #6b7280; }
 
     .text-right { text-align: right; }
-    .font-bold { font-weight: bold; }
+    .font-bold { font-weight: 700; }
     .font-semibold { font-weight: 600; }
 
     /* Header: company left, doc info right */
-    .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 14px; margin-bottom: 0; }
-    .header-left { text-align: left; }
-    .header-left .company-logo { margin-bottom: 10px; }
-    .header-left .company-logo svg { height: 32px; width: auto; }
-    .header-left .company-name { font-size: 16px; font-weight: bold; }
-    .header-left p { margin-top: 2px; font-size: 11px; color: #374151; }
-    .header-right { text-align: left; position: relative; z-index: 1; padding-right: 32mm; }
-    .header-right .doc-title { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
-    .header-right .doc-subtitle { font-size: 13px; color: #6b7280; margin-bottom: 10px; }
-    .header-right .doc-meta { font-size: 14px; color: #374151; }
-    .header-right .doc-meta .meta-row { display: flex; margin-top: 4px; }
-    .header-right .doc-meta .meta-label { width: 65px; flex-shrink: 0; font-weight: 600; color: var(--accent-color, #ef443a); }
-    .header-right .doc-meta .meta-value { }
+    .header-row { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 12px; margin-bottom: 0; gap: 16px; }
+    .header-left { flex: 1; text-align: left; }
+    .header-left .company-logo { margin-bottom: 8px; }
+    .header-left .company-logo svg { height: 36px; width: auto; }
+    .header-left .company-name { font-size: 13px; font-weight: 700; color: #111; }
+    .header-left p { margin-top: 1px; font-size: 10px; color: #6b7280; }
 
-    /* Customer / Billing — no border, flows under company */
-    .customer-section { padding: 0; margin-bottom: 14px; font-size: 12px; }
-    .customer-section .section-title { font-weight: 600; margin-bottom: 4px; font-size: 12px; }
-    .customer-section .customer-detail { margin-top: 2px; }
+    .header-right { width: 230px; flex-shrink: 0; text-align: right; position: relative; z-index: 1; }
+    .header-right .doc-title { font-size: 20px; font-weight: 700; color: var(--theme-color, #15803d); margin-bottom: 0; }
+
+    /* Info box — table with horizontal lines only */
+    .info-box { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .info-box tr:first-child td { padding-top: 6px; border-top: 0.5px solid #ccc; }
+    .info-box tr:last-child td { padding-bottom: 6px; border-bottom: 0.5px solid #ccc; }
+    .info-box td { padding: 2px 0; border: none; }
+    .info-box .info-label { width: 50px; font-weight: 600; color: var(--theme-color, #15803d); text-align: left; }
+    .info-box .info-value { text-align: left; }
+
+    /* Customer / Billing */
+    .customer-section { padding: 0; margin-bottom: 12px; font-size: 11px; }
+    .customer-section .section-title { font-weight: 700; margin-bottom: 3px; font-size: 11px; color: var(--theme-color, #15803d); }
+    .customer-section .customer-detail { margin-top: 1px; color: #374151; }
 
     /* Reference (credit notes) */
-    .reference-box { background: #f9fafb; border: 1px solid #d1d5db; border-radius: 4px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; }
+    .reference-box { border: 0.5px solid #ccc; padding: 8px 10px; margin-bottom: 12px; font-size: 11px; }
 
-    /* Items table */
-    table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
-    th, td { border: 1px solid #d1d5db; padding: 5px 8px; text-align: left; font-size: 12px; }
-    th { background: #f3f4f6; font-weight: 600; }
+    /* Items table — no vertical lines, horizontal only */
+    table.items { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+    table.items th, table.items td { border: none; padding: 6px 8px; text-align: left; font-size: 11px; vertical-align: top; }
+    table.items thead tr { border-top: 1px solid #333; border-bottom: 1px solid #333; }
+    table.items th { font-weight: 600; background: none; }
+    table.items tbody tr { border-bottom: 0.5px solid #e5e7eb; }
+    table.items tbody tr:last-child { border-bottom: 1px solid #333; }
 
     /* Below table: payment left + summary right */
-    .below-table { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 12px; margin-bottom: 14px; gap: 24px; }
+    .below-table { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 12px; margin-bottom: 12px; gap: 20px; }
     .below-table-left { flex: 1; }
-    .below-table-right { width: 240px; flex-shrink: 0; }
+    .below-table-right { width: 260px; flex-shrink: 0; }
 
-    /* Payment box */
-    .payment-box { border: 1px solid #d1d5db; border-radius: 4px; padding: 10px 12px; font-size: 12px; }
-    .payment-box .box-title { font-weight: 600; margin-bottom: 4px; }
+    /* Payment info — rounded border box */
+    .payment-section { font-size: 11px; border: 1px solid #d1d5db; border-radius: 15px; padding: 10px 16px 10px 14px; margin-top: 4px; max-width: 260px; }
+    .payment-section .section-label { font-weight: 600; margin-bottom: 6px; font-size: 11px; }
     .payment-row { display: flex; justify-content: space-between; padding: 2px 0; }
     .text-red { color: #dc2626; }
 
     /* Reason box (credit notes) */
-    .reason-box { border: 1px solid #fecaca; background: #fef2f2; border-radius: 4px; padding: 10px 12px; font-size: 12px; margin-top: 8px; }
-    .reason-box .box-title { font-weight: 600; margin-bottom: 4px; }
+    .reason-box { border: 0.5px solid #fecaca; padding: 8px 10px; font-size: 11px; margin-top: 8px; }
+    .reason-box .box-title { font-weight: 600; margin-bottom: 3px; }
 
-    /* Summary */
-    .summary-box { font-size: 12px; }
-    .summary-row { display: flex; justify-content: space-between; padding: 3px 0; }
-    .summary-discount { display: flex; justify-content: space-between; padding: 3px 0; color: #15803d; }
-    .summary-total { display: flex; justify-content: space-between; padding: 6px 0; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px; margin-top: 4px; }
+    /* Summary — clean, no border */
+    .summary-box { font-size: 11px; }
+    .summary-row { display: flex; justify-content: space-between; padding: 2px 0; }
+    .summary-discount { display: flex; justify-content: space-between; padding: 2px 0; color: #15803d; }
+    .summary-total { display: flex; justify-content: space-between; padding: 6px 0; font-weight: 700; font-size: 13px; margin-top: 4px; color: var(--theme-color, #15803d); }
 
     /* Footer: signatures + company line */
-    .doc-footer { margin-top: auto; }
-    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; text-align: center; padding-top: 16px; }
-    .signature-line { border-bottom: 1px solid #9ca3af; margin-bottom: 4px; height: 40px; }
-    .signature-label { font-size: 12px; }
-    .signature-date { color: #9ca3af; font-size: 11px; margin-top: 2px; }
-    .footer-line { margin-top: 20px; text-align: center; color: #9ca3af; font-size: 11px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+    .doc-footer { margin-top: auto; padding: 0 14mm 14mm 14mm; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; text-align: center; padding-top: 12px; }
+    .signature-block { }
+    .signature-company { font-size: 10px; color: #6b7280; margin-bottom: 16px; }
+    .signature-line-row { display: flex; justify-content: center; align-items: flex-end; gap: 12px; }
+    .sig-line { border-bottom: 0.5px solid #ccc; width: 140px; height: 1px; }
+    .date-line { border-bottom: 0.5px solid #ccc; width: 80px; height: 1px; }
+    .signature-label { font-size: 10px; margin-top: 4px; }
+    .signature-date-label { font-size: 10px; margin-top: 4px; color: #6b7280; }
+    .footer-line { margin-top: 16px; text-align: center; color: #9ca3af; font-size: 10px; border-top: 0.5px solid #e5e7eb; padding-top: 6px; }
   `;
 }
 
-export function generateDocumentHTML(data: DocumentData): string {
+function generatePageHTML(data: DocumentData, copyType: 'original' | 'copy'): string {
   const hasStudentColumn = data.items.some(item => item.studentName);
+  const themeColor = THEME_COLORS[data.documentType] || '#15803d';
+  const copyLabel = copyType === 'original' ? '(ต้นฉบับ)' : '(สำเนา)';
+  const copyClass = copyType === 'original' ? 'original' : 'duplicate';
 
-  // Determine accent color based on document type
-  const accentColor = '#ef443a';
+  let html = `<div class="doc-container"><div class="doc-page" style="--theme-color: ${themeColor}">`;
 
-  // Subtitle based on document type
-  const subtitleMap: Record<string, string> = {
-    'receipt': 'ต้นฉบับ',
-    'tax-invoice-receipt': 'ต้นฉบับ',
-    'credit-note': 'ต้นฉบับ',
-    'credit-note-tax': 'ต้นฉบับ',
-  };
-  const subtitle = subtitleMap[data.documentType] || '';
+  // Corner triangle SVG
+  html += `<div class="corner-triangle">
+    <svg width="72" height="72" viewBox="0 0 72 72">
+      <polygon points="10,0 72,0 72,62" fill="${themeColor}" />
+    </svg>
+  </div>`;
 
-  let html = `<div class="doc-container"><div class="doc-page" style="--accent-color: ${accentColor}"><div class="corner-accent"></div><div class="doc-content">`;
+  html += `<div class="doc-content">`;
 
   // ===== Header Row: Company (left) + Doc Info (right) =====
   html += `<div class="header-row">
@@ -188,17 +219,17 @@ export function generateDocumentHTML(data: DocumentData): string {
     </div>
     <div class="header-right">
       <div class="doc-title">${data.documentTitle}</div>
-      ${subtitle ? `<div class="doc-subtitle">${subtitle}</div>` : ''}
-      <div class="doc-meta">
-        <div class="meta-row">
-          <span class="meta-label">เลขที่</span>
-          <span class="meta-value">${data.documentNumber}</span>
-        </div>
-        <div class="meta-row">
-          <span class="meta-label">วันที่</span>
-          <span class="meta-value">${data.documentDate}</span>
-        </div>
-      </div>
+      <div class="copy-label ${copyClass}">${copyLabel}</div>
+      <table class="info-box">
+        <tr>
+          <td class="info-label">เลขที่</td>
+          <td class="info-value">${data.documentNumber}</td>
+        </tr>
+        <tr>
+          <td class="info-label">วันที่</td>
+          <td class="info-value">${data.documentDate}</td>
+        </tr>
+      </table>
     </div>
   </div>`;
 
@@ -211,7 +242,6 @@ export function generateDocumentHTML(data: DocumentData): string {
   }
 
   // ===== Customer / Billing =====
-  // If billing info exists, show billing as primary customer display
   const displayName = data.billing?.name || data.customer.name;
   const displayAddress = data.billing?.address || data.customer.address;
   const displayTaxId = data.billing?.taxId || data.customer.taxId;
@@ -224,13 +254,13 @@ export function generateDocumentHTML(data: DocumentData): string {
     ${data.billing?.branch ? `<p class="customer-detail">สาขา: ${data.billing.branch}</p>` : ''}
   </div>`;
 
-  // ===== Items Table =====
-  html += `<table>
+  // ===== Items Table — no vertical lines =====
+  html += `<table class="items">
     <thead><tr>
-      <th style="width:36px">#</th>
+      <th style="width:32px">#</th>
       <th>รายการ</th>
       ${hasStudentColumn ? '<th>นักเรียน</th>' : ''}
-      <th style="width:110px" class="text-right">จำนวนเงิน</th>
+      <th style="width:100px" class="text-right">จำนวนเงิน</th>
     </tr></thead>
     <tbody>`;
 
@@ -239,39 +269,47 @@ export function generateDocumentHTML(data: DocumentData): string {
       <td>${idx + 1}</td>
       <td>${item.description}</td>
       ${hasStudentColumn ? `<td>${item.studentName || ''}</td>` : ''}
-      <td class="text-right">${formatCurrency(item.amount)}</td>
+      <td class="text-right font-semibold">${formatCurrency(item.amount)}</td>
     </tr>`;
   });
 
   html += `</tbody></table>`;
 
-  // ===== Below Table: Payment (left) + Summary (right) =====
+  // ===== Below Table: Payment/Notes (left) + Summary (right) =====
   html += `<div class="below-table">`;
 
   // Left: Payment + Reason
   html += `<div class="below-table-left">`;
 
   if (data.payment) {
-    html += `<div class="payment-box">
-      <p class="box-title">การชำระเงิน / Payment</p>
+    html += `<div class="payment-section">
+      <p class="section-label">การชำระเงิน / Payment</p>
       <div class="payment-row">
         <span>วิธีชำระ:</span>
         <span>${data.payment.method}</span>
       </div>`;
 
-    if (data.payment.enrollmentTotal && data.payment.enrollmentTotal > data.payment.paidAmount) {
+    if (data.payment.enrollmentTotal && data.payment.remainingAfter != null && data.payment.remainingAfter >= 0) {
       html += `<div class="payment-row" style="margin-top:4px">
         <span>ยอดค่าเรียนทั้งหมด:</span>
         <span>${formatCurrency(data.payment.enrollmentTotal)}</span>
-      </div>
-      <div class="payment-row">
+      </div>`;
+      if (data.payment.remainingBefore != null && data.payment.remainingBefore < data.payment.enrollmentTotal) {
+        html += `<div class="payment-row">
+          <span>ยอดคงเหลือ:</span>
+          <span>${formatCurrency(data.payment.remainingBefore)}</span>
+        </div>`;
+      }
+      html += `<div class="payment-row">
         <span>ชำระครั้งนี้:</span>
         <span>${formatCurrency(data.payment.paidAmount)}</span>
-      </div>
-      <div class="payment-row text-red" style="font-weight:600">
-        <span>คงเหลือ:</span>
-        <span>${formatCurrency(data.payment.enrollmentTotal - data.payment.paidAmount)}</span>
       </div>`;
+      if (data.payment.remainingAfter > 0) {
+        html += `<div class="payment-row text-red" style="font-weight:600">
+          <span>เหลือชำระ:</span>
+          <span>${formatCurrency(data.payment.remainingAfter)}</span>
+        </div>`;
+      }
     } else {
       html += `<div class="payment-row">
         <span>ชำระแล้ว:</span>
@@ -327,26 +365,41 @@ export function generateDocumentHTML(data: DocumentData): string {
   // Close below-table
   html += `</div>`;
 
-  // ===== Close doc-content =====
+  // Close doc-content
   html += `</div>`;
 
-  // ===== Footer: Signatures + Company Line (always at bottom) =====
+  // ===== Footer: Signatures =====
   html += `<div class="doc-footer">
     <div class="signatures">
-      <div>
-        <div class="signature-line"></div>
-        <p class="signature-label">${data.signatures.left.label}</p>
-        <p class="signature-date">วันที่ ___/___/______</p>
+      <div class="signature-block">
+        <p class="signature-company">ในนาม ${data.company.name}</p>
+        <div class="signature-line-row">
+          <div>
+            <div class="sig-line"></div>
+            <p class="signature-label">${data.signatures.left.label}</p>
+          </div>
+          <div>
+            <div class="date-line"></div>
+            <p class="signature-date-label">วันที่</p>
+          </div>
+        </div>
       </div>
-      <div>
-        <div class="signature-line"></div>
-        <p class="signature-label">${data.signatures.right.label}</p>
-        <p class="signature-date">วันที่ ___/___/______</p>
+      <div class="signature-block">
+        <p class="signature-company">ในนาม ${data.company.name}</p>
+        <div class="signature-line-row">
+          <div>
+            <div class="sig-line"></div>
+            <p class="signature-label">${data.signatures.right.label}</p>
+          </div>
+          <div>
+            <div class="date-line"></div>
+            <p class="signature-date-label">วันที่</p>
+          </div>
+        </div>
       </div>
     </div>
     <div class="footer-line">
       <p>${data.company.name}</p>
-      ${data.company.email ? `<p>${data.company.email}</p>` : ''}
     </div>
   </div>`;
 
@@ -356,8 +409,14 @@ export function generateDocumentHTML(data: DocumentData): string {
   return html;
 }
 
+export function generateDocumentHTML(data: DocumentData): string {
+  // Generate 2 pages: ต้นฉบับ (original) + สำเนา (copy)
+  const originalPage = generatePageHTML(data, 'original');
+  const copyPage = generatePageHTML(data, 'copy');
+  return originalPage + copyPage;
+}
+
 export function openPrintWindow(title: string, contentHTML: string) {
-  // Use hidden iframe to print without opening a new tab
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.top = '-10000px';
@@ -381,7 +440,7 @@ export function openPrintWindow(title: string, contentHTML: string) {
   <title>${title}</title>
   <style>${generatePrintStyles()}</style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>${contentHTML}</body>
 </html>`);
@@ -391,11 +450,10 @@ export function openPrintWindow(title: string, contentHTML: string) {
   setTimeout(() => {
     iframe.contentWindow?.focus();
     iframe.contentWindow?.print();
-    // Clean up after print dialog closes
     setTimeout(() => {
       document.body.removeChild(iframe);
     }, 1000);
-  }, 500);
+  }, 600);
 }
 
 // Helper: format address object to string

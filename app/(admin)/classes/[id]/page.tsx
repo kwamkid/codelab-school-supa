@@ -413,7 +413,7 @@ export default function ClassDetailPage() {
               />
               {classData.name}
             </h1>
-            <p className="text-gray-600 mt-2">รหัสคลาส: {classData.code}</p>
+            <p className="text-gray-600 mt-1">รหัสคลาส: {classData.code}</p>
           </div>
           <Badge className={statusColors[classData.status as keyof typeof statusColors]}>
             {statusLabels[classData.status as keyof typeof statusLabels]}

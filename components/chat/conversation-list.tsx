@@ -5,8 +5,9 @@ import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChatConversation, ChatChannelType } from '@/types/models';
+import { ChatConversation, Branch } from '@/types/models';
 import { ConversationItem } from './conversation-item';
+import { ConversationFilters, ChatFilters, DEFAULT_FILTERS } from './conversation-filters';
 
 interface ConversationListProps {
   conversations: ChatConversation[];
@@ -14,15 +15,9 @@ interface ConversationListProps {
   activeConversationId?: string | null;
   onSelect: (id: string) => void;
   loading: boolean;
+  branches: Branch[];
+  defaultBranchId?: string | null;
 }
-
-type ChannelFilter = 'all' | 'line' | 'facebook_instagram';
-
-const filterButtons: { key: ChannelFilter; label: string }[] = [
-  { key: 'all', label: '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14' },
-  { key: 'line', label: 'LINE' },
-  { key: 'facebook_instagram', label: 'FB/IG' },
-];
 
 export default function ConversationList({
   conversations,
@@ -30,21 +25,61 @@ export default function ConversationList({
   activeConversationId,
   onSelect,
   loading,
+  branches,
+  defaultBranchId,
 }: ConversationListProps) {
   const activeId = selectedId ?? activeConversationId ?? null;
   const [search, setSearch] = useState('');
-  const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
+  const [filters, setFilters] = useState<ChatFilters>({
+    ...DEFAULT_FILTERS,
+    branchId: defaultBranchId || null,
+  });
+
+  // Collect all unique tags from conversations for the filter UI
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    conversations.forEach(c => {
+      c.contact?.tags?.forEach(t => tagSet.add(t));
+    });
+    return Array.from(tagSet).sort();
+  }, [conversations]);
 
   const filtered = useMemo(() => {
     let result = conversations;
 
-    // Channel filter
-    if (channelFilter === 'line') {
+    // Platform filter
+    if (filters.platform === 'line') {
       result = result.filter((c) => c.channel?.type === 'line');
-    } else if (channelFilter === 'facebook_instagram') {
+    } else if (filters.platform === 'facebook_instagram') {
       result = result.filter(
         (c) => c.channel?.type === 'facebook' || c.channel?.type === 'instagram'
       );
+    }
+
+    // Branch filter
+    if (filters.branchId) {
+      result = result.filter((c) =>
+        c.contact?.branchIds?.includes(filters.branchId!)
+      );
+    }
+
+    // Tags filter
+    if (filters.tags.length > 0) {
+      result = result.filter((c) =>
+        filters.tags.some(t => c.contact?.tags?.includes(t))
+      );
+    }
+
+    // Link status filter
+    if (filters.linkStatus === 'linked') {
+      result = result.filter((c) => !!c.contact?.parentId);
+    } else if (filters.linkStatus === 'unlinked') {
+      result = result.filter((c) => !c.contact?.parentId);
+    }
+
+    // Unread only
+    if (filters.unreadOnly) {
+      result = result.filter((c) => c.unreadCount > 0);
     }
 
     // Search filter
@@ -59,16 +94,16 @@ export default function ConversationList({
     }
 
     return result;
-  }, [conversations, channelFilter, search]);
+  }, [conversations, filters, search]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-800">
       {/* Search */}
-      <div className="p-3 border-b">
+      <div className="p-3 border-b dark:border-slate-700">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="\u0e04\u0e49\u0e19\u0e2b\u0e32\u0e41\u0e0a\u0e17..."
+            placeholder="ค้นหาแชท..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 text-base"
@@ -76,23 +111,13 @@ export default function ConversationList({
         </div>
       </div>
 
-      {/* Channel filter tabs */}
-      <div className="flex gap-1 px-3 py-2 border-b">
-        {filterButtons.map((btn) => (
-          <button
-            key={btn.key}
-            onClick={() => setChannelFilter(btn.key)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-              channelFilter === btn.key
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-500 hover:bg-gray-100'
-            )}
-          >
-            {btn.label}
-          </button>
-        ))}
-      </div>
+      {/* Filters */}
+      <ConversationFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        branches={branches}
+        availableTags={availableTags}
+      />
 
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto">
@@ -113,8 +138,8 @@ export default function ConversationList({
             <Search className="w-10 h-10 mb-3" />
             <p className="text-base">
               {search.trim()
-                ? '\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e41\u0e0a\u0e17\u0e17\u0e35\u0e48\u0e04\u0e49\u0e19\u0e2b\u0e32'
-                : '\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e41\u0e0a\u0e17'}
+                ? 'ไม่พบแชทที่ค้นหา'
+                : 'ยังไม่มีแชท'}
             </p>
           </div>
         ) : (

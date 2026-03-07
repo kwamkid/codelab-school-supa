@@ -41,6 +41,10 @@ function mapContact(row: any): ChatContact {
     phone: row.phone || undefined,
     email: row.email || undefined,
     tags: row.tags || [],
+    branchIds: row.branch_ids || [],
+    isGroup: row.is_group || false,
+    groupId: row.group_id || undefined,
+    memberCount: row.member_count || undefined,
     customData: row.custom_data || undefined,
     lastMessageAt: row.last_message_at ? new Date(row.last_message_at) : undefined,
     createdAt: new Date(row.created_at),
@@ -368,16 +372,54 @@ export async function updateContactInfo(contactId: string, data: {
   phone?: string;
   email?: string;
   tags?: string[];
+  branchIds?: string[];
 }): Promise<void> {
   const updateData: any = { updated_at: new Date().toISOString() };
   if (data.phone !== undefined) updateData.phone = data.phone;
   if (data.email !== undefined) updateData.email = data.email;
   if (data.tags !== undefined) updateData.tags = data.tags;
+  if (data.branchIds !== undefined) updateData.branch_ids = data.branchIds;
 
   await adminMutation({
     table: 'chat_contacts',
     operation: 'update',
     data: updateData,
+    match: { id: contactId },
+  });
+}
+
+export async function addContactBranch(contactId: string, branchId: string): Promise<void> {
+  const contact = await getContact(contactId);
+  if (!contact) return;
+  const branchIds = contact.branchIds || [];
+  if (!branchIds.includes(branchId)) {
+    await updateContactInfo(contactId, { branchIds: [...branchIds, branchId] });
+  }
+}
+
+export async function addContactTag(contactId: string, tag: string): Promise<void> {
+  const contact = await getContact(contactId);
+  if (!contact) return;
+  const tags = contact.tags || [];
+  if (!tags.includes(tag)) {
+    await updateContactInfo(contactId, { tags: [...tags, tag] });
+  }
+}
+
+export async function removeContactTag(contactId: string, tag: string): Promise<void> {
+  const contact = await getContact(contactId);
+  if (!contact) return;
+  await updateContactInfo(contactId, { tags: (contact.tags || []).filter(t => t !== tag) });
+}
+
+export async function unlinkContactFromParent(contactId: string): Promise<void> {
+  await adminMutation({
+    table: 'chat_contacts',
+    operation: 'update',
+    data: {
+      parent_id: null,
+      updated_at: new Date().toISOString(),
+    },
     match: { id: contactId },
   });
 }

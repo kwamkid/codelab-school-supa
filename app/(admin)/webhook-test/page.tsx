@@ -136,7 +136,7 @@ export default function WebhookTestPage() {
           <Webhook className="h-8 w-8 text-red-500" />
           ทดสอบ Webhook
         </h1>
-        <p className="text-gray-600 mt-2">ทดสอบการทำงานของ webhook endpoint</p>
+        <p className="text-gray-600 mt-1">ทดสอบการทำงานของ webhook endpoint</p>
         {/* Debug: Show current logs */}
       <Card>
         <CardHeader>

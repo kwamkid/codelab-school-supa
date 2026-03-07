@@ -192,7 +192,7 @@ export default function RoomsPage() {
               <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>
             )}
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-600 mt-1">
             {isAllBranches ? 'จัดการห้องเรียนทุกสาขา' : 'จัดการห้องเรียนในสาขา'}
           </p>
         </div>

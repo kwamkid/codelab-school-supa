@@ -4,12 +4,18 @@ import { createServiceClient } from '@/lib/supabase/server';
 
 /**
  * Find or create a chat contact by platform user ID.
+ * For group chats, platformUserId = groupId, isGroup = true.
  */
 export async function findOrCreateContact(
   channelId: string,
   platformUserId: string,
   displayName?: string,
-  avatarUrl?: string
+  avatarUrl?: string,
+  groupOptions?: {
+    isGroup?: boolean;
+    groupId?: string;
+    memberCount?: number;
+  }
 ): Promise<string> {
   const supabase = createServiceClient();
 
@@ -22,28 +28,38 @@ export async function findOrCreateContact(
     .single();
 
   if (existing) {
-    // Update display name / avatar if changed
-    if (displayName || avatarUrl) {
-      const updateData: any = { updated_at: new Date().toISOString() };
-      if (displayName) updateData.display_name = displayName;
-      if (avatarUrl) updateData.avatar_url = avatarUrl;
-      await (supabase as any)
-        .from('chat_contacts')
-        .update(updateData)
-        .eq('id', existing.id);
+    // Update display name / avatar / group info if changed
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (displayName) updateData.display_name = displayName;
+    if (avatarUrl) updateData.avatar_url = avatarUrl;
+    if (groupOptions?.isGroup) {
+      updateData.is_group = true;
+      if (groupOptions.groupId) updateData.group_id = groupOptions.groupId;
     }
+    if (groupOptions?.memberCount) updateData.member_count = groupOptions.memberCount;
+    await (supabase as any)
+      .from('chat_contacts')
+      .update(updateData)
+      .eq('id', existing.id);
     return existing.id;
   }
 
   // Create new contact
+  const insertData: any = {
+    channel_id: channelId,
+    platform_user_id: platformUserId,
+    display_name: displayName || platformUserId,
+    avatar_url: avatarUrl || null,
+  };
+  if (groupOptions?.isGroup) {
+    insertData.is_group = true;
+    insertData.group_id = groupOptions.groupId || platformUserId;
+    insertData.member_count = groupOptions.memberCount || null;
+  }
+
   const { data: newContact, error } = await (supabase as any)
     .from('chat_contacts')
-    .insert({
-      channel_id: channelId,
-      platform_user_id: platformUserId,
-      display_name: displayName || platformUserId,
-      avatar_url: avatarUrl || null,
-    })
+    .insert(insertData)
     .select('id')
     .single();
 
@@ -97,16 +113,30 @@ export async function processInboundMessage(params: {
   mediaUrl?: string;
   platformMessageId?: string;
   metadata?: Record<string, any>;
+  // Group-specific
+  isGroup?: boolean;
+  groupId?: string;
+  groupName?: string;
+  groupAvatarUrl?: string;
+  memberCount?: number;
+  senderId?: string;
 }): Promise<void> {
   const supabase = createServiceClient();
   const now = new Date().toISOString();
 
-  // 1. Find or create contact
+  // 1. Find or create contact (for groups, the contact is the group itself)
+  const contactDisplayName = params.isGroup ? params.groupName : params.senderName;
+  const contactAvatar = params.isGroup ? params.groupAvatarUrl : params.senderAvatar;
   const contactId = await findOrCreateContact(
     params.channelId,
     params.platformUserId,
-    params.senderName,
-    params.senderAvatar
+    contactDisplayName,
+    contactAvatar,
+    params.isGroup ? {
+      isGroup: true,
+      groupId: params.groupId,
+      memberCount: params.memberCount,
+    } : undefined
   );
 
   // 2. Find or create conversation
@@ -129,7 +159,7 @@ export async function processInboundMessage(params: {
       conversation_id: conversationId,
       direction: 'inbound',
       sender_type: 'contact',
-      sender_id: params.platformUserId,
+      sender_id: params.senderId || params.platformUserId,
       sender_name: params.senderName || null,
       message_type: params.messageType,
       content: params.content || null,

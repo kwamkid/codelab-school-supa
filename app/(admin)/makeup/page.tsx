@@ -5,12 +5,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MakeupClass } from '@/types/models';
 import { getMakeupClasses, deleteMakeupClass } from '@/lib/services/makeup';
 import { getActiveBranches } from '@/lib/services/branches';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import { Pagination, usePagination } from '@/components/ui/pagination';
 import {
   Calendar,
@@ -60,8 +60,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from 'next/navigation';
-import ScheduleMakeupDialog from '@/components/makeup/schedule-makeup-dialog';
-import CreateMakeupDialog from '@/components/makeup/create-makeup-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useMakeup } from '@/contexts/MakeupContext';
@@ -70,6 +68,8 @@ import { PermissionGuard } from '@/components/auth/permission-guard';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageSkeleton } from '@/components/ui/page-skeleton';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import ScheduleMakeupDialog from '@/components/makeup/schedule-makeup-dialog';
+import CreateMakeupDialog from '@/components/makeup/create-makeup-dialog';
 
 const statusColors = {
   'pending': 'bg-yellow-100 text-yellow-700',
@@ -111,12 +111,15 @@ export default function MakeupPage() {
   const [filterClass, setFilterClass] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   
-  // Dialogs
-  const [selectedMakeup, setSelectedMakeup] = useState<MakeupClass | null>(null);
-  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  
+
+  // Schedule dialog
+  const [scheduleMakeup, setScheduleMakeup] = useState<MakeupClass | null>(null);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+
   // Delete dialog
+  const [selectedMakeup, setSelectedMakeup] = useState<MakeupClass | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -216,13 +219,13 @@ export default function MakeupPage() {
     }
   }, [makeupClasses, loadingMakeup, refreshMakeupCount]);
 
-  const handleSchedule = (makeup: MakeupClass) => {
-    setSelectedMakeup(makeup);
-    setShowScheduleDialog(true);
+  const handleViewDetail = (makeup: MakeupClass) => {
+    router.push(`/makeup/${makeup.id}/edit`);
   };
 
-  const handleViewDetail = (makeup: MakeupClass) => {
-    router.push(`/makeup/${makeup.id}`);
+  const handleSchedule = (makeup: MakeupClass) => {
+    setScheduleMakeup(makeup);
+    setShowScheduleDialog(true);
   };
 
   const handleQuickDelete = (makeup: MakeupClass) => {
@@ -277,7 +280,7 @@ export default function MakeupPage() {
             การลา และชดเชย
             {/* {!isAllBranches && <span className="text-red-600 text-lg ml-2">(เฉพาะสาขาที่เลือก)</span>} */}
           </h1>
-          <p className="text-gray-600 mt-2">การลา เรียนชดเชย Makeup Class</p>
+          <p className="text-gray-600 mt-1">การลา เรียนชดเชย Makeup Class</p>
         </div>
         <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
           <Button
@@ -302,66 +305,42 @@ export default function MakeupPage() {
         </Alert>
       )}
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">รอจัดตาราง</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">นัดแล้ว</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.scheduled}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">เรียนแล้ว</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ยกเลิก</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.cancelled}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-orange-200 bg-orange-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-orange-800">Auto-generated</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.autoGenerated}</div>
-            {stats.pendingAutoGenerated > 0 && (
-              <p className="text-xs text-orange-600 mt-1">
-                {stats.pendingAutoGenerated} รอจัดตาราง
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      {/* Status Filter Tabs */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        {[
+          { value: 'all', label: 'ทั้งหมด', count: stats.total, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700' },
+          { value: 'pending', label: 'รอจัดตาราง', count: stats.pending, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700' },
+          { value: 'scheduled', label: 'นัดแล้ว', count: stats.scheduled, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-blue-500', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700' },
+          { value: 'completed', label: 'เรียนแล้ว', count: stats.completed, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700' },
+          { value: 'cancelled', label: 'ยกเลิก', count: stats.cancelled, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600' },
+        ].map((tab) => {
+          const isActive = filterStatus === tab.value;
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setFilterStatus(tab.value)}
+              className={cn(
+                'flex flex-col items-center justify-center w-24 h-[72px] rounded-xl transition-all',
+                isActive
+                  ? `${tab.activeBg} shadow-md`
+                  : `${tab.inactiveBg} hover:shadow-sm`
+              )}
+            >
+              <span className={cn(
+                'text-sm font-medium',
+                isActive ? tab.labelColor : tab.inactiveLabel
+              )}>
+                {tab.label}
+              </span>
+              <span className={cn(
+                'text-2xl font-bold mt-0.5',
+                isActive ? tab.countColor : tab.inactiveCount
+              )}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -399,187 +378,176 @@ export default function MakeupPage() {
         </Select>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={filterStatus} onValueChange={setFilterStatus}>
-        <TabsList>
-          <TabsTrigger value="all">ทั้งหมด ({stats.total})</TabsTrigger>
-          <TabsTrigger value="pending">รอจัดตาราง ({stats.pending})</TabsTrigger>
-          <TabsTrigger value="scheduled">นัดแล้ว ({stats.scheduled})</TabsTrigger>
-          <TabsTrigger value="completed">เรียนแล้ว ({stats.completed})</TabsTrigger>
-          <TabsTrigger value="cancelled">ยกเลิก ({stats.cancelled})</TabsTrigger>
-        </TabsList>
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {filteredMakeupClasses.length === 0 ? (
+            <EmptyState
+              icon={Calendar}
+              title="ไม่พบข้อมูล Makeup Class"
+              description={
+                searchTerm || filterClass !== 'all' || filterType !== 'all'
+                  ? 'ลองปรับเงื่อนไขการค้นหา'
+                  : 'ยังไม่มีการขอ Makeup Class'
+              }
+            />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[130px]">นักเรียน</TableHead>
+                      <TableHead className="w-[110px]">ครั้งที่ขาด</TableHead>
+                      <TableHead className="min-w-[130px]">คลาส</TableHead>
+                      {isAllBranches && <TableHead className="w-[90px]">สาขา</TableHead>}
+                      <TableHead className="max-w-[180px]">เหตุผล</TableHead>
+                      <TableHead className="w-[110px]">วันที่นัด</TableHead>
+                      <TableHead className="text-center w-[90px]">สถานะ</TableHead>
+                      <TableHead className="w-[40px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedMakeupClasses.map((makeup) => {
+                      const StatusIcon = statusIcons[makeup.status];
+                      const isAutoGenerated = makeup.requestedBy === 'system';
 
-        <TabsContent value={filterStatus} className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>รายการ Makeup Class ({filteredMakeupClasses.length})</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {filteredMakeupClasses.length === 0 ? (
-                <EmptyState
-                  icon={Calendar}
-                  title="ไม่พบข้อมูล Makeup Class"
-                  description={
-                    searchTerm || filterClass !== 'all' || filterType !== 'all'
-                      ? 'ลองปรับเงื่อนไขการค้นหา'
-                      : 'ยังไม่มีการขอ Makeup Class'
-                  }
-                />
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[100px]">วันที่ขอ</TableHead>
-                          <TableHead className="min-w-[120px]">นักเรียน</TableHead>
-                          <TableHead className="min-w-[140px]">คลาสเดิม</TableHead>
-                          <TableHead className="w-[90px]">วันที่ขาด</TableHead>
-                          {isAllBranches && <TableHead className="w-[100px]">สาขา</TableHead>}
-                          <TableHead className="max-w-[200px]">เหตุผล</TableHead>
-                          <TableHead className="w-[110px]">วันที่นัด</TableHead>
-                          <TableHead className="text-center w-[100px]">สถานะ</TableHead>
-                          <TableHead className="w-[40px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedMakeupClasses.map((makeup) => {
-                          const StatusIcon = statusIcons[makeup.status];
-                          const isAutoGenerated = makeup.requestedBy === 'system';
-                          
-                          return (
-                            <TableRow key={makeup.id} className={isAutoGenerated ? 'bg-orange-50' : ''}>
-                              <TableCell className="whitespace-nowrap align-top">
-                                <div>
-                                  {formatDate(makeup.requestDate)}
-                                </div>
+                      return (
+                        <TableRow key={makeup.id} className={isAutoGenerated ? 'bg-orange-50' : ''}>
+                          <TableCell className="align-top">
+                            <div>
+                              <p className="font-medium">
+                                {makeup.studentNickname ? `${makeup.studentNickname} (${makeup.studentName.split(' ')[0]})` : makeup.studentName}
                                 {isAutoGenerated && (
-                                  <Badge variant="outline" className="mt-1 text-xs border-orange-300 text-orange-700">
-                                    <Sparkles className="h-3 w-3 mr-1" />
+                                  <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 border-orange-300 text-orange-600">
+                                    <Sparkles className="h-2.5 w-2.5 mr-0.5" />
                                     Auto
                                   </Badge>
                                 )}
-                              </TableCell>
-                              <TableCell className="align-top">
-                                <div className="min-w-[120px]">
-                                  <p className="font-medium">{makeup.studentNickname || makeup.studentName}</p>
-                                  <p className="text-gray-500">{makeup.parentName}</p>
-                                </div>
-                              </TableCell>
-                              <TableCell className="align-top">
-                                <div className="min-w-[140px]">
-                                  <p className="font-medium">{makeup.className}</p>
-                                  <p className="text-gray-500">{makeup.classCode}</p>
-                                </div>
-                              </TableCell>
-                              <TableCell className="whitespace-nowrap align-top">
-                                {makeup.originalSessionNumber ? (
-                                  <div>
-                                    <p className="font-medium text-red-600">
-                                      ครั้งที่ {makeup.originalSessionNumber}
-                                    </p>
-                                    {makeup.originalSessionDate && (
-                                      <p className="text-gray-500">
-                                        {formatDateShort(makeup.originalSessionDate)}
-                                      </p>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </TableCell>
-                              {isAllBranches && (
-                                <TableCell className="align-top">
-                                  {makeup.branchName}
-                                </TableCell>
-                              )}
-                              <TableCell className="align-top">
-                                <div className="truncate max-w-[200px]" title={makeup.reason}>
-                                  {makeup.reason}
-                                </div>
-                                {isAutoGenerated && (
-                                  <p className="text-orange-600 mt-1">
-                                    (สร้างอัตโนมัติ)
+                              </p>
+                              <p className="text-xs text-gray-500">{makeup.studentSchoolName || '-'}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap align-top">
+                            {makeup.originalSessionNumber ? (
+                              <div>
+                                <p className="font-medium text-red-600">
+                                  ครั้งที่ {makeup.originalSessionNumber}
+                                </p>
+                                {makeup.originalSessionDate && (
+                                  <p className="text-xs text-gray-500">
+                                    {formatDateShort(makeup.originalSessionDate)}
                                   </p>
                                 )}
-                              </TableCell>
-                              <TableCell className="whitespace-nowrap align-top">
-                                {makeup.makeupSchedule ? (
-                                  <div>
-                                    <p>{formatDate(makeup.makeupSchedule.date)}</p>
-                                    <p className="text-gray-500">
-                                      {makeup.makeupSchedule.startTime} - {makeup.makeupSchedule.endTime}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center align-top">
-                                <Badge className={`${statusColors[makeup.status]} text-xs`}>
-                                  <StatusIcon className="h-3 w-3 mr-1" />
-                                  {statusLabels[makeup.status]}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="align-top">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                      <span className="sr-only">เปิดเมนู</span>
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>จัดการ</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    
-                                    <DropdownMenuItem onClick={() => handleViewDetail(makeup)}>
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      ดูรายละเอียด
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <div>
+                              <p className="font-medium text-sm">{makeup.className}</p>
+                              <p className="text-xs text-gray-500">{makeup.subjectName}</p>
+                            </div>
+                          </TableCell>
+                          {isAllBranches && (
+                            <TableCell className="align-top text-sm">
+                              {makeup.branchName}
+                            </TableCell>
+                          )}
+                          <TableCell className="align-top">
+                            <div className="max-w-[180px]">
+                              <p className="text-sm line-clamp-2" title={makeup.reason}>
+                                {makeup.reason}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap align-top">
+                            {makeup.makeupSchedule ? (
+                              <div>
+                                <p className="text-sm">{formatDate(makeup.makeupSchedule.date)}</p>
+                                <p className="text-xs text-gray-500">
+                                  {makeup.makeupSchedule.startTime?.substring(0, 5)} - {makeup.makeupSchedule.endTime?.substring(0, 5)}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center align-top">
+                            <Badge className={`${statusColors[makeup.status]} text-xs`}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {statusLabels[makeup.status]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <span className="sr-only">เปิดเมนู</span>
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>จัดการ</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+
+                                <DropdownMenuItem onClick={() => handleViewDetail(makeup)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  ดูรายละเอียด
+                                </DropdownMenuItem>
+
+                                <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+                                  {makeup.status === 'pending' && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleSchedule(makeup)}
+                                      className="text-blue-600"
+                                    >
+                                      <CalendarCheck className="h-4 w-4 mr-2" />
+                                      นัด Makeup
                                     </DropdownMenuItem>
-                                    
-                                    <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-                                      {makeup.status === 'pending' && (
-                                        <DropdownMenuItem 
-                                          onClick={() => handleSchedule(makeup)}
-                                          className="text-blue-600"
-                                        >
-                                          <CalendarCheck className="h-4 w-4 mr-2" />
-                                          จัดตาราง
-                                        </DropdownMenuItem>
-                                      )}
-                                      
-                                      {makeup.status === 'scheduled' && (
-                                        <DropdownMenuItem 
-                                          onClick={() => handleViewDetail(makeup)}
-                                          className="text-green-600"
-                                        >
-                                          <CheckCircle className="h-4 w-4 mr-2" />
-                                          บันทึกการเข้าเรียน
-                                        </DropdownMenuItem>
-                                      )}
-                                      
-                                      {(makeup.status === 'pending' || makeup.status === 'scheduled') && (
-                                        <>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem 
-                                            onClick={() => handleQuickDelete(makeup)}
-                                            className="text-red-600"
-                                          >
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            ลบ
-                                          </DropdownMenuItem>
-                                        </>
-                                      )}
-                                    </PermissionGuard>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                                  )}
+
+                                  {makeup.status === 'scheduled' && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={() => handleSchedule(makeup)}
+                                        className="text-blue-600"
+                                      >
+                                        <CalendarCheck className="h-4 w-4 mr-2" />
+                                        เปลี่ยนวันนัด
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => handleViewDetail(makeup)}
+                                        className="text-green-600"
+                                      >
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        บันทึกการเข้าเรียน
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+
+                                  {(makeup.status === 'pending' || makeup.status === 'scheduled') && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={() => handleQuickDelete(makeup)}
+                                        className="text-red-600"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        ลบ
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </PermissionGuard>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
                   </div>
 
                   <Pagination
@@ -592,10 +560,8 @@ export default function MakeupPage() {
                   />
                 </>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          </CardContent>
+        </Card>
 
       {/* Dialogs */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -645,32 +611,29 @@ export default function MakeupPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {selectedMakeup && (
+      {/* Create Makeup Dialog */}
+      <CreateMakeupDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.makeupClasses(selectedBranchId) });
+          window.dispatchEvent(new CustomEvent('makeup-changed'));
+        }}
+      />
+
+      {/* Schedule Makeup Dialog */}
+      {scheduleMakeup && (
         <ScheduleMakeupDialog
           open={showScheduleDialog}
           onOpenChange={setShowScheduleDialog}
-          makeupRequest={selectedMakeup}
-          onSuccess={async () => {
-            setShowScheduleDialog(false);
-            await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.makeupClasses(selectedBranchId) });
-            // Dispatch event to update sidebar badge
+          makeupRequest={scheduleMakeup}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.makeupClasses(selectedBranchId) });
             window.dispatchEvent(new CustomEvent('makeup-changed'));
           }}
         />
       )}
 
-      {/* ✅ ไม่ต้องส่ง students และ classes prop - ให้ dialog โหลดเอง */}
-      <CreateMakeupDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        onCreated={async () => {
-          setShowCreateDialog(false);
-          await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.makeupClasses(selectedBranchId) });
-          // Dispatch event to update sidebar badge
-          window.dispatchEvent(new CustomEvent('makeup-changed'));
-          toast.success('สร้าง Makeup Request เรียบร้อยแล้ว');
-        }}
-      />
     </div>
   );
 }

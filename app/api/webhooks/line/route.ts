@@ -56,21 +56,72 @@ export async function POST(request: NextRequest) {
     for (const event of webhookBody.events) {
       if (event.type !== 'message') continue;
 
+      const sourceType = event.source?.type; // 'user' | 'group' | 'room'
       const userId = event.source?.userId;
-      if (!userId) continue;
+      const groupId = event.source?.groupId;
+      const roomId = event.source?.roomId;
 
-      // Get user profile from LINE
+      // For group/room: use groupId as contact, userId as sender
+      // For 1-on-1: use userId as both contact and sender
+      const isGroup = sourceType === 'group' || sourceType === 'room';
+      const contactPlatformId = isGroup ? (groupId || roomId) : userId;
+      if (!contactPlatformId) continue;
+
+      // Get profile info
       let displayName: string | undefined;
       let avatarUrl: string | undefined;
+      let senderName: string | undefined;
+      let memberCount: number | undefined;
+
       if (accessToken) {
         try {
-          const profileRes = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-          if (profileRes.ok) {
-            const profile = await profileRes.json();
-            displayName = profile.displayName;
-            avatarUrl = profile.pictureUrl;
+          if (sourceType === 'group' && groupId) {
+            // Get group summary (name + icon + member count)
+            const groupRes = await fetch(
+              `https://api.line.me/v2/bot/group/${groupId}/summary`,
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            if (groupRes.ok) {
+              const gp = await groupRes.json();
+              displayName = gp.groupName;
+              avatarUrl = gp.pictureUrl;
+              memberCount = gp.memberCount;
+            }
+            // Get individual sender's name within the group
+            if (userId) {
+              const memberRes = await fetch(
+                `https://api.line.me/v2/bot/group/${groupId}/member/${userId}`,
+                { headers: { Authorization: `Bearer ${accessToken}` } }
+              );
+              if (memberRes.ok) {
+                const mp = await memberRes.json();
+                senderName = mp.displayName;
+              }
+            }
+          } else if (sourceType === 'room' && roomId) {
+            displayName = 'ห้องแชท';
+            if (userId) {
+              const memberRes = await fetch(
+                `https://api.line.me/v2/bot/room/${roomId}/member/${userId}`,
+                { headers: { Authorization: `Bearer ${accessToken}` } }
+              );
+              if (memberRes.ok) {
+                const mp = await memberRes.json();
+                senderName = mp.displayName;
+              }
+            }
+          } else if (userId) {
+            // 1-on-1 chat
+            const profileRes = await fetch(
+              `https://api.line.me/v2/bot/profile/${userId}`,
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            if (profileRes.ok) {
+              const profile = await profileRes.json();
+              displayName = profile.displayName;
+              avatarUrl = profile.pictureUrl;
+              senderName = profile.displayName;
+            }
           }
         } catch {}
       }
@@ -89,7 +140,6 @@ export async function POST(request: NextRequest) {
           break;
         case 'image':
           messageType = 'image';
-          // Image content URL requires LINE API to download
           mediaUrl = `https://api-data.line.me/v2/bot/message/${msg.id}/content`;
           break;
         case 'sticker':
@@ -127,14 +177,21 @@ export async function POST(request: NextRequest) {
 
       await processInboundMessage({
         channelId: channel.id,
-        platformUserId: userId,
-        senderName: displayName,
-        senderAvatar: avatarUrl,
+        platformUserId: contactPlatformId,
+        senderName: senderName || displayName,
+        senderAvatar: isGroup ? undefined : avatarUrl,
         messageType,
         content,
         mediaUrl,
         platformMessageId: msg.id,
         metadata,
+        // Group-specific
+        isGroup,
+        groupId: groupId || roomId,
+        groupName: isGroup ? displayName : undefined,
+        groupAvatarUrl: isGroup ? avatarUrl : undefined,
+        memberCount,
+        senderId: isGroup ? userId : undefined,
       });
     }
 

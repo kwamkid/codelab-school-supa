@@ -207,7 +207,7 @@ export default function StudentsPage() {
           <Globe className="h-8 w-8 text-blue-500" />
           นักเรียนทั้งหมด
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-gray-600 mt-1">
           รายชื่อนักเรียนทั้งหมดในระบบ
           {(loadingStudents || fetchingStudents) && (
             <span className="text-orange-500 ml-2">

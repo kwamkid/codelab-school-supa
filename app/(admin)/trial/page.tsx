@@ -364,7 +364,7 @@ export default function TrialBookingsPage() {
               <span className="text-lg font-normal text-gray-500">(เฉพาะสาขาที่เลือก)</span>
             )} */}
           </h1>
-          <p className="text-gray-600 mt-2">จัดการการจองทดลองเรียนทั้งหมด</p>
+          <p className="text-gray-600 mt-1">จัดการการจองทดลองเรียนทั้งหมด</p>
         </div>
         <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
           <Button 

@@ -248,6 +248,9 @@ export interface InvoiceCompany {
   email?: string;
   invoicePrefix: string;
   nextInvoiceNumber: number;
+  taxInvoicePrefix: string;
+  nextTaxInvoiceNumber: number;
+  currentTaxInvoiceMonth: string;
   creditNotePrefix: string;
   nextCreditNoteNumber: number;
   currentInvoiceMonth: string;
@@ -258,12 +261,46 @@ export interface InvoiceCompany {
   updatedAt: Date;
 }
 
-export interface Invoice {
+export interface Receipt {
   id: string;
-  invoiceNumber: string;
+  receiptNumber: string;
   invoiceCompanyId: string;
   enrollmentId?: string;
   branchId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerAddress?: Record<string, string>;
+  customerTaxId?: string;
+  items: { description: string; studentName: string; className: string; amount: number }[];
+  subtotal: number;
+  vatAmount: number;
+  discountType?: string;
+  discountValue?: number;
+  discountAmount?: number;
+  promotionCode?: string;
+  totalAmount: number;
+  paymentMethod?: string;
+  paymentType?: string;
+  paidAmount: number;
+  paymentDate?: Date;
+  status: 'active' | 'void';
+  issuedAt?: Date;
+  note?: string;
+  createdBy?: string;
+  linkedTaxInvoices?: { id: string; taxInvoiceNumber: string }[];
+  linkedCreditNotes?: { id: string; creditNoteNumber: string; refundType: string; refundAmount: number; status: string }[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TaxInvoice {
+  id: string;
+  taxInvoiceNumber: string;
+  invoiceCompanyId: string;
+  enrollmentId?: string;
+  branchId: string;
+  receiptId?: string;
   billingType: 'personal' | 'company';
   billingName: string;
   billingAddress?: {
@@ -276,7 +313,6 @@ export interface Invoice {
   };
   billingTaxId?: string;
   billingCompanyBranch?: string;
-  wantTaxInvoice: boolean;
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
@@ -284,6 +320,7 @@ export interface Invoice {
   customerTaxId?: string;
   items: { description: string; studentName: string; className: string; amount: number }[];
   subtotal: number;
+  vatAmount: number;
   discountType?: string;
   discountValue?: number;
   discountAmount?: number;
@@ -291,8 +328,9 @@ export interface Invoice {
   totalAmount: number;
   paymentMethod?: string;
   paymentType?: string;
-  paidAmount?: number;
-  status: 'draft' | 'issued' | 'paid' | 'cancelled' | 'voided';
+  paidAmount: number;
+  paymentDate?: Date;
+  status: 'active' | 'void';
   issuedAt?: Date;
   note?: string;
   createdBy?: string;
@@ -301,11 +339,14 @@ export interface Invoice {
   updatedAt: Date;
 }
 
+// Backward compat alias
+export type Invoice = Receipt;
+
 export interface CreditNote {
   id: string;
   creditNoteNumber: string;
   invoiceCompanyId: string;
-  originalInvoiceId?: string;
+  taxInvoiceId?: string;
   enrollmentId?: string;
   branchId: string;
   customerName: string;
@@ -327,10 +368,12 @@ export interface CreditNote {
   billingCompanyBranch?: string;
   items: { description: string; amount: number }[];
   refundAmount: number;
+  vatAmount: number;
   reason: string;
   refundType: 'full' | 'partial';
-  status: 'issued' | 'voided';
+  status: 'active' | 'void';
   issuedDate?: string;
+  paymentDate?: Date;
   createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -529,6 +572,7 @@ export interface MakeupClass {
   // Denormalized Student Data ✨
   studentName: string;            // เพิ่ม: ชื่อเต็มนักเรียน
   studentNickname: string;        // เพิ่ม: ชื่อเล่น
+  studentSchoolName?: string;     // เพิ่ม: ชื่อโรงเรียน
   
   // Parent Info
   parentId: string;
@@ -804,6 +848,10 @@ export interface ChatContact {
   phone?: string;
   email?: string;
   tags: string[];
+  branchIds: string[];
+  isGroup?: boolean;
+  groupId?: string;
+  memberCount?: number;
   customData?: Record<string, any>;
   lastMessageAt?: Date;
   createdAt: Date;
