@@ -627,6 +627,17 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
 
         {/* New student form */}
         {studentMode === 'new' && (
+          <div className="space-y-3">
+          {existingStudents.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-500"
+              onClick={() => { setStudentMode('existing'); setSelectedStudentId(existingStudents[0]?.id || ''); }}
+            >
+              ← เลือกนักเรียนที่มีอยู่
+            </Button>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-sm">ชื่อ-นามสกุล *</Label>
@@ -648,6 +659,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
                 options={[{ value: 'M', label: 'ชาย' }, { value: 'F', label: 'หญิง' }]}
               />
             </div>
+          </div>
           </div>
         )}
 
