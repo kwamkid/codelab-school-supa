@@ -79,6 +79,7 @@ function mapMessage(row: any): ChatMessage {
     senderType: row.sender_type,
     senderId: row.sender_id || undefined,
     senderName: row.sender_name || undefined,
+    senderAvatarUrl: row.sender_avatar_url || undefined,
     messageType: row.message_type,
     content: row.content || undefined,
     mediaUrl: row.media_url || undefined,

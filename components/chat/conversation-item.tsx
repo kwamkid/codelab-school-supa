@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChatConversation } from '@/types/models';
+import { ChatConversation, Branch } from '@/types/models';
 import { ChannelIcon } from './channel-icon';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { LinkIcon, Users } from 'lucide-react';
@@ -10,6 +11,7 @@ interface ConversationItemProps {
   conversation: ChatConversation;
   isActive: boolean;
   onClick: () => void;
+  branches?: Branch[];
 }
 
 function formatRelativeTime(date: Date): string {
@@ -48,7 +50,7 @@ function getTagColor(tag: string): string {
   return TAG_COLORS[tag] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
 }
 
-export function ConversationItem({ conversation, isActive, onClick }: ConversationItemProps) {
+export function ConversationItem({ conversation, isActive, onClick, branches }: ConversationItemProps) {
   const contact = conversation.contact;
   const channel = conversation.channel;
   const displayName = contact?.displayName || 'ไม่ทราบชื่อ';
@@ -57,22 +59,28 @@ export function ConversationItem({ conversation, isActive, onClick }: Conversati
   const tags = contact?.tags || [];
   const isLinked = !!contact?.parentId;
   const isGroup = !!contact?.isGroup;
+  const [avatarError, setAvatarError] = useState(false);
+  const contactBranches = branches?.filter(b => contact?.branchIds?.includes(b.id)) || [];
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        'w-full flex items-start gap-2 px-3 py-1.5 md:gap-3 md:px-4 md:py-2 text-left transition-colors',
+        'w-full flex items-start gap-3 px-3 py-2.5 md:px-4 md:py-3 text-left transition-colors',
         'hover:bg-gray-50 dark:hover:bg-slate-700/50',
         isActive && 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500',
         !isActive && 'border-l-2 border-transparent'
       )}
     >
       {/* Avatar with channel icon overlay */}
-      <div className="relative shrink-0">
-        <Avatar className="w-9 h-9 md:w-10 md:h-10">
-          {contact?.avatarUrl ? (
-            <AvatarImage src={contact.avatarUrl} alt={displayName} />
+      <div className="relative shrink-0 mt-0.5">
+        <Avatar className="w-10 h-10 md:w-11 md:h-11">
+          {contact?.avatarUrl && !avatarError ? (
+            <AvatarImage
+              src={contact.avatarUrl}
+              alt={displayName}
+              onError={() => setAvatarError(true)}
+            />
           ) : null}
           <AvatarFallback className={cn(
             'text-sm md:text-base',
@@ -94,9 +102,9 @@ export function ConversationItem({ conversation, isActive, onClick }: Conversati
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <span className={cn(
-              'text-sm md:text-base truncate',
+              'text-base truncate',
               conversation.unreadCount > 0
                 ? 'font-semibold text-gray-900 dark:text-white'
                 : 'font-medium text-gray-700 dark:text-gray-300'
@@ -118,9 +126,9 @@ export function ConversationItem({ conversation, isActive, onClick }: Conversati
             </span>
           )}
         </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
+        <div className="flex items-center justify-between gap-2 mt-1">
           <p className={cn(
-            'text-xs md:text-sm truncate font-[family-name:var(--font-chat)]',
+            'text-sm truncate font-[family-name:var(--font-chat)]',
             conversation.unreadCount > 0
               ? 'text-gray-700 dark:text-gray-300'
               : 'text-gray-400 dark:text-gray-500'
@@ -133,9 +141,17 @@ export function ConversationItem({ conversation, isActive, onClick }: Conversati
             </span>
           )}
         </div>
-        {/* Tag badges — show max 2 */}
-        {tags.length > 0 && (
-          <div className="flex items-center gap-1 mt-1">
+        {/* Branch + Tag badges */}
+        {(contactBranches.length > 0 || tags.length > 0) && (
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+            {contactBranches.map((branch) => (
+              <span
+                key={branch.id}
+                className="px-1.5 py-0.5 rounded text-[10px] font-medium leading-none bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+              >
+                {branch.name}
+              </span>
+            ))}
             {tags.slice(0, 2).map((tag) => (
               <span
                 key={tag}

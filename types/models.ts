@@ -255,6 +255,9 @@ export interface InvoiceCompany {
   nextCreditNoteNumber: number;
   currentInvoiceMonth: string;
   currentCreditNoteMonth: string;
+  refundNotePrefix: string;
+  nextRefundNoteNumber: number;
+  currentRefundNoteMonth: string;
   isVatRegistered: boolean;
   isActive: boolean;
   createdAt: Date;
@@ -290,6 +293,7 @@ export interface Receipt {
   createdBy?: string;
   linkedTaxInvoices?: { id: string; taxInvoiceNumber: string }[];
   linkedCreditNotes?: { id: string; creditNoteNumber: string; refundType: string; refundAmount: number; status: string }[];
+  linkedRefundNotes?: { id: string; creditNoteNumber: string; refundType: string; refundAmount: number; status: string }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -334,6 +338,10 @@ export interface TaxInvoice {
   issuedAt?: Date;
   note?: string;
   createdBy?: string;
+  voidedById?: string;
+  replacesId?: string;
+  originalPaymentDate?: Date;
+  voidReason?: string;
   linkedCreditNotes?: { id: string; creditNoteNumber: string; refundType: string; refundAmount: number; status: string }[];
   createdAt: Date;
   updatedAt: Date;
@@ -347,6 +355,8 @@ export interface CreditNote {
   creditNoteNumber: string;
   invoiceCompanyId: string;
   taxInvoiceId?: string;
+  receiptId?: string;
+  documentType?: 'credit-note' | 'refund-note';
   enrollmentId?: string;
   branchId: string;
   customerName: string;
@@ -883,6 +893,7 @@ export interface ChatMessage {
   senderType: 'contact' | 'admin' | 'system';
   senderId?: string;
   senderName?: string;
+  senderAvatarUrl?: string;
   messageType: ChatMessageType;
   content?: string;
   mediaUrl?: string;

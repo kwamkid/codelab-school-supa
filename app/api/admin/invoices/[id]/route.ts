@@ -136,6 +136,39 @@ export async function GET(
     }
   }
 
+  // Get voided-by or replaces reference (for void+reissue chain)
+  let replacedDocument = null
+  if (document.replaces_id) {
+    const { data: replaced } = await (supabase as any)
+      .from('tax_invoices')
+      .select('id, tax_invoice_number, issued_at')
+      .eq('id', document.replaces_id)
+      .single()
+    if (replaced) {
+      replacedDocument = {
+        id: replaced.id,
+        invoice_number: replaced.tax_invoice_number,
+        issued_at: replaced.issued_at,
+      }
+    }
+  }
+
+  let replacementDocument = null
+  if (document.voided_by_id) {
+    const { data: replacement } = await (supabase as any)
+      .from('tax_invoices')
+      .select('id, tax_invoice_number, issued_at')
+      .eq('id', document.voided_by_id)
+      .single()
+    if (replacement) {
+      replacementDocument = {
+        id: replacement.id,
+        invoice_number: replacement.tax_invoice_number,
+        issued_at: replacement.issued_at,
+      }
+    }
+  }
+
   return NextResponse.json({
     invoice: document,
     documentType,
@@ -144,7 +177,118 @@ export async function GET(
     enrollment: enrollment || null,
     paymentSnapshot: paymentSnapshot || null,
     referenceInvoice,
+    replacedDocument,
+    replacementDocument,
   })
+}
+
+// PUT - Void + Reissue with billing info
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const supabase = createServiceClient()
+
+  try {
+    const body = await request.json()
+    const { billingType, billingName, billingAddress, billingTaxId, billingCompanyBranch, createdBy } = body
+
+    if (!billingName) {
+      return NextResponse.json({ error: 'billingName is required' }, { status: 400 })
+    }
+
+    // Get original tax invoice
+    const { data: original } = await (supabase as any)
+      .from('tax_invoices')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (!original) {
+      return NextResponse.json({ error: 'Tax invoice not found' }, { status: 404 })
+    }
+
+    if (original.status !== 'active') {
+      return NextResponse.json({ error: 'Can only void active documents' }, { status: 400 })
+    }
+
+    // Generate new number
+    const { data: newNumber, error: rpcError } = await (supabase as any)
+      .rpc('generate_next_tax_invoice_number', { p_company_id: original.invoice_company_id })
+
+    if (rpcError) {
+      return NextResponse.json({ error: rpcError.message }, { status: 500 })
+    }
+
+    const now = new Date().toISOString()
+    const lockedDate = original.original_payment_date || original.payment_date || now
+
+    // Create replacement document
+    const { data: newDoc, error: insertError } = await (supabase as any)
+      .from('tax_invoices')
+      .insert({
+        tax_invoice_number: newNumber,
+        invoice_company_id: original.invoice_company_id,
+        enrollment_id: original.enrollment_id,
+        branch_id: original.branch_id,
+        receipt_id: null,
+        billing_type: billingType || 'personal',
+        billing_name: billingName,
+        billing_address: billingAddress || {},
+        billing_tax_id: billingTaxId || null,
+        billing_company_branch: billingCompanyBranch || null,
+        customer_name: original.customer_name,
+        customer_phone: original.customer_phone,
+        customer_email: original.customer_email,
+        customer_address: original.customer_address,
+        customer_tax_id: billingTaxId || null,
+        items: original.items,
+        subtotal: original.subtotal,
+        vat_amount: original.vat_amount,
+        discount_type: original.discount_type,
+        discount_value: original.discount_value,
+        discount_amount: original.discount_amount,
+        promotion_code: original.promotion_code,
+        total_amount: original.total_amount,
+        payment_method: original.payment_method,
+        payment_type: original.payment_type,
+        paid_amount: original.paid_amount,
+        payment_date: lockedDate,
+        original_payment_date: lockedDate,
+        replaces_id: id,
+        status: 'active',
+        issued_at: now,
+        created_by: createdBy || null,
+      })
+      .select('id')
+      .single()
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    }
+
+    // Void the original
+    await (supabase as any)
+      .from('tax_invoices')
+      .update({
+        status: 'void',
+        voided_by_id: newDoc.id,
+        void_reason: 'เพิ่มข้อมูลใบกำกับภาษี',
+        updated_at: now,
+      })
+      .eq('id', id)
+
+    return NextResponse.json({
+      success: true,
+      newId: newDoc.id,
+      newNumber,
+      voidedId: id,
+    })
+  } catch (err: any) {
+    console.error('Error void+reissue:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }
 
 // PATCH - Fix document amounts to match paid_amount

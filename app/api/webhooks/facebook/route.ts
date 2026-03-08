@@ -87,27 +87,48 @@ export async function POST(request: NextRequest) {
         // Skip echo messages (sent by us)
         if (event.message?.is_echo) continue
 
-        // Get sender profile
+        // Get sender profile from Graph API
         let displayName: string | undefined
         let avatarUrl: string | undefined
         const pageAccessToken = channel.credentials?.pageAccessToken
         if (pageAccessToken) {
           try {
-            const url = channelType === 'instagram'
-              ? `https://graph.facebook.com/v19.0/${senderId}?fields=name,profile_pic&access_token=${pageAccessToken}`
-              : `https://graph.facebook.com/v19.0/${senderId}?fields=first_name,last_name,profile_pic&access_token=${pageAccessToken}`
-            const profileRes = await fetch(url)
+            // Use v21.0 for latest Messenger profile API
+            const fields = channelType === 'instagram'
+              ? 'name,profile_pic'
+              : 'first_name,last_name,profile_pic'
+            const profileRes = await fetch(
+              `https://graph.facebook.com/v21.0/${senderId}?fields=${fields}&access_token=${pageAccessToken}`
+            )
             if (profileRes.ok) {
               const profile = await profileRes.json()
-              displayName = profile.name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+              displayName = channelType === 'instagram'
+                ? profile.name
+                : `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
               avatarUrl = profile.profile_pic
+              if (displayName) {
+                console.log(`FB profile OK: ${senderId} → ${displayName}`)
+              }
             } else {
               const errBody = await profileRes.text()
-              console.error(`FB profile fetch failed (${profileRes.status}):`, errBody)
+              console.error(`FB profile fetch failed (${profileRes.status}) for ${senderId}:`, errBody)
+              // If Graph API user profile fails, try fetching name from conversation
+              // (works when profile_pic permission is limited)
+              try {
+                const convRes = await fetch(
+                  `https://graph.facebook.com/v21.0/${senderId}?fields=name&access_token=${pageAccessToken}`
+                )
+                if (convRes.ok) {
+                  const convData = await convRes.json()
+                  if (convData.name) displayName = convData.name
+                }
+              } catch {}
             }
           } catch (profileErr) {
             console.error('FB profile fetch error:', profileErr)
           }
+        } else {
+          console.warn('FB webhook: no pageAccessToken in channel credentials')
         }
 
         // Process message
@@ -164,6 +185,7 @@ export async function POST(request: NextRequest) {
             platformUserId: senderId,
             senderName: displayName,
             senderAvatar: avatarUrl,
+            senderAvatarUrl: avatarUrl,
             messageType,
             content,
             mediaUrl,

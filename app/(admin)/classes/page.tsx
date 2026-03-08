@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/table";
 import { SearchInput } from '@/components/ui/search-input';
 import { EmptyState } from '@/components/ui/empty-state';
-import { InlineTextSkeleton } from '@/components/ui/page-skeleton';
+import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +57,6 @@ import { useBranch } from '@/contexts/BranchContext';
 import { ActionButton } from '@/components/ui/action-button';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { useAuth } from '@/hooks/useAuth';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, usePagination } from '@/components/ui/pagination';
 
 const statusColors = {
@@ -275,49 +274,7 @@ export default function ClassesPage() {
   
   // Phase 1: Classes Loading (Show skeleton)
   if (loadingClasses) {
-    return (
-      <div className="space-y-6">
-        {/* Header Skeleton */}
-        <div className="flex justify-between items-center">
-          <div>
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-10 w-32" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
-
-        {/* Tabs Skeleton */}
-        <div className="flex gap-2">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-8 w-28 rounded-full" />
-          ))}
-        </div>
-
-        {/* Search + Chips Skeleton */}
-        <div className="space-y-3">
-          <Skeleton className="h-10 w-80" />
-          <div className="flex gap-2">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-7 w-20 rounded-full" />
-            ))}
-          </div>
-        </div>
-
-        {/* Table Skeleton */}
-        <Card>
-          <CardContent className="p-0">
-            <div className="p-6 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <SectionLoading />;
   }
 
   return (
@@ -547,7 +504,7 @@ export default function ClassesPage() {
                           </TableCell>
                           <TableCell className="align-top">
                             {loadingSubjects ? (
-                              <InlineTextSkeleton width="w-16" />
+                              <InlineLoading />
                             ) : (
                               <div className="break-words">{getSubjectName(cls.subjectId)}</div>
                             )}
@@ -555,7 +512,7 @@ export default function ClassesPage() {
                           {isAllBranches && (
                             <TableCell className="align-top">
                               {loadingBranches ? (
-                                <InlineTextSkeleton width="w-20" />
+                                <InlineLoading />
                               ) : (
                                 <div className="break-words">{getBranchName(cls.branchId)}</div>
                               )}
@@ -563,7 +520,7 @@ export default function ClassesPage() {
                           )}
                           <TableCell className="align-top">
                             {loadingTeachers ? (
-                              <InlineTextSkeleton width="w-16" />
+                              <InlineLoading />
                             ) : (
                               getTeacherName(cls.teacherId)
                             )}

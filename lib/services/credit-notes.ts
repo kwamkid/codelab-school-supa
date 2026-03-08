@@ -9,6 +9,8 @@ interface CreditNoteRow {
   credit_note_number: string;
   invoice_company_id: string;
   tax_invoice_id: string | null;
+  receipt_id: string | null;
+  document_type: string;
   enrollment_id: string | null;
   branch_id: string;
   customer_name: string;
@@ -40,6 +42,8 @@ function mapToCreditNote(row: CreditNoteRow): CreditNote {
     creditNoteNumber: row.credit_note_number,
     invoiceCompanyId: row.invoice_company_id,
     taxInvoiceId: row.tax_invoice_id || undefined,
+    receiptId: row.receipt_id || undefined,
+    documentType: (row.document_type as CreditNote['documentType']) || 'credit-note',
     enrollmentId: row.enrollment_id || undefined,
     branchId: row.branch_id,
     customerName: row.customer_name,
@@ -195,4 +199,85 @@ export async function getCreditNotesByTaxInvoice(taxInvoiceId: string): Promise<
 
   if (error) throw error;
   return (data || []).map(mapToCreditNote);
+}
+
+export async function getCreditNotesByReceipt(receiptId: string): Promise<CreditNote[]> {
+  const supabase = getClient();
+  const { data, error } = await (supabase as any)
+    .from('credit_notes')
+    .select('*')
+    .eq('receipt_id', receiptId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(mapToCreditNote);
+}
+
+/**
+ * Create a "ใบบันทึกคืนเงิน" (Refund Note) for non-VAT companies.
+ * Links to a receipt instead of a tax invoice.
+ */
+export async function createRefundNote(data: {
+  invoiceCompanyId: string;
+  receiptId: string;
+  enrollmentId?: string;
+  branchId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerAddress?: Record<string, string>;
+  items: { description: string; amount: number }[];
+  refundAmount: number;
+  vatAmount?: number;
+  reason: string;
+  refundType: 'full' | 'partial';
+  createdBy?: string;
+}): Promise<string> {
+  // Use refund-note number series (RN-)
+  const res = await fetch('/api/admin/document-number', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId: data.invoiceCompanyId, type: 'refund-note' }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to generate refund note number');
+  }
+  const { number: refundNoteNumber } = await res.json();
+
+  const result = await adminMutation<{ id: string }[]>({
+    table: 'credit_notes',
+    operation: 'insert',
+    data: {
+      credit_note_number: refundNoteNumber,
+      invoice_company_id: data.invoiceCompanyId,
+      receipt_id: data.receiptId,
+      tax_invoice_id: null,
+      document_type: 'refund-note',
+      enrollment_id: data.enrollmentId || null,
+      branch_id: data.branchId,
+      customer_name: data.customerName,
+      customer_phone: data.customerPhone || null,
+      customer_email: data.customerEmail || null,
+      customer_address: data.customerAddress || {},
+      customer_tax_id: null,
+      billing_type: 'personal',
+      billing_name: null,
+      billing_address: {},
+      billing_tax_id: null,
+      billing_company_branch: null,
+      items: data.items,
+      refund_amount: data.refundAmount,
+      vat_amount: data.vatAmount || 0,
+      reason: data.reason,
+      refund_type: data.refundType,
+      status: 'active',
+      issued_date: new Date().toISOString().split('T')[0],
+      payment_date: new Date().toISOString(),
+      created_by: data.createdBy || null,
+    },
+    options: { select: 'id', single: true },
+  });
+
+  return (result as any).id;
 }

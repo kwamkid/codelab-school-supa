@@ -15,16 +15,16 @@ import {
 import { getClasses } from '@/lib/services/classes';
 import { getActiveBranches } from '@/lib/services/branches';
 import { getAllStudentsWithParents } from '@/lib/services/parents';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getSubjects } from '@/lib/services/subjects';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from '@/lib/utils';
 import {
   Plus,
   Search,
   Users,
-  Eye,
   Edit,
   XCircle,
   Trash2,
@@ -86,7 +86,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useBranch } from '@/contexts/BranchContext';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import { Pagination, usePagination } from '@/components/ui/pagination';
 
 const statusColors = {
@@ -115,19 +115,7 @@ const paymentStatusLabels = {
   'paid': 'ชำระแล้ว',
 };
 
-// ============================================
-// 🎨 Mini Skeleton Components
-// ============================================
-const TableCellSkeleton = () => (
-  <div className="space-y-2">
-    <Skeleton className="h-4 w-24" />
-    <Skeleton className="h-3 w-32" />
-  </div>
-);
-
-const InlineTextSkeleton = ({ width = "w-20" }: { width?: string }) => (
-  <Skeleton className={`h-4 ${width}`} />
-);
+const dayLabels = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -264,6 +252,12 @@ export default function EnrollmentsPage() {
     staleTime: 10 * 60 * 1000,
   });
 
+  const { data: subjects = [] } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: getSubjects,
+    staleTime: 10 * 60 * 1000,
+  });
+
   // Create lookup maps
   const studentsMap = useMemo(() => 
     new Map(students.map(s => [s.id, s])), 
@@ -275,9 +269,14 @@ export default function EnrollmentsPage() {
     [classes]
   );
   
-  const branchesMap = useMemo(() => 
-    new Map(branches.map(b => [b.id, b])), 
+  const branchesMap = useMemo(() =>
+    new Map(branches.map(b => [b.id, b])),
     [branches]
+  );
+
+  const subjectsMap = useMemo(() =>
+    new Map(subjects.map(s => [s.id, s])),
+    [subjects]
   );
 
   const getStudentInfo = (studentId: string) => studentsMap.get(studentId);
@@ -360,6 +359,7 @@ export default function EnrollmentsPage() {
       paidCount: baseFiltered.filter(e => e.payment.status === 'paid').length,
       pendingCount: baseFiltered.filter(e => e.payment.status === 'pending').length,
       partialCount: baseFiltered.filter(e => e.payment.status === 'partial').length,
+      droppedCount: baseFiltered.filter(e => e.status === 'dropped').length,
     };
   }, [hasActiveFilters, allEnrollments, selectedStatus, dateRange, isSearchMode, debouncedSearchTerm, getStudentInfo, getClassInfo]);
 
@@ -440,32 +440,9 @@ export default function EnrollmentsPage() {
   // 🎨 Loading States
   // ============================================
   
-  // Phase 1: Stats Loading (Show skeleton cards)
+  // Phase 1: Stats Loading
   if (loadingStats) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-4 w-96" />
-          </div>
-          <Skeleton className="h-10 w-40" />
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-20" />
-                <Skeleton className="h-3 w-32 mt-1" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
+    return <SectionLoading />;
   }
 
   const isLoadingTable = isSearchMode ? loadingAllEnrollments : loadingEnrollments;
@@ -494,74 +471,54 @@ export default function EnrollmentsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">กำลังเรียน</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats?.active || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">ชำระแล้ว</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.paidCount || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">{formatCurrency(stats?.totalRevenue || 0)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">รอชำระ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats?.pendingCount || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">{formatCurrency(stats?.pendingAmount || 0)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">ชำระบางส่วน</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats?.partialCount || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">ค้าง {formatCurrency(stats?.partialRemainingAmount || 0)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Payment Status Tabs */}
-      <Tabs value={selectedPaymentStatus} onValueChange={setSelectedPaymentStatus} className="mb-4">
-        <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
-          <TabsTrigger
-            value="all"
-            className="data-[state=active]:bg-gray-900 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-          >
-            ทั้งหมด ({filteredStats?.total ?? stats?.total ?? 0})
-          </TabsTrigger>
-          <TabsTrigger
-            value="paid"
-            className="data-[state=active]:bg-green-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-          >
-            ชำระแล้ว ({filteredStats?.paidCount ?? stats?.paidCount ?? 0})
-          </TabsTrigger>
-          <TabsTrigger
-            value="pending"
-            className="data-[state=active]:bg-yellow-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-          >
-            รอชำระ ({filteredStats?.pendingCount ?? stats?.pendingCount ?? 0})
-          </TabsTrigger>
-          <TabsTrigger
-            value="partial"
-            className="data-[state=active]:bg-orange-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-          >
-            ชำระบางส่วน ({filteredStats?.partialCount ?? stats?.partialCount ?? 0})
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap gap-3 mb-6">
+        {[
+          { value: 'all', label: 'ทั้งหมด', count: filteredStats?.total ?? stats?.total ?? 0, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700' },
+          { value: 'paid', label: 'ชำระแล้ว', count: filteredStats?.paidCount ?? stats?.paidCount ?? 0, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700' },
+          { value: 'pending', label: 'รอชำระ', count: filteredStats?.pendingCount ?? stats?.pendingCount ?? 0, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700' },
+          { value: 'partial', label: 'ชำระบางส่วน', count: filteredStats?.partialCount ?? stats?.partialCount ?? 0, activeBg: 'bg-orange-500', inactiveBg: 'bg-orange-50', inactiveLabel: 'text-orange-600', inactiveCount: 'text-orange-700' },
+          { value: 'dropped', label: 'ยกเลิก', count: filteredStats?.droppedCount ?? stats?.dropped ?? 0, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700', isStatusFilter: true },
+        ].map((tab) => {
+          const isDroppedTab = (tab as any).isStatusFilter;
+          const isActive = isDroppedTab
+            ? selectedStatus === 'dropped'
+            : selectedPaymentStatus === tab.value && selectedStatus !== 'dropped';
+          return (
+            <button
+              key={tab.value}
+              onClick={() => {
+                if (isDroppedTab) {
+                  setSelectedStatus('dropped');
+                  setSelectedPaymentStatus('all');
+                } else {
+                  setSelectedStatus('all');
+                  setSelectedPaymentStatus(tab.value);
+                }
+              }}
+              className={cn(
+                'flex flex-col items-center justify-center w-24 h-[72px] rounded-xl transition-all',
+                isActive
+                  ? `${tab.activeBg} shadow-md`
+                  : `${tab.inactiveBg} hover:shadow-sm`
+              )}
+            >
+              <span className={cn(
+                'text-sm font-medium',
+                isActive ? 'text-white' : tab.inactiveLabel
+              )}>
+                {tab.label}
+              </span>
+              <span className={cn(
+                'text-2xl font-bold mt-0.5',
+                isActive ? 'text-white' : tab.inactiveCount
+              )}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3 mb-6">
@@ -601,26 +558,9 @@ export default function EnrollmentsPage() {
 
       {/* Enrollments Table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>รายการลงทะเบียน</span>
-            {fetchingEnrollments && !isLoadingTable && (
-              <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-            )}
-            {(loadingStudents || loadingClasses || loadingBranches) && (
-              <span className="text-xs text-gray-400 font-normal ml-2">
-                (กำลังโหลดข้อมูลเพิ่มเติม...)
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
         <CardContent className="p-0">
           {isLoadingTable ? (
-            <div className="p-6 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
+            <SectionLoading />
           ) : displayedEnrollments.length === 0 ? (
             <div className="text-center py-12 px-4">
               <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -635,36 +575,85 @@ export default function EnrollmentsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <Table>
+              {/* Mobile: Card List */}
+              <div className="divide-y md:hidden">
+                {displayedEnrollments.map((enrollment) => {
+                  const student = getStudentInfo(enrollment.studentId);
+                  const classInfo = getClassInfo(enrollment.classId);
+                  const subject = classInfo ? subjectsMap.get(classInfo.subjectId) : undefined;
+                  const isUpcoming = enrollment.status === 'active' && classInfo?.startDate && new Date(classInfo.startDate) > new Date();
+
+                  return (
+                    <Link key={enrollment.id} href={`/enrollments/${enrollment.id}`} className="block px-4 py-3 hover:bg-gray-50 active:bg-gray-100">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-base truncate">
+                            {student?.nickname || student?.name || 'Unknown'}
+                          </p>
+                          <p className="text-sm text-gray-500 truncate">
+                            {subject?.name || ''} {classInfo ? `${classInfo.daysOfWeek.map(d => dayLabels[d]).join(',')} ${classInfo.startTime?.substring(0, 5)}-${classInfo.endTime?.substring(0, 5)}` : ''}
+                          </p>
+                          {student && (student.schoolName || student.gradeLevel) && (
+                            <p className="text-xs text-gray-400 truncate">
+                              {[student.schoolName, student.gradeLevel].filter(Boolean).join(' / ')}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-semibold text-sm">{formatCurrency(enrollment.pricing.finalPrice)}</p>
+                          <p className="text-xs text-gray-400">{formatDate(enrollment.enrolledAt)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <Badge className={`text-[11px] ${paymentStatusColors[enrollment.payment.status]}`}>
+                          {paymentStatusLabels[enrollment.payment.status]}
+                        </Badge>
+                        <Badge className={`text-[11px] ${isUpcoming ? 'bg-yellow-100 text-yellow-700' : statusColors[enrollment.status]}`}>
+                          {isUpcoming ? 'รอเริ่มเรียน' : statusLabels[enrollment.status]}
+                        </Badge>
+                        {isAllBranches && (
+                          <span className="text-xs text-gray-400">{getBranchName(enrollment.branchId)}</span>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>นักเรียน</TableHead>
-                      <TableHead>คลาส</TableHead>
-                      {isAllBranches && <TableHead>สาขา</TableHead>}
-                      <TableHead>วันที่ลงทะเบียน</TableHead>
-                      <TableHead className="text-right">ค่าเรียน</TableHead>
-                      <TableHead className="text-center">การชำระเงิน</TableHead>
-                      <TableHead className="text-center">สถานะ</TableHead>
-                      <TableHead className="text-right">จัดการ</TableHead>
+                      <TableHead className="w-[20%]">นักเรียน</TableHead>
+                      <TableHead className="w-[30%]">คลาส</TableHead>
+                      {isAllBranches && <TableHead className="w-[7%]">สาขา</TableHead>}
+                      <TableHead className="w-[11%]">ลงทะเบียน</TableHead>
+                      <TableHead className="w-[9%] text-right">ค่าเรียน</TableHead>
+                      <TableHead className="w-[7%] text-center">ชำระเงิน</TableHead>
+                      <TableHead className="w-[7%] text-center">สถานะ</TableHead>
+                      <TableHead className="w-[36px] text-right">
+                        <span className="sr-only">จัดการ</span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {displayedEnrollments.map((enrollment) => {
                       const student = getStudentInfo(enrollment.studentId);
                       const classInfo = getClassInfo(enrollment.classId);
-                      
+                      const subject = classInfo ? subjectsMap.get(classInfo.subjectId) : undefined;
+
                       return (
-                        <TableRow key={enrollment.id}>
-                          <TableCell>
+                        <TableRow key={enrollment.id} className="cursor-pointer" onClick={() => router.push(`/enrollments/${enrollment.id}`)}>
+                          <TableCell className="py-2">
                             {loadingStudents ? (
-                              <TableCellSkeleton />
+                              <InlineLoading />
                             ) : student ? (
-                              <div>
-                                <p className="font-medium">{student.nickname || student.name}</p>
-                                <p className="text-sm text-gray-500">ผู้ปกครอง: {student.parentName}</p>
+                              <div className="min-w-0">
+                                <p className="font-medium text-base truncate">{student.nickname || student.name}</p>
+                                <p className="text-sm text-gray-500 truncate">ผปค. {student.parentName}</p>
                                 {(student.schoolName || student.gradeLevel) && (
-                                  <p className="text-xs text-gray-400">
+                                  <p className="text-xs text-gray-400 line-clamp-2">
                                     {[student.schoolName, student.gradeLevel].filter(Boolean).join(' / ')}
                                   </p>
                                 )}
@@ -672,125 +661,119 @@ export default function EnrollmentsPage() {
                             ) : (
                               <div>
                                 <p className="font-medium text-gray-400">Unknown</p>
-                                <p className="text-sm text-gray-400">ID: {enrollment.studentId}</p>
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2">
                             {loadingClasses ? (
-                              <TableCellSkeleton />
+                              <InlineLoading />
                             ) : classInfo ? (
-                              <div>
-                                <p className="font-medium">{classInfo.name}</p>
+                              <div className="min-w-0">
+                                <p className="text-sm text-gray-700 truncate" title={classInfo.name}>{classInfo.name}</p>
                                 <p className="text-sm text-gray-500">
+                                  {subject?.name || ''}{' '}
+                                  <span className="text-gray-400">
+                                    {classInfo.daysOfWeek.map(d => dayLabels[d]).join(',')}{' '}
+                                    {classInfo.startTime?.substring(0, 5)}-{classInfo.endTime?.substring(0, 5)}
+                                  </span>
+                                </p>
+                                <p className="text-xs text-gray-400">
                                   {formatDateCompact(classInfo.startDate)} - {formatDateCompact(classInfo.endDate)}
                                 </p>
                               </div>
                             ) : (
                               <div>
-                                <p className="font-medium text-gray-400">Unknown</p>
-                                <p className="text-sm text-gray-400">ID: {enrollment.classId}</p>
+                                <p className="text-sm text-gray-400">Unknown</p>
                               </div>
                             )}
                           </TableCell>
                           {isAllBranches && (
-                            <TableCell>
+                            <TableCell className="py-2">
                               {loadingBranches ? (
-                                <InlineTextSkeleton width="w-24" />
+                                <InlineLoading />
                               ) : (
-                                getBranchName(enrollment.branchId)
+                                <span className="text-sm">{getBranchName(enrollment.branchId)}</span>
                               )}
                             </TableCell>
                           )}
-                          <TableCell>
+                          <TableCell className="py-2">
                             <div>
-                              <p>{formatDate(enrollment.enrolledAt)}</p>
+                              <p className="text-sm whitespace-nowrap">{formatDate(enrollment.enrolledAt)}</p>
                               {classInfo && (
-                                <p className="text-xs text-gray-400">
-                                  เริ่มเรียน: {formatDateCompact(classInfo.startDate)}
+                                <p className="text-xs text-gray-400 whitespace-nowrap">
+                                  เริ่ม: {formatDateCompact(classInfo.startDate)}
                                 </p>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right py-2">
                             <div>
-                              <p className="font-medium">{formatCurrency(enrollment.pricing.finalPrice)}</p>
+                              <p className="font-medium text-sm whitespace-nowrap">{formatCurrency(enrollment.pricing.finalPrice)}</p>
                               {enrollment.pricing.discount > 0 && (
-                                <p className="text-sm text-green-600">
-                                  -ส่วนลด {formatCurrency(enrollment.pricing.discount)}
+                                <p className="text-xs text-green-600 whitespace-nowrap">
+                                  -{formatCurrency(enrollment.pricing.discount)}
                                 </p>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-center">
-                            <Badge className={paymentStatusColors[enrollment.payment.status]}>
+                          <TableCell className="text-center py-2">
+                            <Badge className={`text-[11px] whitespace-nowrap ${paymentStatusColors[enrollment.payment.status]}`}>
                               {paymentStatusLabels[enrollment.payment.status]}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-center">
-                            <div>
-                              {(() => {
-                                const isUpcoming = enrollment.status === 'active' && classInfo?.startDate && new Date(classInfo.startDate) > new Date();
-                                return (
-                                  <Badge className={isUpcoming ? 'bg-yellow-100 text-yellow-700' : statusColors[enrollment.status]}>
-                                    {isUpcoming ? 'รอเริ่มเรียน' : statusLabels[enrollment.status]}
-                                  </Badge>
-                                );
-                              })()}
-                              {enrollment.status === 'dropped' && enrollment.droppedReason && (
-                                <p className="text-xs text-red-500 mt-1">
-                                  {enrollment.droppedReason}
-                                </p>
-                              )}
-                            </div>
+                          <TableCell className="text-center py-2">
+                            {(() => {
+                              const isUpcoming = enrollment.status === 'active' && classInfo?.startDate && new Date(classInfo.startDate) > new Date();
+                              return (
+                                <Badge className={`text-[11px] whitespace-nowrap ${isUpcoming ? 'bg-yellow-100 text-yellow-700' : statusColors[enrollment.status]}`}>
+                                  {isUpcoming ? 'รอเริ่มเรียน' : statusLabels[enrollment.status]}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right py-2">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>จัดการ</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                
-                                <Link href={`/enrollments/${enrollment.id}`}>
-                                  <DropdownMenuItem>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    ดูรายละเอียด
-                                  </DropdownMenuItem>
-                                </Link>
-                                
+
                                 {enrollment.payment.status === 'paid' && (
-                                  <DropdownMenuItem onClick={handlePrintReceipt}>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePrintReceipt(); }}>
                                     <Printer className="h-4 w-4 mr-2" />
                                     พิมพ์ใบเสร็จ
                                   </DropdownMenuItem>
                                 )}
-                                
+
                                 <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-                                  {enrollment.payment.status !== 'paid' && (
-                                    <Link href={`/enrollments/${enrollment.id}`}>
+                                  {enrollment.status !== 'dropped' && enrollment.payment.status !== 'paid' && (
+                                    <Link href={`/enrollments/${enrollment.id}`} onClick={(e) => e.stopPropagation()}>
                                       <DropdownMenuItem className="text-green-600">
                                         <CreditCard className="h-4 w-4 mr-2" />
                                         ชำระเพิ่ม
                                       </DropdownMenuItem>
                                     </Link>
                                   )}
-                                  
-                                  <Link href={`/enrollments/${enrollment.id}/edit`}>
-                                    <DropdownMenuItem>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      แก้ไข
-                                    </DropdownMenuItem>
-                                  </Link>
-                                  
+
+                                  {enrollment.status !== 'dropped' && (
+                                    <Link href={`/enrollments/${enrollment.id}/edit`} onClick={(e) => e.stopPropagation()}>
+                                      <DropdownMenuItem>
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        แก้ไข
+                                      </DropdownMenuItem>
+                                    </Link>
+                                  )}
+
                                   {enrollment.status === 'active' && (
                                     <>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setSelectedEnrollment(enrollment);
                                           setCancelReason('');
                                           setShowCancelDialog(true);
@@ -802,12 +785,12 @@ export default function EnrollmentsPage() {
                                       </DropdownMenuItem>
                                     </>
                                   )}
-                                  
+
                                   <DropdownMenuSeparator />
-                                  
+
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <DropdownMenuItem 
+                                      <DropdownMenuItem
                                         className="text-red-600"
                                         onSelect={(e) => e.preventDefault()}
                                       >
@@ -825,7 +808,7 @@ export default function EnrollmentsPage() {
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                                        <AlertDialogAction 
+                                        <AlertDialogAction
                                           onClick={() => handleDeleteEnrollment(enrollment.id)}
                                           className="bg-red-500 hover:bg-red-600"
                                           disabled={deletingId === enrollment.id}

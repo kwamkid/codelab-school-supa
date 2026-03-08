@@ -8,7 +8,7 @@ import { getActiveBranches } from '@/lib/services/branches';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SearchInput } from '@/components/ui/search-input';
 import { EmptyState } from '@/components/ui/empty-state';
-import { TableRowsSkeleton } from '@/components/ui/page-skeleton';
+import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import { Button } from '@/components/ui/button';
 import { Pagination, usePagination } from '@/components/ui/pagination';
 import {
@@ -54,7 +54,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Skeleton } from '@/components/ui/skeleton';
 
 type StudentWithInfo = Student & { 
   parentName: string; 
@@ -225,10 +224,7 @@ export default function StudentsPage() {
           </CardHeader>
           <CardContent>
             {loadingStudents ? (
-              <>
-                <Skeleton className="h-8 w-12 mb-1" />
-                <Skeleton className="h-3 w-20" />
-              </>
+              <InlineLoading />
             ) : (
               <>
                 <div className="text-2xl font-bold">{stats.total}</div>
@@ -246,10 +242,7 @@ export default function StudentsPage() {
           </CardHeader>
           <CardContent>
             {loadingStudents ? (
-              <>
-                <Skeleton className="h-8 w-12 mb-1" />
-                <Skeleton className="h-3 w-16" />
-              </>
+              <InlineLoading />
             ) : (
               <>
                 <div className="text-2xl font-bold text-blue-600">{stats.male}</div>
@@ -267,10 +260,7 @@ export default function StudentsPage() {
           </CardHeader>
           <CardContent>
             {loadingStudents ? (
-              <>
-                <Skeleton className="h-8 w-12 mb-1" />
-                <Skeleton className="h-3 w-16" />
-              </>
+              <InlineLoading />
             ) : (
               <>
                 <div className="text-2xl font-bold text-pink-600">{stats.female}</div>
@@ -288,10 +278,7 @@ export default function StudentsPage() {
           </CardHeader>
           <CardContent>
             {loadingStudents ? (
-              <>
-                <Skeleton className="h-8 w-12 mb-1" />
-                <Skeleton className="h-3 w-16" />
-              </>
+              <InlineLoading />
             ) : (
               <>
                 <div className="text-2xl font-bold text-red-600">{stats.withAllergies}</div>
@@ -363,24 +350,7 @@ export default function StudentsPage() {
         </CardHeader>
         <CardContent className="p-0">
           {loadingStudents ? (
-            // แสดง skeleton แค่ใน table เท่านั้น
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[200px]">ข้อมูลนักเรียน</TableHead>
-                    <TableHead className="w-[120px]">เพศ / อายุ</TableHead>
-                    <TableHead className="w-[180px]">โรงเรียน</TableHead>
-                    <TableHead className="w-[180px]">ผู้ปกครอง</TableHead>
-                    <TableHead className="text-center w-[100px]">ประวัติแพ้</TableHead>
-                    <TableHead className="text-right w-[80px]">จัดการ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRowsSkeleton columns={6} rows={5} />
-                </TableBody>
-              </Table>
-            </div>
+            <SectionLoading />
           ) : paginatedStudents.length === 0 ? (
             <EmptyState
               icon={Users}

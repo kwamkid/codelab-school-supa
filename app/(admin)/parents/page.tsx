@@ -49,7 +49,7 @@ import {
 import { formatDate, calculateAge } from '@/lib/utils';
 import { PermissionGuard, usePermissions } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -82,16 +82,6 @@ interface ParentWithInfo extends Parent {
   enrollmentStatus?: 'active' | 'completed' | 'never' | 'mixed';
 }
 
-// ============================================
-// 🎨 Mini Skeleton Components
-// ============================================
-const InlineTextSkeleton = ({ width = "w-20" }: { width?: string }) => (
-  <Skeleton className={`h-4 ${width}`} />
-);
-
-const BadgeSkeleton = () => (
-  <Skeleton className="h-5 w-16" />
-);
 
 export default function ParentsPage() {
   const { isSuperAdmin } = usePermissions();
@@ -313,43 +303,7 @@ export default function ParentsPage() {
   
   // Phase 1: Parents Loading
   if (loadingParents) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-4 w-96" />
-          </div>
-          <Skeleton className="h-10 w-40" />
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Card key={`skeleton-card-${i}`}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-20" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-12" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={`skeleton-row-${i}`} className="h-12 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <SectionLoading />;
   }
 
   return (
@@ -619,7 +573,7 @@ export default function ParentsPage() {
                           </TableCell>
                           <TableCell>
                             {loadingBranches ? (
-                              <InlineTextSkeleton width="w-24" />
+                              <InlineLoading />
                             ) : parent.preferredBranchId ? (
                               <div className="flex items-center gap-1">
                                 <Badge variant="outline">
@@ -634,7 +588,7 @@ export default function ParentsPage() {
                           <TableCell>
                             <div className="flex flex-wrap gap-1 max-w-[200px]">
                               {loadingBranches ? (
-                                <BadgeSkeleton />
+                                <InlineLoading />
                               ) : (() => {
                                 const enrolledBranches = new Set<string>();
                                 parent.students?.forEach(student => {

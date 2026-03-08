@@ -13,10 +13,13 @@ import MessageArea from '@/components/chat/message-area';
 import ActionPanel from '@/components/chat/action-panel';
 import { LinkParentModal } from '@/components/chat/link-parent-modal';
 import { ChatSplitView, MobileView } from '@/components/chat/chat-layout';
-import { ResponsiveFormDialog } from '@/components/shared/responsive-form-dialog';
 import { TrialBookingForm } from '@/components/shared/trial-booking-form';
 import { CompactEnrollmentForm } from '@/components/shared/compact-enrollment-form';
 import { adminMutation } from '@/lib/admin-mutation';
+
+type PanelView = 'info' | 'trial' | 'enrollment';
+
+const MESSAGES_PER_PAGE = 50;
 
 export default function ChatPage() {
   const { selectedBranchId } = useBranch();
@@ -27,16 +30,16 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>('list');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkedParent, setLinkedParent] = useState<{ id: string; displayName: string; phone: string; students?: { id: string; name: string }[] } | null>(null);
-  const [showTrialDialog, setShowTrialDialog] = useState(false);
-  const [showEnrollDialog, setShowEnrollDialog] = useState(false);
+  const [panelView, setPanelView] = useState<PanelView>('info');
 
-  // Refs
-  const sendingRef = useRef(false);
+  // Counter for generating unique optimistic message IDs
+  const optimisticIdRef = useRef(0);
 
   // Derived state
   const selectedConversation = conversations.find(c => c.id === selectedConversationId) || null;
@@ -79,18 +82,25 @@ export default function ChatPage() {
     load();
   }, []);
 
+  // Reset panel view when conversation changes
+  useEffect(() => {
+    setPanelView('info');
+  }, [selectedConversationId]);
+
   // Load messages when conversation is selected
   useEffect(() => {
     if (!selectedConversationId) {
       setMessages([]);
+      setHasMoreMessages(false);
       return;
     }
 
     const loadMessages = async () => {
       try {
         setLoadingMessages(true);
-        const data = await getMessages(selectedConversationId);
+        const data = await getMessages(selectedConversationId, MESSAGES_PER_PAGE);
         setMessages(data);
+        setHasMoreMessages(data.length === MESSAGES_PER_PAGE);
         // Mark as read
         await markConversationRead(selectedConversationId);
         // Update unread count in local state
@@ -108,6 +118,28 @@ export default function ChatPage() {
     loadMessages();
   }, [selectedConversationId]);
 
+  // Load more (older) messages
+  const handleLoadMoreMessages = useCallback(async () => {
+    if (!selectedConversationId || loadingMoreMessages || !hasMoreMessages) return;
+    const oldestMessage = messages[0];
+    if (!oldestMessage) return;
+
+    try {
+      setLoadingMoreMessages(true);
+      const olderMessages = await getMessages(
+        selectedConversationId,
+        MESSAGES_PER_PAGE,
+        oldestMessage.createdAt.toISOString()
+      );
+      setMessages(prev => [...olderMessages, ...prev]);
+      setHasMoreMessages(olderMessages.length === MESSAGES_PER_PAGE);
+    } catch (error) {
+      console.error('Error loading more messages:', error);
+    } finally {
+      setLoadingMoreMessages(false);
+    }
+  }, [selectedConversationId, loadingMoreMessages, hasMoreMessages, messages]);
+
   // Realtime: new messages for active conversation
   const handleNewMessage = useCallback(
     (rawMessage: any) => {
@@ -120,6 +152,7 @@ export default function ChatPage() {
         senderType: rawMessage.sender_type,
         senderId: rawMessage.sender_id || undefined,
         senderName: rawMessage.sender_name || undefined,
+        senderAvatarUrl: rawMessage.sender_avatar_url || undefined,
         messageType: rawMessage.message_type,
         content: rawMessage.content || undefined,
         mediaUrl: rawMessage.media_url || undefined,
@@ -132,6 +165,17 @@ export default function ChatPage() {
       };
 
       setMessages(prev => {
+        // Replace optimistic message with real one (match by content + direction for outbound)
+        if (message.direction === 'outbound') {
+          const optimisticIdx = prev.findIndex(
+            m => m.id.startsWith('optimistic-') && m.content === message.content && m.direction === 'outbound'
+          );
+          if (optimisticIdx !== -1) {
+            const updated = [...prev];
+            updated[optimisticIdx] = message;
+            return updated;
+          }
+        }
         // Avoid duplicates
         if (prev.some(m => m.id === message.id)) return prev;
         return [...prev, message];
@@ -189,25 +233,77 @@ export default function ChatPage() {
 
   useChatConversationsRealtime(handleConversationUpdate);
 
-  // Send message handler
+  // Optimistic send message handler
   const handleSendMessage = useCallback(
-    async (content: string) => {
+    (content: string) => {
       if (!selectedConversationId || !content.trim()) return;
-      if (sendingRef.current) return;
+      const trimmed = content.trim();
 
-      try {
-        sendingRef.current = true;
-        setSending(true);
-        await sendMessage(selectedConversationId, content.trim());
-      } catch (error) {
+      // 1. Create optimistic message and add to local state immediately
+      const tempId = `optimistic-${++optimisticIdRef.current}`;
+      const optimisticMessage: ChatMessage = {
+        id: tempId,
+        conversationId: selectedConversationId,
+        direction: 'outbound',
+        senderType: 'admin',
+        messageType: 'text',
+        content: trimmed,
+        status: 'pending',
+        createdAt: new Date(),
+      };
+
+      setMessages(prev => [...prev, optimisticMessage]);
+
+      // Update conversation preview locally
+      setConversations(prev =>
+        prev.map(c =>
+          c.id === selectedConversationId
+            ? { ...c, lastMessagePreview: trimmed, lastMessageAt: new Date() }
+            : c
+        )
+      );
+
+      // 2. Send via API in background — don't block UI
+      sendMessage(selectedConversationId, trimmed).catch((error) => {
         console.error('Error sending message:', error);
-      } finally {
-        sendingRef.current = false;
-        setSending(false);
-      }
+        // Mark optimistic message as failed
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === tempId ? { ...m, status: 'failed' as const } : m
+          )
+        );
+        toast.error('ส่งข้อความไม่สำเร็จ');
+      });
     },
     [selectedConversationId]
   );
+
+  // Refresh profile from platform API
+  const handleRefreshProfile = useCallback(async () => {
+    const contactId = selectedConversation?.contact?.id;
+    if (!contactId) return;
+
+    try {
+      const res = await fetch('/api/admin/chat/refresh-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'ไม่สามารถรีเฟรชโปรไฟล์ได้');
+        return;
+      }
+      // Update local state
+      updateLocalContact(contactId, {
+        displayName: data.displayName,
+        avatarUrl: data.avatarUrl,
+      });
+      toast.success('รีเฟรชโปรไฟล์สำเร็จ');
+    } catch {
+      toast.error('ไม่สามารถรีเฟรชโปรไฟล์ได้');
+    }
+  }, [selectedConversation]);
 
   // Load linked parent when conversation changes
   useEffect(() => {
@@ -329,18 +425,24 @@ export default function ChatPage() {
     }
   }, [selectedConversation, updateLocalContact]);
 
-  // Action handlers — open dialogs instead of navigating
+  // Action handlers — show inline forms in action panel
   const handleTrialBooking = useCallback(() => {
-    setShowTrialDialog(true);
+    setPanelView('trial');
+    setMobileView('panel');
   }, []);
 
   const handleEnrollment = useCallback(() => {
-    setShowEnrollDialog(true);
+    setPanelView('enrollment');
+    setMobileView('panel');
+  }, []);
+
+  const handleFormCancel = useCallback(() => {
+    setPanelView('info');
   }, []);
 
   // After successful trial booking from chat
   const handleTrialSuccess = useCallback(async (bookingId: string) => {
-    setShowTrialDialog(false);
+    setPanelView('info');
     const contact = selectedConversation?.contact;
     if (!contact) return;
 
@@ -365,7 +467,7 @@ export default function ChatPage() {
 
   // After successful enrollment from chat
   const handleEnrollSuccess = useCallback(async (result: { enrollmentId: string; invoiceId?: string }) => {
-    setShowEnrollDialog(false);
+    setPanelView('info');
     const contact = selectedConversation?.contact;
     if (!contact) return;
 
@@ -407,16 +509,22 @@ export default function ChatPage() {
             conversation={selectedConversation}
             messages={messages}
             loading={loadingMessages}
-            sending={sending}
             onSend={handleSendMessage}
+            branches={branches}
             onBack={handleBack}
             onTogglePanel={handleTogglePanel}
+            onTrialBooking={handleTrialBooking}
+            onEnrollment={handleEnrollment}
+            hasMore={hasMoreMessages}
+            loadingMore={loadingMoreMessages}
+            onLoadMore={handleLoadMoreMessages}
           />
         }
         panel={
           <ActionPanel
             conversation={selectedConversation}
             branches={branches}
+            panelView={panelView}
             onTrialBooking={handleTrialBooking}
             onEnrollment={handleEnrollment}
             onAddTag={handleAddTag}
@@ -425,8 +533,49 @@ export default function ChatPage() {
             onRemoveBranch={handleRemoveBranch}
             onLinkParent={() => setShowLinkModal(true)}
             onUnlinkParent={handleUnlinkParent}
+            onRefreshProfile={handleRefreshProfile}
             linkedParent={linkedParent}
-            onBack={() => setMobileView('messages')}
+            onBack={() => {
+              if (panelView !== 'info') {
+                setPanelView('info');
+              } else {
+                setMobileView('messages');
+              }
+            }}
+            trialFormNode={
+              panelView === 'trial' ? (
+                <TrialBookingForm
+                  context="chat"
+                  prefill={{
+                    parentName: selectedConversation?.contact?.displayName,
+                    parentPhone: selectedConversation?.contact?.phone,
+                    parentId: selectedConversation?.contact?.parentId,
+                    contactId: selectedConversation?.contact?.id,
+                    conversationId: selectedConversation?.id,
+                    branchId: selectedBranchId || undefined,
+                  }}
+                  onSuccess={handleTrialSuccess}
+                  onCancel={handleFormCancel}
+                />
+              ) : null
+            }
+            enrollFormNode={
+              panelView === 'enrollment' ? (
+                <CompactEnrollmentForm
+                  context="chat"
+                  prefill={{
+                    parentId: selectedConversation?.contact?.parentId,
+                    parentName: selectedConversation?.contact?.displayName,
+                    parentPhone: selectedConversation?.contact?.phone,
+                    contactId: selectedConversation?.contact?.id,
+                    conversationId: selectedConversation?.id,
+                    branchId: selectedBranchId || undefined,
+                  }}
+                  onSuccess={handleEnrollSuccess}
+                  onCancel={handleFormCancel}
+                />
+              ) : null
+            }
           />
         }
       />
@@ -443,47 +592,6 @@ export default function ChatPage() {
         />
       )}
 
-      {/* Trial Booking Dialog */}
-      <ResponsiveFormDialog
-        open={showTrialDialog}
-        onOpenChange={setShowTrialDialog}
-        title="จองทดลองเรียน"
-      >
-        <TrialBookingForm
-          context="chat"
-          prefill={{
-            parentName: selectedConversation?.contact?.displayName,
-            parentPhone: selectedConversation?.contact?.phone,
-            parentId: selectedConversation?.contact?.parentId,
-            contactId: selectedConversation?.contact?.id,
-            conversationId: selectedConversation?.id,
-            branchId: selectedBranchId || undefined,
-          }}
-          onSuccess={handleTrialSuccess}
-          onCancel={() => setShowTrialDialog(false)}
-        />
-      </ResponsiveFormDialog>
-
-      {/* Enrollment Dialog */}
-      <ResponsiveFormDialog
-        open={showEnrollDialog}
-        onOpenChange={setShowEnrollDialog}
-        title="ลงทะเบียน"
-      >
-        <CompactEnrollmentForm
-          context="chat"
-          prefill={{
-            parentId: selectedConversation?.contact?.parentId,
-            parentName: selectedConversation?.contact?.displayName,
-            parentPhone: selectedConversation?.contact?.phone,
-            contactId: selectedConversation?.contact?.id,
-            conversationId: selectedConversation?.id,
-            branchId: selectedBranchId || undefined,
-          }}
-          onSuccess={handleEnrollSuccess}
-          onCancel={() => setShowEnrollDialog(false)}
-        />
-      </ResponsiveFormDialog>
     </>
   );
 }

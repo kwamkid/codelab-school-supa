@@ -7,16 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Printer, Receipt as ReceiptIcon, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Printer, FileText, Loader2 } from 'lucide-react';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { SectionLoading } from '@/components/ui/loading';
+import { Pagination, usePagination } from '@/components/ui/pagination';
 import { useBranch } from '@/contexts/BranchContext';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { Receipt, TaxInvoice, InvoiceCompany } from '@/types/models';
-import { getReceipts } from '@/lib/services/receipts';
+import { TaxInvoice, InvoiceCompany } from '@/types/models';
 import { getTaxInvoices } from '@/lib/services/tax-invoices';
 import { getInvoiceCompanies } from '@/lib/services/invoice-companies';
-import ReceiptPrintDialog from '@/components/invoices/receipt-print-dialog';
+import { useDocumentPrint } from '@/hooks/useDocumentPrint';
+import PrintDialogs from '@/components/shared/print-dialogs';
 import {
   DocumentData,
   generateDocumentHTML,
@@ -24,67 +25,15 @@ import {
   formatAddress,
 } from '@/components/invoices/document-template';
 
-// Unified document type for display
-interface DocumentItem {
-  id: string;
-  documentType: 'receipt' | 'tax-invoice' | 'tax-invoice-receipt';
-  documentNumber: string;
-  invoiceCompanyId: string;
-  enrollmentId?: string;
-  branchId: string;
-  customerName: string;
-  customerPhone?: string;
-  totalAmount: number;
-  paidAmount: number;
-  status: string;
-  issuedAt?: Date;
-  createdAt: Date;
-  receiptId?: string; // for tax invoices
-  linkedCreditNotes?: { id: string; creditNoteNumber: string; refundType: string; refundAmount: number; status: string }[];
-  linkedTaxInvoices?: { id: string; taxInvoiceNumber: string }[];
-}
+const DEFAULT_PAGE_SIZE = 20;
 
-function receiptToDoc(r: Receipt): DocumentItem {
-  return {
-    id: r.id,
-    documentType: 'receipt',
-    documentNumber: r.receiptNumber,
-    invoiceCompanyId: r.invoiceCompanyId,
-    enrollmentId: r.enrollmentId,
-    branchId: r.branchId,
-    customerName: r.customerName,
-    customerPhone: r.customerPhone,
-    totalAmount: r.totalAmount,
-    paidAmount: r.paidAmount,
-    status: r.status,
-    issuedAt: r.issuedAt,
-    createdAt: r.createdAt,
-    linkedTaxInvoices: r.linkedTaxInvoices,
-    linkedCreditNotes: r.linkedCreditNotes,
-  };
+function getCurrentMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+  return { from: `${y}-${m}-01`, to: `${y}-${m}-${String(lastDay).padStart(2, '0')}` };
 }
-
-function taxInvoiceToDoc(t: TaxInvoice): DocumentItem {
-  return {
-    id: t.id,
-    documentType: t.receiptId ? 'tax-invoice' : 'tax-invoice-receipt',
-    documentNumber: t.taxInvoiceNumber,
-    invoiceCompanyId: t.invoiceCompanyId,
-    enrollmentId: t.enrollmentId,
-    branchId: t.branchId,
-    customerName: t.customerName,
-    customerPhone: t.customerPhone,
-    totalAmount: t.totalAmount,
-    paidAmount: t.paidAmount,
-    status: t.status,
-    issuedAt: t.issuedAt,
-    createdAt: t.createdAt,
-    receiptId: t.receiptId,
-    linkedCreditNotes: t.linkedCreditNotes,
-  };
-}
-
-const PAGE_SIZE = 20;
 
 const paymentMethodLabels: Record<string, string> = {
   cash: 'เงินสด',
@@ -96,33 +45,33 @@ const paymentMethodLabels: Record<string, string> = {
   credit: 'บัตรเครดิต',
 };
 
-export default function InvoicesPage() {
+export default function TaxInvoicesPage() {
   const router = useRouter();
   const { selectedBranchId } = useBranch();
+  const print = useDocumentPrint();
   const [companies, setCompanies] = useState<InvoiceCompany[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState<string>('');
   const [loadingCompanies, setLoadingCompanies] = useState(true);
 
-  // Per-company lazy-loaded data stored in a Map
-  const [invoiceCache, setInvoiceCache] = useState<Map<string, DocumentItem[]>>(new Map());
+  const [invoiceCache, setInvoiceCache] = useState<Map<string, TaxInvoice[]>>(new Map());
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>();
-  const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>(getCurrentMonthRange());
+  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPagination } = usePagination(DEFAULT_PAGE_SIZE);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkPrinting, setBulkPrinting] = useState(false);
 
-  // Load companies on mount
   useEffect(() => {
     (async () => {
       setLoadingCompanies(true);
       try {
         const comp = await getInvoiceCompanies();
-        setCompanies(comp);
-        if (comp.length > 0) {
-          setActiveCompanyId(comp[0].id);
+        // Only show VAT-registered companies
+        const vatCompanies = comp.filter(c => c.isVatRegistered);
+        setCompanies(vatCompanies);
+        if (vatCompanies.length > 0) {
+          setActiveCompanyId(vatCompanies[0].id);
         }
       } catch (error) {
         console.error('Error loading companies:', error);
@@ -134,49 +83,39 @@ export default function InvoicesPage() {
 
   const cacheKey = `${activeCompanyId}__${selectedBranchId || ''}`;
 
-  // Lazy load invoices when tab changes or branch changes
   useEffect(() => {
     if (!activeCompanyId) return;
     if (invoiceCache.has(cacheKey)) return;
 
     let cancelled = false;
     setLoadingInvoices(true);
-    Promise.all([
-      getReceipts(selectedBranchId || undefined, activeCompanyId),
-      getTaxInvoices(selectedBranchId || undefined, activeCompanyId),
-    ])
-      .then(([receipts, taxInvoices]) => {
+    getTaxInvoices(selectedBranchId || undefined, activeCompanyId)
+      .then((data) => {
         if (!cancelled) {
-          const merged = [
-            ...receipts.map(receiptToDoc),
-            ...taxInvoices.map(taxInvoiceToDoc),
-          ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-          setInvoiceCache((prev) => new Map(prev).set(cacheKey, merged));
+          setInvoiceCache((prev) => new Map(prev).set(cacheKey, data));
         }
       })
-      .catch((error) => console.error('Error loading documents:', error))
+      .catch((error) => console.error('Error loading tax invoices:', error))
       .finally(() => { if (!cancelled) setLoadingInvoices(false); });
 
     return () => { cancelled = true; };
   }, [activeCompanyId, selectedBranchId, cacheKey]);
 
-  // When switching tabs: reload if not cached, reset filters
   const handleTabChange = (companyId: string) => {
     setActiveCompanyId(companyId);
     setSearchQuery('');
     setDateRange(undefined);
-    setCurrentPage(1);
+    resetPagination();
     setSelectedIds(new Set());
   };
 
-  // When branch changes: clear cache so tabs reload
   useEffect(() => {
     setInvoiceCache(new Map());
   }, [selectedBranchId]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, dateRange]);
+    resetPagination();
+  }, [searchQuery, dateRange, resetPagination]);
 
   const invoices = invoiceCache.get(cacheKey) || [];
 
@@ -188,16 +127,16 @@ export default function InvoicesPage() {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      inv.documentNumber.toLowerCase().includes(q) ||
+      inv.taxInvoiceNumber.toLowerCase().includes(q) ||
       inv.customerName.toLowerCase().includes(q) ||
       (inv.customerPhone && inv.customerPhone.includes(q))
     );
   });
 
-  const totalPages = Math.ceil(filteredInvoices.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredInvoices.length / pageSize);
   const paginatedInvoices = filteredInvoices.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   const toggleSelect = (id: string) => {
@@ -236,24 +175,15 @@ export default function InvoicesPage() {
         if (!result?.invoice || !result?.company) continue;
         const { invoice, company, branch } = result;
 
-        const isVatRegistered = company.is_vat_registered;
-        const docType = result.documentType || invoice.documentType || 'receipt';
-        const isTaxInv = docType === 'tax-invoice' || docType === 'tax-invoice-receipt';
+        const docType = result.documentType || 'tax-invoice-receipt';
         const totalAmount = invoice.total_amount || 0;
         const vatAmount = invoice.vat_amount || 0;
         const priceBeforeVat = totalAmount - vatAmount;
-        const showVat = isTaxInv || (isVatRegistered && vatAmount > 0);
         const remaining = totalAmount - (invoice.paid_amount || 0);
-        const showBillingDetails = isTaxInv;
 
-        let documentTitle: string;
-        if (docType === 'tax-invoice') {
-          documentTitle = 'ใบกำกับภาษี / Tax Invoice';
-        } else if (docType === 'tax-invoice-receipt') {
-          documentTitle = 'ใบกำกับภาษี/ใบเสร็จรับเงิน';
-        } else {
-          documentTitle = 'ใบเสร็จรับเงิน / Receipt';
-        }
+        const documentTitle = docType === 'tax-invoice'
+          ? 'ใบกำกับภาษี / Tax Invoice'
+          : 'ใบกำกับภาษี/ใบเสร็จรับเงิน';
 
         const docData: DocumentData = {
           documentType: docType as any,
@@ -273,12 +203,12 @@ export default function InvoicesPage() {
             phone: invoice.customer_phone || undefined,
             email: invoice.customer_email || undefined,
           },
-          billing: showBillingDetails ? {
-            name: invoice.billing_name,
+          billing: {
+            name: invoice.billing_name || invoice.customer_name,
             address: invoice.billing_address ? formatAddress(invoice.billing_address) : undefined,
             taxId: invoice.billing_tax_id || undefined,
             branch: invoice.billing_company_branch || undefined,
-          } : undefined,
+          },
           items: (invoice.items || []).map((item: any) => ({
             description: item.description || item.className,
             studentName: item.studentName,
@@ -290,7 +220,7 @@ export default function InvoicesPage() {
               label: `ส่วนลด / Discount${invoice.discount_type === 'percentage' ? ` (${invoice.discount_value}%)` : ''}`,
               amount: invoice.discount_amount,
             } : undefined,
-            vatBreakdown: showVat ? { priceBeforeVat, vatAmount } : undefined,
+            vatBreakdown: { priceBeforeVat, vatAmount },
             total: totalAmount,
             totalLabel: 'ยอดสุทธิ / Total',
           },
@@ -309,7 +239,7 @@ export default function InvoicesPage() {
       }
 
       if (htmlParts.length > 0) {
-        openPrintWindow(`ใบเสร็จ (${htmlParts.length} ใบ)`, htmlParts.join(''));
+        openPrintWindow(`ใบกำกับภาษี (${htmlParts.length} ใบ)`, htmlParts.join(''));
       }
     } catch (error) {
       console.error('Error bulk printing:', error);
@@ -321,7 +251,7 @@ export default function InvoicesPage() {
   if (loadingCompanies) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">ใบเสร็จ</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">ใบกำกับภาษี</h1>
         <SectionLoading />
       </div>
     );
@@ -330,10 +260,10 @@ export default function InvoicesPage() {
   if (companies.length === 0) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">ใบเสร็จ</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">ใบกำกับภาษี</h1>
         <div className="text-center py-12 text-gray-500">
-          <ReceiptIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-          <p className="text-base">ยังไม่มีบริษัทออกใบเสร็จ</p>
+          <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+          <p className="text-base">ไม่มีบริษัทจด VAT</p>
         </div>
       </div>
     );
@@ -344,7 +274,7 @@ export default function InvoicesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">ใบเสร็จ</h1>
+        <h1 className="text-2xl font-bold text-gray-900">ใบกำกับภาษี</h1>
         <div className="flex items-center gap-3">
           {selectedIds.size > 0 && (
             <Button
@@ -364,7 +294,6 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* Company Tabs */}
       {companies.length > 1 && (
         <div className="flex gap-1 mb-4 border-b">
           {companies.map((c) => (
@@ -373,7 +302,7 @@ export default function InvoicesPage() {
               onClick={() => handleTabChange(c.id)}
               className={`px-4 py-2 text-base font-medium border-b-2 transition-colors ${
                 activeCompanyId === c.id
-                  ? 'border-primary text-primary'
+                  ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
@@ -383,12 +312,11 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="ค้นหาเลขใบเสร็จ, ชื่อลูกค้า, เบอร์โทร..."
+            placeholder="ค้นหาเลขใบกำกับภาษี, ชื่อลูกค้า, เบอร์โทร..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -406,132 +334,211 @@ export default function InvoicesPage() {
         <SectionLoading />
       ) : (
         <>
-          <Card>
-            <CardContent className="p-0">
-              {filteredInvoices.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <ReceiptIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                  <p className="text-base">ไม่พบใบเสร็จ</p>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {/* Header row with select all */}
-                  <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 text-sm text-gray-500">
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                    <span>เลือกทั้งหมด ({filteredInvoices.length} ใบ)</span>
-                  </div>
-                  {paginatedInvoices.map((inv) => (
-                    <div
+          {filteredInvoices.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+              <p className="text-base">ไม่พบใบกำกับภาษี</p>
+            </div>
+          ) : (
+            <>
+              {/* Mobile card view */}
+              <div className="md:hidden space-y-3">
+                {paginatedInvoices.map((inv) => {
+                  const isVoided = inv.status === 'void';
+                  return (
+                    <Card
                       key={inv.id}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      className={`cursor-pointer active:bg-gray-50 transition-colors ${isVoided ? 'opacity-50' : ''}`}
+                      onClick={() => inv.enrollmentId && router.push(`/enrollments/${inv.enrollmentId}`)}
                     >
-                      <Checkbox
-                        checked={selectedIds.has(inv.id)}
-                        onCheckedChange={() => toggleSelect(inv.id)}
-                      />
-                      <div
-                        className="flex items-center justify-between flex-1 min-w-0 cursor-pointer"
-                        onClick={() => inv.enrollmentId && router.push(`/enrollments/${inv.enrollmentId}`)}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-base text-gray-900">
-                              {inv.documentNumber}
-                            </span>
-                            {inv.documentType === 'tax-invoice' || inv.documentType === 'tax-invoice-receipt' ? (
-                              <Badge className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100">ใบกำกับภาษี</Badge>
-                            ) : (
-                              <Badge className="text-xs bg-green-100 text-green-700 hover:bg-green-100">ใบเสร็จ</Badge>
-                            )}
-                            {inv.documentType === 'tax-invoice' && inv.receiptId && (
-                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">ออกทีหลัง</Badge>
-                            )}
-                            {inv.status === 'void' && (
-                              <Badge variant="secondary" className="text-xs">ยกเลิก</Badge>
-                            )}
-                            {inv.status !== 'void' && inv.paidAmount > 0 && inv.paidAmount < inv.totalAmount && (
-                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">จ่ายบางส่วน</Badge>
-                            )}
-                            {inv.status !== 'void' && inv.paidAmount === 0 && inv.totalAmount > 0 && (
-                              <Badge variant="outline" className="text-xs text-red-600 border-red-300">ยังไม่ชำระ</Badge>
-                            )}
-                            {inv.linkedCreditNotes && inv.linkedCreditNotes.some(cn => cn.status !== 'void') && (
-                              <Badge variant="outline" className="text-xs text-red-600 border-red-300 bg-red-50">มี CN</Badge>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`font-semibold text-base ${isVoided ? 'text-gray-400 line-through' : 'text-blue-700'}`}>
+                                {inv.taxInvoiceNumber}
+                              </span>
+                              {inv.receiptId && (
+                                <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">ออกทีหลัง</Badge>
+                              )}
+                              {isVoided && inv.voidedById && (
+                                <Badge variant="secondary" className="text-xs">ยกเลิก (ออกใหม่)</Badge>
+                              )}
+                              {isVoided && !inv.voidedById && (
+                                <Badge variant="secondary" className="text-xs">ยกเลิก</Badge>
+                              )}
+                              {inv.replacesId && (
+                                <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">แทนใบเดิม</Badge>
+                              )}
+                              {!isVoided && inv.paidAmount > 0 && inv.paidAmount < inv.totalAmount && (
+                                <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">จ่ายบางส่วน</Badge>
+                              )}
+                              </div>
+                            <p className="text-sm text-gray-700 mt-1">{inv.customerName}</p>
+                            <p className="text-sm text-gray-400 mt-0.5">
+                              {formatDate(inv.issuedAt || inv.createdAt, 'short')}
+                            </p>
+                            {inv.linkedCreditNotes && inv.linkedCreditNotes.filter(cn => cn.status !== 'void').length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {inv.linkedCreditNotes.filter(cn => cn.status !== 'void').map(cn => (
+                                  <span
+                                    key={cn.id}
+                                    className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 cursor-pointer hover:bg-red-100 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      router.push('/accounting/credit-notes');
+                                    }}
+                                  >
+                                    CN: {cn.creditNoteNumber} (-{formatCurrency(cn.refundAmount)})
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                            <span>{inv.customerName}</span>
-                            {inv.customerPhone && <span>{inv.customerPhone}</span>}
-                            <span>{formatDate(inv.issuedAt || inv.createdAt, 'short')}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
+                          <div className="text-right shrink-0">
                             <div className="font-semibold text-base">{formatCurrency(inv.totalAmount)}</div>
                             {inv.paidAmount < inv.totalAmount && (
                               <div className="text-xs text-red-500">
                                 ค้าง {formatCurrency(inv.totalAmount - inv.paidAmount)}
                               </div>
                             )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                print.printReceipt(inv.id);
+                              }}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPrintInvoiceId(inv.id);
-                            }}
-                          >
-                            <Printer className="h-4 w-4" />
-                          </Button>
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-sm text-gray-500">
-                หน้า {currentPage} / {totalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => p - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
-            </div>
+
+              {/* Desktop list view */}
+              <div className="hidden md:block">
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 text-sm text-gray-500">
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                        <span>เลือกทั้งหมด ({filteredInvoices.length} ใบ)</span>
+                      </div>
+                      {paginatedInvoices.map((inv) => {
+                        const isVoided = inv.status === 'void';
+                        const isReissued = inv.receiptId ? 'tax-invoice' : 'tax-invoice-receipt';
+                        return (
+                        <div
+                          key={inv.id}
+                          className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${isVoided ? 'opacity-50' : ''}`}
+                        >
+                          <Checkbox
+                            checked={selectedIds.has(inv.id)}
+                            onCheckedChange={() => toggleSelect(inv.id)}
+                          />
+                          <div
+                            className="flex items-center justify-between flex-1 min-w-0 cursor-pointer"
+                            onClick={() => inv.enrollmentId && router.push(`/enrollments/${inv.enrollmentId}`)}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`font-semibold text-base ${isVoided ? 'text-gray-400 line-through' : 'text-blue-700'}`}>
+                                  {inv.taxInvoiceNumber}
+                                </span>
+                                {isReissued === 'tax-invoice' && (
+                                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">ออกทีหลัง</Badge>
+                                )}
+                                {isVoided && inv.voidedById && (
+                                  <Badge variant="secondary" className="text-xs">ยกเลิก (ออกใหม่)</Badge>
+                                )}
+                                {isVoided && !inv.voidedById && (
+                                  <Badge variant="secondary" className="text-xs">ยกเลิก</Badge>
+                                )}
+                                {inv.replacesId && (
+                                  <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">แทนใบเดิม</Badge>
+                                )}
+                                {!isVoided && inv.paidAmount > 0 && inv.paidAmount < inv.totalAmount && (
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">จ่ายบางส่วน</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                                <span>{inv.customerName}</span>
+                                {inv.customerPhone && <span>{inv.customerPhone}</span>}
+                                <span>{formatDate(inv.issuedAt || inv.createdAt, 'short')}</span>
+                              </div>
+                              {inv.linkedCreditNotes && inv.linkedCreditNotes.filter(cn => cn.status !== 'void').length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {inv.linkedCreditNotes.filter(cn => cn.status !== 'void').map(cn => (
+                                    <span
+                                      key={cn.id}
+                                      className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 cursor-pointer hover:bg-red-100 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push('/accounting/credit-notes');
+                                      }}
+                                    >
+                                      CN: {cn.creditNoteNumber} (-{formatCurrency(cn.refundAmount)})
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <div className="font-semibold text-base">{formatCurrency(inv.totalAmount)}</div>
+                                {inv.paidAmount < inv.totalAmount && (
+                                  <div className="text-xs text-red-500">
+                                    ค้าง {formatCurrency(inv.totalAmount - inv.paidAmount)}
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  print.printReceipt(inv.id);
+                                }}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+
+          {filteredInvoices.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={filteredInvoices.length}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              pageSizeOptions={[20, 50, 100]}
+              showFirstLastButtons={false}
+            />
           )}
         </>
       )}
 
-      {printInvoiceId && (
-        <ReceiptPrintDialog
-          open={!!printInvoiceId}
-          onOpenChange={(open) => !open && setPrintInvoiceId(null)}
-          invoiceId={printInvoiceId}
-        />
-      )}
+      <PrintDialogs print={print} />
     </div>
   );
 }

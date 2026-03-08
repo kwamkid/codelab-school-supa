@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from '@/components/ui/skeleton';
+import { SectionLoading } from '@/components/ui/loading';
 
 // Cache key constants
 const QUERY_KEYS = {
@@ -148,54 +148,7 @@ export default function TeachingMaterialsPage() {
   const isLoading = loadingSubjects || loadingCounts;
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        {/* Header Skeleton */}
-        <div>
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-5 w-96" />
-        </div>
-
-        {/* Filters Skeleton */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-3">
-              <Skeleton className="h-10 w-full md:w-[200px]" />
-              <Skeleton className="h-10 flex-1" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Content Skeleton */}
-        <div className="space-y-6">
-          {[...Array(3)].map((_, categoryIndex) => (
-            <div key={categoryIndex}>
-              <Skeleton className="h-6 w-32 mb-3" />
-              <div className="space-y-2">
-                {[...Array(3)].map((_, itemIndex) => (
-                  <Card key={itemIndex}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-4">
-                        <Skeleton className="h-20 w-20 rounded-lg" />
-                        <div className="flex-1">
-                          <Skeleton className="h-6 w-48 mb-2" />
-                          <Skeleton className="h-4 w-32 mb-2" />
-                          <Skeleton className="h-4 w-full" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Skeleton className="h-6 w-20" />
-                          <Skeleton className="h-9 w-24" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <SectionLoading />;
   }
 
   return (

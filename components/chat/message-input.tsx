@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, KeyboardEvent } from 'react';
+import { useState, useRef, useCallback, KeyboardEvent, useEffect } from 'react';
 import { Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,20 @@ import { Button } from '@/components/ui/button';
 interface MessageInputProps {
   onSend: (content: string) => void;
   disabled?: boolean;
+  /** Keep focus after send for rapid typing */
+  autoFocus?: boolean;
 }
 
-export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
+export function MessageInput({ onSend, disabled = false, autoFocus = true }: MessageInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus when enabled
+  useEffect(() => {
+    if (autoFocus && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [autoFocus]);
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
@@ -22,6 +31,8 @@ export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
+      // Re-focus immediately for next message
+      textareaRef.current.focus();
     }
   }, [value, disabled, onSend]);
 

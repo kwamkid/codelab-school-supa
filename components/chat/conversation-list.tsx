@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SectionLoading } from '@/components/ui/loading';
 import { ChatConversation, Branch } from '@/types/models';
 import { ConversationItem } from './conversation-item';
 import { ConversationFilters, ChatFilters, DEFAULT_FILTERS } from './conversation-filters';
@@ -82,16 +82,29 @@ export default function ConversationList({
       result = result.filter((c) => c.unreadCount > 0);
     }
 
-    // Search filter
+    // Search filter — match name, phone, tags, last message
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter((c) => {
         const name = c.contact?.displayName?.toLowerCase() || '';
         const preview = c.lastMessagePreview?.toLowerCase() || '';
         const phone = c.contact?.phone?.toLowerCase() || '';
-        return name.includes(q) || preview.includes(q) || phone.includes(q);
+        const tags = c.contact?.tags?.join(' ').toLowerCase() || '';
+        return name.includes(q) || preview.includes(q) || phone.includes(q) || tags.includes(q);
       });
     }
+
+    // Sort: unread first, then by last message time descending
+    result = [...result].sort((a, b) => {
+      // Unread conversations first
+      const aUnread = a.unreadCount > 0 ? 1 : 0;
+      const bUnread = b.unreadCount > 0 ? 1 : 0;
+      if (aUnread !== bUnread) return bUnread - aUnread;
+      // Then by timestamp descending
+      const aTime = a.lastMessageAt?.getTime() || 0;
+      const bTime = b.lastMessageAt?.getTime() || 0;
+      return bTime - aTime;
+    });
 
     return result;
   }, [conversations, filters, search]);
@@ -103,7 +116,7 @@ export default function ConversationList({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="ค้นหาแชท..."
+            placeholder="ค้นหาชื่อ, เบอร์, แท็ก..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 text-base"
@@ -122,17 +135,7 @@ export default function ConversationList({
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4 space-y-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <Skeleton className="w-10 h-10 rounded-full shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <SectionLoading />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
             <Search className="w-10 h-10 mb-3" />
@@ -150,6 +153,7 @@ export default function ConversationList({
                 conversation={conversation}
                 isActive={conversation.id === activeId}
                 onClick={() => onSelect(conversation.id)}
+                branches={branches}
               />
             ))}
           </div>

@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
       let displayName: string | undefined;
       let avatarUrl: string | undefined;
       let senderName: string | undefined;
+      let senderAvatarUrl: string | undefined;
       let memberCount: number | undefined;
 
       if (accessToken) {
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
               avatarUrl = gp.pictureUrl;
               memberCount = gp.memberCount;
             }
-            // Get individual sender's name within the group
+            // Get individual sender's profile within the group
             if (userId) {
               const memberRes = await fetch(
                 `https://api.line.me/v2/bot/group/${groupId}/member/${userId}`,
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
               if (memberRes.ok) {
                 const mp = await memberRes.json();
                 senderName = mp.displayName;
+                senderAvatarUrl = mp.pictureUrl;
               }
             }
           } else if (sourceType === 'room' && roomId) {
@@ -108,6 +110,7 @@ export async function POST(request: NextRequest) {
               if (memberRes.ok) {
                 const mp = await memberRes.json();
                 senderName = mp.displayName;
+                senderAvatarUrl = mp.pictureUrl;
               }
             }
           } else if (userId) {
@@ -180,6 +183,7 @@ export async function POST(request: NextRequest) {
         platformUserId: contactPlatformId,
         senderName: senderName || displayName,
         senderAvatar: isGroup ? undefined : avatarUrl,
+        senderAvatarUrl: isGroup ? senderAvatarUrl : avatarUrl,
         messageType,
         content,
         mediaUrl,

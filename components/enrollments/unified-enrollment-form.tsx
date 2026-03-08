@@ -13,7 +13,8 @@ import { processUnifiedEnrollment } from '@/lib/services/unified-enrollment';
 import { getTrialBooking, getTrialSessionsByBooking } from '@/lib/services/trial-bookings';
 import { useAuth } from '@/hooks/useAuth';
 import { useBranch } from '@/contexts/BranchContext';
-import ReceiptPrintDialog from '@/components/invoices/receipt-print-dialog';
+import { useDocumentPrint } from '@/hooks/useDocumentPrint';
+import PrintDialogs from '@/components/shared/print-dialogs';
 
 const STEP_LABELS = [
   'ประเภท',
@@ -31,8 +32,7 @@ export default function UnifiedEnrollmentForm() {
   const [formData, setFormData] = useState<UnifiedFormData>({ ...DEFAULT_FORM_DATA });
   const [submitting, setSubmitting] = useState(false);
   const submitGuardRef = useRef(false);
-  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
-  const [printInvoiceId, setPrintInvoiceId] = useState<string>('');
+  const print = useDocumentPrint();
   const [successEnrollmentId, setSuccessEnrollmentId] = useState<string>('');
 
   // Check URL params for trial source
@@ -175,8 +175,8 @@ export default function UnifiedEnrollmentForm() {
 
       // If invoice was created, show receipt dialog first
       if (result.invoiceId) {
-        setPrintInvoiceId(result.invoiceId);
-        setShowReceiptDialog(true);
+        print.printReceipt(result.invoiceId);
+
         return; // Don't navigate yet - will navigate when dialog closes
       }
 
@@ -196,7 +196,7 @@ export default function UnifiedEnrollmentForm() {
   };
 
   const handleReceiptClose = () => {
-    setShowReceiptDialog(false);
+    print.closeReceiptDialog();
     if (successEnrollmentId) {
       router.push(`/enrollments/${successEnrollmentId}`);
     } else {
@@ -255,13 +255,8 @@ export default function UnifiedEnrollmentForm() {
           submitting={submitting}
         />
       )}
-      {/* Receipt Print Dialog */}
-      <ReceiptPrintDialog
-        open={showReceiptDialog}
-        onOpenChange={setShowReceiptDialog}
-        invoiceId={printInvoiceId}
-        onClose={handleReceiptClose}
-      />
+      {/* Print Dialogs (shared) */}
+      <PrintDialogs print={print} onReceiptClose={handleReceiptClose} />
     </div>
   );
 }

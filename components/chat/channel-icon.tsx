@@ -11,53 +11,29 @@ interface ChannelIconProps {
 }
 
 const sizeMap = {
-  sm: 'w-4 h-4 text-[8px]',
-  md: 'w-6 h-6 text-[10px]',
-  lg: 'w-8 h-8 text-xs',
+  sm: 'w-4 h-4',
+  md: 'w-6 h-6',
+  lg: 'w-8 h-8',
+};
+
+const iconSrc: Record<string, string> = {
+  line: '/social/line_oa.svg',
+  facebook: '/social/facebook.svg',
+  instagram: '/social/instagram.svg',
 };
 
 export function ChannelIcon({ type, size = 'md', className }: ChannelIconProps) {
   const sizeClasses = sizeMap[size];
+  const src = iconSrc[type];
 
-  if (type === 'line') {
+  if (src) {
     return (
-      <div
-        className={cn(
-          'flex items-center justify-center rounded-full bg-[#06C755] text-white font-bold',
-          sizeClasses,
-          className
-        )}
-      >
-        <span className="leading-none">L</span>
-      </div>
-    );
-  }
-
-  if (type === 'facebook') {
-    return (
-      <div
-        className={cn(
-          'flex items-center justify-center rounded-full bg-[#0084FF] text-white font-bold',
-          sizeClasses,
-          className
-        )}
-      >
-        <span className="leading-none">M</span>
-      </div>
-    );
-  }
-
-  if (type === 'instagram') {
-    return (
-      <div
-        className={cn(
-          'flex items-center justify-center rounded-full bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-white font-bold',
-          sizeClasses,
-          className
-        )}
-      >
-        <span className="leading-none">IG</span>
-      </div>
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={type}
+        className={cn(sizeClasses, 'rounded-full shrink-0', className)}
+      />
     );
   }
 

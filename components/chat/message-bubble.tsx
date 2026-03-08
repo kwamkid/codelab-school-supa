@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { ChatMessage } from '@/types/models';
-import { FileIcon, Download, Play } from 'lucide-react';
+import { FileIcon, Download, Clock, AlertCircle } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -29,7 +29,6 @@ function formatFileSize(bytes?: number): string {
 /** Resolve media URL — LINE content URLs need proxy, others pass through */
 function resolveMediaUrl(url: string | undefined, channelId?: string): string | undefined {
   if (!url) return undefined;
-  // LINE content URLs require auth — proxy through our API
   if (url.includes('api-data.line.me') && channelId) {
     return `/api/admin/chat/media?url=${encodeURIComponent(url)}&channelId=${encodeURIComponent(channelId)}`;
   }
@@ -47,6 +46,9 @@ export function MessageBubble({ message, showSenderName = false, channelId }: Me
   const isOutbound = message.direction === 'outbound';
   const isSystem = message.senderType === 'system';
   const mediaUrl = resolveMediaUrl(message.mediaUrl, channelId);
+  const time = formatMessageTime(message.createdAt);
+  const isPending = message.status === 'pending';
+  const isFailed = message.status === 'failed';
 
   // System messages
   if (isSystem) {
@@ -59,163 +61,181 @@ export function MessageBubble({ message, showSenderName = false, channelId }: Me
     );
   }
 
-  // Image messages
+  // Shared timestamp element — displayed beside the bubble
+  const timeEl = (
+    <div className={cn(
+      'flex items-center gap-0.5 shrink-0 self-end pb-1',
+      isOutbound && 'flex-row-reverse'
+    )}>
+      <span className="text-[11px] leading-none text-gray-400 dark:text-gray-500 whitespace-nowrap">
+        {time}
+      </span>
+      {isPending && <Clock className="w-3 h-3 text-gray-400" />}
+      {isFailed && <AlertCircle className="w-3 h-3 text-red-400" />}
+    </div>
+  );
+
+  // Sender name (for inbound group messages)
+  const senderNameEl = isInbound && showSenderName && message.senderName ? (
+    <span className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 ml-1">{message.senderName}</span>
+  ) : null;
+
+  // Outer wrapper classes
+  const wrapperCls = cn(
+    'flex flex-col max-w-[70vw] md:max-w-[min(65vw,400px)]',
+    isOutbound ? 'ml-auto items-end' : 'items-start'
+  );
+
+  // Inner content row: [bubble][time] for inbound, [time][bubble] for outbound
+  const rowCls = cn('flex items-end gap-1.5', isOutbound && 'flex-row-reverse');
+
+  // ── Image ──
   if (message.messageType === 'image' && mediaUrl) {
     return (
-      <div className={cn('flex flex-col max-w-[75vw] md:max-w-[min(70vw,400px)]', isOutbound ? 'ml-auto items-end' : 'items-start')}>
-        {isInbound && showSenderName && message.senderName && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-1">{message.senderName}</span>
-        )}
-        <a
-          href={mediaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            'block rounded-2xl overflow-hidden cursor-pointer',
-            isOutbound ? 'rounded-br-md' : 'rounded-bl-md'
-          )}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={mediaUrl}
-            alt="รูปภาพ"
-            className="max-w-full h-auto rounded-2xl"
-            loading="lazy"
-          />
-        </a>
-        <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 mx-1">
-          {formatMessageTime(message.createdAt)}
-        </span>
+      <div className={wrapperCls}>
+        {senderNameEl}
+        <div className={rowCls}>
+          <a
+            href={mediaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'block rounded-2xl overflow-hidden cursor-pointer',
+              isOutbound ? 'rounded-br-md' : 'rounded-bl-md'
+            )}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={mediaUrl}
+              alt="รูปภาพ"
+              className="max-w-full max-h-[300px] h-auto rounded-2xl object-cover"
+              loading="lazy"
+            />
+          </a>
+          {timeEl}
+        </div>
       </div>
     );
   }
 
-  // Video messages — stream via proxy, don't preload to save bandwidth
+  // ── Video ──
   if (message.messageType === 'video' && mediaUrl) {
     return (
-      <div className={cn('flex flex-col max-w-[75vw] md:max-w-[min(70vw,400px)]', isOutbound ? 'ml-auto items-end' : 'items-start')}>
-        {isInbound && showSenderName && message.senderName && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-1">{message.senderName}</span>
-        )}
-        <div className={cn('rounded-2xl overflow-hidden', isOutbound ? 'rounded-br-md' : 'rounded-bl-md')}>
-          <video
-            src={mediaUrl}
-            controls
-            preload="none"
-            className="max-w-full h-auto rounded-2xl"
-            poster=""
-          >
-            <a href={mediaUrl} target="_blank" rel="noopener noreferrer">ดูวิดีโอ</a>
-          </video>
+      <div className={wrapperCls}>
+        {senderNameEl}
+        <div className={rowCls}>
+          <div className={cn('rounded-2xl overflow-hidden', isOutbound ? 'rounded-br-md' : 'rounded-bl-md')}>
+            <video
+              src={mediaUrl}
+              controls
+              preload="none"
+              className="max-w-full h-auto rounded-2xl"
+              poster=""
+            >
+              <a href={mediaUrl} target="_blank" rel="noopener noreferrer">ดูวิดีโอ</a>
+            </video>
+          </div>
+          {timeEl}
         </div>
-        <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 mx-1">
-          {formatMessageTime(message.createdAt)}
-        </span>
       </div>
     );
   }
 
-  // Audio messages
+  // ── Audio ──
   if (message.messageType === 'audio' && mediaUrl) {
     return (
-      <div className={cn('flex flex-col max-w-[75vw] md:max-w-[min(70vw,400px)]', isOutbound ? 'ml-auto items-end' : 'items-start')}>
-        {isInbound && showSenderName && message.senderName && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-1">{message.senderName}</span>
-        )}
-        <div className={cn(
-          'px-3 py-2 md:px-4 md:py-2.5 rounded-2xl',
-          isInbound && 'bg-gray-100 dark:bg-slate-700 rounded-bl-md',
-          isOutbound && 'bg-blue-500 rounded-br-md',
-        )}>
-          <audio src={mediaUrl} controls preload="none" className="max-w-full h-8" />
+      <div className={wrapperCls}>
+        {senderNameEl}
+        <div className={rowCls}>
+          <div className={cn(
+            'px-3 py-2 rounded-2xl',
+            isInbound && 'bg-gray-100 dark:bg-slate-700 rounded-bl-md',
+            isOutbound && 'bg-blue-500 rounded-br-md',
+          )}>
+            <audio src={mediaUrl} controls preload="none" className="max-w-full h-8" />
+          </div>
+          {timeEl}
         </div>
-        <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 mx-1">
-          {formatMessageTime(message.createdAt)}
-        </span>
       </div>
     );
   }
 
-  // File messages
+  // ── File ──
   if (message.messageType === 'file' && mediaUrl) {
     const fileName = message.mediaMetadata?.fileName || message.metadata?.fileName || 'ไฟล์';
     const fileSize = message.mediaMetadata?.fileSize || message.metadata?.fileSize;
     return (
-      <div className={cn('flex flex-col max-w-[75vw] md:max-w-[min(70vw,400px)]', isOutbound ? 'ml-auto items-end' : 'items-start')}>
-        {isInbound && showSenderName && message.senderName && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-1">{message.senderName}</span>
-        )}
-        <a
-          href={mediaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            'flex items-center gap-3 px-3 py-2 md:px-4 md:py-2.5 rounded-2xl no-underline',
-            isInbound && 'bg-gray-100 dark:bg-slate-700 rounded-bl-md',
-            isOutbound && 'bg-blue-500 rounded-br-md',
-          )}
-        >
-          <FileIcon className={cn('w-5 h-5 shrink-0', isOutbound ? 'text-white/80' : 'text-gray-400')} />
-          <div className="flex-1 min-w-0">
-            <p className={cn('text-sm font-medium truncate', isOutbound ? 'text-white' : 'text-gray-900 dark:text-white')}>
-              {fileName}
-            </p>
-            {fileSize && (
-              <p className={cn('text-xs', isOutbound ? 'text-white/70' : 'text-gray-400 dark:text-gray-500')}>
-                {formatFileSize(fileSize)}
-              </p>
+      <div className={wrapperCls}>
+        {senderNameEl}
+        <div className={rowCls}>
+          <a
+            href={mediaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 md:px-4 md:py-2.5 rounded-2xl no-underline',
+              isInbound && 'bg-gray-100 dark:bg-slate-700 rounded-bl-md',
+              isOutbound && 'bg-blue-500 rounded-br-md',
             )}
-          </div>
-          <Download className={cn('w-4 h-4 shrink-0', isOutbound ? 'text-white/80' : 'text-gray-400')} />
-        </a>
-        <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 mx-1">
-          {formatMessageTime(message.createdAt)}
-        </span>
+          >
+            <FileIcon className={cn('w-5 h-5 shrink-0', isOutbound ? 'text-white/80' : 'text-gray-400')} />
+            <div className="flex-1 min-w-0">
+              <p className={cn('text-sm font-medium truncate', isOutbound ? 'text-white' : 'text-gray-900 dark:text-white')}>
+                {fileName}
+              </p>
+              {fileSize && (
+                <p className={cn('text-xs', isOutbound ? 'text-white/70' : 'text-gray-400 dark:text-gray-500')}>
+                  {formatFileSize(fileSize)}
+                </p>
+              )}
+            </div>
+            <Download className={cn('w-4 h-4 shrink-0', isOutbound ? 'text-white/80' : 'text-gray-400')} />
+          </a>
+          {timeEl}
+        </div>
       </div>
     );
   }
 
-  // Sticker messages
+  // ── Sticker ──
   if (message.messageType === 'sticker') {
     const stickerUrl = getStickerUrl(message.metadata) || resolveMediaUrl(message.mediaUrl, channelId) || message.metadata?.stickerImageUrl;
     return (
       <div className={cn('flex flex-col max-w-[200px]', isOutbound ? 'ml-auto items-end' : 'items-start')}>
-        {isInbound && showSenderName && message.senderName && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-1">{message.senderName}</span>
-        )}
-        {stickerUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={stickerUrl} alt="สติกเกอร์" className="w-24 h-24 object-contain" loading="lazy" />
-        ) : (
-          <div className="text-4xl p-2">
-            {message.content || '🏷️'}
-          </div>
-        )}
-        <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 mx-1">
-          {formatMessageTime(message.createdAt)}
-        </span>
+        {senderNameEl}
+        <div className={rowCls}>
+          {stickerUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={stickerUrl} alt="สติกเกอร์" className="w-24 h-24 object-contain" loading="lazy" />
+          ) : (
+            <div className="text-4xl p-2">
+              {message.content || '🏷️'}
+            </div>
+          )}
+          {timeEl}
+        </div>
       </div>
     );
   }
 
-  // Text messages (default)
+  // ── Text (default) ──
   return (
-    <div className={cn('flex flex-col max-w-[75vw] md:max-w-[min(70vw,400px)]', isOutbound ? 'ml-auto items-end' : 'items-start')}>
-      {isInbound && showSenderName && message.senderName && (
-        <span className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-1">{message.senderName}</span>
-      )}
-      <div
-        className={cn(
-          'px-3 py-1.5 md:px-4 md:py-2.5 rounded-2xl text-base whitespace-pre-wrap break-words font-[family-name:var(--font-chat)]',
-          isInbound && 'bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-bl-md',
-          isOutbound && 'bg-blue-500 text-white rounded-br-md'
-        )}
-      >
-        {message.content}
+    <div className={wrapperCls}>
+      {senderNameEl}
+      <div className={rowCls}>
+        <div
+          className={cn(
+            'px-3 py-1.5 md:px-4 md:py-2.5 rounded-2xl text-base whitespace-pre-wrap break-words min-w-0 font-[family-name:var(--font-chat)]',
+            isInbound && 'bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-bl-md',
+            isOutbound && !isFailed && 'bg-blue-500 text-white rounded-br-md',
+            isOutbound && isFailed && 'bg-red-400 text-white rounded-br-md',
+            isPending && 'opacity-70'
+          )}
+        >
+          {message.content}
+        </div>
+        {timeEl}
       </div>
-      <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 mx-1">
-        {formatMessageTime(message.createdAt)}
-      </span>
     </div>
   );
 }

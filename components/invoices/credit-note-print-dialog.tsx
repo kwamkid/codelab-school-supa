@@ -62,15 +62,21 @@ export default function CreditNotePrintDialog({
       const vatAmount = creditNote.vat_amount || 0;
       const priceBeforeVat = refundAmount - vatAmount;
       const showVat = vatAmount > 0;
+      const isRefundNote = creditNote.document_type === 'refund-note';
 
-      const documentTitle = showVat
-        ? 'ใบลดหนี้/ใบกำกับภาษี'
-        : 'ใบลดหนี้ / Credit Note';
+      let documentTitle: string;
+      if (isRefundNote) {
+        documentTitle = 'ใบบันทึกคืนเงิน / Refund Note';
+      } else if (showVat) {
+        documentTitle = 'ใบลดหนี้/ใบกำกับภาษี';
+      } else {
+        documentTitle = 'ใบลดหนี้ / Credit Note';
+      }
 
-      const showBillingDetails = creditNote.billing_tax_id || creditNote.billing_type === 'company';
+      const showBillingDetails = !isRefundNote && (creditNote.billing_tax_id || creditNote.billing_type === 'company');
 
       const docData: DocumentData = {
-        documentType: showVat ? 'credit-note-tax' : 'credit-note',
+        documentType: isRefundNote ? 'refund-note' : (showVat ? 'credit-note-tax' : 'credit-note'),
         documentTitle,
         company: {
           name: company.name || '-',
@@ -84,7 +90,7 @@ export default function CreditNotePrintDialog({
         documentNumber: creditNote.credit_note_number,
         documentDate: formatDate(creditNote.issued_date || creditNote.created_at, 'long'),
         reference: originalInvoice ? {
-          label: 'เอกสารอ้างอิง / Reference Document',
+          label: isRefundNote ? 'ใบเสร็จอ้างอิง / Reference Receipt' : 'เอกสารอ้างอิง / Reference Document',
           number: originalInvoice.invoice_number,
           date: formatDate(originalInvoice.issued_at, 'long'),
         } : undefined,
@@ -113,7 +119,7 @@ export default function CreditNotePrintDialog({
         },
         reason: creditNote.reason,
         signatures: {
-          left: { label: 'ผู้ออกใบลดหนี้ / Issuer' },
+          left: { label: isRefundNote ? 'ผู้ออกเอกสาร / Issuer' : 'ผู้ออกใบลดหนี้ / Issuer' },
           right: { label: 'ผู้รับเงินคืน / Recipient' },
         },
       };

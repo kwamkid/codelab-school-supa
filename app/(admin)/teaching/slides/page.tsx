@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from 'sonner';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SectionLoading } from '@/components/ui/loading';
 
 // Cache key constants
 const QUERY_KEYS = {
@@ -120,48 +120,7 @@ export default function TeachingSlidesPage() {
   const isLoading = loadingSubjects || loadingCounts;
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        {/* Header Skeleton */}
-        <div>
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-5 w-48" />
-        </div>
-
-        {/* Filters Skeleton */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-3">
-              <Skeleton className="h-10 w-full md:w-[200px]" />
-              <Skeleton className="h-10 flex-1" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Grid Skeleton */}
-        <div className="space-y-6">
-          {[...Array(2)].map((_, categoryIndex) => (
-            <div key={categoryIndex}>
-              <Skeleton className="h-6 w-32 mb-3" />
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {[...Array(5)].map((_, i) => (
-                  <Card key={i}>
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <Skeleton className="h-8 w-8" />
-                        <Skeleton className="h-5 w-16" />
-                      </div>
-                      <Skeleton className="h-4 w-full mb-1" />
-                      <Skeleton className="h-3 w-2/3" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <SectionLoading />;
   }
 
   return (

@@ -6,7 +6,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 
 export interface DocumentData {
   // Document type
-  documentType: 'receipt' | 'tax-invoice-receipt' | 'credit-note' | 'credit-note-tax';
+  documentType: 'receipt' | 'tax-invoice-receipt' | 'credit-note' | 'credit-note-tax' | 'refund-note';
   documentTitle: string; // e.g. "ใบเสร็จรับเงิน / Receipt"
 
   // Company header
@@ -91,6 +91,7 @@ const THEME_COLORS: Record<string, string> = {
   'tax-invoice': '#2563eb',
   'credit-note': '#dc2626',
   'credit-note-tax': '#dc2626',
+  'refund-note': '#ea580c',
 };
 
 export function generatePrintStyles(): string {

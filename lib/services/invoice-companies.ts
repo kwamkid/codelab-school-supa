@@ -21,6 +21,9 @@ interface InvoiceCompanyRow {
   next_credit_note_number: number;
   current_invoice_month: string;
   current_credit_note_month: string;
+  refund_note_prefix: string;
+  next_refund_note_number: number;
+  current_refund_note_month: string;
   is_vat_registered: boolean;
   is_active: boolean;
   created_at: string;
@@ -45,6 +48,9 @@ function mapToCompany(row: InvoiceCompanyRow): InvoiceCompany {
     nextCreditNoteNumber: row.next_credit_note_number || 1,
     currentInvoiceMonth: row.current_invoice_month || '',
     currentCreditNoteMonth: row.current_credit_note_month || '',
+    refundNotePrefix: row.refund_note_prefix || 'RN',
+    nextRefundNoteNumber: row.next_refund_note_number || 1,
+    currentRefundNoteMonth: row.current_refund_note_month || '',
     isVatRegistered: row.is_vat_registered,
     isActive: row.is_active,
     createdAt: new Date(row.created_at),
@@ -87,6 +93,7 @@ export async function createInvoiceCompany(data: {
   email?: string;
   invoicePrefix?: string;
   taxInvoicePrefix?: string;
+  refundNotePrefix?: string;
   isVatRegistered?: boolean;
 }): Promise<string> {
   const result = await adminMutation<{ id: string }[]>({
@@ -101,6 +108,7 @@ export async function createInvoiceCompany(data: {
       email: data.email || null,
       invoice_prefix: data.invoicePrefix || 'INV',
       tax_invoice_prefix: data.taxInvoicePrefix || 'TAX',
+      refund_note_prefix: data.refundNotePrefix || 'RN',
       is_vat_registered: data.isVatRegistered || false,
     },
     options: { select: 'id', single: true },
@@ -125,6 +133,7 @@ export async function updateInvoiceCompany(
   if (data.email !== undefined) updateData.email = data.email || null;
   if (data.invoicePrefix !== undefined) updateData.invoice_prefix = data.invoicePrefix;
   if (data.taxInvoicePrefix !== undefined) updateData.tax_invoice_prefix = data.taxInvoicePrefix;
+  if (data.refundNotePrefix !== undefined) updateData.refund_note_prefix = data.refundNotePrefix;
   if (data.isVatRegistered !== undefined) updateData.is_vat_registered = data.isVatRegistered;
   if (data.isActive !== undefined) updateData.is_active = data.isActive;
 

@@ -53,7 +53,7 @@ import { cn } from '@/lib/utils';
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import { BranchProvider, useBranch } from '@/contexts/BranchContext';
 import { BranchSelector } from '@/components/layout/branch-selector';
-import { PageLoading } from '@/components/ui/loading';
+import { Loading, PageLoading } from '@/components/ui/loading';
 import { getMakeupClasses } from '@/lib/services/makeup';
 import { getTrialBookings } from '@/lib/services/trial-bookings';
 import { getUnreadNotifications, markNotificationAsRead } from '@/lib/services/notifications';
@@ -89,24 +89,27 @@ const MenuLink = ({ href, children, className, onClick }: MenuLinkProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  
+
   const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // Allow open in new tab (ctrl/cmd+click, middle-click)
+    if (e.ctrlKey || e.metaKey || e.button === 1) return;
+
     e.preventDefault();
-    
+
     // ถ้ากำลังอยู่ที่หน้าเดิมอยู่แล้ว ไม่ต้องทำอะไร
     if (pathname === href) {
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     // Execute onClick if provided
     if (onClick) onClick();
-    
+
     try {
       // Navigate
       await router.push(href);
-      
+
       // Reset loading after navigation
       setTimeout(() => setIsLoading(false), 500);
     } catch (error) {
@@ -114,13 +117,13 @@ const MenuLink = ({ href, children, className, onClick }: MenuLinkProps) => {
       setIsLoading(false);
     }
   };
-  
+
   return (
     <Link href={href} onClick={handleClick} className={className}>
       {isLoading ? (
-        <div className="flex items-center">
+        <div className="flex items-center text-white/70">
           <Loader2 className="mr-3 h-4 w-4 animate-spin" />
-          <span className="opacity-70">กำลังโหลด...</span>
+          <span>กำลังโหลด...</span>
         </div>
       ) : (
         children
@@ -583,16 +586,28 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       requiredRole: ['super_admin', 'branch_admin'],
       subItems: [
         {
-          name: 'ใบเสร็จ',
-          href: '/accounting/invoices',
+          name: 'ใบเสร็จรับเงิน',
+          href: '/accounting/receipts',
           icon: Receipt,
           iconColor: 'text-emerald-500'
+        },
+        {
+          name: 'ใบกำกับภาษี',
+          href: '/accounting/invoices',
+          icon: FileText,
+          iconColor: 'text-blue-500'
         },
         {
           name: 'ใบลดหนี้',
           href: '/accounting/credit-notes',
           icon: CreditCard,
           iconColor: 'text-red-500'
+        },
+        {
+          name: 'ใบบันทึกคืนเงิน',
+          href: '/accounting/refund-notes',
+          icon: CreditCard,
+          iconColor: 'text-orange-500'
         },
       ]
     },
@@ -708,8 +723,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   return (
     <div className="h-[100dvh] overflow-hidden bg-gray-50">
       <div className="flex h-full">
-        {/* Loading overlay */}
-        {navigating && <PageLoading />}
+        {/* Loading overlay — z-[100] to cover sidebar (z-50) */}
+        {navigating && <Loading fullScreen size="lg" className="z-[100]" />}
         
         {/* Mobile menu overlay */}
         {sidebarOpen && (
@@ -722,20 +737,20 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         {/* Sidebar */}
         <div
           className={cn(
-            'fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-lg transition-transform duration-200 ease-in-out lg:static lg:translate-x-0',
+            'fixed inset-y-0 left-0 z-50 w-64 transform bg-[#ef443a] shadow-lg transition-transform duration-200 ease-in-out lg:static lg:translate-x-0',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           )}
         >
           <div className="flex h-full flex-col">
             {/* Logo */}
-            <div className="flex h-16 items-center justify-between px-6 border-b">
+            <div className="flex h-16 items-center justify-between px-6 border-b border-white/20">
               <div className="w-full">
                 <Image
                   src="/logo.svg"
                   alt="CodeLab School"
                   width={150}
                   height={40}
-                  className="w-full max-w-[180px]"
+                  className="w-full max-w-[180px] brightness-0 invert"
                   priority
                 />
               </div>
@@ -743,7 +758,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 onClick={() => setSidebarOpen(false)}
                 className="lg:hidden ml-2"
               >
-                <X className="h-6 w-6 text-gray-500" />
+                <X className="h-6 w-6 text-white/80" />
               </button>
             </div>
 
@@ -755,9 +770,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 return (
                   <div key={item.name} className={item.isDivider ? '' : 'mb-2'}>
                     {item.isDivider ? (
-                      <div className="my-3 border-t border-gray-200">
+                      <div className="my-3 border-t border-white/20">
                         {item.sectionLabel && (
-                          <div className="pt-2 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                          <div className="pt-2 px-3 text-xs font-semibold text-white/60 uppercase tracking-wider">
                             {item.sectionLabel}
                           </div>
                         )}
@@ -769,18 +784,18 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                           className={cn(
                             'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-normal transition-colors',
                             isSubItemActive(item)
-                              ? 'bg-red-50/50 text-red-600'
-                              : 'text-gray-700 hover:bg-gray-50'
+                              ? 'bg-white/20 text-white font-medium'
+                              : 'text-white/80 hover:bg-white/10'
                           )}
                         >
                           <div className="flex items-center">
-                            {ItemIcon && <ItemIcon className={cn("mr-3 h-5 w-5", item.iconColor || 'text-gray-500')} />}
+                            {ItemIcon && <ItemIcon className="mr-3 h-5 w-5 text-white/80" />}
                             {item.name}
                           </div>
                           {expandedItems.includes(item.name) ? (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-4 w-4 text-white/60" />
                           ) : (
-                            <ChevronRight className="h-4 w-4" />
+                            <ChevronRight className="h-4 w-4 text-white/60" />
                           )}
                         </button>
                         {expandedItems.includes(item.name) && (
@@ -795,8 +810,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                                   className={cn(
                                     'flex items-center rounded-lg px-3 py-2 text-base font-normal transition-colors',
                                     isActive(subItem.href)
-                                      ? 'bg-red-50 text-red-600'
-                                      : 'text-gray-600 hover:bg-gray-50'
+                                      ? 'bg-white/20 text-white font-medium'
+                                      : 'text-white/70 hover:bg-white/10'
                                   )}
                                   onClick={() => {
                                     // เช็คว่าถ้ากำลังอยู่ที่หน้านี้อยู่แล้ว ไม่ต้องทำอะไร
@@ -806,7 +821,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                                     }
                                   }}
                                 >
-                                  {SubItemIcon && <SubItemIcon className={cn("mr-3 h-4 w-4", subItem.iconColor || 'text-gray-500')} />}
+                                  {SubItemIcon && <SubItemIcon className="mr-3 h-4 w-4 text-white/70" />}
                                   {subItem.name}
                                 </MenuLink>
                               ) : null;
@@ -820,8 +835,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                         className={cn(
                           'flex items-center rounded-lg px-3 py-2.5 text-base font-normal transition-colors',
                           isActive(item.href)
-                            ? 'bg-red-50/50 text-red-600'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            ? 'bg-white/20 text-white font-medium'
+                            : 'text-white/80 hover:bg-white/10'
                         )}
                         onClick={() => {
                           setSidebarOpen(false);
@@ -830,11 +845,11 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center">
-                            {ItemIcon && <ItemIcon className={cn("mr-3 h-5 w-5", item.iconColor || 'text-gray-500')} />}
+                            {ItemIcon && <ItemIcon className="mr-3 h-5 w-5 text-white/80" />}
                             {item.name}
                           </div>
                           {item.badge && (
-                            <span className="ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-medium text-white bg-red-500 rounded-full">
+                            <span className="ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-bold text-[#ef443a] bg-white rounded-full">
                               {item.badge}
                             </span>
                           )}

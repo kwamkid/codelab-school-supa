@@ -44,7 +44,7 @@ export async function GET(
     .eq('id', creditNote.branch_id)
     .single()
 
-  // Get original tax invoice (if referenced)
+  // Get reference document (tax invoice for credit notes, receipt for refund notes)
   let originalInvoice = null
   if (creditNote.tax_invoice_id) {
     const { data: ti } = await (supabase as any)
@@ -56,6 +56,18 @@ export async function GET(
       originalInvoice = {
         invoice_number: ti.tax_invoice_number,
         issued_at: ti.issued_at,
+      }
+    }
+  } else if (creditNote.receipt_id) {
+    const { data: rec } = await (supabase as any)
+      .from('receipts')
+      .select('receipt_number, issued_at, created_at')
+      .eq('id', creditNote.receipt_id)
+      .single()
+    if (rec) {
+      originalInvoice = {
+        invoice_number: rec.receipt_number,
+        issued_at: rec.issued_at || rec.created_at,
       }
     }
   }

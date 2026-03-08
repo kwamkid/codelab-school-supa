@@ -39,6 +39,7 @@ interface CompanyFormData {
   email: string;
   invoicePrefix: string;
   taxInvoicePrefix: string;
+  refundNotePrefix: string;
   isVatRegistered: boolean;
 }
 
@@ -58,6 +59,7 @@ const DEFAULT_FORM: CompanyFormData = {
   email: '',
   invoicePrefix: 'INV',
   taxInvoicePrefix: 'TAX',
+  refundNotePrefix: 'RN',
   isVatRegistered: false,
 };
 
@@ -102,6 +104,7 @@ export default function InvoiceCompanySettingsPage() {
       email: company.email || '',
       invoicePrefix: company.invoicePrefix || 'INV',
       taxInvoicePrefix: company.taxInvoicePrefix || 'TAX',
+      refundNotePrefix: company.refundNotePrefix || 'RN',
       isVatRegistered: company.isVatRegistered || false,
     });
     setDialogOpen(true);
@@ -125,6 +128,7 @@ export default function InvoiceCompanySettingsPage() {
           email: formData.email || undefined,
           invoicePrefix: formData.invoicePrefix,
           taxInvoicePrefix: formData.taxInvoicePrefix,
+          refundNotePrefix: formData.refundNotePrefix,
           isVatRegistered: formData.isVatRegistered,
         });
         toast.success('อัปเดตข้อมูลบริษัทเรียบร้อย');
@@ -138,6 +142,7 @@ export default function InvoiceCompanySettingsPage() {
           email: formData.email || undefined,
           invoicePrefix: formData.invoicePrefix,
           taxInvoicePrefix: formData.taxInvoicePrefix,
+          refundNotePrefix: formData.refundNotePrefix,
           isVatRegistered: formData.isVatRegistered,
         });
         toast.success('เพิ่มบริษัทใหม่เรียบร้อย');
@@ -354,6 +359,19 @@ export default function InvoiceCompanySettingsPage() {
                   </p>
                 </div>
               )}
+              <div>
+                <Label className="text-base">Prefix ใบคืนเงิน</Label>
+                <Input
+                  value={formData.refundNotePrefix}
+                  onChange={e => setFormData(prev => ({ ...prev, refundNotePrefix: e.target.value.toUpperCase() }))}
+                  placeholder="RN"
+                  className="text-base"
+                  maxLength={10}
+                />
+                <p className="text-sm text-gray-400 mt-1">
+                  เช่น {formData.refundNotePrefix || 'RN'}-2603-0001
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-3 border rounded-lg p-3">

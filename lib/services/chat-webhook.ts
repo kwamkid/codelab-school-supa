@@ -108,6 +108,7 @@ export async function processInboundMessage(params: {
   platformUserId: string;
   senderName?: string;
   senderAvatar?: string;
+  senderAvatarUrl?: string;
   messageType: string;
   content?: string;
   mediaUrl?: string;
@@ -161,6 +162,7 @@ export async function processInboundMessage(params: {
       sender_type: 'contact',
       sender_id: params.senderId || params.platformUserId,
       sender_name: params.senderName || null,
+      sender_avatar_url: params.senderAvatarUrl || null,
       message_type: params.messageType,
       content: params.content || null,
       media_url: params.mediaUrl || null,

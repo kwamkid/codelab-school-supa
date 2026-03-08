@@ -79,11 +79,13 @@ import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 import { Receipt } from '@/types/models';
 import { createReceipt } from '@/lib/services/receipts';
+import { createTaxInvoiceReceipt } from '@/lib/services/tax-invoices';
 import { adminMutation } from '@/lib/admin-mutation';
-import ReceiptPrintDialog from '@/components/invoices/receipt-print-dialog';
-import CreditNotePrintDialog from '@/components/invoices/credit-note-print-dialog';
 import IssueCreditNoteDialog from '@/components/invoices/issue-credit-note-dialog';
+import IssueRefundNoteDialog from '@/components/invoices/issue-refund-note-dialog';
 import RequestTaxInvoiceDialog from '@/components/invoices/request-tax-invoice-dialog';
+import { useDocumentPrint } from '@/hooks/useDocumentPrint';
+import PrintDialogs from '@/components/shared/print-dialogs';
 import { getInvoiceCompany } from '@/lib/services/invoice-companies';
 import { InvoiceCompany } from '@/types/models';
 
@@ -155,14 +157,14 @@ export default function EnrollmentDetailPage() {
 
   // Invoice states
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
-  const [printInvoiceId, setPrintInvoiceId] = useState<string>('');
 
   // Credit note states
   const [creditNotes, setCreditNotes] = useState<any[]>([]);
   const [showIssueCNDialog, setShowIssueCNDialog] = useState(false);
-  const [showCNPrintDialog, setShowCNPrintDialog] = useState(false);
-  const [printCNId, setPrintCNId] = useState<string>('');
+  const [showIssueRNDialog, setShowIssueRNDialog] = useState(false);
+
+  // Shared print hook
+  const print = useDocumentPrint();
 
   // Tax invoice request states
   const [invoiceCompany, setInvoiceCompany] = useState<InvoiceCompany | null>(null);
@@ -320,42 +322,77 @@ export default function EnrollmentDetailPage() {
             toast.error('ยกเลิกสำเร็จ แต่ไม่สามารถบันทึกการคืนเงินได้');
           }
 
-          // Also create credit note if tax invoices exist (CN ผูกกับ tax_invoices เท่านั้น)
-          const taxInvs = invoices.filter((d: any) => d.documentType === 'tax-invoice' || d.documentType === 'tax-invoice-receipt');
-          if (taxInvs.length > 0) {
-            try {
-              const { createCreditNote } = await import('@/lib/services/credit-notes');
-              const inv = taxInvs[0];
-              const vatAmount = Math.round((refundAmt - refundAmt / 1.07) * 100) / 100;
-              const docNumber = inv.tax_invoice_number || inv.invoice_number;
-              const cnId = await createCreditNote({
-                invoiceCompanyId: inv.invoice_company_id,
-                taxInvoiceId: inv.id,
-                enrollmentId,
-                branchId: enrollment!.branchId,
-                customerName: inv.customer_name,
-                customerPhone: inv.customer_phone,
-                customerEmail: inv.customer_email,
-                billingType: inv.billing_type,
-                billingName: inv.billing_name,
-                billingAddress: inv.billing_address,
-                billingTaxId: inv.billing_tax_id,
-                billingCompanyBranch: inv.billing_company_branch,
-                items: [{
-                  description: `คืนเงิน${cancelRefundType === 'partial' ? 'บางส่วน' : ''} - ${docNumber}`,
-                  amount: refundAmt,
-                }],
-                refundAmount: refundAmt,
-                vatAmount,
-                reason: cancelReason,
-                refundType: cancelRefundType === 'full' ? 'full' : 'partial',
-                createdBy: adminUser?.id,
-              });
-              setPrintCNId(cnId);
-              setShowCNPrintDialog(true);
-              toast.success('สร้างใบลดหนี้เรียบร้อย');
-            } catch (cnError) {
-              console.error('Error creating credit note:', cnError);
+          // Create refund document
+          const isVat = invoiceCompany?.isVatRegistered || false;
+          if (isVat) {
+            // VAT: create credit note linked to tax invoice
+            const taxInvs = invoices.filter((d: any) => d.documentType === 'tax-invoice' || d.documentType === 'tax-invoice-receipt');
+            if (taxInvs.length > 0) {
+              try {
+                const { createCreditNote } = await import('@/lib/services/credit-notes');
+                const inv = taxInvs[0];
+                const vatAmount = Math.round((refundAmt - refundAmt / 1.07) * 100) / 100;
+                const docNumber = inv.tax_invoice_number || inv.invoice_number;
+                const cnId = await createCreditNote({
+                  invoiceCompanyId: inv.invoice_company_id,
+                  taxInvoiceId: inv.id,
+                  enrollmentId,
+                  branchId: enrollment!.branchId,
+                  customerName: inv.customer_name,
+                  customerPhone: inv.customer_phone,
+                  customerEmail: inv.customer_email,
+                  billingType: inv.billing_type,
+                  billingName: inv.billing_name,
+                  billingAddress: inv.billing_address,
+                  billingTaxId: inv.billing_tax_id,
+                  billingCompanyBranch: inv.billing_company_branch,
+                  items: [{
+                    description: `คืนเงิน${cancelRefundType === 'partial' ? 'บางส่วน' : ''} - ${docNumber}`,
+                    amount: refundAmt,
+                  }],
+                  refundAmount: refundAmt,
+                  vatAmount,
+                  reason: cancelReason,
+                  refundType: cancelRefundType === 'full' ? 'full' : 'partial',
+                  createdBy: adminUser?.id,
+                });
+                print.printCreditNote(cnId);
+                toast.success('สร้างใบลดหนี้เรียบร้อย');
+              } catch (cnError) {
+                console.error('Error creating credit note:', cnError);
+              }
+            }
+          } else {
+            // Non-VAT: create refund note linked to receipt
+            const receipts = invoices.filter((d: any) => d.documentType === 'receipt');
+            if (receipts.length > 0) {
+              try {
+                const { createRefundNote } = await import('@/lib/services/credit-notes');
+                const inv = receipts[0];
+                const docNumber = inv.receipt_number || inv.invoice_number;
+                const rnId = await createRefundNote({
+                  invoiceCompanyId: inv.invoice_company_id,
+                  receiptId: inv.id,
+                  enrollmentId,
+                  branchId: enrollment!.branchId,
+                  customerName: inv.customer_name,
+                  customerPhone: inv.customer_phone,
+                  customerEmail: inv.customer_email,
+                  customerAddress: inv.customer_address,
+                  items: [{
+                    description: `คืนเงิน${cancelRefundType === 'partial' ? 'บางส่วน' : ''} - ${docNumber}`,
+                    amount: refundAmt,
+                  }],
+                  refundAmount: refundAmt,
+                  reason: cancelReason,
+                  refundType: cancelRefundType === 'full' ? 'full' : 'partial',
+                  createdBy: adminUser?.id,
+                });
+                print.printRefundNote(rnId);
+                toast.success('สร้างใบบันทึกคืนเงินเรียบร้อย');
+              } catch (rnError) {
+                console.error('Error creating refund note:', rnError);
+              }
             }
           }
         }
@@ -403,7 +440,7 @@ export default function EnrollmentDetailPage() {
         recordedBy: adminUser?.id,
       });
 
-      // 2. Auto-create receipt for this payment
+      // 2. Auto-create document for this payment
       if (branch?.invoiceCompanyId && enrollment) {
         try {
           const firstDoc = invoices[0];
@@ -414,41 +451,68 @@ export default function EnrollmentDetailPage() {
             : '';
           const parentDisplayName = parent?.displayName || '';
 
-          // Compute VAT if company is VAT registered
           const isVat = invoiceCompany?.isVatRegistered || false;
           const vatAmount = isVat ? Math.round((data.amount - data.amount / 1.07) * 100) / 100 : 0;
           const netSubtotal = isVat ? Math.round((data.amount / 1.07) * 100) / 100 : data.amount;
 
-          await createReceipt({
-            invoiceCompanyId: branch.invoiceCompanyId,
-            enrollmentId,
-            branchId: enrollment.branchId,
-            customerName: parentDisplayName,
-            customerPhone: parent?.phone || undefined,
-            customerEmail: parent?.email || undefined,
-            customerAddress: firstDoc?.customer_address || undefined,
-            customerTaxId: firstDoc?.customer_tax_id || undefined,
-            items: [{
-              description: `ชำระค่าเรียนเพิ่มเติม${refLabel}`,
-              studentName,
-              className,
-              amount: data.amount,
-            }],
-            subtotal: netSubtotal,
-            vatAmount,
-            totalAmount: data.amount,
-            paymentMethod: data.method,
-            paymentType: 'deposit',
-            paidAmount: data.amount,
-            createdBy: adminUser?.id,
-          });
+          if (isVat) {
+            // VAT company: auto-issue ใบกำกับภาษี/ใบเสร็จรับเงิน
+            await createTaxInvoiceReceipt({
+              invoiceCompanyId: branch.invoiceCompanyId,
+              enrollmentId,
+              branchId: enrollment.branchId,
+              customerName: parentDisplayName,
+              customerPhone: parent?.phone || undefined,
+              customerEmail: parent?.email || undefined,
+              customerAddress: firstDoc?.customer_address || undefined,
+              items: [{
+                description: `ชำระค่าเรียน${refLabel}`,
+                studentName,
+                className,
+                amount: data.amount,
+              }],
+              subtotal: netSubtotal,
+              vatAmount,
+              totalAmount: data.amount,
+              paymentMethod: data.method,
+              paymentType: 'deposit',
+              paidAmount: data.amount,
+              createdBy: adminUser?.id,
+            });
+          } else {
+            // Non-VAT company: auto-issue ใบเสร็จรับเงิน
+            await createReceipt({
+              invoiceCompanyId: branch.invoiceCompanyId,
+              enrollmentId,
+              branchId: enrollment.branchId,
+              customerName: parentDisplayName,
+              customerPhone: parent?.phone || undefined,
+              customerEmail: parent?.email || undefined,
+              customerAddress: firstDoc?.customer_address || undefined,
+              customerTaxId: firstDoc?.customer_tax_id || undefined,
+              items: [{
+                description: `ชำระค่าเรียน${refLabel}`,
+                studentName,
+                className,
+                amount: data.amount,
+              }],
+              subtotal: netSubtotal,
+              vatAmount,
+              totalAmount: data.amount,
+              paymentMethod: data.method,
+              paymentType: 'deposit',
+              paidAmount: data.amount,
+              createdBy: adminUser?.id,
+            });
+          }
         } catch (invoiceError) {
-          console.error('Error creating receipt:', invoiceError);
-          toast.error('บันทึกการชำระสำเร็จ แต่ออกใบเสร็จไม่ได้');
+          console.error('Error creating document:', invoiceError);
+          toast.error('บันทึกการชำระสำเร็จ แต่ออกเอกสารไม่ได้');
         }
       }
 
-      toast.success('บันทึกการชำระเงิน + ออกใบเสร็จเรียบร้อย');
+      const docLabel = invoiceCompany?.isVatRegistered ? 'ใบกำกับภาษี/ใบเสร็จ' : 'ใบเสร็จ';
+      toast.success(`บันทึกการชำระเงิน + ออก${docLabel}เรียบร้อย`);
       await loadEnrollmentDetails();
     } catch (error) {
       console.error('Error adding payment:', error);
@@ -474,8 +538,7 @@ export default function EnrollmentDetailPage() {
       toast.error('ไม่พบใบเสร็จ');
       return;
     }
-    setPrintInvoiceId(id);
-    setShowReceiptDialog(true);
+    print.printReceipt(id);
   };
 
   if (loading) {
@@ -508,15 +571,76 @@ export default function EnrollmentDetailPage() {
         </Link>
         
         <div className="flex gap-2">
-          {/* Print Receipt Button */}
-          {invoices.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => handlePrintReceipt()}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              พิมพ์ใบเสร็จ
-            </Button>
+          {/* Print Document Dropdown */}
+          {(invoices.length > 0 || creditNotes.length > 0) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Printer className="h-4 w-4 mr-2" />
+                  พิมพ์เอกสาร
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {/* Tax Invoice / Receipt (VAT) */}
+                {invoices.filter((d: any) => d.documentType === 'tax-invoice-receipt' || d.documentType === 'tax-invoice').length > 0 && (
+                  <>
+                    <DropdownMenuLabel className="text-xs text-gray-500">ใบกำกับภาษี</DropdownMenuLabel>
+                    {invoices
+                      .filter((d: any) => d.documentType === 'tax-invoice-receipt' || d.documentType === 'tax-invoice')
+                      .map((inv: any) => (
+                        <DropdownMenuItem key={inv.id} onClick={() => handlePrintReceipt(inv.id)}>
+                          {inv.documentType === 'tax-invoice-receipt' ? 'ใบกำกับภาษี/ใบเสร็จ' : 'ใบกำกับภาษี'} {inv.invoice_number}
+                        </DropdownMenuItem>
+                      ))
+                    }
+                  </>
+                )}
+                {/* Receipt (non-VAT) */}
+                {invoices.filter((d: any) => d.documentType === 'receipt').length > 0 && (
+                  <>
+                    <DropdownMenuLabel className="text-xs text-gray-500">ใบเสร็จรับเงิน</DropdownMenuLabel>
+                    {invoices
+                      .filter((d: any) => d.documentType === 'receipt')
+                      .map((inv: any) => (
+                        <DropdownMenuItem key={inv.id} onClick={() => handlePrintReceipt(inv.id)}>
+                          ใบเสร็จ {inv.invoice_number}
+                        </DropdownMenuItem>
+                      ))
+                    }
+                  </>
+                )}
+                {/* Credit Notes */}
+                {creditNotes.filter((cn: any) => cn.document_type !== 'refund-note').length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs text-gray-500">ใบลดหนี้</DropdownMenuLabel>
+                    {creditNotes
+                      .filter((cn: any) => cn.document_type !== 'refund-note')
+                      .map((cn: any) => (
+                        <DropdownMenuItem key={cn.id} onClick={() => print.printCreditNote(cn.id)}>
+                          ใบลดหนี้ {cn.credit_note_number}
+                        </DropdownMenuItem>
+                      ))
+                    }
+                  </>
+                )}
+                {/* Refund Notes */}
+                {creditNotes.filter((cn: any) => cn.document_type === 'refund-note').length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs text-gray-500">ใบบันทึกคืนเงิน</DropdownMenuLabel>
+                    {creditNotes
+                      .filter((cn: any) => cn.document_type === 'refund-note')
+                      .map((cn: any) => (
+                        <DropdownMenuItem key={cn.id} onClick={() => print.printCreditNote(cn.id)}>
+                          ใบบันทึกคืนเงิน {cn.credit_note_number}
+                        </DropdownMenuItem>
+                      ))
+                    }
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
 {/* Actions Dropdown */}
@@ -1010,6 +1134,7 @@ export default function EnrollmentDetailPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handlePrintReceipt(inv.id)}
+                              title={isTaxInv ? 'พิมพ์ใบกำกับภาษี' : 'พิมพ์ใบเสร็จ'}
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -1100,11 +1225,11 @@ export default function EnrollmentDetailPage() {
                 </PermissionGuard>
               )}
 
-              {/* Credit Notes */}
-              {creditNotes.length > 0 && (
+              {/* Credit Notes (ใบลดหนี้) */}
+              {creditNotes.filter((cn: any) => cn.document_type !== 'refund-note').length > 0 && (
                 <div className="pt-2 border-t space-y-2">
                   <p className="text-sm font-medium text-red-600">ใบลดหนี้ / Credit Note</p>
-                  {creditNotes.map((cn: any) => (
+                  {creditNotes.filter((cn: any) => cn.document_type !== 'refund-note').map((cn: any) => (
                     <div key={cn.id} className="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -1119,10 +1244,8 @@ export default function EnrollmentDetailPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          setPrintCNId(cn.id);
-                          setShowCNPrintDialog(true);
-                        }}
+                        onClick={() => print.printCreditNote(cn.id)}
+                        title="พิมพ์ใบลดหนี้"
                       >
                         <Printer className="h-4 w-4" />
                       </Button>
@@ -1131,17 +1254,60 @@ export default function EnrollmentDetailPage() {
                 </div>
               )}
 
-              {/* Issue Credit Note Button */}
-              {enrollment.status === 'dropped' && invoices.some((d: any) => d.documentType === 'tax-invoice' || d.documentType === 'tax-invoice-receipt') && (
+              {/* Refund Notes (ใบบันทึกคืนเงิน) */}
+              {creditNotes.filter((cn: any) => cn.document_type === 'refund-note').length > 0 && (
+                <div className="pt-2 border-t space-y-2">
+                  <p className="text-sm font-medium text-orange-600">ใบบันทึกคืนเงิน / Refund Note</p>
+                  {creditNotes.filter((cn: any) => cn.document_type === 'refund-note').map((cn: any) => (
+                    <div key={cn.id} className="flex items-center justify-between bg-orange-50 rounded-lg px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-base text-orange-600">{cn.credit_note_number}</span>
+                          <span className="font-semibold text-base text-orange-600">-{formatCurrency(cn.refund_amount)}</span>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {formatDate(cn.issued_date || cn.created_at, 'short')}
+                          {cn.reason && ` · ${cn.reason}`}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => print.printCreditNote(cn.id)}
+                        title="พิมพ์ใบบันทึกคืนเงิน"
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Issue Credit Note / Refund Note Buttons */}
+              {enrollment.status === 'dropped' && (
                 <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-                  <Button
-                    variant="outline"
-                    className="w-full text-red-600 border-red-300 hover:bg-red-50 text-base"
-                    onClick={() => setShowIssueCNDialog(true)}
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    ออกใบลดหนี้เพิ่ม
-                  </Button>
+                  {/* VAT: ออกใบลดหนี้ */}
+                  {invoices.some((d: any) => d.documentType === 'tax-invoice' || d.documentType === 'tax-invoice-receipt') && (
+                    <Button
+                      variant="outline"
+                      className="w-full text-red-600 border-red-300 hover:bg-red-50 text-base"
+                      onClick={() => setShowIssueCNDialog(true)}
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      ออกใบลดหนี้
+                    </Button>
+                  )}
+                  {/* Non-VAT: ออกใบบันทึกคืนเงิน */}
+                  {invoices.some((d: any) => d.documentType === 'receipt') && (
+                    <Button
+                      variant="outline"
+                      className="w-full text-orange-600 border-orange-300 hover:bg-orange-50 text-base"
+                      onClick={() => setShowIssueRNDialog(true)}
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      ออกใบบันทึกคืนเงิน
+                    </Button>
+                  )}
                 </PermissionGuard>
               )}
             </CardContent>
@@ -1193,12 +1359,8 @@ export default function EnrollmentDetailPage() {
         onSubmit={handleAddPayment}
       />
 
-      {/* Receipt Print Dialog */}
-      <ReceiptPrintDialog
-        open={showReceiptDialog}
-        onOpenChange={setShowReceiptDialog}
-        invoiceId={printInvoiceId}
-      />
+      {/* Print Dialogs (shared) */}
+      <PrintDialogs print={print} />
 
       {/* Issue Credit Note Dialog */}
       <IssueCreditNoteDialog
@@ -1208,17 +1370,22 @@ export default function EnrollmentDetailPage() {
         branchId={enrollment.branchId}
         invoices={invoices.filter((d: any) => d.documentType === 'tax-invoice' || d.documentType === 'tax-invoice-receipt')}
         onSuccess={(creditNoteId) => {
-          setPrintCNId(creditNoteId);
-          setShowCNPrintDialog(true);
-          loadEnrollmentDetails(); // Reload to show new CN
+          print.printCreditNote(creditNoteId);
+          loadEnrollmentDetails();
         }}
       />
 
-      {/* Credit Note Print Dialog */}
-      <CreditNotePrintDialog
-        open={showCNPrintDialog}
-        onOpenChange={setShowCNPrintDialog}
-        creditNoteId={printCNId}
+      {/* Issue Refund Note Dialog (non-VAT) */}
+      <IssueRefundNoteDialog
+        open={showIssueRNDialog}
+        onOpenChange={setShowIssueRNDialog}
+        enrollmentId={enrollmentId}
+        branchId={enrollment.branchId}
+        receipts={invoices.filter((d: any) => d.documentType === 'receipt')}
+        onSuccess={(refundNoteId) => {
+          print.printRefundNote(refundNoteId);
+          loadEnrollmentDetails();
+        }}
       />
 
       {/* Request Tax Invoice Dialog */}
@@ -1231,8 +1398,7 @@ export default function EnrollmentDetailPage() {
           }}
           invoice={selectedInvoiceForTax}
           onSuccess={(taxInvoiceId) => {
-            setPrintInvoiceId(taxInvoiceId);
-            setShowReceiptDialog(true);
+            print.printReceipt(taxInvoiceId);
             loadEnrollmentDetails();
           }}
         />

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Phone, Mail, Tag, Link as LinkIcon, BookOpen, GraduationCap, ArrowLeft, X, Plus, MapPin, UserCheck, Unlink } from 'lucide-react';
+import { useState, useEffect, ReactNode } from 'react';
+import { Phone, Mail, Tag, Link as LinkIcon, BookOpen, GraduationCap, ArrowLeft, X, Plus, MapPin, UserCheck, Unlink, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,9 +10,12 @@ import { Input } from '@/components/ui/input';
 import { ChatConversation, Branch } from '@/types/models';
 import { ChannelIcon } from './channel-icon';
 
+type PanelView = 'info' | 'trial' | 'enrollment';
+
 interface ActionPanelProps {
   conversation: ChatConversation | null;
   branches: Branch[];
+  panelView?: PanelView;
   onTrialBooking: () => void;
   onEnrollment: () => void;
   onAddTag: (tag: string) => void;
@@ -21,8 +24,11 @@ interface ActionPanelProps {
   onRemoveBranch: (branchId: string) => void;
   onLinkParent: () => void;
   onUnlinkParent: () => void;
+  onRefreshProfile?: () => Promise<void>;
   linkedParent?: { id: string; displayName: string; phone: string; students?: { id: string; name: string }[] } | null;
   onBack?: () => void;
+  trialFormNode?: ReactNode;
+  enrollFormNode?: ReactNode;
 }
 
 function getInitials(name?: string): string {
@@ -58,6 +64,7 @@ function getTagColor(tag: string): string {
 export default function ActionPanel({
   conversation,
   branches,
+  panelView = 'info',
   onTrialBooking,
   onEnrollment,
   onAddTag,
@@ -66,17 +73,70 @@ export default function ActionPanel({
   onRemoveBranch,
   onLinkParent,
   onUnlinkParent,
+  onRefreshProfile,
   linkedParent,
   onBack,
+  trialFormNode,
+  enrollFormNode,
 }: ActionPanelProps) {
   const [newTag, setNewTag] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
   const [showBranchSelect, setShowBranchSelect] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showAvatarPreview, setShowAvatarPreview] = useState(false);
+
+  // Close lightbox on ESC
+  useEffect(() => {
+    if (!showAvatarPreview) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowAvatarPreview(false); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [showAvatarPreview]);
 
   if (!conversation) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
         <p className="text-base">เลือกแชทเพื่อดูข้อมูล</p>
+      </div>
+    );
+  }
+
+  // ── Trial form view ──
+  if (panelView === 'trial' && trialFormNode) {
+    return (
+      <div className="flex flex-col h-full bg-white dark:bg-slate-800">
+        <div className="flex items-center gap-2 px-3 py-3 border-b dark:border-slate-700 shrink-0">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack} className="-ml-1">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
+          <BookOpen className="w-5 h-5 text-orange-500" />
+          <span className="text-base font-semibold dark:text-white">จองทดลองเรียน</span>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {trialFormNode}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Enrollment form view ──
+  if (panelView === 'enrollment' && enrollFormNode) {
+    return (
+      <div className="flex flex-col h-full bg-white dark:bg-slate-800">
+        <div className="flex items-center gap-2 px-3 py-3 border-b dark:border-slate-700 shrink-0">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack} className="-ml-1">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
+          <GraduationCap className="w-5 h-5 text-blue-500" />
+          <span className="text-base font-semibold dark:text-white">ลงทะเบียน</span>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {enrollFormNode}
+        </div>
       </div>
     );
   }
@@ -112,16 +172,56 @@ export default function ActionPanel({
         </div>
       )}
 
+      {/* Avatar lightbox */}
+      {showAvatarPreview && contact?.avatarUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setShowAvatarPreview(false)}
+        >
+          <button
+            onClick={() => setShowAvatarPreview(false)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-black/40 text-white hover:bg-black/60"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={contact.avatarUrl}
+            alt={displayName}
+            className="max-w-[90vw] max-h-[90vh] rounded-xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {/* Contact profile */}
       <div className="flex flex-col items-center px-6 py-6 border-b dark:border-slate-700">
-        <Avatar className="w-20 h-20 mb-3">
-          {contact?.avatarUrl ? (
-            <AvatarImage src={contact.avatarUrl} alt={displayName} />
-          ) : null}
-          <AvatarFallback className="text-2xl bg-gray-200 text-gray-600 dark:bg-slate-600 dark:text-gray-300">
-            {getInitials(displayName)}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar
+            className={cn('w-20 h-20 mb-3', contact?.avatarUrl && 'cursor-pointer hover:ring-2 hover:ring-blue-300 transition-shadow')}
+            onClick={() => contact?.avatarUrl && setShowAvatarPreview(true)}
+          >
+            {contact?.avatarUrl ? (
+              <AvatarImage src={contact.avatarUrl} alt={displayName} />
+            ) : null}
+            <AvatarFallback className="text-2xl bg-gray-200 text-gray-600 dark:bg-slate-600 dark:text-gray-300">
+              {getInitials(displayName)}
+            </AvatarFallback>
+          </Avatar>
+          {onRefreshProfile && (
+            <button
+              onClick={async () => {
+                setRefreshing(true);
+                try { await onRefreshProfile(); } finally { setRefreshing(false); }
+              }}
+              disabled={refreshing}
+              className="absolute -bottom-0.5 -right-0.5 p-1 rounded-full bg-white dark:bg-slate-700 border dark:border-slate-600 shadow-sm hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50"
+              title="รีเฟรชโปรไฟล์"
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5 text-gray-500', refreshing && 'animate-spin')} />
+            </button>
+          )}
+        </div>
         <h3 className="text-base font-semibold text-gray-900 dark:text-white text-center">
           {displayName}
         </h3>

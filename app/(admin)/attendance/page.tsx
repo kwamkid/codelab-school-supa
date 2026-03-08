@@ -51,7 +51,7 @@ import {
   ClipboardCheck,
   Building2
 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SectionLoading } from '@/components/ui/loading';
 
 interface ClassWithDetails extends Class {
   subject?: Subject;
@@ -376,43 +376,7 @@ export default function AttendancePage() {
   
   // Loading state
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        {/* Header Skeleton */}
-        <div>
-          <Skeleton className="h-8 w-48 mb-2" />
-          <Skeleton className="h-5 w-64" />
-        </div>
-        
-        {/* Filters Skeleton */}
-        <Card>
-          <CardHeader className="pb-3">
-            <Skeleton className="h-5 w-24" />
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i}>
-                  <Skeleton className="h-4 w-16 mb-2" />
-                  <Skeleton className="h-9 w-full" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Table Skeleton */}
-        <Card>
-          <CardContent className="p-0">
-            <div className="p-6 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-20 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <SectionLoading />;
   }
   
   // Show empty state if no branch selected and not super admin viewing all branches

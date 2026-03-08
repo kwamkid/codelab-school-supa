@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 /**
  * POST /api/admin/document-number
  * Generates next document number atomically via PostgreSQL RPC.
- * Body: { companyId: string, type: 'receipt' | 'tax-invoice' | 'credit-note' }
+ * Body: { companyId: string, type: 'receipt' | 'tax-invoice' | 'credit-note' | 'refund-note' }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
       'receipt': 'generate_next_receipt_number',
       'tax-invoice': 'generate_next_tax_invoice_number',
       'credit-note': 'generate_next_credit_note_number',
-    }[type]
+      'refund-note': 'generate_next_refund_note_number',
+    }[type as string]
 
     if (!rpcName) {
       return NextResponse.json({ error: `Invalid type: ${type}` }, { status: 400 })
