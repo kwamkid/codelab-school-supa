@@ -279,7 +279,7 @@ export default function MakeupDetailDialog({
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="h-4 w-4 text-blue-600" />
                   <span className="font-medium">เวลา:</span>
-                  <span>{makeup.makeupSchedule.startTime} - {makeup.makeupSchedule.endTime} น.</span>
+                  <span>{makeup.makeupSchedule.startTime?.slice(0, 5)} - {makeup.makeupSchedule.endTime?.slice(0, 5)} น.</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <MapPin className="h-4 w-4 text-blue-600" />
@@ -412,7 +412,7 @@ export default function MakeupDetailDialog({
                     <div className="my-4 bg-green-50 border border-green-200 rounded p-3">
                       <p className="text-sm text-green-800">
                         <strong>วันที่:</strong> {makeup.makeupSchedule && formatDate(makeup.makeupSchedule.date, 'long')}<br/>
-                        <strong>เวลา:</strong> {makeup.makeupSchedule?.startTime} - {makeup.makeupSchedule?.endTime} น.
+                        <strong>เวลา:</strong> {makeup.makeupSchedule?.startTime?.slice(0, 5)} - {makeup.makeupSchedule?.endTime?.slice(0, 5)} น.
                       </p>
                     </div>
                     <AlertDialogFooter>

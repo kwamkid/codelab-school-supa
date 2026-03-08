@@ -389,6 +389,10 @@ export default function TrialBookingsPage() {
           { value: 'cancelled', label: 'ยกเลิก', count: statusCounts.cancelled, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600' },
         ].map((tab) => {
           const isActive = selectedStatus === tab.value;
+          const total = statusCounts.all;
+          const pct = total > 0 && tab.value !== 'all'
+            ? ((tab.count / total) * 100).toFixed(0)
+            : null;
           return (
             <button
               key={tab.value}
@@ -412,6 +416,14 @@ export default function TrialBookingsPage() {
               )}>
                 {tab.count}
               </span>
+              {pct !== null && (
+                <span className={cn(
+                  'text-[10px] leading-none',
+                  isActive ? 'text-white/80' : 'text-gray-400'
+                )}>
+                  {pct}%
+                </span>
+              )}
             </button>
           );
         })}

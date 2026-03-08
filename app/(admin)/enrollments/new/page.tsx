@@ -25,12 +25,14 @@ function EnrollmentPageContent() {
   };
 
   return (
-    <CompactEnrollmentForm
-      context="admin"
-      prefill={prefill}
-      onSuccess={({ enrollmentId }) => router.push(`/enrollments/${enrollmentId}`)}
-      onCancel={() => router.back()}
-    />
+    <div className="p-6">
+      <CompactEnrollmentForm
+        context="admin"
+        prefill={prefill}
+        onSuccess={({ enrollmentId }) => router.push(`/enrollments/${enrollmentId}`)}
+        onCancel={() => router.back()}
+      />
+    </div>
   );
 }
 

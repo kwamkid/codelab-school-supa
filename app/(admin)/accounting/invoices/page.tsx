@@ -121,7 +121,7 @@ export default function TaxInvoicesPage() {
 
   const filteredInvoices = invoices.filter((inv) => {
     if (dateRange) {
-      const docDate = (inv.issuedAt || inv.createdAt).toString().slice(0, 10);
+      const docDate = (inv.issuedAt || inv.createdAt).toISOString().slice(0, 10);
       if (docDate < dateRange.from || docDate > dateRange.to) return false;
     }
     if (!searchQuery) return true;

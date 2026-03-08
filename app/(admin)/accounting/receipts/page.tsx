@@ -119,7 +119,7 @@ export default function ReceiptsPage() {
 
   const filteredReceipts = receipts.filter((r) => {
     if (dateRange) {
-      const docDate = (r.issuedAt || r.createdAt).toString().slice(0, 10);
+      const docDate = (r.issuedAt || r.createdAt).toISOString().slice(0, 10);
       if (docDate < dateRange.from || docDate > dateRange.to) return false;
     }
     if (!searchQuery) return true;

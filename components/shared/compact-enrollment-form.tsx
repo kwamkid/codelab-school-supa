@@ -8,17 +8,20 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { FormSelect } from '@/components/ui/form-select';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { SchoolNameCombobox } from '@/components/ui/school-name-combobox';
+import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { formatCurrency, getDayName, calculateAge, formatTime } from '@/lib/utils';
+import { formatCurrency, getDayName, calculateAge, formatTime, formatDateCompact } from '@/lib/utils';
 import {
   Loader2, Search, User, CheckCircle, ArrowLeft, Users,
   Clock, Calendar, ChevronDown, ChevronUp, AlertCircle, TestTube,
-  School, GraduationCap, Plus,
+  School, GraduationCap, Plus, ChevronRight, ChevronLeft, Save, Building2,
+  Banknote, Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Class, Subject, Teacher, Branch, Student, PaymentMethod, PaymentType } from '@/types/models';
-import { getClasses } from '@/lib/services/classes';
+import { getClasses, getClassStatistics } from '@/lib/services/classes';
 import { getSubjects } from '@/lib/services/subjects';
 import { getTeachers } from '@/lib/services/teachers';
 import { getBranches, getActiveBranches } from '@/lib/services/branches';
@@ -27,6 +30,9 @@ import { ParentSearchInput, ParentSearchSelection, ParentSearchInputRef } from '
 import { checkAvailableSeats, checkDuplicateEnrollment, getEnrollmentsByStudent } from '@/lib/services/enrollments';
 import { processUnifiedEnrollment, UnifiedEnrollmentResult } from '@/lib/services/unified-enrollment';
 import { getTrialBooking, getTrialSessionsByBooking } from '@/lib/services/trial-bookings';
+import { getBranchPaymentSettings } from '@/lib/services/branch-payment-settings';
+import PaymentMethodSelector from '@/components/enrollments/payment/payment-method-selector';
+import { BranchPaymentSettings } from '@/types/models';
 import { useAuth } from '@/hooks/useAuth';
 
 // Section wrapper — defined outside the component to keep stable reference (prevents input focus loss)
@@ -90,6 +96,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
 
   // Parent section
   const [parentMode, setParentMode] = useState<'search' | 'linked' | 'new'>('search');
+  const [focusSearchOnMount, setFocusSearchOnMount] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState(prefill?.parentId || '');
   const [parentName, setParentName] = useState(prefill?.parentName || '');
   const [parentPhone, setParentPhone] = useState(prefill?.parentPhone || '');
@@ -102,13 +109,16 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
   const [studentNickname, setStudentNickname] = useState('');
   const [studentBirthdate, setStudentBirthdate] = useState('');
   const [studentGender, setStudentGender] = useState<'M' | 'F'>('M');
+  const [studentSchoolName, setStudentSchoolName] = useState('');
+  const [studentGradeLevel, setStudentGradeLevel] = useState('');
 
   // Class section
   const [selectedBranch, setSelectedBranch] = useState(prefill?.branchId || '');
   const [classSearchTerm, setClassSearchTerm] = useState('');
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('all');
   const [selectedClassId, setSelectedClassId] = useState('');
   const [classInfo, setClassInfo] = useState<{ cls: Class; subject: Subject | null; teacher: Teacher | null } | null>(null);
+  const [classStats, setClassStats] = useState<{ completedSessions: number; totalSessions: number } | null>(null);
   const [enrolledClassIds, setEnrolledClassIds] = useState<Set<string>>(new Set());
 
   // Payment section
@@ -116,16 +126,24 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
   const [paymentType, setPaymentType] = useState<PaymentType>('full');
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<'fixed' | 'percent'>('fixed');
+  const [branchPaymentSettings, setBranchPaymentSettings] = useState<BranchPaymentSettings | null>(null);
 
   // Billing section
   const [wantTaxInvoice, setWantTaxInvoice] = useState(false);
+  const [billingCompanyName, setBillingCompanyName] = useState('');
   const [billingType, setBillingType] = useState<'personal' | 'company'>('personal');
   const [billingName, setBillingName] = useState('');
+  const [billingPhone, setBillingPhone] = useState('');
   const [billingTaxId, setBillingTaxId] = useState('');
   const [billingCompanyBranch, setBillingCompanyBranch] = useState('');
   const [billingAddress, setBillingAddress] = useState({
     houseNumber: '', street: '', subDistrict: '', district: '', province: '', postalCode: '',
   });
+
+  // Step state (admin wizard): 1=parent, 2=student, 3=class, 4=payment
+  const [step, setStep] = useState(1);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Trial data
   const [trialBookingId, setTrialBookingId] = useState<string | undefined>(prefill?.bookingId);
@@ -159,6 +177,14 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
     getClasses(selectedBranch)
       .then((data) => setClasses(data.filter((c) => c.status === 'published' || c.status === 'started')))
       .catch(() => setClasses([]));
+  }, [selectedBranch]);
+
+  // Load branch payment settings when branch changes
+  useEffect(() => {
+    if (!selectedBranch) { setBranchPaymentSettings(null); return; }
+    getBranchPaymentSettings(selectedBranch)
+      .then(setBranchPaymentSettings)
+      .catch(() => setBranchPaymentSettings(null));
   }, [selectedBranch]);
 
   // Auto-load parent if prefill.parentId exists
@@ -241,21 +267,32 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
     setParentMode('linked');
     setExistingStudents(selection.students);
     if (selection.students.length > 0) setStudentMode('existing');
+    // Pre-fill billing from parent data
+    setBillingName(selection.parentName);
+    setBillingPhone(selection.parentPhone);
+    if (selection.parentAddress) {
+      setBillingAddress(selection.parentAddress);
+    }
   };
 
   // Update class info when selected
   useEffect(() => {
-    if (!selectedClassId) { setClassInfo(null); return; }
+    if (!selectedClassId) { setClassInfo(null); setClassStats(null); return; }
     const cls = classes.find((c) => c.id === selectedClassId);
-    if (!cls) { setClassInfo(null); return; }
+    if (!cls) { setClassInfo(null); setClassStats(null); return; }
+    // Load class statistics (completed sessions)
+    getClassStatistics(selectedClassId)
+      .then((stats) => setClassStats({ completedSessions: stats.completedSessions, totalSessions: stats.totalSessions }))
+      .catch(() => setClassStats(null));
     const subject = subjects.find((s) => s.id === cls.subjectId) || null;
     const teacher = teachers.find((t) => t.id === cls.teacherId) || null;
     setClassInfo({ cls, subject, teacher });
     // Auto-set payment amount from class pricing
     const price = cls.pricing?.totalPrice || 0;
-    const finalPrice = discount > 0 ? Math.max(0, price - discount) : price;
+    const discountAmount = discountType === 'percent' ? Math.round(price * discount / 100) : discount;
+    const finalPrice = discountAmount > 0 ? Math.max(0, price - discountAmount) : price;
     setPaymentAmount(finalPrice);
-  }, [selectedClassId, classes, subjects, teachers, discount]);
+  }, [selectedClassId, classes, subjects, teachers, discount, discountType]);
 
   // Load enrolled class IDs when existing student is selected
   useEffect(() => {
@@ -268,12 +305,6 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
     }
   }, [studentMode, selectedStudentId]);
 
-  // Auto-fill billing name when parent name changes
-  useEffect(() => {
-    if (!billingName && parentName) {
-      setBillingName(parentName);
-    }
-  }, [parentName]);
 
   // Student age for filtering
   const studentAge = useMemo(() => {
@@ -303,7 +334,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
       });
     }
     // Filter by subject
-    if (selectedSubjectFilter) {
+    if (selectedSubjectFilter && selectedSubjectFilter !== 'all') {
       filtered = filtered.filter((c) => c.subjectId === selectedSubjectFilter);
     }
     // Filter out already-enrolled classes
@@ -333,6 +364,60 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
       setSelectedClassId('');
     }
   }, [filteredClasses, selectedClassId]);
+
+  // Step validation (admin wizard)
+  const validateStep = (s: number): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (s === 1) {
+      if (!selectedBranch) newErrors.branch = 'กรุณาเลือกสาขา';
+      if (!selectedParentId && parentMode !== 'linked') {
+        if (!parentName.trim()) newErrors.parentName = 'กรุณากรอกชื่อผู้ปกครอง';
+        if (!parentPhone.trim()) newErrors.parentPhone = 'กรุณากรอกเบอร์โทรศัพท์';
+      }
+    }
+
+    if (s === 2) {
+      if (studentMode === 'existing' && !selectedStudentId) {
+        newErrors.student = 'กรุณาเลือกนักเรียน';
+      }
+      if (studentMode === 'new' || (existingStudents.length === 0 && studentMode !== 'new')) {
+        if (!studentName.trim()) newErrors.studentName = 'กรุณากรอกชื่อนักเรียน';
+        if (!studentNickname.trim()) newErrors.studentNickname = 'กรุณากรอกชื่อเล่น';
+        if (!studentBirthdate) newErrors.studentBirthdate = 'กรุณาเลือกวันเกิด';
+      }
+    }
+
+    if (s === 3) {
+      if (!selectedClassId) newErrors.classId = 'กรุณาเลือกคลาส';
+    }
+
+    if (s === 4) {
+      if (!paymentMethod) newErrors.paymentMethod = 'กรุณาเลือกวิธีชำระเงิน';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...newErrors }));
+      // Show first error as toast
+      const firstErr = Object.values(newErrors)[0];
+      if (firstErr) toast.error(firstErr);
+      return false;
+    }
+    return true;
+  };
+
+  const clearError = (key: string) => {
+    setErrors(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const goNext = () => { if (validateStep(step)) setStep(step + 1); };
+  const goPrev = () => setStep(step - 1);
+  const errCls = (key: string) => errors[key] ? 'border-red-500 ring-1 ring-red-500' : '';
 
   // Validate and submit
   const handleSubmit = async () => {
@@ -408,21 +493,25 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
                 ? (existingStudent?.birthdate ? new Date(existingStudent.birthdate).toISOString().split('T')[0] : '')
                 : studentBirthdate,
               gender: studentMode === 'existing' ? ((existingStudent as any)?.gender || 'M') : studentGender,
+              schoolName: studentMode === 'existing' ? (existingStudent?.schoolName || undefined) : (studentSchoolName.trim() || undefined),
+              gradeLevel: studentMode === 'existing' ? (existingStudent?.gradeLevel || undefined) : (studentGradeLevel.trim() || undefined),
               classId: selectedClassId,
             },
           ],
-          discount,
+          discount: discountType === 'percent' ? Math.round((classInfo?.cls.pricing?.totalPrice || 0) * discount / 100) : discount,
           discountType: 'fixed',
           paymentMethod,
           paymentType,
           initialPaymentAmount: paymentAmount,
-          // Billing
+          // Billing (always send name/phone for receipt)
+          billingName: billingName || parentName || undefined,
+          billingPhone: billingPhone || parentPhone || undefined,
+          billingAddress,
           wantTaxInvoice,
           billingType: wantTaxInvoice ? billingType : undefined,
-          billingName: wantTaxInvoice ? billingName : undefined,
-          billingAddress: wantTaxInvoice ? billingAddress : undefined,
           billingTaxId: wantTaxInvoice ? billingTaxId : undefined,
-          billingCompanyBranch: wantTaxInvoice ? billingCompanyBranch : undefined,
+          billingCompanyName: wantTaxInvoice && billingType === 'company' ? billingCompanyName : undefined,
+          billingCompanyBranch: wantTaxInvoice && billingType === 'company' ? billingCompanyBranch : undefined,
         },
         adminUser?.id
       );
@@ -474,13 +563,13 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
             <p className="text-sm text-gray-500 dark:text-gray-400">{parentPhone}</p>
           </div>
           <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 shrink-0">เชื่อมแล้ว</Badge>
-          <Button variant="ghost" size="sm" onClick={() => { setParentMode('search'); setSelectedParentId(''); setParentName(''); setParentPhone(''); setExistingStudents([]); setStudentMode('new'); setTimeout(() => parentSearchRef.current?.focus(), 100); }}>
+          <Button variant="ghost" size="sm" onClick={() => { setParentMode('search'); setSelectedParentId(''); setParentName(''); setParentPhone(''); setExistingStudents([]); setStudentMode('new'); setFocusSearchOnMount(true); }}>
             เปลี่ยน
           </Button>
         </div>
       ) : (
         <div className="space-y-3">
-          <ParentSearchInput ref={parentSearchRef} onSelect={handleParentSelect} />
+          <ParentSearchInput ref={parentSearchRef} onSelect={handleParentSelect} autoFocus={focusSearchOnMount} />
           {!selectedParentId && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -659,6 +748,14 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
                 options={[{ value: 'M', label: 'ชาย' }, { value: 'F', label: 'หญิง' }]}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">โรงเรียน</Label>
+              <SchoolNameCombobox value={studentSchoolName} onChange={setStudentSchoolName} placeholder="พิมพ์ชื่อโรงเรียน..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">ระดับชั้น</Label>
+              <GradeLevelCombobox value={studentGradeLevel} onChange={setStudentGradeLevel} placeholder="เลือกหรือพิมพ์ระดับชั้น..." />
+            </div>
           </div>
           </div>
         )}
@@ -685,6 +782,14 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
                 onValueChange={(v) => setStudentGender(v as 'M' | 'F')}
                 options={[{ value: 'M', label: 'ชาย' }, { value: 'F', label: 'หญิง' }]}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">โรงเรียน</Label>
+              <SchoolNameCombobox value={studentSchoolName} onChange={setStudentSchoolName} placeholder="พิมพ์ชื่อโรงเรียน..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">ระดับชั้น</Label>
+              <GradeLevelCombobox value={studentGradeLevel} onChange={setStudentGradeLevel} placeholder="เลือกหรือพิมพ์ระดับชั้น..." />
             </div>
           </div>
         )}
@@ -745,6 +850,14 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
                           {isFull && <span className="text-red-500 font-medium">(เต็ม)</span>}
                         </span>
                       </div>
+                      {/* Date range */}
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatDateCompact(cls.startDate)} - {formatDateCompact(cls.endDate)}
+                        </span>
+                        <span>{cls.totalSessions} ครั้ง</span>
+                      </div>
                     </div>
                     <div className="text-right shrink-0 ml-2">
                       <span className="text-sm font-semibold dark:text-white">{formatCurrency(cls.pricing?.totalPrice || 0)}</span>
@@ -756,6 +869,32 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
           )}
         </div>
       )}
+      {/* Selected class session info */}
+      {classInfo && classStats && (
+        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-2 text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
+            <CheckCircle className="h-4 w-4" />
+            {classInfo.cls.name}
+          </div>
+          <div className="flex items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-gray-400" />
+              {formatDateCompact(classInfo.cls.startDate)} - {formatDateCompact(classInfo.cls.endDate)}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 mt-1.5 text-sm">
+            <span className="text-gray-600 dark:text-gray-400">
+              เรียนไปแล้ว <span className="font-semibold text-green-600 dark:text-green-400">{classStats.completedSessions}</span>/{classStats.totalSessions} ครั้ง
+            </span>
+            {classStats.completedSessions > 0 && (
+              <span className="text-orange-600 dark:text-orange-400 font-medium flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                ต้องชดเชย {classStats.completedSessions} ครั้ง
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -764,7 +903,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
       <div className="space-y-3">
         <FormSelect
           value={selectedBranch}
-          onValueChange={(v) => { setSelectedBranch(v); setSelectedClassId(''); setSelectedSubjectFilter(''); }}
+          onValueChange={(v) => { setSelectedBranch(v); setSelectedClassId(''); setSelectedSubjectFilter('all'); }}
           placeholder="เลือกสาขา"
           options={branches.map((b) => ({ value: b.id, label: b.name }))}
         />
@@ -789,7 +928,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
           <div className="w-40">
             <FormSelect
               value={selectedBranch}
-              onValueChange={(v) => { setSelectedBranch(v); setSelectedClassId(''); setSelectedSubjectFilter(''); }}
+              onValueChange={(v) => { setSelectedBranch(v); setSelectedClassId(''); setSelectedSubjectFilter('all'); }}
               placeholder="เลือกสาขา"
               options={branches.map((b) => ({ value: b.id, label: b.name }))}
             />
@@ -815,7 +954,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
               placeholder="ทุกวิชา"
               disabled={!selectedBranch}
               options={[
-                { value: '', label: 'ทุกวิชา' },
+                { value: 'all', label: 'ทุกวิชา' },
                 ...branchSubjects.map((s) => ({ value: s.id, label: s.name })),
               ]}
             />
@@ -826,16 +965,43 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
     </Card>
   );
 
+  const actualDiscountAmount = discountType === 'percent'
+    ? Math.round((classInfo?.cls.pricing?.totalPrice || 0) * discount / 100)
+    : discount;
+
   const priceSummary = classInfo && (
-    <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg space-y-1">
+    <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg space-y-2">
+      {/* Class info: dates + session progress */}
+      <div className="space-y-1 text-sm">
+        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+          <Calendar className="h-3.5 w-3.5 shrink-0" />
+          <span>{formatDateCompact(classInfo.cls.startDate)} - {formatDateCompact(classInfo.cls.endDate)}</span>
+        </div>
+        {classStats && (
+          <div className="flex items-center gap-4 text-gray-600 dark:text-gray-300">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+              เรียนไปแล้ว {classStats.completedSessions}/{classStats.totalSessions} ครั้ง
+            </span>
+            {classStats.completedSessions > 0 && (
+              <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
+                <AlertCircle className="h-3.5 w-3.5" />
+                ต้องชดเชย {classStats.completedSessions} ครั้ง
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="border-t dark:border-slate-700" />
+      {/* Price breakdown */}
       <div className="flex justify-between text-sm">
         <span className="text-gray-500 dark:text-gray-400">ราคาคลาส ({classInfo.cls.name})</span>
         <span className="dark:text-white">{formatCurrency(classInfo.cls.pricing?.totalPrice || 0)}</span>
       </div>
-      {discount > 0 && (
+      {actualDiscountAmount > 0 && (
         <div className="flex justify-between text-sm text-green-600">
-          <span>ส่วนลด</span>
-          <span>-{formatCurrency(discount)}</span>
+          <span>ส่วนลด{discountType === 'percent' ? ` (${discount}%)` : ''}</span>
+          <span>-{formatCurrency(actualDiscountAmount)}</span>
         </div>
       )}
       <div className="flex justify-between font-semibold border-t dark:border-slate-700 pt-1">
@@ -845,47 +1011,93 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
     </div>
   );
 
+  const defaultPaymentSettings: BranchPaymentSettings = {
+    id: '', branchId: selectedBranch, enabledMethods: ['cash', 'bank_transfer', 'promptpay', 'credit_card'],
+    bankAccounts: [], onlinePaymentEnabled: false,
+  };
+
   const paymentSection = (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-sm">วิธีชำระ *</Label>
-          <FormSelect
-            value={paymentMethod}
-            onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
-            placeholder="เลือกวิธี"
-            options={[
-              { value: 'cash', label: 'เงินสด' },
-              { value: 'bank_transfer', label: 'โอนเงิน' },
-              { value: 'promptpay', label: 'PromptPay' },
-              { value: 'credit_card', label: 'บัตรเครดิต' },
-            ]}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-sm">ประเภท</Label>
-          <FormSelect
-            value={paymentType}
-            onValueChange={(v) => setPaymentType(v as PaymentType)}
-            options={[
-              { value: 'full', label: 'เต็มจำนวน' },
-              { value: 'deposit', label: 'มัดจำ' },
-            ]}
-          />
-        </div>
-      </div>
+    <div className="space-y-4">
+      {/* Payment Method - from branch settings */}
+      <PaymentMethodSelector
+        selectedMethod={paymentMethod}
+        onMethodChange={setPaymentMethod}
+        paymentSettings={branchPaymentSettings || defaultPaymentSettings}
+        colorScheme="green"
+        gridCols="grid-cols-4"
+        label="วิธีชำระ *"
+      />
+
+      {/* Payment Type - Inline button group with icons */}
       <div className="space-y-1.5">
-        <Label className="text-sm">ส่วนลด (บาท)</Label>
-        <Input
-          type="number"
-          value={discount || ''}
-          onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-          placeholder="0"
-          min={0}
-        />
+        <Label className="text-sm">ประเภท</Label>
+        <div className="inline-flex gap-2">
+          {[
+            { value: 'full' as PaymentType, label: 'เต็มจำนวน', icon: <Banknote className="h-4 w-4" /> },
+            { value: 'deposit' as PaymentType, label: 'มัดจำ', icon: <Wallet className="h-4 w-4" /> },
+          ].map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setPaymentType(t.value)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg border-2 py-2 px-4 text-sm font-medium transition-all',
+                paymentType === t.value
+                  ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-400'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-400 dark:hover:border-slate-600'
+              )}
+            >
+              {t.icon}
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Discount - inline input with toggle appended */}
+      <div className="space-y-1.5">
+        <Label className="text-sm">ส่วนลด</Label>
+        <div className="flex items-center gap-0 max-w-xs">
+          <Input
+            type="number"
+            value={discount || ''}
+            onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+            placeholder="0"
+            min={0}
+            max={discountType === 'percent' ? 100 : undefined}
+            className="rounded-r-none border-r-0"
+          />
+          <div className="inline-flex h-9 shrink-0 rounded-r-md border border-gray-300 dark:border-slate-600 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => { setDiscountType('fixed'); setDiscount(0); }}
+              className={cn(
+                'px-3 h-full text-sm font-medium transition-colors',
+                discountType === 'fixed'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-400'
+              )}
+            >
+              ฿
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDiscountType('percent'); setDiscount(0); }}
+              className={cn(
+                'px-3 h-full text-sm font-medium transition-colors border-l border-gray-300 dark:border-slate-600',
+                discountType === 'percent'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-400'
+              )}
+            >
+              %
+            </button>
+          </div>
+        </div>
+      </div>
+
       {paymentType === 'deposit' && (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 max-w-xs">
           <Label className="text-sm">จำนวนเงินมัดจำ (บาท)</Label>
           <Input
             type="number"
@@ -899,24 +1111,52 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
     </div>
   );
 
+  const addressFields = (
+    <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-1.5">
+        <Label className="text-sm">บ้านเลขที่</Label>
+        <Input value={billingAddress.houseNumber} onChange={(e) => setBillingAddress(prev => ({ ...prev, houseNumber: e.target.value }))} />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-sm">ถนน</Label>
+        <Input value={billingAddress.street} onChange={(e) => setBillingAddress(prev => ({ ...prev, street: e.target.value }))} />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-sm">แขวง/ตำบล</Label>
+        <Input value={billingAddress.subDistrict} onChange={(e) => setBillingAddress(prev => ({ ...prev, subDistrict: e.target.value }))} />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-sm">เขต/อำเภอ</Label>
+        <Input value={billingAddress.district} onChange={(e) => setBillingAddress(prev => ({ ...prev, district: e.target.value }))} />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-sm">จังหวัด</Label>
+        <Input value={billingAddress.province} onChange={(e) => setBillingAddress(prev => ({ ...prev, province: e.target.value }))} />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-sm">รหัสไปรษณีย์</Label>
+        <Input value={billingAddress.postalCode} onChange={(e) => setBillingAddress(prev => ({ ...prev, postalCode: e.target.value }))} />
+      </div>
+    </div>
+  );
+
   const billingSection = (
     <div className="space-y-3">
+      {/* Tax invoice toggle */}
       <div className="flex items-center gap-2">
         <Checkbox
           id="wantTaxInvoice"
           checked={wantTaxInvoice}
-          onCheckedChange={(checked) => {
-            setWantTaxInvoice(!!checked);
-            if (checked && !billingName) setBillingName(parentName);
-          }}
+          onCheckedChange={(checked) => setWantTaxInvoice(!!checked)}
         />
         <Label htmlFor="wantTaxInvoice" className="text-sm font-medium cursor-pointer">
           ต้องการใบกำกับภาษี
         </Label>
       </div>
 
+      {/* Tax invoice fields (inline) */}
       {wantTaxInvoice && (
-        <div className="space-y-3 pt-1">
+        <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
           {/* Billing type toggle */}
           <div className="flex gap-2">
             <Button
@@ -924,10 +1164,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
               variant={billingType === 'personal' ? 'default' : 'outline'}
               size="sm"
               className="flex-1"
-              onClick={() => {
-                setBillingType('personal');
-                if (!billingName) setBillingName(parentName);
-              }}
+              onClick={() => setBillingType('personal')}
             >
               บุคคลธรรมดา
             </Button>
@@ -936,77 +1173,79 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
               variant={billingType === 'company' ? 'default' : 'outline'}
               size="sm"
               className="flex-1"
-              onClick={() => {
-                setBillingType('company');
-                if (billingType === 'personal') setBillingName('');
-              }}
+              onClick={() => setBillingType('company')}
             >
               นิติบุคคล
             </Button>
           </div>
 
-          {/* Billing name */}
-          <div className="space-y-1.5">
-            <Label className="text-sm">
-              {billingType === 'company' ? 'ชื่อบริษัท / นิติบุคคล' : 'ชื่อออกบิล'}
-            </Label>
-            <Input
-              value={billingName}
-              onChange={(e) => setBillingName(e.target.value)}
-              placeholder={billingType === 'company' ? 'บริษัท xxx จำกัด' : ''}
-            />
-          </div>
-
-          {/* Tax ID + company branch */}
-          <div className={cn('grid gap-3', billingType === 'company' ? 'grid-cols-2' : 'grid-cols-1')}>
-            <div className="space-y-1.5">
-              <Label className="text-sm">เลขประจำตัวผู้เสียภาษี</Label>
-              <Input
-                value={billingTaxId}
-                onChange={(e) => setBillingTaxId(e.target.value)}
-                placeholder="เลข 13 หลัก"
-                maxLength={13}
-              />
-            </div>
-            {billingType === 'company' && (
+          {/* Personal: pre-filled from parent, just add tax ID */}
+          {billingType === 'personal' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">ชื่อ-นามสกุล</Label>
+                  <Input
+                    value={billingName}
+                    onChange={(e) => setBillingName(e.target.value)}
+                    placeholder="ชื่อ-นามสกุล"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">เบอร์โทร</Label>
+                  <Input
+                    value={billingPhone}
+                    onChange={(e) => setBillingPhone(e.target.value)}
+                    placeholder="08x-xxx-xxxx"
+                  />
+                </div>
+              </div>
+              {addressFields}
               <div className="space-y-1.5">
-                <Label className="text-sm">สาขา</Label>
+                <Label className="text-sm">เลขประจำตัวผู้เสียภาษี</Label>
                 <Input
-                  value={billingCompanyBranch}
-                  onChange={(e) => setBillingCompanyBranch(e.target.value)}
-                  placeholder="สำนักงานใหญ่"
+                  value={billingTaxId}
+                  onChange={(e) => setBillingTaxId(e.target.value)}
+                  placeholder="เลข 13 หลัก"
+                  maxLength={13}
                 />
               </div>
-            )}
-          </div>
+            </>
+          )}
 
-          {/* Address */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-sm">บ้านเลขที่</Label>
-              <Input value={billingAddress.houseNumber} onChange={(e) => setBillingAddress(prev => ({ ...prev, houseNumber: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">ถนน</Label>
-              <Input value={billingAddress.street} onChange={(e) => setBillingAddress(prev => ({ ...prev, street: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">แขวง/ตำบล</Label>
-              <Input value={billingAddress.subDistrict} onChange={(e) => setBillingAddress(prev => ({ ...prev, subDistrict: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">เขต/อำเภอ</Label>
-              <Input value={billingAddress.district} onChange={(e) => setBillingAddress(prev => ({ ...prev, district: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">จังหวัด</Label>
-              <Input value={billingAddress.province} onChange={(e) => setBillingAddress(prev => ({ ...prev, province: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">รหัสไปรษณีย์</Label>
-              <Input value={billingAddress.postalCode} onChange={(e) => setBillingAddress(prev => ({ ...prev, postalCode: e.target.value }))} />
-            </div>
-          </div>
+          {/* Company: all fresh fields */}
+          {billingType === 'company' && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-sm">ชื่อบริษัท / นิติบุคคล</Label>
+                <Input
+                  value={billingCompanyName}
+                  onChange={(e) => setBillingCompanyName(e.target.value)}
+                  placeholder="บริษัท xxx จำกัด"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">เลขประจำตัวผู้เสียภาษี</Label>
+                  <Input
+                    value={billingTaxId}
+                    onChange={(e) => setBillingTaxId(e.target.value)}
+                    placeholder="เลข 13 หลัก"
+                    maxLength={13}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">สาขา</Label>
+                  <Input
+                    value={billingCompanyBranch}
+                    onChange={(e) => setBillingCompanyBranch(e.target.value)}
+                    placeholder="สำนักงานใหญ่"
+                  />
+                </div>
+              </div>
+              {addressFields}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -1036,15 +1275,75 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
     </div>
   );
 
-  // ===================== ADMIN LAYOUT: 2-column full-width =====================
+  // ===================== ADMIN LAYOUT: Step wizard (like trial booking) =====================
   if (isAdmin) {
+    const stepLabels = ['ผู้ปกครอง', 'นักเรียน', 'เลือกคลาส', 'ชำระเงิน'];
+    const totalSteps = stepLabels.length;
+
+    const stepIndicator = (
+      <div className="flex items-center gap-1.5">
+        {stepLabels.map((label, i) => {
+          const stepNum = i + 1;
+          const isActive = step === stepNum;
+          const isDone = step > stepNum;
+          return (
+            <div key={i} className="flex items-center gap-1.5">
+              {i > 0 && <div className={cn('h-px w-4 sm:w-6', isDone ? 'bg-green-400' : 'bg-gray-200')} />}
+              <button
+                type="button"
+                onClick={() => { if (isDone) setStep(stepNum); }}
+                disabled={!isDone}
+                className={cn(
+                  'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+                  isActive && 'bg-gray-900 text-white',
+                  isDone && 'bg-green-100 text-green-700 cursor-pointer hover:bg-green-200',
+                  !isActive && !isDone && 'bg-gray-100 text-gray-400',
+                )}
+              >
+                {stepNum}. {label}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+
+    const stepActions = (
+      <div className="flex justify-between gap-3 pt-4">
+        <div>
+          {step > 1 && (
+            <Button type="button" variant="outline" onClick={goPrev}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> กลับ
+            </Button>
+          )}
+          {step === 1 && onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> กลับ
+            </Button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {step === totalSteps ? (
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting || !selectedClassId || (!selectedParentId && !parentName.trim())}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />กำลังลงทะเบียน...</> : <><Save className="h-4 w-4 mr-2" />ลงทะเบียน</>}
+            </Button>
+          ) : (
+            <Button onClick={goNext} className="bg-gray-900 hover:bg-gray-800">
+              ถัดไป <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+
     return (
-      <div>
+      <div className="space-y-5 max-w-4xl">
         {/* Page header */}
-        <div className="mb-6">
-          <Button variant="ghost" onClick={onCancel} className="mb-2 -ml-2">
-            <ArrowLeft className="h-4 w-4 mr-2" /> กลับ
-          </Button>
+        <div className="mb-2">
           <h1 className="text-xl sm:text-3xl font-bold text-gray-900">ลงทะเบียนเรียน</h1>
           {isFromTrial && trialParentName && (
             <div className="flex items-center gap-2 mt-2">
@@ -1056,49 +1355,387 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
           )}
         </div>
 
-        {/* 2-column grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-          {/* Left column: Parent + Student + Class */}
-          <div className="lg:col-span-3 space-y-6">
-            {parentSection}
-            {studentSection}
-            {classSection}
-          </div>
+        {stepIndicator}
 
-          {/* Right column: Summary + Payment + Billing + Submit (sticky) */}
-          <div className="lg:col-span-2 lg:sticky lg:top-4 space-y-6">
+        {/* Step 1: Branch + Parent */}
+        {step === 1 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">ข้อมูลผู้ปกครอง</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Branch */}
+                <div className="space-y-1.5">
+                  <Label>
+                    <Building2 className="inline h-4 w-4 mr-1" />
+                    สาขา <span className="text-red-500">*</span>
+                  </Label>
+                  <FormSelect
+                    value={selectedBranch}
+                    onValueChange={(v) => { setSelectedBranch(v); setSelectedClassId(''); setSelectedSubjectFilter('all'); clearError('branch'); }}
+                    placeholder="เลือกสาขา"
+                    options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                    className={errCls('branch')}
+                  />
+                </div>
+
+                {/* Parent: linked or search+manual */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">
+                    <User className="inline h-4 w-4 mr-1" />
+                    ผู้ปกครอง
+                  </Label>
+                  {parentMode === 'linked' ? (
+                    <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <User className="h-5 w-5 text-green-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-base">{parentName}</p>
+                        <p className="text-sm text-gray-500">{parentPhone}</p>
+                      </div>
+                      <Badge className="bg-green-100 text-green-700 shrink-0">เชื่อมแล้ว</Badge>
+                      <Button variant="ghost" size="sm" onClick={() => { setParentMode('search'); setSelectedParentId(''); setParentName(''); setParentPhone(''); setExistingStudents([]); setStudentMode('new'); setFocusSearchOnMount(true); }}>
+                        เปลี่ยน
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <ParentSearchInput ref={parentSearchRef} onSelect={handleParentSelect} autoFocus={focusSearchOnMount} />
+                      {!selectedParentId && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label>ชื่อผู้ปกครอง <span className="text-red-500">*</span></Label>
+                            <Input value={parentName} onChange={(e) => { setParentName(e.target.value); clearError('parentName'); }} placeholder="ชื่อ-นามสกุล" className={errCls('parentName')} />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>เบอร์โทร <span className="text-red-500">*</span></Label>
+                            <Input value={parentPhone} onChange={(e) => { setParentPhone(e.target.value); clearError('parentPhone'); }} placeholder="08x-xxx-xxxx" className={errCls('parentPhone')} />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2: Student */}
+        {step === 2 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">นักเรียน</CardTitle>
+                {existingStudents.length > 0 && (
+                  <Button
+                    variant={studentMode === 'new' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setStudentMode('new'); setSelectedStudentId(''); }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    เพิ่มนักเรียนใหม่
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Existing students list */}
+              {existingStudents.length > 0 && studentMode !== 'new' && (
+                <div className="border rounded-lg divide-y">
+                  {existingStudents.map((s, idx) => {
+                    const isSelected = studentMode === 'existing' && selectedStudentId === s.id;
+                    const onlyOne = existingStudents.length === 1;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { setStudentMode('existing'); setSelectedStudentId(s.id); clearError('student'); }}
+                        className={cn(
+                          'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors first:rounded-t-lg last:rounded-b-lg',
+                          isSelected
+                            ? 'bg-green-100'
+                            : idx % 2 === 1
+                              ? 'bg-gray-50/50 hover:bg-green-50/60'
+                              : 'hover:bg-green-50/60'
+                        )}
+                      >
+                        {isSelected && !onlyOne ? (
+                          <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                        ) : (
+                          <User className="h-4 w-4 text-gray-400 shrink-0" />
+                        )}
+                        <span className="font-semibold text-base min-w-[60px]">{s.nickname || '-'}</span>
+                        <span className="text-sm text-gray-500">{s.name}</span>
+                        {s.schoolName && (
+                          <span className="flex items-center gap-1 text-xs text-gray-500 ml-auto">
+                            <School className="h-3 w-3 shrink-0" />
+                            {s.schoolName}
+                          </span>
+                        )}
+                        {s.gradeLevel && (
+                          <span className="flex items-center gap-1 text-xs text-gray-500">
+                            <GraduationCap className="h-3 w-3 shrink-0" />
+                            {s.gradeLevel}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* New student form */}
+              {studentMode === 'new' && (
+                <div className="space-y-3">
+                  {existingStudents.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-500"
+                      onClick={() => { setStudentMode('existing'); setSelectedStudentId(existingStudents[0]?.id || ''); }}
+                    >
+                      ← เลือกนักเรียนที่มีอยู่
+                    </Button>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>ชื่อ-นามสกุล <span className="text-red-500">*</span></Label>
+                      <Input value={studentName} onChange={(e) => { setStudentName(e.target.value); clearError('studentName'); }} placeholder="ชื่อ-นามสกุล" className={errCls('studentName')} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>ชื่อเล่น <span className="text-red-500">*</span></Label>
+                      <Input value={studentNickname} onChange={(e) => { setStudentNickname(e.target.value); clearError('studentNickname'); }} placeholder="ชื่อเล่น" className={errCls('studentNickname')} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>วันเกิด <span className="text-red-500">*</span></Label>
+                      <DateRangePicker mode="single" value={studentBirthdate} onChange={(d) => { setStudentBirthdate(d || ''); clearError('studentBirthdate'); }} maxDate={new Date()} placeholder="เลือกวันที่" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>เพศ <span className="text-red-500">*</span></Label>
+                      <FormSelect
+                        value={studentGender}
+                        onValueChange={(v) => setStudentGender(v as 'M' | 'F')}
+                        options={[{ value: 'M', label: 'ชาย' }, { value: 'F', label: 'หญิง' }]}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>โรงเรียน</Label>
+                      <SchoolNameCombobox value={studentSchoolName} onChange={setStudentSchoolName} placeholder="พิมพ์ชื่อโรงเรียน..." />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>ระดับชั้น</Label>
+                      <GradeLevelCombobox value={studentGradeLevel} onChange={setStudentGradeLevel} placeholder="เลือกหรือพิมพ์ระดับชั้น..." />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* No students yet — show new student form */}
+              {existingStudents.length === 0 && studentMode !== 'new' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>ชื่อ-นามสกุล <span className="text-red-500">*</span></Label>
+                    <Input value={studentName} onChange={(e) => { setStudentName(e.target.value); clearError('studentName'); }} placeholder="ชื่อ-นามสกุล" className={errCls('studentName')} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>ชื่อเล่น <span className="text-red-500">*</span></Label>
+                    <Input value={studentNickname} onChange={(e) => { setStudentNickname(e.target.value); clearError('studentNickname'); }} placeholder="ชื่อเล่น" className={errCls('studentNickname')} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>วันเกิด <span className="text-red-500">*</span></Label>
+                    <DateRangePicker mode="single" value={studentBirthdate} onChange={(d) => { setStudentBirthdate(d || ''); clearError('studentBirthdate'); }} maxDate={new Date()} placeholder="เลือกวันที่" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>เพศ <span className="text-red-500">*</span></Label>
+                    <FormSelect
+                      value={studentGender}
+                      onValueChange={(v) => setStudentGender(v as 'M' | 'F')}
+                      options={[{ value: 'M', label: 'ชาย' }, { value: 'F', label: 'หญิง' }]}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>โรงเรียน</Label>
+                    <SchoolNameCombobox value={studentSchoolName} onChange={setStudentSchoolName} placeholder="พิมพ์ชื่อโรงเรียน..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>ระดับชั้น</Label>
+                    <GradeLevelCombobox value={studentGradeLevel} onChange={setStudentGradeLevel} placeholder="เลือกหรือพิมพ์ระดับชั้น..." />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 3: Class Selection */}
+        {step === 3 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">เลือกคลาส</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      value={classSearchTerm}
+                      onChange={(e) => setClassSearchTerm(e.target.value)}
+                      placeholder="ค้นหาคลาส..."
+                      className="pl-10"
+                      disabled={!selectedBranch}
+                    />
+                  </div>
+                  <FormSelect
+                    value={selectedSubjectFilter}
+                    onValueChange={setSelectedSubjectFilter}
+                    placeholder="ทุกวิชา"
+                    disabled={!selectedBranch}
+                    options={[
+                      { value: 'all', label: 'ทุกวิชา' },
+                      ...branchSubjects.map((s) => ({ value: s.id, label: s.name })),
+                    ]}
+                  />
+                </div>
+
+                {!selectedBranch ? (
+                  <div className="text-center py-6 text-gray-400 text-sm">
+                    <AlertCircle className="h-5 w-5 mx-auto mb-2" />
+                    กรุณาเลือกสาขาก่อน (กลับไป Step 1)
+                  </div>
+                ) : (
+                  <div className="border rounded-lg max-h-80 overflow-y-auto">
+                    {filteredClasses.length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 text-sm">ไม่พบคลาส</div>
+                    ) : (
+                      filteredClasses.map((cls, idx) => {
+                        const subject = subjects.find((s) => s.id === cls.subjectId);
+                        const teacher = teachers.find((t) => t.id === cls.teacherId);
+                        const isSelected = selectedClassId === cls.id;
+                        const availableSeats = cls.maxStudents - cls.enrolledCount;
+                        const isFull = availableSeats <= 0;
+
+                        return (
+                          <button
+                            key={cls.id}
+                            type="button"
+                            onClick={() => { if (!isFull) { setSelectedClassId(cls.id); clearError('classId'); } }}
+                            disabled={isFull}
+                            className={cn(
+                              'w-full px-4 py-3 text-left border-b last:border-b-0 transition-colors',
+                              isFull
+                                ? 'bg-red-50 cursor-not-allowed'
+                                : isSelected
+                                  ? 'bg-green-100'
+                                  : idx % 2 === 1
+                                    ? 'bg-gray-50/50 hover:bg-green-50/60'
+                                    : 'hover:bg-green-50/60'
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm">{cls.name}</span>
+                                  {subject && (
+                                    <Badge variant="outline" className="text-xs" style={{ backgroundColor: `${subject.color}15`, color: subject.color, borderColor: `${subject.color}40` }}>
+                                      {subject.name}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                  {teacher && <span>{teacher.nickname || teacher.name}</span>}
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {cls.daysOfWeek?.map((d: number) => getDayName(d)).join(', ')} {formatTime(cls.startTime)}-{formatTime(cls.endTime)}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Users className="h-3 w-3" />
+                                    {cls.enrolledCount}/{cls.maxStudents}
+                                    {isFull && <span className="text-red-500 font-medium">(เต็ม)</span>}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {formatDateCompact(cls.startDate)} - {formatDateCompact(cls.endDate)}
+                                  </span>
+                                  <span>{cls.totalSessions} ครั้ง</span>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0 ml-2">
+                                <span className="text-sm font-semibold">{formatCurrency(cls.pricing?.totalPrice || 0)}</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {/* Selected class detail - session progress */}
+                {classInfo && classStats && (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm font-medium text-blue-800 mb-2">
+                      <CheckCircle className="h-4 w-4" />
+                      {classInfo.cls.name}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-gray-700">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                        {formatDateCompact(classInfo.cls.startDate)} - {formatDateCompact(classInfo.cls.endDate)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 mt-1.5 text-sm">
+                      <span className="text-gray-600">
+                        เรียนไปแล้ว <span className="font-semibold text-green-600">{classStats.completedSessions}</span>/{classStats.totalSessions} ครั้ง
+                      </span>
+                      {classStats.completedSessions > 0 && (
+                        <span className="text-orange-600 font-medium flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          ต้องชดเชย {classStats.completedSessions} ครั้ง
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 4: Payment + Billing + Summary */}
+        {step === 4 && (
+          <div className="space-y-5">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">สรุปราคา</CardTitle>
               </CardHeader>
               <CardContent>
                 {classInfo ? priceSummary : (
-                  <p className="text-sm text-gray-400 text-center py-4">เลือกคลาสเพื่อดูราคา</p>
+                  <p className="text-sm text-gray-400 text-center py-4">ไม่พบข้อมูลคลาส</p>
                 )}
               </CardContent>
             </Card>
 
-            {classInfo && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">การชำระเงิน</CardTitle>
-                </CardHeader>
-                <CardContent>{paymentSection}</CardContent>
-              </Card>
-            )}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">การชำระเงิน</CardTitle>
+              </CardHeader>
+              <CardContent>{paymentSection}</CardContent>
+            </Card>
 
-            {classInfo && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">ใบกำกับภาษี</CardTitle>
-                </CardHeader>
-                <CardContent>{billingSection}</CardContent>
-              </Card>
-            )}
-
-            {submitButton}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">ใบกำกับภาษี</CardTitle>
+              </CardHeader>
+              <CardContent>{billingSection}</CardContent>
+            </Card>
           </div>
-        </div>
+        )}
+
+        {stepActions}
       </div>
     );
   }

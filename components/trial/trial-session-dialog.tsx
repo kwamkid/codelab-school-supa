@@ -30,6 +30,7 @@ interface TrialSessionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   bookingId: string;
+  bookingBranchId?: string;
   students: Array<{
     name: string;
     schoolName?: string;
@@ -40,17 +41,20 @@ interface TrialSessionDialogProps {
   teachers: Teacher[];
   branches: Branch[];
   onSuccess: () => void;
+  defaultStudent?: string;
 }
 
 export default function TrialSessionDialog({
   isOpen,
   onClose,
   bookingId,
+  bookingBranchId,
   students,
   subjects: initialSubjects,
   teachers: initialTeachers,
   branches: initialBranches,
-  onSuccess
+  onSuccess,
+  defaultStudent
 }: TrialSessionDialogProps) {
   const [selectedStudent, setSelectedStudent] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -82,25 +86,21 @@ export default function TrialSessionDialog({
   // Auto-select student and reset form when dialog opens
   useEffect(() => {
     if (isOpen && students.length > 0) {
-      setSelectedStudent(students[0].name);
-      resetForm();
+      setSelectedStudent(defaultStudent || students[0].name);
+      setFormData({
+        subjectId: '',
+        scheduledDate: '',
+        startTime: '10:00',
+        endTime: '11:00',
+        teacherId: '',
+        branchId: bookingBranchId || '',
+        roomId: '',
+      });
+      setAvailabilityIssues([]);
+      setExistingTrialsCount(0);
+      setExistingTrials([]);
     }
-  }, [isOpen]);
-
-  const resetForm = () => {
-    setFormData({
-      subjectId: '',
-      scheduledDate: '',
-      startTime: '10:00',
-      endTime: '11:00',
-      teacherId: '',
-      branchId: '',
-      roomId: '',
-    });
-    setAvailabilityIssues([]);
-    setExistingTrialsCount(0);
-    setExistingTrials([]);
-  };
+  }, [isOpen, bookingBranchId]);
 
   // Load rooms when branch changes
   useEffect(() => {
@@ -291,7 +291,18 @@ export default function TrialSessionDialog({
                     type="button"
                     onClick={() => {
                       setSelectedStudent(student.name);
-                      resetForm();
+                      setFormData({
+                        subjectId: '',
+                        scheduledDate: '',
+                        startTime: '10:00',
+                        endTime: '11:00',
+                        teacherId: '',
+                        branchId: bookingBranchId || '',
+                        roomId: '',
+                      });
+                      setAvailabilityIssues([]);
+                      setExistingTrialsCount(0);
+                      setExistingTrials([]);
                     }}
                     className={cn(
                       "px-3 py-1.5 text-sm rounded-full border transition-colors",
@@ -352,19 +363,21 @@ export default function TrialSessionDialog({
             {/* Form fields */}
             <div className="space-y-3">
               {/* Row 1: Branch and Subject */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>สาขา *</Label>
-                  <FormSelect
-                    value={formData.branchId}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, branchId: value, subjectId: '' }))}
-                    placeholder="เลือกสาขา"
-                    options={branches.map((branch) => ({
-                      value: branch.id,
-                      label: branch.name,
-                    }))}
-                  />
-                </div>
+              <div className={bookingBranchId ? '' : 'grid grid-cols-2 gap-3'}>
+                {!bookingBranchId && (
+                  <div className="space-y-1.5">
+                    <Label>สาขา *</Label>
+                    <FormSelect
+                      value={formData.branchId}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, branchId: value, subjectId: '' }))}
+                      placeholder="เลือกสาขา"
+                      options={branches.map((branch) => ({
+                        value: branch.id,
+                        label: branch.name,
+                      }))}
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label>วิชา *</Label>
@@ -475,7 +488,7 @@ export default function TrialSessionDialog({
                               >
                                 {trialSubject?.name || 'ไม่ระบุวิชา'}
                               </Badge>
-                              <span className="text-xs opacity-70">{trial.startTime}-{trial.endTime}</span>
+                              <span className="text-xs opacity-70">{trial.startTime?.slice(0, 5)}-{trial.endTime?.slice(0, 5)}</span>
                             </div>
                           );
                         })}

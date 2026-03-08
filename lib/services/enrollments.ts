@@ -1,7 +1,7 @@
 import { Enrollment, Class } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
 import { getClassSchedules, incrementEnrolledCount, decrementEnrolledCount } from './classes';
-import { createMakeupRequest } from './makeup';
+import { createMakeupRequest, getMakeupClassesByStudent, cancelMakeupClass } from './makeup';
 import { getClass } from './classes';
 import { adminMutation } from '@/lib/admin-mutation';
 
@@ -519,8 +519,8 @@ async function createMakeupForMissedSessions(
           studentId: studentId,
           parentId: parentId,
           requestDate: new Date(),
-          requestedBy: parentId, // Use parent ID for auto-generated requests
-          reason: 'สมัครเรียนหลังจากคลาสเริ่มแล้ว (Auto-generated)',
+          requestedBy: parentId,
+          reason: 'สมัครเรียนหลังจากคลาสเริ่มแล้ว',
           status: 'pending',
           originalSessionNumber: schedule.sessionNumber,
           originalSessionDate: schedule.sessionDate
@@ -661,6 +661,24 @@ export async function cancelEnrollment(
 
     // Decrement enrolled count on class
     await decrementEnrolledCount(enrollment.classId);
+
+    // Cancel all pending/scheduled makeup classes for this student+class
+    try {
+      const studentMakeups = await getMakeupClassesByStudent(enrollment.studentId);
+      const classRelatedMakeups = studentMakeups.filter(
+        m => m.originalClassId === enrollment.classId &&
+             (m.status === 'pending' || m.status === 'scheduled')
+      );
+      for (const makeup of classRelatedMakeups) {
+        await cancelMakeupClass(makeup.id, `ยกเลิกอัตโนมัติ - ยกเลิกลงทะเบียน: ${reason}`, 'system');
+      }
+      if (classRelatedMakeups.length > 0) {
+        console.log(`Cancelled ${classRelatedMakeups.length} makeup classes for dropped enrollment ${id}`);
+      }
+    } catch (makeupError) {
+      console.error('Error cleaning up makeup classes:', makeupError);
+      // Don't throw - enrollment cancellation should still succeed
+    }
 
     // Fire-and-forget: notify FB audience sync
     fetch('/api/fb/enrollment-status-change', {

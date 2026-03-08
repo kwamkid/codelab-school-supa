@@ -65,6 +65,7 @@ export interface UnifiedEnrollmentData {
   // Billing
   billingType?: 'personal' | 'company';
   billingName?: string;
+  billingPhone?: string;
   billingAddress?: {
     houseNumber: string;
     street: string;
@@ -74,6 +75,7 @@ export interface UnifiedEnrollmentData {
     postalCode: string;
   };
   billingTaxId?: string;
+  billingCompanyName?: string;
   billingCompanyBranch?: string;
   wantTaxInvoice?: boolean;
 }
@@ -293,10 +295,10 @@ export async function processUnifiedEnrollment(
         invoiceCompanyId: branchData.invoiceCompanyId,
         enrollmentId: enrollments.length === 1 ? enrollments[0].enrollmentId : undefined,
         branchId: data.branchId,
-        customerName: data.parentName,
-        customerPhone: data.parentPhone,
+        customerName: data.billingName || data.parentName,
+        customerPhone: data.billingPhone || data.parentPhone,
         customerEmail: data.parentEmail,
-        customerAddress: data.address as any,
+        customerAddress: data.billingAddress as any,
         customerTaxId: data.billingTaxId,
         items: invoiceItems,
         subtotal: netSubtotal,
@@ -317,9 +319,10 @@ export async function processUnifiedEnrollment(
         invoiceId = await createTaxInvoice({
           ...commonData,
           billingType: data.billingType || 'personal',
-          billingName: data.billingName || data.parentName,
+          billingName: data.billingCompanyName || data.billingName || data.parentName,
           billingAddress: data.billingAddress as any,
           billingTaxId: data.billingTaxId,
+          billingCompanyName: data.billingCompanyName,
           billingCompanyBranch: data.billingCompanyBranch,
         });
       } else {

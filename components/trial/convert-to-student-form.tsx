@@ -1091,7 +1091,7 @@ export default function ConvertToStudentForm({
                                 <Calendar className="h-3 w-3" />
                                 {cls.daysOfWeek.map(d => ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'][d]).join(', ')}
                               </span>
-                              <span className="shrink-0">{cls.startTime} - {cls.endTime}</span>
+                              <span className="shrink-0">{cls.startTime?.slice(0, 5)} - {cls.endTime?.slice(0, 5)}</span>
                             </div>
                           </div>
                           <div className="text-left sm:text-right">

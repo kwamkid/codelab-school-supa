@@ -33,7 +33,6 @@ import {
   Calendar,
   Clock,
   MapPin,
-  School,
   GraduationCap,
   Plus,
   Edit,
@@ -260,7 +259,9 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
     const student = booking.students[idx];
     setTempStudentData({
       name: student.name,
-      birthdate: student.birthdate ? new Date(student.birthdate).toISOString().split('T')[0] : '',
+      birthdate: student.birthdate
+        ? new Date(student.birthdate).toISOString().split('T')[0]
+        : '',
       schoolName: student.schoolName || '',
       gradeLevel: student.gradeLevel || ''
     });
@@ -425,13 +426,57 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
               <TestTube className="h-8 w-8 text-red-500" />
               รายละเอียดการจองทดลองเรียน
             </h1>
-            <p className="text-gray-600 mt-1">
-              จองเมื่อ {formatDate(booking.createdAt, 'full')}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-gray-600">
+                จองเมื่อ {formatDate(booking.createdAt, 'full')}
+              </p>
+              {getSourceBadge(booking.source)}
+              {getStatusBadge(booking.status)}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {getSourceBadge(booking.source)}
-            {getStatusBadge(booking.status)}
+          {/* Action buttons - changes by status */}
+          <div className="flex items-center gap-2 shrink-0">
+            {booking.status === 'new' && (
+              <Button
+                onClick={() => handleStatusUpdate('contacted')}
+                variant="outline"
+                size="sm"
+              >
+                <PhoneCall className="h-4 w-4 mr-1" />
+                บันทึกว่าติดต่อแล้ว
+              </Button>
+            )}
+            {booking.status === 'contacted' && sessions.length > 0 && (
+              <Button
+                onClick={() => handleStatusUpdate('scheduled')}
+                variant="outline"
+                size="sm"
+              >
+                <CalendarCheck className="h-4 w-4 mr-1" />
+                เปลี่ยนเป็นนัดหมายแล้ว
+              </Button>
+            )}
+            {booking.status === 'contacted' && (
+              <Button
+                onClick={() => handleStatusUpdate('new')}
+                variant="ghost"
+                size="sm"
+                className="text-gray-500"
+              >
+                กลับเป็นใหม่
+              </Button>
+            )}
+            {(booking.status === 'new' || booking.status === 'contacted' || booking.status === 'scheduled') && (
+              <Button
+                onClick={() => setCancelDialogOpen(true)}
+                variant="outline"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                ยกเลิก
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -439,10 +484,8 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Booking Info */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Parent & Students Info - 2 columns */}
-          <div className="grid grid-cols-2 md:grid-cols-2 gap-6">
-            {/* Parent Info */}
-            <Card>
+          {/* Parent Info */}
+          <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -512,141 +555,20 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                         </p>
                       </div>
                     )}
+                    <div>
+                      <p className="text-xs text-gray-500">สาขา</p>
+                      <p className="font-medium flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-gray-400" />
+                        {booking.branchId ? (branches.find(b => b.id === booking.branchId)?.name || booking.branchId) : <span className="text-amber-600">ยังไม่ได้เลือกสาขา</span>}
+                      </p>
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Students Info */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <GraduationCap className="h-5 w-5 text-gray-400" />
-                  นักเรียน ({booking.students.length} คน)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {booking.students.map((student, idx) => (
-                    <div key={idx} className="border rounded-lg p-3 hover:shadow-md transition-shadow">
-                      {editingStudent === idx ? (
-                        <div className="space-y-3">
-                          <Input
-                            placeholder="ชื่อ-นามสกุล"
-                            value={tempStudentData.name}
-                            onChange={(e) => setTempStudentData(prev => ({ ...prev, name: e.target.value }))}
-                            className="text-base"
-                          />
-                          <div>
-                            <DateRangePicker
-                              mode="single"
-                              value={tempStudentData.birthdate}
-                              onChange={(date) => setTempStudentData(prev => ({ ...prev, birthdate: date || '' }))}
-                              maxDate={new Date()}
-                              placeholder="เลือกวันที่"
-                            />
-                            {tempStudentData.birthdate && (
-                              <p className="text-sm text-gray-500 mt-1">
-                                อายุ: {calculateAge(new Date(tempStudentData.birthdate))} ปี
-                              </p>
-                            )}
-                          </div>
-                          <SchoolNameCombobox
-                            placeholder="โรงเรียน"
-                            value={tempStudentData.schoolName}
-                            onChange={(value) => setTempStudentData(prev => ({ ...prev, schoolName: value }))}
-                            className="text-base"
-                          />
-                          <GradeLevelCombobox
-                            value={tempStudentData.gradeLevel}
-                            onChange={(value) => setTempStudentData(prev => ({ ...prev, gradeLevel: value }))}
-                            placeholder="ระดับชั้น..."
-                            className="text-base"
-                          />
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={handleStudentSave} className="text-base">บันทึก</Button>
-                            <Button size="sm" variant="outline" onClick={() => setEditingStudent(null)} className="text-base">ยกเลิก</Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 space-y-1">
-                              {/* Row 1: Name + Birthday */}
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium text-base">{student.name}</span>
-                                {student.birthdate && (
-                                  <span className="text-base text-gray-500">
-                                    ({calculateAge(student.birthdate)} ปี)
-                                  </span>
-                                )}
-                              </div>
-                              {/* Row 2: School + Grade */}
-                              {(student.schoolName || student.gradeLevel) && (
-                                <div className="flex items-center gap-2 text-base text-gray-600">
-                                  {student.schoolName && (
-                                    <span className="flex items-center gap-1">
-                                      <School className="h-4 w-4" />
-                                      {student.schoolName}
-                                    </span>
-                                  )}
-                                  {student.gradeLevel && (
-                                    <span>{student.gradeLevel}</span>
-                                  )}
-                                </div>
-                              )}
-                              {/* Row 3: Subject interests */}
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-base text-gray-500">วิชาที่สนใจ:</span>
-                                {student.subjectInterests.map(subjectId => {
-                                  const subject = subjects.find(s => s.id === subjectId);
-                                  return subject ? (
-                                    <Badge
-                                      key={subjectId}
-                                      className="text-sm h-6 px-2"
-                                      style={{
-                                        backgroundColor: `${subject.color}20`,
-                                        color: subject.color,
-                                        borderColor: subject.color
-                                      }}
-                                    >
-                                      {subject.name}
-                                    </Badge>
-                                  ) : null;
-                                })}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-0.5">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => handleStudentEdit(idx)}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              {isSuperAdmin && booking.students.length > 1 && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                  onClick={() => setDeleteStudentIndex(idx)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Trial Sessions */}
+          {/* Trial Sessions - Grouped by Student */}
           <Card>
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
@@ -656,16 +578,6 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                     จัดการนัดหมายทดลองเรียนสำหรับแต่ละนักเรียน
                   </CardDescription>
                 </div>
-                {unscheduledStudents.length > 0 && booking.branchId && (
-                  <Button
-                    onClick={() => setSessionModalOpen(true)}
-                    size="sm"
-                    className="bg-red-500 hover:bg-red-600"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    นัดหมาย
-                  </Button>
-                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -676,350 +588,375 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                     กรุณาเลือกสาขาก่อนจึงจะสามารถนัดหมายทดลองเรียนได้
                   </AlertDescription>
                 </Alert>
-              ) : sessions.length === 0 ? (
-                <div className="text-center py-8">
-                  <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">ยังไม่มีการนัดหมายทดลองเรียน</p>
-                  {booking.status === 'new' && (
-                    <p className="text-sm text-gray-400 mt-2">
-                      กรุณาติดต่อผู้ปกครองก่อนนัดหมาย
-                    </p>
-                  )}
-                </div>
               ) : (
-                <div>
-                  <Table className="table-fixed w-full">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[14%]">นักเรียน</TableHead>
-                        <TableHead className="w-[10%]">วิชา</TableHead>
-                        <TableHead className="w-[18%]">วันที่และเวลา</TableHead>
-                        <TableHead className="w-[20%]">สาขา/ครู/ห้อง</TableHead>
-                        <TableHead className="w-[14%] text-center">การเข้าเรียน</TableHead>
-                        <TableHead className="w-[14%]">ประวัติ</TableHead>
-                        <TableHead className="w-[10%] text-right">จัดการ</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sessions.map((session) => {
-                        const subject = subjects.find(s => s.id === session.subjectId);
-                        const teacher = teachers.find(t => t.id === session.teacherId);
-                        const branch = branches.find(b => b.id === session.branchId);
-                        const room = rooms[session.branchId]?.find(r => r.id === session.roomId);
-                        const isPast = new Date(session.scheduledDate) < new Date();
-                        
-                        return (
-                          <TableRow key={session.id} className={session.status === 'cancelled' ? 'opacity-60' : ''}>
-                            <TableCell>
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">{session.studentName}</div>
-                                {session.converted && (
-                                  <Badge className="mt-1 bg-emerald-100 text-emerald-700" variant="outline">
-                                    <UserPlus className="h-3 w-3 mr-1" />
-                                    ลงทะเบียนแล้ว
-                                  </Badge>
+                <div className="space-y-4">
+                  {booking.students.map((student, studentIdx) => {
+                    const studentSessions = sessions.filter(s => s.studentName === student.name);
+                    const hasSession = studentSessions.length > 0;
+
+                    return (
+                      <div key={studentIdx} className="border rounded-lg overflow-hidden">
+                        {/* Student header */}
+                        <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <GraduationCap className="h-4 w-4 text-gray-500" />
+                            <span className="font-semibold text-base">{student.name}</span>
+                            {student.birthdate && (
+                              <span className="text-sm text-gray-500">({calculateAge(student.birthdate)} ปี)</span>
+                            )}
+                            {(student.schoolName || student.gradeLevel) && (
+                              <span className="text-sm text-gray-500">
+                                {[student.schoolName, student.gradeLevel].filter(Boolean).join(' / ')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {student.subjectInterests.map(subjectId => {
+                              const subject = subjects.find(s => s.id === subjectId);
+                              return subject ? (
+                                <Badge
+                                  key={subjectId}
+                                  className="text-xs h-5 px-2"
+                                  style={{
+                                    backgroundColor: `${subject.color}20`,
+                                    color: subject.color,
+                                    borderColor: subject.color
+                                  }}
+                                >
+                                  {subject.name}
+                                </Badge>
+                              ) : null;
+                            })}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleStudentEdit(studentIdx)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            {isSuperAdmin && booking.students.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => setDeleteStudentIndex(studentIdx)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Student edit form */}
+                        {editingStudent === studentIdx && (
+                          <div className="px-4 py-3 border-b bg-white space-y-3">
+                            {/* Row 1: ชื่อ + วันเกิด */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <Input
+                                placeholder="ชื่อ-นามสกุล"
+                                value={tempStudentData.name}
+                                onChange={(e) => setTempStudentData(prev => ({ ...prev, name: e.target.value }))}
+                                className="text-base"
+                              />
+                              <div>
+                                <DateRangePicker
+                                  mode="single"
+                                  value={tempStudentData.birthdate}
+                                  onChange={(date) => setTempStudentData(prev => ({ ...prev, birthdate: date || '' }))}
+                                  maxDate={new Date()}
+                                  placeholder="วันเกิด"
+                                />
+                                {tempStudentData.birthdate && (
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    อายุ: {calculateAge(new Date(tempStudentData.birthdate))} ปี
+                                  </p>
                                 )}
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge style={{ backgroundColor: subject?.color || '#EF4444' }}>
-                                {subject?.name}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{formatDate(session.scheduledDate)}</div>
-                                <div className="text-sm text-gray-600">
-                                  {session.startTime?.slice(0, 5)} - {session.endTime?.slice(0, 5)}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">{branch?.name}</div>
-                                <div className="text-sm text-gray-600 truncate">
-                                  ครู{teacher?.nickname || teacher?.name}
-                                </div>
-                                <div className="text-sm text-gray-600 truncate" title={`ห้อง ${session.roomName || room?.name || session.roomId}`}>
-                                  ห้อง {session.roomName || room?.name || session.roomId}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {session.converted ? (
-                                <Badge className="bg-emerald-100 text-emerald-700">
-                                  <UserPlus className="h-3 w-3 mr-1" />
-                                  ลงทะเบียนแล้ว
-                                </Badge>
-                              ) : (
-                                <>
-                                  {session.status === 'scheduled' && isPast ? (
-                                    <div className="flex gap-2 justify-center">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
-                                        disabled={savingSessionId === session.id}
-                                        onClick={async () => {
-                                          setSavingSessionId(session.id);
-                                          try {
-                                            await updateTrialSession(session.id, {
-                                              status: 'attended',
-                                              attended: true
-                                            });
+                            </div>
+                            {/* Row 2: โรงเรียน + ระดับชั้น */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <SchoolNameCombobox
+                                placeholder="โรงเรียน"
+                                value={tempStudentData.schoolName}
+                                onChange={(value) => setTempStudentData(prev => ({ ...prev, schoolName: value }))}
+                                className="text-base"
+                              />
+                              <GradeLevelCombobox
+                                value={tempStudentData.gradeLevel}
+                                onChange={(value) => setTempStudentData(prev => ({ ...prev, gradeLevel: value }))}
+                                placeholder="ระดับชั้น..."
+                                className="text-base"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={handleStudentSave} className="text-base">บันทึก</Button>
+                              <Button size="sm" variant="outline" onClick={() => setEditingStudent(null)} className="text-base">ยกเลิก</Button>
+                            </div>
+                          </div>
+                        )}
 
-                                            const updatedSessions = sessions.map(s =>
-                                              s.id === session.id ? { ...s, status: 'attended' as const } : s
-                                            );
-                                            const allCompleted = updatedSessions.every(s =>
-                                              s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted
-                                            );
+                        {/* Student sessions or schedule prompt */}
+                        <div className="p-4">
+                          {hasSession ? (
+                            <div className="space-y-3">
+                              {studentSessions.map((session) => {
+                                const subject = subjects.find(s => s.id === session.subjectId);
+                                const teacher = teachers.find(t => t.id === session.teacherId);
+                                const branch = branches.find(b => b.id === session.branchId);
+                                const room = rooms[session.branchId]?.find(r => r.id === session.roomId);
+                                const isPast = new Date(session.scheduledDate) < new Date();
 
-                                            if (allCompleted) {
-                                              await updateBookingStatus(booking.id, 'completed');
-                                            }
-
-                                            toast.success('บันทึกการเข้าเรียนสำเร็จ');
-                                            loadData();
-                                          } catch (error) {
-                                            toast.error('เกิดข้อผิดพลาดในการบันทึก');
-                                          } finally {
-                                            setSavingSessionId(null);
-                                          }
-                                        }}
-                                      >
-                                        {savingSessionId === session.id ? (
-                                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                        ) : (
-                                          <CheckCircle className="h-4 w-4 mr-1" />
+                                return (
+                                  <div
+                                    key={session.id}
+                                    className={`border rounded-lg p-3 ${session.status === 'cancelled' ? 'opacity-60 bg-gray-50' : 'hover:shadow-sm'}`}
+                                  >
+                                    {/* Subject + status + menu */}
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                        <Badge
+                                          className="text-xs"
+                                          style={{ backgroundColor: `${subject?.color || '#EF4444'}20`, color: subject?.color || '#EF4444', borderColor: `${subject?.color || '#EF4444'}40` }}
+                                        >
+                                          {subject?.name}
+                                        </Badge>
+                                        {session.converted && (
+                                          <Badge className="bg-emerald-100 text-emerald-700 text-xs">
+                                            <UserPlus className="h-3 w-3 mr-1" />
+                                            ลงทะเบียนแล้ว
+                                          </Badge>
                                         )}
-                                        มาเรียน
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="bg-red-50 hover:bg-red-100 text-red-700 border-red-300"
-                                        disabled={savingSessionId === session.id}
-                                        onClick={async () => {
-                                          setSavingSessionId(session.id);
-                                          try {
-                                            await updateTrialSession(session.id, {
-                                              status: 'absent',
-                                              attended: false
-                                            });
-
-                                            const updatedSessions = sessions.map(s =>
-                                              s.id === session.id ? { ...s, status: 'absent' as const } : s
-                                            );
-                                            const allCompleted = updatedSessions.every(s =>
-                                              s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted
-                                            );
-
-                                            if (allCompleted) {
-                                              await updateBookingStatus(booking.id, 'completed');
-                                            }
-
-                                            toast.success('บันทึกว่าไม่มาเรียน');
-                                            loadData();
-                                          } catch (error) {
-                                            toast.error('เกิดข้อผิดพลาดในการบันทึก');
-                                          } finally {
-                                            setSavingSessionId(null);
-                                          }
-                                        }}
-                                      >
-                                        {savingSessionId === session.id ? (
-                                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                        ) : (
-                                          <XCircle className="h-4 w-4 mr-1" />
-                                        )}
-                                        ไม่มา
-                                      </Button>
+                                      </div>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0">
+                                            <MoreVertical className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56 z-50">
+                                          {session.converted ? (
+                                            <DropdownMenuItem disabled className="text-gray-400">
+                                              <CheckCircle className="h-4 w-4 mr-2" />
+                                              ลงทะเบียนเรียบร้อยแล้ว
+                                            </DropdownMenuItem>
+                                          ) : (
+                                            <>
+                                              {session.status === 'scheduled' && isPast && (
+                                                <DropdownMenuItem
+                                                  onSelect={async () => {
+                                                    try {
+                                                      await updateTrialSession(session.id, { status: 'attended', attended: true });
+                                                      const allOther = sessions.filter(s => s.id !== session.id);
+                                                      if (allOther.every(s => s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted)) {
+                                                        await updateBookingStatus(booking.id, 'completed');
+                                                      }
+                                                      toast.success('บันทึกการเข้าเรียนสำเร็จ');
+                                                      loadData();
+                                                    } catch { toast.error('เกิดข้อผิดพลาด'); }
+                                                  }}
+                                                >
+                                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                                  บันทึกว่าเข้าเรียนแล้ว
+                                                </DropdownMenuItem>
+                                              )}
+                                              {!session.converted && (
+                                                <DropdownMenuItem
+                                                  onSelect={() => router.push(`/enrollments/new?from=trial&bookingId=${booking.id}&sessionId=${session.id}`)}
+                                                  className="text-green-600 focus:text-green-600"
+                                                >
+                                                  <UserPlus className="h-4 w-4 mr-2" />
+                                                  ลงทะเบียนเรียน
+                                                </DropdownMenuItem>
+                                              )}
+                                              {((session.status === 'scheduled' && !isPast) || session.status === 'cancelled' || session.status === 'absent') && (
+                                                <DropdownMenuItem onSelect={() => { setSelectedSession(session); setRescheduleModalOpen(true); }}>
+                                                  <Edit className="h-4 w-4 mr-2" />
+                                                  {session.status === 'cancelled' ? 'นัดวันใหม่' : 'เปลี่ยนวันนัดหมาย'}
+                                                </DropdownMenuItem>
+                                              )}
+                                              {session.status === 'scheduled' && !isPast && (
+                                                <>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem className="text-red-600 focus:text-red-600" onSelect={() => setCancelSessionId(session.id)}>
+                                                    <XCircle className="h-4 w-4 mr-2" />
+                                                    ยกเลิกนัดหมาย
+                                                  </DropdownMenuItem>
+                                                </>
+                                              )}
+                                            </>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
                                     </div>
-                                  ) : session.status === 'scheduled' && !isPast ? (
-                                    <Badge className="bg-purple-100 text-purple-700">
-                                      รอถึงวัน
-                                    </Badge>
-                                  ) : session.status === 'cancelled' ? (
-                                    <Badge className="bg-gray-100 text-gray-700">
-                                      ยกเลิก
-                                    </Badge>
-                                  ) : (
-                                    <Badge className={
-                                      session.status === 'attended' ? 'bg-green-100 text-green-700' :
-                                      session.status === 'absent' ? 'bg-red-100 text-red-700' :
-                                      'bg-gray-100 text-gray-700'
-                                    }>
-                                      {session.status === 'attended' ? 'เข้าเรียนแล้ว' :
-                                       session.status === 'absent' ? 'ไม่มาเรียน' :
-                                       'ยกเลิก'}
-                                    </Badge>
-                                  )}
-                                </>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {session.rescheduleHistory && session.rescheduleHistory.length > 0 && (
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm"
-                                      className="h-auto py-1 px-2"
-                                    >
-                                      <History className="h-3 w-3 mr-1" />
-                                      เลื่อน {session.rescheduleHistory.length} ครั้ง
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-80">
-                                    <div className="space-y-3">
-                                      <h4 className="font-medium text-sm flex items-center gap-2">
-                                        <Clock className="h-4 w-4" />
-                                        ประวัติการเลื่อนนัด
-                                      </h4>
-                                      <div className="space-y-3 max-h-64 overflow-y-auto">
-                                        {session.rescheduleHistory.map((history, idx) => {
-                                          const originalDate = history.originalDate instanceof Date 
-                                            ? history.originalDate 
-                                            : new Date((history.originalDate as any).seconds * 1000);
-                                          const newDate = history.newDate instanceof Date 
-                                            ? history.newDate 
-                                            : new Date((history.newDate as any).seconds * 1000);
-                                          const rescheduledAt = history.rescheduledAt instanceof Date 
-                                            ? history.rescheduledAt 
-                                            : new Date((history.rescheduledAt as any).seconds * 1000);
-                                          
-                                          return (
-                                            <div key={idx} className="text-sm border-l-2 border-gray-200 pl-3">
-                                              <div className="font-medium mb-1">ครั้งที่ {idx + 1}</div>
-                                              <div className="text-gray-600 space-y-0.5 text-xs">
-                                                <div className="flex items-start gap-1">
-                                                  <span className="text-gray-500">จาก:</span>
-                                                  <span>{formatDate(originalDate)} {history.originalTime}</span>
-                                                </div>
-                                                <div className="flex items-start gap-1">
-                                                  <span className="text-gray-500">เป็น:</span>
-                                                  <span>{formatDate(newDate)} {history.newTime}</span>
-                                                </div>
-                                                <div className="flex items-start gap-1">
-                                                  <span className="text-gray-500">เหตุผล:</span>
-                                                  <span>{history.reason}</span>
-                                                </div>
-                                                <div className="flex items-start gap-1">
-                                                  <span className="text-gray-500">เมื่อ:</span>
-                                                  <span>{formatDate(rescheduledAt, 'full')}</span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
+
+                                    {/* Date/Time + Branch/Teacher/Room */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-sm text-gray-600 mb-3">
+                                      <div className="flex items-center gap-1.5">
+                                        <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                        <span>{formatDate(session.scheduledDate)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <Clock className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                        <span>{session.startTime?.slice(0, 5)} - {session.endTime?.slice(0, 5)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                        <span>{branch?.name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                        <span>ครู{teacher?.nickname || teacher?.name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 col-span-2 sm:col-span-1">
+                                        <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                        <span>ห้อง {session.roomName || room?.name || '-'}</span>
                                       </div>
                                     </div>
-                                  </PopoverContent>
-                                </Popover>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <span className="sr-only">Open menu</span>
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56 z-50">
-                                  {session.converted ? (
-                                    <DropdownMenuItem disabled className="text-gray-400">
-                                      <CheckCircle className="h-4 w-4 mr-2" />
-                                      ลงทะเบียนเรียบร้อยแล้ว
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <>
-                                      {session.status === 'scheduled' && isPast && (
-                                        <DropdownMenuItem
-                                          onSelect={async () => {
-                                            try {
-                                              await updateTrialSession(session.id, {
-                                                status: 'attended',
-                                                attended: true
-                                              });
-                                              
-                                              const allSessions = sessions.filter(s => s.id !== session.id);
-                                              const allAttended = allSessions.every(s => 
-                                                s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted
-                                              );
-                                              
-                                              if (allAttended) {
-                                                await updateBookingStatus(booking.id, 'completed');
-                                              }
-                                              
-                                              toast.success('บันทึกการเข้าเรียนสำเร็จ');
-                                              loadData();
-                                            } catch (error) {
-                                              console.error('Error updating attendance:', error);
-                                              toast.error('เกิดข้อผิดพลาดในการบันทึก');
-                                            }
-                                          }}
-                                        >
-                                          <CheckCircle className="h-4 w-4 mr-2" />
-                                          บันทึกว่าเข้าเรียนแล้ว
-                                        </DropdownMenuItem>
+
+                                    {/* Attendance + Reschedule history */}
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                      <div>
+                                        {session.converted ? (
+                                          <Badge className="bg-emerald-100 text-emerald-700">
+                                            <UserPlus className="h-3 w-3 mr-1" />
+                                            ลงทะเบียนแล้ว
+                                          </Badge>
+                                        ) : session.status === 'scheduled' && isPast ? (
+                                          <div className="flex gap-2">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300 h-8"
+                                              disabled={savingSessionId === session.id}
+                                              onClick={async () => {
+                                                setSavingSessionId(session.id);
+                                                try {
+                                                  await updateTrialSession(session.id, { status: 'attended', attended: true });
+                                                  const updated = sessions.map(s => s.id === session.id ? { ...s, status: 'attended' as const } : s);
+                                                  if (updated.every(s => s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted)) {
+                                                    await updateBookingStatus(booking.id, 'completed');
+                                                  }
+                                                  toast.success('บันทึกการเข้าเรียนสำเร็จ');
+                                                  loadData();
+                                                } catch { toast.error('เกิดข้อผิดพลาด'); } finally { setSavingSessionId(null); }
+                                              }}
+                                            >
+                                              {savingSessionId === session.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                                              มาเรียน
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="bg-red-50 hover:bg-red-100 text-red-700 border-red-300 h-8"
+                                              disabled={savingSessionId === session.id}
+                                              onClick={async () => {
+                                                setSavingSessionId(session.id);
+                                                try {
+                                                  await updateTrialSession(session.id, { status: 'absent', attended: false });
+                                                  const updated = sessions.map(s => s.id === session.id ? { ...s, status: 'absent' as const } : s);
+                                                  if (updated.every(s => s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted)) {
+                                                    await updateBookingStatus(booking.id, 'completed');
+                                                  }
+                                                  toast.success('บันทึกว่าไม่มาเรียน');
+                                                  loadData();
+                                                } catch { toast.error('เกิดข้อผิดพลาด'); } finally { setSavingSessionId(null); }
+                                              }}
+                                            >
+                                              {savingSessionId === session.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
+                                              ไม่มา
+                                            </Button>
+                                          </div>
+                                        ) : session.status === 'scheduled' && !isPast ? (
+                                          <Badge className="bg-purple-100 text-purple-700">รอถึงวัน</Badge>
+                                        ) : session.status === 'cancelled' ? (
+                                          <Badge className="bg-gray-100 text-gray-700">ยกเลิก</Badge>
+                                        ) : (
+                                          <Badge className={
+                                            session.status === 'attended' ? 'bg-green-100 text-green-700' :
+                                            session.status === 'absent' ? 'bg-red-100 text-red-700' :
+                                            'bg-gray-100 text-gray-700'
+                                          }>
+                                            {session.status === 'attended' ? 'เข้าเรียนแล้ว' : session.status === 'absent' ? 'ไม่มาเรียน' : 'ยกเลิก'}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {session.rescheduleHistory && session.rescheduleHistory.length > 0 && (
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+                                              <History className="h-3 w-3 mr-1" />
+                                              เลื่อน {session.rescheduleHistory.length} ครั้ง
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-80">
+                                            <div className="space-y-3">
+                                              <h4 className="font-medium text-sm flex items-center gap-2">
+                                                <Clock className="h-4 w-4" />
+                                                ประวัติการเลื่อนนัด
+                                              </h4>
+                                              <div className="space-y-3 max-h-64 overflow-y-auto">
+                                                {session.rescheduleHistory.map((history, idx) => {
+                                                  const originalDate = history.originalDate instanceof Date ? history.originalDate : new Date((history.originalDate as any).seconds * 1000);
+                                                  const newDate = history.newDate instanceof Date ? history.newDate : new Date((history.newDate as any).seconds * 1000);
+                                                  const rescheduledAt = history.rescheduledAt instanceof Date ? history.rescheduledAt : new Date((history.rescheduledAt as any).seconds * 1000);
+                                                  return (
+                                                    <div key={idx} className="text-sm border-l-2 border-gray-200 pl-3">
+                                                      <div className="font-medium mb-1">ครั้งที่ {idx + 1}</div>
+                                                      <div className="text-gray-600 space-y-0.5 text-xs">
+                                                        <div><span className="text-gray-500">จาก:</span> {formatDate(originalDate)} {history.originalTime}</div>
+                                                        <div><span className="text-gray-500">เป็น:</span> {formatDate(newDate)} {history.newTime}</div>
+                                                        <div><span className="text-gray-500">เหตุผล:</span> {history.reason}</div>
+                                                        <div><span className="text-gray-500">เมื่อ:</span> {formatDate(rescheduledAt, 'full')}</div>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
                                       )}
-                                      
-                                      {!session.converted && (
-                                        <DropdownMenuItem
-                                          onSelect={() => {
-                                            router.push(`/enrollments/new?from=trial&bookingId=${booking.id}&sessionId=${session.id}`);
-                                          }}
-                                          className="text-green-600 focus:text-green-600"
-                                        >
-                                          <UserPlus className="h-4 w-4 mr-2" />
-                                          ลงทะเบียนเรียน
-                                        </DropdownMenuItem>
-                                      )}
-                                      
-                                      {((session.status === 'scheduled' && !isPast) || 
-                                       session.status === 'cancelled' || 
-                                       session.status === 'absent') && (
-                                        <>
-                                          <DropdownMenuItem
-                                            onSelect={() => {
-                                              setSelectedSession(session);
-                                              setRescheduleModalOpen(true);
-                                            }}
-                                          >
-                                            <Edit className="h-4 w-4 mr-2" />
-                                            {session.status === 'cancelled' ? 'นัดวันใหม่' : 'เปลี่ยนวันนัดหมาย'}
-                                          </DropdownMenuItem>
-                                        </>
-                                      )}
-                                      
-                                      {session.status === 'scheduled' && !isPast && (
-                                        <>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem
-                                            className="text-red-600 focus:text-red-600"
-                                            onSelect={() => setCancelSessionId(session.id)}
-                                          >
-                                            <XCircle className="h-4 w-4 mr-2" />
-                                            ยกเลิกนัดหมาย
-                                          </DropdownMenuItem>
-                                        </>
-                                      )}
-                                    </>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {/* Add more sessions button for this student */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-gray-500 hover:text-gray-700"
+                                onClick={() => {
+                                  setSelectedStudent(student.name);
+                                  setSessionModalOpen(true);
+                                }}
+                              >
+                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                เพิ่มนัดหมาย
+                              </Button>
+                            </div>
+                          ) : (
+                            /* No session yet - prompt to schedule */
+                            <div className="flex items-center justify-between py-2">
+                              <p className="text-gray-500 text-sm">ยังไม่มีนัดหมายทดลองเรียน</p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-300 text-red-600 hover:bg-red-50"
+                                onClick={() => {
+                                  setSelectedStudent(student.name);
+                                  setSessionModalOpen(true);
+                                }}
+                              >
+                                <CalendarCheck className="h-4 w-4 mr-1" />
+                                นัดเลยมั้ย?
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -1028,154 +965,6 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
 
         {/* Right Column - Actions & History */}
         <div className="space-y-6">
-          {/* Branch Info */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-gray-400" />
-                  สาขา
-                </CardTitle>
-                {!editingBranch && (
-                  <Button variant="ghost" size="icon" onClick={handleBranchEdit}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {editingBranch ? (
-                <div className="space-y-4">
-                  <Select value={tempBranchId} onValueChange={setTempBranchId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="เลือกสาขา" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleBranchSave} disabled={!tempBranchId} className="flex-1">
-                      <Save className="h-4 w-4 mr-1" />
-                      บันทึก
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => setEditingBranch(false)}
-                      className="flex-1"
-                    >
-                      ยกเลิก
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  {booking.branchId ? (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium">
-                        {branches.find(b => b.id === booking.branchId)?.name || booking.branchId}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="text-center py-2">
-                      <AlertCircle className="h-8 w-8 text-amber-500 mx-auto mb-2" />
-                      <p className="text-amber-600 font-medium text-sm">ยังไม่ได้เลือกสาขา</p>
-                      <p className="text-xs text-gray-600 mt-1">คลิกปุ่มแก้ไขเพื่อเลือกสาขา</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">การดำเนินการ</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {booking.status === 'new' && (
-                <Button
-                  onClick={() => handleStatusUpdate('contacted')}
-                  className="w-full"
-                  variant="outline"
-                >
-                  <PhoneCall className="h-4 w-4 mr-2" />
-                  บันทึกว่าติดต่อแล้ว
-                </Button>
-              )}
-              
-              {booking.status === 'contacted' && (
-                <>
-                  {sessions.length === 0 && (
-                    <Alert className="mb-2">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        กรุณานัดหมายทดลองเรียนให้กับนักเรียน
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {sessions.length > 0 && (
-                    <Button
-                      onClick={() => handleStatusUpdate('scheduled')}
-                      className="w-full mb-2"
-                      variant="outline"
-                    >
-                      <CalendarCheck className="h-4 w-4 mr-2" />
-                      เปลี่ยนสถานะเป็นนัดหมายแล้ว
-                    </Button>
-                  )}
-                  <button
-                    onClick={() => handleStatusUpdate('new')}
-                    className="text-xs text-gray-500 hover:text-gray-700 underline w-full text-center"
-                  >
-                    กลับสถานะเป็นยังไม่ได้ติดต่อ
-                  </button>
-                </>
-              )}
-              
-              {sessions.some(s => s.status === 'attended' && !s.converted) && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    มีนักเรียนที่ทดลองเรียนแล้ว สามารถแปลงเป็นนักเรียนจริงได้
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              {(booking.status === 'new' || booking.status === 'contacted' || booking.status === 'scheduled') && (
-                <>
-                 <div className="pt-2 mt-2 border-t">
-                    <Button
-                      onClick={() => setCancelDialogOpen(true)}
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      ยกเลิกทดลองเรียน
-                    </Button>
-                  </div>
-                </>
-              )}
-              
-              {booking.status === 'cancelled' && (
-                <Alert>
-                  <XCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    การจองนี้ถูกยกเลิกแล้ว
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Contact History */}
           <ContactHistorySection booking={booking} onUpdate={loadData} />
         </div>
@@ -1190,7 +979,9 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
             setSelectedStudent('');
           }}
           bookingId={booking.id}
-          students={unscheduledStudents}
+          bookingBranchId={booking.branchId}
+          students={booking.students}
+          defaultStudent={selectedStudent}
           subjects={subjects}
           teachers={teachers}
           branches={branches}

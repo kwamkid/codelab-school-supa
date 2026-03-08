@@ -508,8 +508,8 @@ async function createMakeupForMissedSessions(
         student_id: studentId,
         parent_id: parentId,
         branch_id: null, // Will be filled from class
-        requested_by: 'system',
-        reason: 'สมัครเรียนหลังจากคลาสเริ่มแล้ว (Auto-generated)',
+        requested_by: parentId,
+        reason: 'สมัครเรียนหลังจากคลาสเริ่มแล้ว',
         status: 'pending' as const,
         original_session_number: schedule.session_number,
         original_session_date: schedule.session_date

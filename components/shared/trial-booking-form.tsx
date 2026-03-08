@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,14 +14,15 @@ import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
 import { SchoolNameCombobox } from '@/components/ui/school-name-combobox';
 import { SubjectSelector } from './subject-selector';
+import { ParentSearchInput, ParentSearchSelection } from './parent-search-input';
 import { cn } from '@/lib/utils';
 import { calculateAge } from '@/lib/utils';
 import {
-  ArrowLeft, Save, Plus, Trash2, User, Phone, Mail, Building2, Calendar,
-  Loader2, AlertCircle, CheckCircle2, XCircle, Info, ChevronRight, ChevronLeft, CheckCircle,
+  ArrowLeft, Save, Plus, Trash2, User, Phone, Building2, Calendar,
+  Loader2, AlertCircle, CheckCircle2, XCircle, Info, ChevronRight, ChevronLeft, CheckCircle, School, GraduationCap,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Subject, Teacher, Branch, Room } from '@/types/models';
+import { Subject, Teacher, Branch, Room, Student } from '@/types/models';
 import { getSubjects } from '@/lib/services/subjects';
 import { getBranches, getActiveBranches } from '@/lib/services/branches';
 import { getTeachers } from '@/lib/services/teachers';
@@ -30,6 +31,7 @@ import { createTrialBooking, createTrialSession } from '@/lib/services/trial-boo
 import { AvailabilityIssue } from '@/lib/utils/availability';
 
 interface StudentForm {
+  id: string; // stable key
   name: string;
   birthdate: string;
   schoolName: string;
@@ -52,19 +54,34 @@ export interface TrialBookingFormProps {
   onCancel?: () => void;
 }
 
-const DEFAULT_STUDENT: StudentForm = {
-  name: '',
-  birthdate: '',
-  schoolName: '',
-  gradeLevel: '',
-  subjectInterests: [],
-};
+let nextStudentId = Date.now();
+function makeStudent(): StudentForm {
+  return { id: `s-${nextStudentId++}`, name: '', birthdate: '', schoolName: '', gradeLevel: '', subjectInterests: [] };
+}
+
+// Section wrapper — must be outside the main component to avoid re-mount on every render
+function Section({ children, title, headerRight, isChat }: { children: React.ReactNode; title?: string; headerRight?: React.ReactNode; isChat?: boolean }) {
+  if (isChat) return <div className="space-y-3">{children}</div>;
+  return (
+    <Card>
+      {title && (
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">{title}</CardTitle>
+            {headerRight}
+          </div>
+        </CardHeader>
+      )}
+      <CardContent className={title ? undefined : 'pt-6'}>{children}</CardContent>
+    </Card>
+  );
+}
 
 export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: TrialBookingFormProps) {
   const isAdmin = context === 'admin';
   const isLiff = context === 'liff';
   const isChat = context === 'chat';
-  const showSessionStep = !isLiff; // LIFF users don't schedule sessions
+  const showSessionStep = !isLiff;
 
   // Loading & data
   const [loading, setLoading] = useState(true);
@@ -75,19 +92,27 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
 
-  // Step state
+  // Step state: 1=parent, 2=students, 3=session
   const [step, setStep] = useState(1);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Step 1: Parent + Students
+  // Inline validation errors: key = field name, value = error message
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Step 1: Parent
+  const [parentMode, setParentMode] = useState<'search' | 'linked'>('search');
+  const [selectedParentId, setSelectedParentId] = useState(prefill?.parentId || '');
   const [parentName, setParentName] = useState(prefill?.parentName || '');
   const [parentPhone, setParentPhone] = useState(prefill?.parentPhone || '');
-  const [parentEmail, setParentEmail] = useState(prefill?.parentEmail || '');
   const [selectedBranch, setSelectedBranch] = useState(prefill?.branchId || '');
-  const [students, setStudents] = useState<StudentForm[]>([{ ...DEFAULT_STUDENT }]);
+  const [existingStudents, setExistingStudents] = useState<Student[]>([]);
+
+  // Step 2: Students (with sub-steps)
+  const [students, setStudents] = useState<StudentForm[]>([makeStudent()]);
+  const [activeStudentIdx, setActiveStudentIdx] = useState(0);
   const [contactNote, setContactNote] = useState('');
 
-  // Step 2: Session scheduling
+  // Step 3: Session scheduling
   const [sessionData, setSessionData] = useState({
     studentIndex: 0,
     subjectId: '',
@@ -100,6 +125,9 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [availabilityIssues, setAvailabilityIssues] = useState<AvailabilityIssue[]>([]);
 
+  // Total steps
+  const totalSteps = showSessionStep ? 3 : 2;
+
   // Load data
   useEffect(() => {
     const load = async () => {
@@ -110,7 +138,6 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
         ]);
         setSubjects(subjectsData.filter((s) => s.isActive));
         setBranches(branchesData.filter((b) => b.isActive));
-
         if (showSessionStep) {
           const teachersData = await getTeachers();
           setTeachers(teachersData.filter((t) => t.isActive));
@@ -133,7 +160,8 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
     }
   }, [prefill?.branchId, branches, selectedBranch]);
 
-  // Load rooms when branch changes (step 2)
+
+  // Load rooms when branch changes
   useEffect(() => {
     if (!selectedBranch || !showSessionStep) return;
     getRoomsByBranch(selectedBranch)
@@ -163,96 +191,169 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
       setAvailabilityIssues([]);
       return;
     }
-
     setCheckingAvailability(true);
     const timer = setTimeout(async () => {
       try {
         const { checkAvailability } = await import('@/lib/utils/availability');
         const result = await checkAvailability({
-          date: new Date(scheduledDate),
-          startTime,
-          endTime,
-          branchId: selectedBranch,
-          roomId,
-          teacherId,
-          excludeType: 'trial',
+          date: new Date(scheduledDate), startTime, endTime,
+          branchId: selectedBranch, roomId, teacherId, excludeType: 'trial',
         });
         setAvailabilityIssues(result.available ? [] : result.reasons);
-      } catch {
-        // ignore
-      } finally {
-        setCheckingAvailability(false);
-      }
+      } catch { /* ignore */ } finally { setCheckingAvailability(false); }
     }, 500);
     return () => clearTimeout(timer);
   }, [sessionData, selectedBranch, showSessionStep]);
 
   // Filter teachers by subject + branch
   const availableTeachers = useMemo(
-    () =>
-      teachers.filter(
-        (t) =>
-          (!sessionData.subjectId || t.specialties.includes(sessionData.subjectId)) &&
-          (!selectedBranch || t.availableBranches.includes(selectedBranch))
-      ),
+    () => teachers.filter((t) =>
+      (!sessionData.subjectId || t.specialties.includes(sessionData.subjectId)) &&
+      (!selectedBranch || t.availableBranches.includes(selectedBranch))
+    ),
     [teachers, sessionData.subjectId, selectedBranch]
   );
 
-  // Student helpers
-  const addStudent = () => setStudents([...students, { ...DEFAULT_STUDENT }]);
-  const removeStudent = (idx: number) => {
-    if (students.length > 1) setStudents(students.filter((_, i) => i !== idx));
-  };
-  const updateStudent = (idx: number, field: keyof StudentForm, value: any) => {
-    const updated = [...students];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setStudents(updated);
-  };
-  const toggleSubject = (studentIdx: number, subjectId: string) => {
-    const updated = [...students];
-    const interests = updated[studentIdx].subjectInterests;
-    updated[studentIdx].subjectInterests = interests.includes(subjectId)
-      ? interests.filter((id) => id !== subjectId)
-      : [...interests, subjectId];
-    setStudents(updated);
-  };
+  // ─── Student helpers (stable callbacks) ───
+  const updateStudent = useCallback((idx: number, field: keyof StudentForm, value: any) => {
+    setStudents(prev => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return updated;
+    });
+  }, []);
 
-  // Validation
-  const validateStep1 = (): boolean => {
-    if (!parentName.trim()) { toast.error('กรุณากรอกชื่อผู้ปกครอง'); return false; }
-    if (!parentPhone.trim()) { toast.error('กรุณากรอกเบอร์โทรศัพท์'); return false; }
-    const cleanPhone = parentPhone.replace(/[-\s]/g, '');
-    if (!/^0[0-9]{8,9}$/.test(cleanPhone)) { toast.error('เบอร์โทรศัพท์ไม่ถูกต้อง'); return false; }
-    if (!selectedBranch) { toast.error('กรุณาเลือกสาขา'); return false; }
-    if (parentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail)) { toast.error('อีเมลไม่ถูกต้อง'); return false; }
+  const toggleSubject = useCallback((studentIdx: number, subjectId: string) => {
+    setStudents(prev => {
+      const updated = [...prev];
+      const interests = updated[studentIdx].subjectInterests;
+      updated[studentIdx] = {
+        ...updated[studentIdx],
+        subjectInterests: interests.includes(subjectId)
+          ? interests.filter((id) => id !== subjectId)
+          : [...interests, subjectId],
+      };
+      return updated;
+    });
+  }, []);
 
-    for (let i = 0; i < students.length; i++) {
-      const s = students[i];
-      if (!s.name.trim()) { toast.error(`กรุณากรอกชื่อนักเรียนคนที่ ${i + 1}`); return false; }
-      if (s.birthdate) {
-        const age = calculateAge(new Date(s.birthdate));
-        if (age < 3 || age > 22) { toast.error(`อายุนักเรียนคนที่ ${i + 1} ต้องอยู่ระหว่าง 3-22 ปี`); return false; }
+  const addStudent = useCallback(() => {
+    setStudents(prev => {
+      const newStudents = [...prev, makeStudent()];
+      setActiveStudentIdx(newStudents.length - 1);
+      return newStudents;
+    });
+  }, []);
+
+  const removeStudent = useCallback((idx: number) => {
+    setStudents(prev => {
+      if (prev.length <= 1) return prev;
+      const newStudents = prev.filter((_, i) => i !== idx);
+      setActiveStudentIdx(Math.min(idx, newStudents.length - 1));
+      return newStudents;
+    });
+  }, []);
+
+  // ─── Parent search handler ───
+  const handleParentSelect = useCallback((selection: ParentSearchSelection) => {
+    setSelectedParentId(selection.parentId);
+    setParentName(selection.parentName);
+    setParentPhone(selection.parentPhone);
+    setParentMode('linked');
+    setExistingStudents(selection.students || []);
+    // Pre-fill students from existing data
+    if (selection.students && selection.students.length > 0) {
+      const prefilled: StudentForm[] = selection.students.map((s) => ({
+        id: `s-${nextStudentId++}`,
+        name: s.name || '',
+        birthdate: s.birthdate ? new Date(s.birthdate).toISOString().split('T')[0] : '',
+        schoolName: s.schoolName || '',
+        gradeLevel: s.gradeLevel || '',
+        subjectInterests: [],
+      }));
+      setStudents(prefilled);
+      setActiveStudentIdx(0);
+    }
+  }, []);
+
+  const handleChangeParent = useCallback(() => {
+    setSelectedParentId('');
+    setParentName('');
+    setParentPhone('');
+    setParentMode('search');
+    setExistingStudents([]);
+    setStudents([makeStudent()]);
+    setActiveStudentIdx(0);
+  }, []);
+
+  // ─── Clear single error on change ───
+  const clearError = useCallback((key: string) => {
+    setErrors(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  // ─── Validation per step ───
+  const validateStep = (s: number): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (s === 1) {
+      if (!selectedBranch) newErrors.branch = 'กรุณาเลือกสาขา';
+      if (!parentName.trim()) newErrors.parentName = 'กรุณากรอกชื่อผู้ปกครอง';
+      if (!parentPhone.trim()) {
+        newErrors.parentPhone = 'กรุณากรอกเบอร์โทรศัพท์';
+      } else {
+        const cleanPhone = parentPhone.replace(/[-\s]/g, '');
+        if (!/^0[0-9]{8,9}$/.test(cleanPhone)) newErrors.parentPhone = 'เบอร์โทรศัพท์ไม่ถูกต้อง';
       }
-      if (s.subjectInterests.length === 0) { toast.error(`กรุณาเลือกวิชาที่สนใจสำหรับนักเรียนคนที่ ${i + 1}`); return false; }
+    }
+
+    if (s === 2) {
+      for (let i = 0; i < students.length; i++) {
+        const st = students[i];
+        if (!st.name.trim()) newErrors[`student_${i}_name`] = 'กรุณากรอกชื่อนักเรียน';
+        if (st.subjectInterests.length === 0) newErrors[`student_${i}_subjects`] = 'กรุณาเลือกวิชาที่สนใจ';
+      }
+      // Navigate to the first student with an error
+      const firstErrIdx = students.findIndex((_, i) => newErrors[`student_${i}_name`] || newErrors[`student_${i}_subjects`]);
+      if (firstErrIdx >= 0) setActiveStudentIdx(firstErrIdx);
+    }
+
+    if (s === 3) {
+      if (!sessionData.subjectId) newErrors.sessionSubject = 'กรุณาเลือกวิชา';
+      if (!sessionData.scheduledDate) newErrors.sessionDate = 'กรุณาเลือกวันที่';
+      if (!sessionData.teacherId) newErrors.sessionTeacher = 'กรุณาเลือกครูผู้สอน';
+      if (!sessionData.roomId) newErrors.sessionRoom = 'กรุณาเลือกห้องเรียน';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...newErrors }));
+      return false;
     }
     return true;
   };
 
-  // Submit — create booking (+ optionally session)
+  const goNext = () => { if (validateStep(step)) setStep(step + 1); };
+  const goPrev = () => setStep(step - 1);
+
+  // Error display helpers
+  const errCls = (key: string) => errors[key] ? 'border-red-500 ring-1 ring-red-500' : '';
+  const FieldError = ({ name }: { name: string }) => errors[name] ? <p className="text-red-500 text-xs mt-1">{errors[name]}</p> : null;
+
+  // ─── Submit ───
   const handleSubmit = async (withSession: boolean) => {
     if (submitGuardRef.current) return;
-    if (step === 1 && !validateStep1()) return;
+    // Validate all prior steps
+    for (let s = 1; s <= Math.min(step, 2); s++) {
+      if (!validateStep(s)) return;
+    }
 
     if (withSession) {
-      const { subjectId, scheduledDate, startTime, endTime, teacherId, roomId } = sessionData;
-      if (!subjectId || !scheduledDate || !startTime || !endTime || !teacherId || !roomId) {
-        toast.error('กรุณากรอกข้อมูลนัดหมายให้ครบ');
-        return;
-      }
-      if (availabilityIssues.length > 0) {
-        toast.error('ไม่สามารถจองเวลานี้ได้');
-        return;
-      }
+      if (!validateStep(3)) return;
+      if (availabilityIssues.length > 0) { toast.error('ไม่สามารถจองเวลานี้ได้'); return; }
     }
 
     submitGuardRef.current = true;
@@ -278,11 +379,10 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
         ...(isAdmin ? { contactedAt: new Date(), contactNote: contactNote.trim() || 'Walk-in - ติดต่อโดยตรง' } : {}),
         ...(contactNote.trim() && !isAdmin ? { contactNote: contactNote.trim() } : {}),
       };
-      if (parentEmail.trim()) bookingData.parentEmail = parentEmail.trim();
+      if (selectedParentId) bookingData.parentId = selectedParentId;
 
       const bookingId = await createTrialBooking(bookingData);
 
-      // Fire FB conversion (admin + liff)
       if (!isChat) {
         try {
           await fetch('/api/fb/send-conversion', {
@@ -291,7 +391,6 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
             body: JSON.stringify({
               event_type: 'trial',
               phone: parentPhone.replace(/[-\s]/g, ''),
-              email: parentEmail.trim() || undefined,
               entity_id: bookingId,
               branch_id: selectedBranch,
             }),
@@ -299,7 +398,6 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
         } catch {}
       }
 
-      // Create session if requested
       if (withSession) {
         const selectedRoom = rooms.find((r) => r.id === sessionData.roomId);
         const studentForSession = students[sessionData.studentIndex] || students[0];
@@ -333,7 +431,7 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
     }
   };
 
-  // LIFF success screen
+  // ─── LIFF success screen ───
   if (showSuccess) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
@@ -341,7 +439,7 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
         <h2 className="text-xl font-bold mb-2">ลงทะเบียนทดลองเรียนสำเร็จ!</h2>
         <p className="text-gray-600 mb-6">ทางสถาบันจะติดต่อกลับเพื่อนัดหมายเวลาเรียนทดลอง</p>
         {isLiff && (
-          <Button onClick={() => { setShowSuccess(false); setStep(1); setStudents([{ ...DEFAULT_STUDENT }]); setParentName(''); setParentPhone(''); setParentEmail(''); setContactNote(''); }}>
+          <Button onClick={() => { setShowSuccess(false); setStep(1); setStudents([makeStudent()]); setParentName(''); setParentPhone(''); setContactNote(''); setParentMode('search'); setSelectedParentId(''); setErrors({}); }}>
             ลงทะเบียนอีกครั้ง
           </Button>
         )}
@@ -357,209 +455,312 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
     );
   }
 
-  const Wrapper = ({ children, title, desc }: { children: React.ReactNode; title?: string; desc?: string }) => {
-    if (isChat) return <div className="space-y-4">{children}</div>;
-    return (
-      <Card>
-        {title && (
-          <CardHeader>
-            <CardTitle>{title}</CardTitle>
-            {desc && <CardDescription>{desc}</CardDescription>}
-          </CardHeader>
+  // ─── Step labels ───
+  const stepLabels = showSessionStep
+    ? ['ผู้ปกครอง', 'นักเรียน', 'นัดหมาย']
+    : ['ผู้ปกครอง', 'นักเรียน'];
+
+  // ─── Step indicator ───
+  const stepIndicator = (
+    <div className="flex items-center gap-1.5">
+      {stepLabels.map((label, i) => {
+        const stepNum = i + 1;
+        const isActive = step === stepNum;
+        const isDone = step > stepNum;
+        return (
+          <div key={i} className="flex items-center gap-1.5">
+            {i > 0 && <div className={cn('h-px w-4 sm:w-6', isDone ? 'bg-green-400' : 'bg-gray-200 dark:bg-slate-700')} />}
+            <button
+              type="button"
+              onClick={() => { if (isDone) setStep(stepNum); }}
+              disabled={!isDone}
+              className={cn(
+                'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+                isActive && 'bg-gray-900 text-white dark:bg-white dark:text-gray-900',
+                isDone && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 cursor-pointer hover:bg-green-200',
+                !isActive && !isDone && 'bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-gray-500',
+              )}
+            >
+              {stepNum}. {label}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // ─── Sub-step indicator for students ───
+  const studentSubStepIndicator = students.length > 1 ? (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {students.map((s, idx) => (
+        <button
+          key={s.id}
+          type="button"
+          onClick={() => setActiveStudentIdx(idx)}
+          className={cn(
+            'px-3 py-1 rounded-full text-sm font-medium transition-colors border',
+            activeStudentIdx === idx
+              ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
+              : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-slate-600 hover:bg-gray-50',
+          )}
+        >
+          {s.name || `คนที่ ${idx + 1}`}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
+  // ─── Navigation buttons ───
+  const stepActions = (
+    <div className="flex justify-between gap-3 pt-4">
+      <div>
+        {step > 1 && (
+          <Button type="button" variant="outline" onClick={goPrev}>
+            <ChevronLeft className="h-4 w-4 mr-1" /> กลับ
+          </Button>
         )}
-        <CardContent className={title ? undefined : 'pt-6'}>{children}</CardContent>
-      </Card>
-    );
-  };
+        {step === 1 && onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
+            {isAdmin ? <><ArrowLeft className="h-4 w-4 mr-1" /> กลับ</> : 'ยกเลิก'}
+          </Button>
+        )}
+      </div>
+      <div className="flex gap-2">
+        {step === totalSteps ? (
+          <>
+            {showSessionStep && (
+              <Button type="button" variant="outline" onClick={() => handleSubmit(false)} disabled={submitting}>
+                บันทึกโดยไม่นัดเวลา
+              </Button>
+            )}
+            <Button
+              onClick={() => {
+                if (showSessionStep) {
+                  const hasSession = !!(sessionData.subjectId && sessionData.scheduledDate && sessionData.teacherId && sessionData.roomId);
+                  if (hasSession && availabilityIssues.length > 0) { toast.error('ไม่สามารถจองเวลานี้ได้'); return; }
+                  handleSubmit(hasSession);
+                } else {
+                  handleSubmit(false);
+                }
+              }}
+              disabled={submitting || (showSessionStep && checkingAvailability)}
+              className={cn(isLiff ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600')}
+            >
+              {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />กำลังบันทึก...</> : <><Save className="h-4 w-4 mr-2" />บันทึก</>}
+            </Button>
+          </>
+        ) : (
+          <Button onClick={goNext} className="bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100">
+            ถัดไป <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+
+  // ─── Active student for step 2 ───
+  const activeStudent = students[activeStudentIdx];
 
   return (
-    <div className={cn(isChat ? 'space-y-4' : 'space-y-6', isAdmin && 'max-w-4xl')}>
-      {/* Header (admin only) */}
+    <div className={cn('space-y-5', isAdmin && 'max-w-4xl')}>
+      {/* Admin header */}
       {isAdmin && (
-        <div className="mb-6">
-          <Button variant="ghost" onClick={onCancel} className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            กลับ
-          </Button>
-          <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
-            เพิ่มการจองทดลองเรียน
-          </h1>
-          <p className="text-gray-600 mt-1">บันทึกข้อมูลผู้ปกครองที่มา Walk-in เพื่อทดลองเรียน</p>
+        <div className="mb-2">
+          <h1 className="text-xl sm:text-3xl font-bold">เพิ่มการจองทดลองเรียน</h1>
         </div>
       )}
 
-      {/* Step indicator (non-admin, multi-step) */}
-      {!isAdmin && showSessionStep && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className={cn('px-3 py-1 rounded-full', step === 1 ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400')}>
-            1. ข้อมูล
-          </span>
-          <ChevronRight className="h-4 w-4 text-gray-300" />
-          <span className={cn('px-3 py-1 rounded-full', step === 2 ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400')}>
-            2. นัดเวลา
-          </span>
-        </div>
-      )}
+      {stepIndicator}
 
-      {/* STEP 1: Parent + Students */}
-      {(step === 1 || isAdmin) && (
-        <>
-          {/* Branch */}
-          <Wrapper title={isAdmin ? 'สาขา' : undefined} desc={isAdmin ? 'เลือกสาขาที่ผู้ปกครองติดต่อ' : undefined}>
-            <div className="space-y-2">
+      {/* ══════════ STEP 1: Branch + Parent ══════════ */}
+      {step === 1 && (
+        <Section isChat={isChat} title={isChat ? undefined : 'ข้อมูลผู้ปกครอง'}>
+          <div className="space-y-4">
+            {/* Branch */}
+            <div className="space-y-1.5">
               <Label>
                 <Building2 className="inline h-4 w-4 mr-1" />
                 สาขา <span className="text-red-500">*</span>
               </Label>
               <FormSelect
                 value={selectedBranch}
-                onValueChange={setSelectedBranch}
+                onValueChange={(v) => { setSelectedBranch(v); clearError('branch'); }}
                 placeholder="เลือกสาขา"
                 options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                className={errCls('branch')}
               />
+              <FieldError name="branch" />
             </div>
-          </Wrapper>
 
-          {/* Parent info */}
-          <Wrapper title={isAdmin ? 'ข้อมูลผู้ปกครอง' : undefined} desc={isAdmin ? 'กรอกข้อมูลติดต่อผู้ปกครอง' : undefined}>
-            {!isAdmin && <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">ข้อมูลผู้ปกครอง</Label>}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>ชื่อผู้ปกครอง <span className="text-red-500">*</span></Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="ชื่อ-นามสกุล" className="pl-10" />
+            {/* Parent: linked or search+manual */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">
+                <User className="inline h-4 w-4 mr-1" />
+                ผู้ปกครอง
+              </Label>
+              {parentMode === 'linked' ? (
+                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <User className="h-5 w-5 text-green-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-base dark:text-white">{parentName}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{parentPhone}</p>
+                  </div>
+                  <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 shrink-0">เชื่อมแล้ว</Badge>
+                  <Button type="button" variant="ghost" size="sm" onClick={handleChangeParent}>เปลี่ยน</Button>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>เบอร์โทรศัพท์ <span className="text-red-500">*</span></Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} placeholder="08x-xxx-xxxx" className="pl-10" />
-                </div>
-              </div>
-              <div className="space-y-2 col-span-2">
-                <Label>อีเมล (ถ้ามี)</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} placeholder="email@example.com" className="pl-10" type="email" />
-                </div>
-              </div>
-            </div>
-          </Wrapper>
-
-          {/* Students */}
-          <Wrapper title={isAdmin ? 'ข้อมูลนักเรียน' : undefined} desc={isAdmin ? 'กรอกข้อมูลนักเรียนที่ต้องการทดลองเรียน' : undefined}>
-            {!isAdmin && (
-              <div className="flex items-center justify-between mb-3">
-                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">ข้อมูลนักเรียน</Label>
-                <Button type="button" onClick={addStudent} variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-1" /> เพิ่ม
-                </Button>
-              </div>
-            )}
-            {isAdmin && (
-              <div className="flex justify-end mb-4">
-                <Button type="button" onClick={addStudent} variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" /> เพิ่มนักเรียน
-                </Button>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              {students.map((student, idx) => (
-                <div key={idx} className={cn('relative space-y-4', isChat ? 'p-3 border rounded-lg dark:border-slate-700' : 'p-4 border rounded-lg')}>
-                  {students.length > 1 && (
-                    <Button type="button" onClick={() => removeStudent(idx)} variant="ghost" size="sm" className="absolute top-2 right-2">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {students.length > 1 && (
-                    <div className="font-medium text-sm text-gray-600 dark:text-gray-400">นักเรียนคนที่ {idx + 1}</div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>ชื่อนักเรียน <span className="text-red-500">*</span></Label>
-                      <Input value={student.name} onChange={(e) => updateStudent(idx, 'name', e.target.value)} placeholder="ชื่อ-นามสกุล" />
+              ) : (
+                <>
+                  <ParentSearchInput onSelect={handleParentSelect} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>ชื่อผู้ปกครอง <span className="text-red-500">*</span></Label>
+                      <Input value={parentName} onChange={(e) => { setParentName(e.target.value); clearError('parentName'); }} placeholder="ชื่อ-นามสกุล" className={errCls('parentName')} />
+                      <FieldError name="parentName" />
                     </div>
-                    <div className="space-y-2">
-                      <Label><Calendar className="inline h-4 w-4 mr-1" />วันเกิด</Label>
-                      <DateRangePicker mode="single" value={student.birthdate} onChange={(d) => updateStudent(idx, 'birthdate', d || '')} maxDate={new Date()} placeholder="เลือกวันที่" />
-                      {student.birthdate && <p className="text-xs text-gray-500">อายุ: {calculateAge(new Date(student.birthdate))} ปี</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>โรงเรียน</Label>
-                      <SchoolNameCombobox value={student.schoolName} onChange={(v) => updateStudent(idx, 'schoolName', v)} placeholder="พิมพ์ชื่อโรงเรียน..." />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>ระดับชั้น</Label>
-                      <GradeLevelCombobox value={student.gradeLevel} onChange={(v) => updateStudent(idx, 'gradeLevel', v)} placeholder="เลือกหรือพิมพ์ระดับชั้น..." />
+                    <div className="space-y-1.5">
+                      <Label>เบอร์โทร <span className="text-red-500">*</span></Label>
+                      <Input value={parentPhone} onChange={(e) => { setParentPhone(e.target.value); clearError('parentPhone'); }} placeholder="08x-xxx-xxxx" className={errCls('parentPhone')} />
+                      <FieldError name="parentPhone" />
                     </div>
                   </div>
+                </>
+              )}
+            </div>
+          </div>
+        </Section>
+      )}
 
-                  <div className="space-y-2">
-                    <Label>วิชาที่สนใจ <span className="text-red-500">*</span></Label>
-                    <SubjectSelector
-                      subjects={subjects}
-                      selectedSubjects={student.subjectInterests}
-                      onToggle={(id) => toggleSubject(idx, id)}
-                      compact={isChat}
+      {/* ══════════ STEP 2: Students (sub-steps) ══════════ */}
+      {step === 2 && (
+        <Section
+          isChat={isChat}
+          title={isChat ? undefined : `ข้อมูลนักเรียน${students.length > 1 ? ` (${activeStudentIdx + 1}/${students.length})` : ''}`}
+          headerRight={
+            <Button type="button" onClick={addStudent} variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-1" /> เพิ่มนักเรียน
+            </Button>
+          }
+        >
+          {isChat && (
+            <div className="flex items-center justify-between mb-1">
+              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                ข้อมูลนักเรียน{students.length > 1 ? ` (${activeStudentIdx + 1}/${students.length})` : ''}
+              </Label>
+              <Button type="button" onClick={addStudent} variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-1" /> เพิ่ม
+              </Button>
+            </div>
+          )}
+
+          {/* Sub-step tabs (when >1 student) */}
+          {studentSubStepIndicator}
+
+          {/* Active student form — 2 columns: info left, subjects right */}
+          {activeStudent && (
+            <div className="space-y-3">
+              {students.length > 1 && (
+                <div className="flex justify-end">
+                  <Button type="button" onClick={() => removeStudent(activeStudentIdx)} variant="ghost" size="sm" className="text-red-500 hover:text-red-600 h-7 text-xs">
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> ลบนักเรียนคนนี้
+                  </Button>
+                </div>
+              )}
+              <div className={cn('grid gap-4', !isChat && 'md:grid-cols-2')}>
+                {/* Left: Student info */}
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>ชื่อนักเรียน <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={activeStudent.name}
+                      onChange={(e) => { updateStudent(activeStudentIdx, 'name', e.target.value); clearError(`student_${activeStudentIdx}_name`); }}
+                      placeholder="ชื่อ-นามสกุล"
+                      className={errCls(`student_${activeStudentIdx}_name`)}
+                    />
+                    <FieldError name={`student_${activeStudentIdx}_name`} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>วันเกิด</Label>
+                    <DateRangePicker
+                      mode="single"
+                      value={activeStudent.birthdate}
+                      onChange={(d) => updateStudent(activeStudentIdx, 'birthdate', d || '')}
+                      maxDate={new Date()}
+                      placeholder="เลือกวันที่"
+                    />
+                    {activeStudent.birthdate && (
+                      <p className="text-xs text-gray-500">อายุ: {calculateAge(new Date(activeStudent.birthdate))} ปี</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>โรงเรียน</Label>
+                    <SchoolNameCombobox
+                      value={activeStudent.schoolName}
+                      onChange={(v) => updateStudent(activeStudentIdx, 'schoolName', v)}
+                      placeholder="พิมพ์ชื่อโรงเรียน..."
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>ระดับชั้น</Label>
+                    <GradeLevelCombobox
+                      value={activeStudent.gradeLevel}
+                      onChange={(v) => updateStudent(activeStudentIdx, 'gradeLevel', v)}
+                      placeholder="เลือกหรือพิมพ์ระดับชั้น..."
                     />
                   </div>
                 </div>
-              ))}
+
+                {/* Right: Subjects */}
+                <div className="space-y-1.5">
+                  <Label>วิชาที่สนใจ <span className="text-red-500">*</span></Label>
+                  <div className={errors[`student_${activeStudentIdx}_subjects`] ? 'rounded-lg border border-red-500 ring-1 ring-red-500 p-2' : ''}>
+                    <SubjectSelector
+                      key={`subjects-${activeStudent.id}`}
+                      subjects={subjects}
+                      selectedSubjects={students[activeStudentIdx]?.subjectInterests ?? []}
+                      onToggle={(id) => {
+                        const idx = activeStudentIdx;
+                        setStudents(prev => {
+                          const updated = [...prev];
+                          const interests = updated[idx].subjectInterests;
+                          updated[idx] = {
+                            ...updated[idx],
+                            subjectInterests: interests.includes(id)
+                              ? interests.filter((sid) => sid !== id)
+                              : [...interests, id],
+                          };
+                          return updated;
+                        });
+                        clearError(`student_${idx}_subjects`);
+                      }}
+                      compact={isChat}
+                    />
+                  </div>
+                  <FieldError name={`student_${activeStudentIdx}_subjects`} />
+                </div>
+              </div>
             </div>
-          </Wrapper>
+          )}
 
-          {/* Notes */}
-          <Wrapper title={isAdmin ? 'หมายเหตุ' : undefined}>
-            {!isAdmin && <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">หมายเหตุ (ถ้ามี)</Label>}
-            <Textarea value={contactNote} onChange={(e) => setContactNote(e.target.value)} placeholder="เช่น ต้องการเรียนช่วงเย็นวันธรรมดา" rows={2} />
-          </Wrapper>
-
-          {/* Step 1 actions */}
-          <div className="flex justify-end gap-3 pt-2">
-            {onCancel && (
-              <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
-                ยกเลิก
-              </Button>
-            )}
-            {isAdmin ? (
-              /* Admin: single step → submit directly */
-              <Button onClick={() => handleSubmit(false)} disabled={submitting} className="bg-red-500 hover:bg-red-600">
-                {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />กำลังบันทึก...</> : <><Save className="h-4 w-4 mr-2" />บันทึกข้อมูล</>}
-              </Button>
-            ) : showSessionStep ? (
-              /* Chat: go to step 2, or save without session */
-              <>
-                <Button type="button" variant="outline" onClick={() => { if (validateStep1()) handleSubmit(false); }} disabled={submitting}>
-                  {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  บันทึกโดยไม่นัดเวลา
-                </Button>
-                <Button onClick={() => { if (validateStep1()) setStep(2); }} className="bg-blue-500 hover:bg-blue-600">
-                  ถัดไป: นัดเวลา <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </>
-            ) : (
-              /* LIFF: submit directly */
-              <Button onClick={() => handleSubmit(false)} disabled={submitting} className="w-full bg-green-500 hover:bg-green-600">
-                {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />กำลังบันทึก...</> : 'ลงทะเบียนทดลองเรียน'}
-              </Button>
-            )}
-          </div>
-        </>
+          {/* Notes (for LIFF — no session step) */}
+          {!showSessionStep && (
+            <div className="pt-3 space-y-1.5">
+              <Label>หมายเหตุ (ถ้ามี)</Label>
+              <Textarea value={contactNote} onChange={(e) => setContactNote(e.target.value)} placeholder="เช่น ต้องการเรียนช่วงเย็นวันธรรมดา" rows={2} />
+            </div>
+          )}
+        </Section>
       )}
 
-      {/* STEP 2: Session scheduling */}
-      {step === 2 && showSessionStep && (
-        <>
+      {/* ══════════ STEP 3: Session scheduling ══════════ */}
+      {step === 3 && showSessionStep && (
+        <Section isChat={isChat} title={isChat ? undefined : 'นัดหมายทดลองเรียน'}>
           {/* Student picker (if multiple) */}
           {students.length > 1 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-3">
               {students.map((s, idx) => (
                 <button
-                  key={idx}
+                  key={s.id}
                   type="button"
                   onClick={() => setSessionData((prev) => ({ ...prev, studentIndex: idx, subjectId: '' }))}
                   className={cn(
@@ -577,7 +778,7 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
 
           {/* Student info summary */}
           {students[sessionData.studentIndex] && (
-            <div className="pb-3 border-b dark:border-slate-700">
+            <div className="pb-3 mb-3 border-b dark:border-slate-700">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-base dark:text-white">{students[sessionData.studentIndex].name}</span>
                 {students[sessionData.studentIndex].schoolName && (
@@ -600,110 +801,104 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
             </div>
           )}
 
-          {/* Session form fields */}
+          {/* Session form */}
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>วิชา *</Label>
+                <Label>วิชา <span className="text-red-500">*</span></Label>
                 <FormSelect
                   value={sessionData.subjectId}
-                  onValueChange={(v) => setSessionData((prev) => ({ ...prev, subjectId: v }))}
+                  onValueChange={(v) => { setSessionData((prev) => ({ ...prev, subjectId: v })); clearError('sessionSubject'); }}
                   placeholder="เลือกวิชา"
                   options={subjects.map((s) => ({ value: s.id, label: s.name, color: s.color }))}
+                  className={errCls('sessionSubject')}
                 />
+                <FieldError name="sessionSubject" />
               </div>
               <div className="space-y-1.5">
-                <Label>วันที่ *</Label>
+                <Label>วันที่ <span className="text-red-500">*</span></Label>
                 <DateRangePicker
                   mode="single"
                   value={sessionData.scheduledDate}
-                  onChange={(d) => setSessionData((prev) => ({ ...prev, scheduledDate: d || '' }))}
+                  onChange={(d) => { setSessionData((prev) => ({ ...prev, scheduledDate: d || '' })); clearError('sessionDate'); }}
                   minDate={new Date()}
                   placeholder="เลือกวันที่"
                 />
+                <FieldError name="sessionDate" />
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5 col-span-2">
-                <Label>เวลา *</Label>
-                <TimeRangePicker
-                  startTime={sessionData.startTime}
-                  endTime={sessionData.endTime}
-                  onStartTimeChange={(v) => setSessionData((prev) => ({ ...prev, startTime: v }))}
-                  onEndTimeChange={(v) => setSessionData((prev) => ({ ...prev, endTime: v }))}
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label>เวลา *</Label>
+              <TimeRangePicker
+                startTime={sessionData.startTime}
+                endTime={sessionData.endTime}
+                onStartTimeChange={(v) => setSessionData((prev) => ({ ...prev, startTime: v }))}
+                onEndTimeChange={(v) => setSessionData((prev) => ({ ...prev, endTime: v }))}
+              />
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>ครูผู้สอน *</Label>
+                <Label>ครูผู้สอน <span className="text-red-500">*</span></Label>
                 <FormSelect
                   value={sessionData.teacherId}
-                  onValueChange={(v) => setSessionData((prev) => ({ ...prev, teacherId: v }))}
+                  onValueChange={(v) => { setSessionData((prev) => ({ ...prev, teacherId: v })); clearError('sessionTeacher'); }}
                   placeholder="เลือกครู"
                   options={availableTeachers.map((t) => ({ value: t.id, label: t.nickname || t.name }))}
+                  className={errCls('sessionTeacher')}
                 />
+                <FieldError name="sessionTeacher" />
               </div>
               <div className="space-y-1.5">
-                <Label>ห้องเรียน *</Label>
+                <Label>ห้องเรียน <span className="text-red-500">*</span></Label>
                 <FormSelect
                   value={sessionData.roomId}
-                  onValueChange={(v) => setSessionData((prev) => ({ ...prev, roomId: v }))}
+                  onValueChange={(v) => { setSessionData((prev) => ({ ...prev, roomId: v })); clearError('sessionRoom'); }}
                   placeholder={rooms.length ? 'เลือกห้อง' : 'เลือกสาขาก่อน'}
                   options={rooms.map((r) => ({ value: r.id, label: `${r.name} (จุ ${r.capacity} คน)` }))}
+                  className={errCls('sessionRoom')}
                 />
+                <FieldError name="sessionRoom" />
               </div>
             </div>
-          </div>
 
-          {/* Availability status */}
-          {checkingAvailability ? (
-            <Alert>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <AlertDescription>กำลังตรวจสอบห้องว่าง...</AlertDescription>
-            </Alert>
-          ) : availabilityIssues.length > 0 ? (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <p className="font-medium">ไม่สามารถจองเวลานี้ได้:</p>
-                {availabilityIssues.map((issue, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm mt-1">
-                    <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                    <span>{issue.message}</span>
-                  </div>
-                ))}
-              </AlertDescription>
-            </Alert>
-          ) : (
-            sessionData.scheduledDate && sessionData.startTime && sessionData.endTime && sessionData.teacherId && sessionData.roomId && (
-              <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800 dark:text-green-300">เวลานี้สามารถจองได้</AlertDescription>
+            {/* Availability status */}
+            {checkingAvailability ? (
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription>กำลังตรวจสอบห้องว่าง...</AlertDescription>
               </Alert>
-            )
-          )}
-
-          {/* Step 2 actions */}
-          <div className="flex justify-between gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => setStep(1)}>
-              <ChevronLeft className="h-4 w-4 mr-1" /> กลับ
-            </Button>
-            <Button
-              onClick={() => handleSubmit(true)}
-              disabled={
-                submitting || checkingAvailability || availabilityIssues.length > 0 ||
-                !sessionData.subjectId || !sessionData.scheduledDate || !sessionData.teacherId || !sessionData.roomId
-              }
-              className="bg-red-500 hover:bg-red-600"
-            >
-              {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />กำลังบันทึก...</> : 'บันทึกและนัดเวลา'}
-            </Button>
+            ) : availabilityIssues.length > 0 ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <p className="font-medium">ไม่สามารถจองเวลานี้ได้:</p>
+                  {availabilityIssues.map((issue, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm mt-1">
+                      <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                      <span>{issue.message}</span>
+                    </div>
+                  ))}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              sessionData.scheduledDate && sessionData.startTime && sessionData.endTime && sessionData.teacherId && sessionData.roomId && (
+                <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800 dark:text-green-300">เวลานี้สามารถจองได้</AlertDescription>
+                </Alert>
+              )
+            )}
           </div>
-        </>
+
+          {/* Notes */}
+          <div className="pt-3 space-y-1.5">
+            <Label>หมายเหตุ (ถ้ามี)</Label>
+            <Textarea value={contactNote} onChange={(e) => setContactNote(e.target.value)} placeholder="เช่น ต้องการเรียนช่วงเย็นวันธรรมดา" rows={2} />
+          </div>
+        </Section>
       )}
+
+      {stepActions}
     </div>
   );
 }

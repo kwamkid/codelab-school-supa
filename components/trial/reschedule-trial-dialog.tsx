@@ -301,7 +301,7 @@ export default function RescheduleTrialDialog({
               <div className="space-y-1">
                 <div><strong>นักเรียน:</strong> {session.studentName}</div>
                 <div><strong>วิชา:</strong> {currentSubject?.name || session.subjectId}</div>
-                <div><strong>นัดหมายเดิม:</strong> {formatDate(session.scheduledDate, 'long')} เวลา {session.startTime} - {session.endTime}</div>
+                <div><strong>นัดหมายเดิม:</strong> {formatDate(session.scheduledDate, 'long')} เวลา {session.startTime?.slice(0, 5)} - {session.endTime?.slice(0, 5)}</div>
               </div>
             </AlertDescription>
           </Alert>

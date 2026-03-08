@@ -296,7 +296,7 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
           <div>
             <p className="text-sm text-gray-500">ตารางเรียน</p>
             <p className="font-medium">{currentClass.daysOfWeek.map(d => getDayName(d)).join(', ')}</p>
-            <p className="text-sm text-gray-600">{currentClass.startTime} - {currentClass.endTime} น.</p>
+            <p className="text-sm text-gray-600">{currentClass.startTime?.slice(0, 5)} - {currentClass.endTime?.slice(0, 5)} น.</p>
           </div>
         </CardContent>
       </Card>
@@ -431,7 +431,7 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
                                 <div>
                                   <span className="flex items-center gap-1">
                                     <Calendar className="h-3 w-3" />
-                                    {getDayName(cls.daysOfWeek[0])} {cls.startTime} - {cls.endTime}
+                                    {getDayName(cls.daysOfWeek[0])} {cls.startTime?.slice(0, 5)} - {cls.endTime?.slice(0, 5)}
                                   </span>
                                   <span className="text-xs">
                                     {formatDate(cls.startDate)} - {formatDate(cls.endDate)}

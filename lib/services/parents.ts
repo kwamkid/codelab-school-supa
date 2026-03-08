@@ -26,12 +26,21 @@ interface ParentRow {
 
 // Map database row to Parent model
 function mapToParent(row: ParentRow): Parent {
+  const hasAddress = row.address_house_number || row.address_sub_district || row.address_province;
   return {
     id: row.id,
     displayName: row.display_name,
     phone: row.phone,
     lineUserId: row.line_user_id || undefined,
     email: row.email || undefined,
+    address: hasAddress ? {
+      houseNumber: row.address_house_number || '',
+      street: row.address_street || '',
+      subDistrict: row.address_sub_district || '',
+      district: row.address_district || '',
+      province: row.address_province || '',
+      postalCode: row.address_postal_code || '',
+    } : undefined,
     createdAt: new Date(row.created_at),
     lastLoginAt: new Date(row.last_login_at),
   };

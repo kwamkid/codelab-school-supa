@@ -22,7 +22,7 @@ export function MakeupProvider({ children }: { children: React.ReactNode }) {
     try {
       const makeupClasses = await getMakeupClasses();
       const pendingAuto = makeupClasses.filter(
-        m => m.status === 'pending' && m.requestedBy === 'system'
+        m => m.status === 'pending' && m.reason.includes('สมัครเรียนหลังจากคลาสเริ่มแล้ว')
       ).length;
       setPendingMakeupCount(pendingAuto);
     } catch (error) {

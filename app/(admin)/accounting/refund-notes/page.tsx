@@ -110,7 +110,7 @@ export default function RefundNotesPage() {
 
   const filteredNotes = refundNotes.filter((cn) => {
     if (dateRange) {
-      const docDate = (cn.issuedDate || cn.createdAt).toString().slice(0, 10);
+      const docDate = (cn.issuedDate || cn.createdAt).toISOString().slice(0, 10);
       if (docDate < dateRange.from || docDate > dateRange.to) return false;
     }
     if (!searchQuery) return true;

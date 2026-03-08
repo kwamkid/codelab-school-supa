@@ -13,6 +13,14 @@ export interface ParentSearchSelection {
   parentId: string;
   parentName: string;
   parentPhone: string;
+  parentAddress?: {
+    houseNumber: string;
+    street: string;
+    subDistrict: string;
+    district: string;
+    province: string;
+    postalCode: string;
+  };
   students: Student[];
 }
 
@@ -21,6 +29,7 @@ interface ParentSearchInputProps {
   placeholder?: string;
   className?: string;
   debounceMs?: number;
+  autoFocus?: boolean;
 }
 
 export interface ParentSearchInputRef {
@@ -32,6 +41,7 @@ export const ParentSearchInput = forwardRef<ParentSearchInputRef, ParentSearchIn
   placeholder = 'ค้นหาด้วยชื่อหรือเบอร์โทร...',
   className,
   debounceMs = 600,
+  autoFocus = false,
 }, ref) {
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<ParentSearchResult[]>([]);
@@ -72,6 +82,7 @@ export const ParentSearchInput = forwardRef<ParentSearchInputRef, ParentSearchIn
       parentId: r.parent.id,
       parentName: r.parent.displayName || r.parent.phone,
       parentPhone: r.parent.phone,
+      parentAddress: r.parent.address,
       students: r.students,
     });
     setSearchTerm('');
@@ -89,6 +100,7 @@ export const ParentSearchInput = forwardRef<ParentSearchInputRef, ParentSearchIn
           onChange={(e) => handleChange(e.target.value)}
           placeholder={placeholder}
           className="pl-10"
+          autoFocus={autoFocus}
         />
       </div>
 

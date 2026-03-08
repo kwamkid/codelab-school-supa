@@ -193,7 +193,7 @@ export default function MakeupClassDialog({
                   <>
                     <p className="pt-2 font-medium">ตารางเรียนชดเชย:</p>
                     <p>วันที่: {formatDate(existingMakeup.makeupSchedule.date, 'long')}</p>
-                    <p>เวลา: {existingMakeup.makeupSchedule.startTime} - {existingMakeup.makeupSchedule.endTime} น.</p>
+                    <p>เวลา: {existingMakeup.makeupSchedule.startTime?.slice(0, 5)} - {existingMakeup.makeupSchedule.endTime?.slice(0, 5)} น.</p>
                   </>
                 )}
               </div>

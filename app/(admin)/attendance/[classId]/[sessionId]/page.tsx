@@ -288,7 +288,7 @@ export default function AttendanceCheckPage() {
                 parentId: studentData.parentId,
                 requestDate: new Date(),
                 requestedBy: user?.uid || '',
-                reason: `${student.status === 'sick' ? 'ป่วย' : student.status === 'leave' ? 'ลา' : 'ขาดเรียน'} - สร้างอัตโนมัติจากการเช็คชื่อ`,
+                reason: `${student.status === 'sick' ? 'ป่วย' : student.status === 'leave' ? 'ลา' : 'ขาดเรียน'}`,
                 status: 'pending',
                 originalSessionNumber: schedule?.sessionNumber,
                 originalSessionDate: schedule?.sessionDate
