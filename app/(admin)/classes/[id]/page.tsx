@@ -158,7 +158,15 @@ export default function ClassDetailPage() {
           };
         })
       );
-      setEnrolledStudents(studentsWithPayment.filter(Boolean) as (Student & { parentName: string; parentPhone: string; paymentStatus: 'pending' | 'partial' | 'paid'; paidAmount: number; finalPrice: number })[]);
+      const filtered = studentsWithPayment.filter(Boolean) as (Student & { parentName: string; parentPhone: string; paymentStatus: 'pending' | 'partial' | 'paid'; paidAmount: number; finalPrice: number })[];
+      setEnrolledStudents(filtered);
+
+      // Auto-fix enrolled_count if it drifted from actual enrollment count
+      if (classData && filtered.length !== classData.enrolledCount) {
+        console.warn(`[ClassDetail] enrolled_count mismatch: cached=${classData.enrolledCount}, actual=${filtered.length}. Auto-fixing.`);
+        await fixEnrolledCount(classId, filtered.length);
+        setClassData(prev => prev ? { ...prev, enrolledCount: filtered.length } : prev);
+      }
     } catch (error) {
       console.error('Error loading enrolled students:', error);
     } finally {

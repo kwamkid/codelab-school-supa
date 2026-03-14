@@ -1,6 +1,6 @@
 import { Enrollment, Class } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
-import { getClassSchedules, incrementEnrolledCount, decrementEnrolledCount } from './classes';
+import { getClassSchedules, fixEnrolledCount } from './classes';
 import { createMakeupRequest, getMakeupClassesByStudent, cancelMakeupClass } from './makeup';
 import { getClass } from './classes';
 import { adminMutation } from '@/lib/admin-mutation';
@@ -469,8 +469,9 @@ export async function createEnrollment(
     if (!result) throw new Error('No data returned from insert');
     const enrollmentId = result.id;
 
-    // Increment enrolled count on class
-    await incrementEnrolledCount(enrollmentData.classId);
+    // Sync enrolled count from actual enrollments (avoids double-count from race conditions)
+    const currentEnrollments = await getEnrollmentsByClass(enrollmentData.classId);
+    await fixEnrolledCount(enrollmentData.classId, currentEnrollments.length);
 
     // Create makeup requests for missed sessions
     await createMakeupForMissedSessions(
@@ -659,8 +660,9 @@ export async function cancelEnrollment(
       match: { id }
     });
 
-    // Decrement enrolled count on class
-    await decrementEnrolledCount(enrollment.classId);
+    // Sync enrolled count from actual enrollments
+    const currentEnrollments = await getEnrollmentsByClass(enrollment.classId);
+    await fixEnrolledCount(enrollment.classId, currentEnrollments.length);
 
     // Cancel all pending/scheduled makeup classes for this student+class
     try {
@@ -705,11 +707,21 @@ export async function checkAvailableSeats(classId: string): Promise<{
     const classData = await getClass(classId);
     if (!classData) throw new Error('Class not found');
 
-    const availableSeats = classData.maxStudents - classData.enrolledCount;
+    // Count actual enrollments instead of trusting cached enrolled_count
+    const actualEnrollments = await getEnrollmentsByClass(classId);
+    const actualCount = actualEnrollments.length;
+
+    // Auto-fix cached counter if it drifted
+    if (actualCount !== classData.enrolledCount) {
+      console.warn(`[checkAvailableSeats] enrolled_count mismatch for class ${classId}: cached=${classData.enrolledCount}, actual=${actualCount}. Auto-fixing.`);
+      await fixEnrolledCount(classId, actualCount);
+    }
+
+    const availableSeats = classData.maxStudents - actualCount;
 
     return {
       available: availableSeats > 0,
-      currentEnrolled: classData.enrolledCount,
+      currentEnrolled: actualCount,
       maxStudents: classData.maxStudents,
       availableSeats: Math.max(0, availableSeats)
     };
@@ -759,9 +771,15 @@ export async function transferEnrollment(
       match: { id: enrollmentId }
     });
 
-    // Update enrolled counts: decrement old class, increment new class
-    await decrementEnrolledCount(enrollment.classId);
-    await incrementEnrolledCount(newClassId);
+    // Sync enrolled counts from actual enrollments for both classes
+    const [oldClassEnrollments, newClassEnrollments] = await Promise.all([
+      getEnrollmentsByClass(enrollment.classId),
+      getEnrollmentsByClass(newClassId),
+    ]);
+    await Promise.all([
+      fixEnrolledCount(enrollment.classId, oldClassEnrollments.length),
+      fixEnrolledCount(newClassId, newClassEnrollments.length),
+    ]);
   } catch (error) {
     console.error('Error transferring enrollment:', error);
     throw error;
