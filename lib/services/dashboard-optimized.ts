@@ -832,111 +832,20 @@ export async function getOptimizedDashboardStats(branchId?: string): Promise<Das
   try {
     const supabase = getClient();
 
-    // Use local date to avoid timezone issues
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const { data, error } = await (supabase.rpc as any)('get_dashboard_stats', {
+      p_branch_id: branchId || null,
+    });
 
-    // Get only active classes
-    let classQuery = supabase
-      .from('classes')
-      .select('*')
-      .in('status', ['published', 'started']);
-
-    if (branchId) {
-      classQuery = classQuery.eq('branch_id', branchId);
-    }
-
-    const { data: classData } = await classQuery;
-
-    // Get total student count from students table (all students in system)
-    const { count: totalStudents } = await supabase
-      .from('students')
-      .select('id', { count: 'exact', head: true });
-
-    // Get today's events count - count unique classes, not events
-    const todayEvents = await getOptimizedCalendarEvents(today, tomorrow, branchId);
-    const uniqueClassIds = new Set(
-      todayEvents
-        .filter(e => e.extendedProps.type === 'class')
-        .map(e => e.classId)
-    );
-    const todayClassCount = uniqueClassIds.size;
-
-    // Get makeup stats
-    const { data: makeupData } = await supabase
-      .from('makeup_classes')
-      .select('*')
-      .in('status', ['pending', 'scheduled']);
-
-    let upcomingMakeups = 0;
-    let pendingMakeups = 0;
-
-    if (branchId && makeupData) {
-      // Filter by branch: lookup original class branch_id (same logic as layout.tsx sidebar)
-      const makeupClassIds = [...new Set(makeupData.map(m => m.original_class_id).filter(Boolean))];
-      const classBranchMap = new Map<string, string>();
-
-      if (makeupClassIds.length > 0) {
-        const { data: classesForMakeup } = await supabase
-          .from('classes')
-          .select('id, branch_id')
-          .in('id', makeupClassIds);
-
-        (classesForMakeup || []).forEach(c => {
-          classBranchMap.set(c.id, c.branch_id);
-        });
-      }
-
-      (makeupData || []).forEach(doc => {
-        // Check branch: use makeup_branch_id if scheduled, otherwise original class branch
-        const docBranch = doc.makeup_branch_id || classBranchMap.get(doc.original_class_id);
-        if (docBranch !== branchId) return;
-
-        if (doc.status === 'pending') {
-          pendingMakeups++;
-        } else if (doc.status === 'scheduled' && doc.makeup_date) {
-          const makeupDate = new Date(doc.makeup_date);
-          if (makeupDate >= today) {
-            upcomingMakeups++;
-          }
-        }
-      });
-    } else {
-      // No branch filter: count all
-      (makeupData || []).forEach(doc => {
-        if (doc.status === 'pending') {
-          pendingMakeups++;
-        } else if (doc.status === 'scheduled' && doc.makeup_date) {
-          const makeupDate = new Date(doc.makeup_date);
-          if (makeupDate >= today) {
-            upcomingMakeups++;
-          }
-        }
-      });
-    }
-
-    // Get trial stats
-    let trialQuery = supabase
-      .from('trial_sessions')
-      .select('*')
-      .eq('status', 'scheduled')
-      .gte('scheduled_date', getLocalDateString(today));
-
-    if (branchId) {
-      trialQuery = trialQuery.eq('branch_id', branchId);
-    }
-
-    const { data: trialData } = await trialQuery;
+    if (error) throw error;
 
     return {
-      totalStudents,
-      totalClasses: classData?.length || 0,
-      activeClasses: classData?.length || 0,
-      todayClasses: todayClassCount,
-      upcomingMakeups,
-      pendingMakeups,
-      upcomingTrials: trialData?.length || 0
+      totalStudents: data?.totalStudents || 0,
+      totalClasses: data?.totalClasses || 0,
+      activeClasses: data?.activeClasses || 0,
+      todayClasses: data?.todayClasses || 0,
+      upcomingMakeups: data?.upcomingMakeups || 0,
+      pendingMakeups: data?.pendingMakeups || 0,
+      upcomingTrials: data?.upcomingTrials || 0,
     };
   } catch (error) {
     console.error('Error getting dashboard stats:', error);

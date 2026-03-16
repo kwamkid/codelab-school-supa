@@ -425,8 +425,9 @@ export default function PaymentReviewStep({ formData, setFormData, onBack }: Ste
                 }}
               />
               <Label htmlFor="wantTaxInvoice" className="text-base font-semibold cursor-pointer">
-                ต้องการใบกำกับภาษี
+                ระบุข้อมูลออกใบกำกับภาษี
               </Label>
+              <span className="text-sm text-gray-500">(ถ้าไม่ระบุ จะใช้ชื่อ-ที่อยู่ผู้ปกครอง)</span>
             </div>
 
             {/* Show billing form only when checked */}

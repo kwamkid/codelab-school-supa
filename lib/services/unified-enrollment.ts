@@ -314,20 +314,27 @@ export async function processUnifiedEnrollment(
         createdBy: adminUserId,
       };
 
-      if (data.wantTaxInvoice) {
-        // ขอใบกำกับภาษีตอนจ่าย → สร้าง tax_invoice เท่านั้น (ใบกำกับภาษี/ใบเสร็จ)
+      if (!isVat) {
+        // บริษัทไม่จด VAT → ออกใบเสร็จรับเงิน
+        invoiceId = await createReceipt(commonData);
+      } else if (data.wantTaxInvoice) {
+        // จด VAT + ติ๊กระบุข้อมูล → ใบกำกับภาษี/ใบเสร็จ ด้วยข้อมูล billing จากฟอร์ม
         invoiceId = await createTaxInvoice({
           ...commonData,
           billingType: data.billingType || 'personal',
           billingName: data.billingCompanyName || data.billingName || data.parentName,
           billingAddress: data.billingAddress as any,
           billingTaxId: data.billingTaxId,
-          billingCompanyName: data.billingCompanyName,
           billingCompanyBranch: data.billingCompanyBranch,
         });
       } else {
-        // ไม่ขอใบกำกับ → สร้าง receipt
-        invoiceId = await createReceipt(commonData);
+        // จด VAT + ไม่ติ๊ก → ใบกำกับภาษี/ใบเสร็จ ด้วยชื่อ-ที่อยู่ผู้ปกครอง ไม่มี taxId
+        invoiceId = await createTaxInvoice({
+          ...commonData,
+          billingType: 'personal',
+          billingName: data.parentName,
+          billingAddress: data.address as any,
+        });
       }
     }
   } catch (error) {
