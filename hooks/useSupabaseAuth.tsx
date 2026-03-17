@@ -205,24 +205,11 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
       loadingAdminRef.current = true;
 
-      // Use fetch directly to avoid Supabase client issues
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
       let adminDataArray;
 
       try {
         const response = await fetch(
-          `${supabaseUrl}/rest/v1/admin_users?email=ilike.${encodeURIComponent(emailLower)}&select=*`,
-          {
-            method: 'GET',
-            headers: {
-              'apikey': supabaseKey!,
-              'Authorization': `Bearer ${supabaseKey!}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-          }
+          `/api/auth/lookup?email=${encodeURIComponent(emailLower)}`
         );
 
         if (!response.ok) {
@@ -352,26 +339,15 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       }
 
       if (data.user) {
-        // Check if user is active admin
-        const { data: adminData, error: adminError } = await supabase
-          .from('admin_users')
-          .select('is_active')
-          .eq('auth_user_id', data.user.id)
-          .single();
+        // Check if user is active admin via API route (bypasses RLS)
+        const checkRes = await fetch('/api/auth/lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authUserId: data.user.id, email: email.toLowerCase() }),
+        });
+        const adminCheck = await checkRes.json();
 
-        // Also try by email if not found by auth_user_id
-        if (adminError) {
-          const { data: adminByEmail } = await supabase
-            .from('admin_users')
-            .select('is_active')
-            .eq('email', email.toLowerCase())
-            .single();
-
-          if (adminByEmail && !adminByEmail.is_active) {
-            await supabase.auth.signOut();
-            throw new Error('บัญชีถูกระงับการใช้งาน');
-          }
-        } else if (adminData && !adminData.is_active) {
+        if (adminCheck.is_active === false) {
           await supabase.auth.signOut();
           throw new Error('บัญชีถูกระงับการใช้งาน');
         }
