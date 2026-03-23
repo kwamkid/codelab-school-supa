@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     // Get contact with channel info
     const { data: contact, error: contactErr } = await (supabase as any)
       .from('chat_contacts')
-      .select('*, chat_channels(id, type, credentials)')
+      .select('*, chat_channels(id, type, credentials, platform_id)')
       .eq('id', contactId)
       .single();
 
@@ -41,27 +41,71 @@ export async function POST(request: NextRequest) {
       }
 
       const psid = contact.platform_user_id;
+      const pageId = channel.credentials?.pageId || channel.platform_id;
+      console.log(`Refresh profile: psid=${psid}, pageId=${pageId}, channelId=${channel.id}, token=${pageAccessToken?.substring(0, 20)}...`);
+
       const fields = channel.type === 'instagram'
         ? 'name,profile_pic'
         : 'first_name,last_name,profile_pic';
 
-      const profileRes = await fetch(
-        `https://graph.facebook.com/v21.0/${psid}?fields=${fields}&access_token=${pageAccessToken}`
-      );
+      // Try multiple API versions (v19.0 matches OAuth exchange version)
+      let profile: any = null;
+      for (const version of ['v19.0', 'v21.0']) {
+        const profileRes = await fetch(
+          `https://graph.facebook.com/${version}/${psid}?fields=${fields}&access_token=${pageAccessToken}`
+        );
+        if (profileRes.ok) {
+          profile = await profileRes.json();
+          console.log(`FB profile OK (${version}): ${psid} ->`, JSON.stringify(profile));
+          break;
+        } else {
+          const errText = await profileRes.text();
+          console.warn(`FB profile failed (${version}) for ${psid}:`, errText);
+        }
+      }
 
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
+      // Fallback: use Conversations API to find user name + avatar
+      if (!profile) {
+        console.log(`FB profile: trying conversations API fallback for ${psid}`);
+        try {
+          const convRes = await fetch(
+            `https://graph.facebook.com/v19.0/${pageId}/conversations?user_id=${psid}&fields=participants{id,name,profile_pic}&access_token=${pageAccessToken}`
+          );
+          if (convRes.ok) {
+            const convData = await convRes.json();
+            console.log('FB conversations response:', JSON.stringify(convData).substring(0, 500));
+            const participants = convData.data?.[0]?.participants?.data;
+            if (participants) {
+              const user = participants.find((p: any) => p.id === psid);
+              if (user?.name) {
+                displayName = user.name;
+                console.log(`FB conversations fallback OK: ${psid} -> ${displayName}`);
+              }
+              if (user?.profile_pic) {
+                avatarUrl = user.profile_pic;
+                console.log(`FB conversations avatar OK: ${psid}`);
+              }
+            }
+          } else {
+            console.warn('FB conversations fallback failed:', await convRes.text());
+          }
+        } catch (convErr) {
+          console.error('FB conversations fallback error:', convErr);
+        }
+      }
+
+      if (profile) {
         displayName = channel.type === 'instagram'
           ? profile.name
           : `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
         avatarUrl = profile.profile_pic;
-      } else {
-        const errBody = await profileRes.text();
-        console.error(`Profile refresh failed for ${psid}:`, errBody);
+      }
+
+      if (!displayName && !avatarUrl) {
         return NextResponse.json({
-          error: 'Facebook API error',
-          details: errBody,
+          error: 'Failed to fetch profile from Facebook API',
           psid,
+          pageId,
         }, { status: 502 });
       }
     } else if (channel.type === 'line') {

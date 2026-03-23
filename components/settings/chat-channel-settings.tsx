@@ -104,9 +104,9 @@ export default function ChatChannelSettings() {
   const [sendingTest, setSendingTest] = useState(false);
   const [testType, setTestType] = useState<'class' | 'makeup' | 'trial'>('class');
 
-  // FB/IG — App config
-  const [fbAppId, setFbAppId] = useState('');
-  const [fbAppSecret, setFbAppSecret] = useState('');
+  // FB/IG — App config (prefer env vars, fallback to manual input)
+  const [fbAppId, setFbAppId] = useState(process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '');
+  const [fbAppSecret, setFbAppSecret] = useState(process.env.NEXT_PUBLIC_FACEBOOK_APP_SECRET || '');
 
   // FB/IG — OAuth flow
   const [connectingFb, setConnectingFb] = useState(false);
@@ -288,7 +288,7 @@ export default function ChatChannelSettings() {
     setConnectingFb(true);
 
     const redirectUri = `${window.location.origin}/settings/chat/facebook-callback`;
-    const scope = 'pages_messaging,pages_manage_metadata,pages_show_list,business_management,public_profile';
+    const scope = 'pages_messaging,pages_read_engagement,pages_manage_metadata,pages_show_list,business_management,public_profile';
     const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${fbAppId.trim()}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
 
     const popup = window.open(oauthUrl, 'fb-oauth', 'width=600,height=700');
@@ -389,26 +389,46 @@ export default function ChatChannelSettings() {
           if (page.instagram.username) credentials.instagramHandle = `@${page.instagram.username}`;
         }
 
-        // Create FB channel
-        await createChannel({
-          type: 'facebook',
-          name: page.pageName,
-          platformId: page.pageId,
-          platformName: page.pageName,
-          credentials,
-          createdBy: user?.uid,
-        });
-
-        // Create IG channel if linked
-        if (page.instagram) {
+        // Check if FB channel already exists for this page → update token instead of creating new
+        const existingFb = channels.find(c => c.type === 'facebook' && c.platformId === page.pageId);
+        if (existingFb) {
+          await updateChannel(existingFb.id, {
+            credentials,
+            name: page.pageName,
+            platformName: page.pageName,
+            isActive: true,
+          });
+        } else {
           await createChannel({
-            type: 'instagram',
-            name: `${page.pageName} (IG)`,
-            platformId: page.instagram.id,
-            platformName: page.instagram.username || page.instagram.name,
+            type: 'facebook',
+            name: page.pageName,
+            platformId: page.pageId,
+            platformName: page.pageName,
             credentials,
             createdBy: user?.uid,
           });
+        }
+
+        // Create or update IG channel if linked
+        if (page.instagram) {
+          const existingIg = channels.find(c => c.type === 'instagram' && c.platformId === page.instagram!.id);
+          if (existingIg) {
+            await updateChannel(existingIg.id, {
+              credentials,
+              name: `${page.pageName} (IG)`,
+              platformName: page.instagram.username || page.instagram.name,
+              isActive: true,
+            });
+          } else {
+            await createChannel({
+              type: 'instagram',
+              name: `${page.pageName} (IG)`,
+              platformId: page.instagram.id,
+              platformName: page.instagram.username || page.instagram.name,
+              credentials,
+              createdBy: user?.uid,
+            });
+          }
         }
       }
 
@@ -747,26 +767,6 @@ export default function ChatChannelSettings() {
 
         {/* ==================== FB/IG TAB ==================== */}
         <TabsContent value="fb" className="space-y-6 mt-4">
-
-          {/* --- App Config --- */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Facebook App Config</CardTitle>
-              <CardDescription className="text-base">กรอก App ID และ App Secret จาก Facebook App Dashboard (ใช้ร่วมกันทุกเพจ)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-base">App ID</Label>
-                  <Input value={fbAppId} onChange={(e) => setFbAppId(e.target.value)} placeholder="Facebook App ID" className="text-base font-mono" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-base">App Secret</Label>
-                  <Input type="password" value={fbAppSecret} onChange={(e) => setFbAppSecret(e.target.value)} placeholder="Facebook App Secret" className="text-base font-mono" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* --- Connect Button --- */}
           <Card>

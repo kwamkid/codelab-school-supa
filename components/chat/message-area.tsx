@@ -167,6 +167,7 @@ export default function MessageArea({
         hasMore={hasMore}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
+        unreadCount={conversation.unreadCount || 0}
       />
 
       {/* Input — never disabled, optimistic sending */}

@@ -207,7 +207,7 @@ export async function getChannelByPlatform(
   const supabase = createServiceClient();
   let query = (supabase as any)
     .from('chat_channels')
-    .select('id, credentials')
+    .select('id, credentials, platform_id, platform_name, name')
     .eq('type', type)
     .eq('is_active', true);
 

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Search } from 'lucide-react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { Search, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { SectionLoading } from '@/components/ui/loading';
@@ -17,6 +17,9 @@ interface ConversationListProps {
   loading: boolean;
   branches: Branch[];
   defaultBranchId?: string | null;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
 }
 
 export default function ConversationList({
@@ -27,6 +30,9 @@ export default function ConversationList({
   loading,
   branches,
   defaultBranchId,
+  onLoadMore,
+  hasMore,
+  loadingMore,
 }: ConversationListProps) {
   const activeId = selectedId ?? activeConversationId ?? null;
   const [search, setSearch] = useState('');
@@ -133,7 +139,16 @@ export default function ConversationList({
       />
 
       {/* Conversation list */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        className="flex-1 overflow-y-auto"
+        onScroll={(e) => {
+          if (!onLoadMore || !hasMore || loadingMore) return;
+          const el = e.currentTarget;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
+            onLoadMore();
+          }
+        }}
+      >
         {loading ? (
           <SectionLoading />
         ) : filtered.length === 0 ? (
@@ -156,6 +171,11 @@ export default function ConversationList({
                 branches={branches}
               />
             ))}
+            {loadingMore && (
+              <div className="flex justify-center py-3">
+                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+              </div>
+            )}
           </div>
         )}
       </div>

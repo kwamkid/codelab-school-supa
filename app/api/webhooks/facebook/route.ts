@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { processInboundMessage, getChannelByPlatform } from '@/lib/services/chat-webhook'
+import { processInboundMessage, getChannelByPlatform, findOrCreateContact, findOrCreateConversation, insertOutboundMessage } from '@/lib/services/chat-webhook'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -57,73 +57,139 @@ export async function POST(request: NextRequest) {
     // Determine channel type
     const channelType = objectType === 'instagram' ? 'instagram' : 'facebook'
 
-    // Validate signature
     const signature = request.headers.get('x-hub-signature-256') || ''
-    const channel = await getChannelByPlatform(channelType)
 
-    if (channel?.credentials?.appSecret && signature) {
-      const expectedSig = 'sha256=' + crypto
-        .createHmac('sha256', channel.credentials.appSecret)
-        .update(body)
-        .digest('hex')
-
-      if (expectedSig !== signature) {
-        console.error('Facebook webhook: invalid signature')
-        return NextResponse.json({ success: true })
-      }
-    }
-
-    if (!channel) {
-      console.error(`No active ${channelType} chat channel configured`)
-      return NextResponse.json({ success: true })
-    }
-
-    // Process entries
+    // Process entries — each entry has its own page ID
     for (const entry of webhookBody.entry || []) {
+      const entryPageId = entry.id // Page ID that received the message
+
+      // Find the channel matching this specific page
+      const channel = await getChannelByPlatform(channelType, entryPageId)
+        || await getChannelByPlatform(channelType) // fallback to any active channel
+
+      if (!channel) {
+        console.error(`No active ${channelType} chat channel for page ${entryPageId}`)
+        continue
+      }
+
+      // Validate signature
+      if (channel.credentials?.appSecret && signature) {
+        const expectedSig = 'sha256=' + crypto
+          .createHmac('sha256', channel.credentials.appSecret)
+          .update(body)
+          .digest('hex')
+
+        if (expectedSig !== signature) {
+          console.error('Facebook webhook: invalid signature')
+          return NextResponse.json({ success: true })
+        }
+      }
+
       for (const event of entry.messaging || []) {
         const senderId = event.sender?.id
         if (!senderId) continue
 
-        // Skip echo messages (sent by us)
-        if (event.message?.is_echo) continue
+        // Handle echo messages (sent by page — from FB inbox or other systems)
+        if (event.message?.is_echo) {
+          const recipientId = event.recipient?.id
+          if (recipientId) {
+            try {
+              const contactId = await findOrCreateContact(channel.id, recipientId)
+              const conversationId = await findOrCreateConversation(channel.id, contactId)
+
+              const echoMsg = event.message
+              let messageType = 'text'
+              let content: string | undefined
+              let mediaUrl: string | undefined
+
+              if (echoMsg.text) {
+                content = echoMsg.text
+              } else if (echoMsg.attachments?.length > 0) {
+                const att = echoMsg.attachments[0]
+                messageType = att.type === 'image' ? 'image'
+                  : att.type === 'audio' ? 'audio'
+                  : att.type === 'video' ? 'video'
+                  : att.type === 'file' ? 'file'
+                  : 'text'
+                mediaUrl = att.payload?.url
+                if (!echoMsg.text && messageType !== 'text') {
+                  content = `[${messageType === 'image' ? 'รูปภาพ' : messageType === 'audio' ? 'เสียง' : messageType === 'video' ? 'วิดีโอ' : 'ไฟล์'}]`
+                }
+              }
+
+              await insertOutboundMessage({
+                conversationId,
+                senderId: senderId, // page ID
+                senderName: channel.platform_name || channel.name || 'Page',
+                messageType,
+                content,
+                mediaUrl,
+                platformMessageId: echoMsg.mid,
+                status: 'sent',
+              })
+              console.log(`FB echo message saved: ${echoMsg.mid}`)
+            } catch (echoErr) {
+              console.error('FB echo message error:', echoErr)
+            }
+          }
+          continue
+        }
 
         // Get sender profile from Graph API
         let displayName: string | undefined
         let avatarUrl: string | undefined
         const pageAccessToken = channel.credentials?.pageAccessToken
+        const pageId = channel.credentials?.pageId || channel.platform_id
         if (pageAccessToken) {
           try {
-            // Use v21.0 for latest Messenger profile API
             const fields = channelType === 'instagram'
               ? 'name,profile_pic'
               : 'first_name,last_name,profile_pic'
-            const profileRes = await fetch(
-              `https://graph.facebook.com/v21.0/${senderId}?fields=${fields}&access_token=${pageAccessToken}`
-            )
-            if (profileRes.ok) {
-              const profile = await profileRes.json()
+
+            // Try multiple API versions
+            let profile: any = null
+            for (const version of ['v19.0', 'v21.0']) {
+              const profileRes = await fetch(
+                `https://graph.facebook.com/${version}/${senderId}?fields=${fields}&access_token=${pageAccessToken}`
+              )
+              if (profileRes.ok) {
+                profile = await profileRes.json()
+                console.log(`FB profile OK (${version}): ${senderId} →`, profile.first_name || profile.name)
+                break
+              }
+            }
+
+            if (profile) {
               displayName = channelType === 'instagram'
                 ? profile.name
                 : `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
               avatarUrl = profile.profile_pic
-              if (displayName) {
-                console.log(`FB profile OK: ${senderId} → ${displayName}`)
-              }
             } else {
-              const errBody = await profileRes.text()
-              console.error(`FB profile fetch failed (${profileRes.status}) for ${senderId}:`, errBody)
-              // If Graph API user profile fails, try fetching name from conversation
-              // (works when profile_pic permission is limited)
+              // Fallback: Conversations API to get participant name
+              console.warn(`FB profile: direct fetch failed for ${senderId}, trying conversations API (pageId=${pageId})`)
               try {
                 const convRes = await fetch(
-                  `https://graph.facebook.com/v21.0/${senderId}?fields=name&access_token=${pageAccessToken}`
+                  `https://graph.facebook.com/v19.0/${pageId}/conversations?user_id=${senderId}&fields=participants{id,name,profile_pic}&access_token=${pageAccessToken}`
                 )
                 if (convRes.ok) {
                   const convData = await convRes.json()
-                  if (convData.name) displayName = convData.name
+                  const participants = convData.data?.[0]?.participants?.data
+                  if (participants) {
+                    const user = participants.find((p: any) => p.id === senderId)
+                    if (user?.name) {
+                      displayName = user.name
+                      console.log(`FB conversations fallback OK: ${senderId} → ${displayName}`)
+                    }
+                    if (user?.profile_pic) {
+                      avatarUrl = user.profile_pic
+                      console.log(`FB conversations avatar OK: ${senderId}`)
+                    }
+                  }
                 }
               } catch {}
             }
+
+            // Note: /{psid}/picture also blocked — profile pics require Advanced Access
           } catch (profileErr) {
             console.error('FB profile fetch error:', profileErr)
           }

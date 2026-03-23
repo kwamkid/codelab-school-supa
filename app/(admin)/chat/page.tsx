@@ -32,6 +32,8 @@ export default function ChatPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMoreConversations, setLoadingMoreConversations] = useState(false);
+  const [hasMoreConversations, setHasMoreConversations] = useState(true);
   const [mobileView, setMobileView] = useState<MobileView>('list');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [showLinkModal, setShowLinkModal] = useState(false);
@@ -67,12 +69,14 @@ export default function ChatPage() {
   }, []);
 
   // Load conversations on mount
+  const CONVERSATIONS_PER_PAGE = 30;
   useEffect(() => {
     const load = async () => {
       try {
         setLoadingConversations(true);
-        const data = await getConversations();
+        const data = await getConversations({ limit: CONVERSATIONS_PER_PAGE });
         setConversations(data);
+        setHasMoreConversations(data.length === CONVERSATIONS_PER_PAGE);
       } catch (error) {
         console.error('Error loading conversations:', error);
       } finally {
@@ -81,6 +85,24 @@ export default function ChatPage() {
     };
     load();
   }, []);
+
+  // Load more conversations (infinite scroll)
+  const handleLoadMoreConversations = useCallback(async () => {
+    if (loadingMoreConversations || !hasMoreConversations) return;
+    try {
+      setLoadingMoreConversations(true);
+      const data = await getConversations({
+        limit: CONVERSATIONS_PER_PAGE,
+        offset: conversations.length,
+      });
+      setConversations(prev => [...prev, ...data]);
+      setHasMoreConversations(data.length === CONVERSATIONS_PER_PAGE);
+    } catch (error) {
+      console.error('Error loading more conversations:', error);
+    } finally {
+      setLoadingMoreConversations(false);
+    }
+  }, [loadingMoreConversations, hasMoreConversations, conversations.length]);
 
   // Reset panel view when conversation changes
   useEffect(() => {
@@ -291,7 +313,8 @@ export default function ChatPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || 'ไม่สามารถรีเฟรชโปรไฟล์ได้');
+        console.error('Refresh profile error:', data);
+        toast.error(`${data.error || 'ไม่สามารถรีเฟรชโปรไฟล์ได้'}${data.details ? ': ' + data.details : ''}`);
         return;
       }
       // Update local state
@@ -501,11 +524,15 @@ export default function ChatPage() {
             onSelect={handleSelectConversation}
             loading={loadingConversations}
             branches={branches}
-            defaultBranchId={selectedBranchId}
+            defaultBranchId={null}
+            onLoadMore={handleLoadMoreConversations}
+            hasMore={hasMoreConversations}
+            loadingMore={loadingMoreConversations}
           />
         }
         messages={
           <MessageArea
+            key={selectedConversationId || 'none'}
             conversation={selectedConversation}
             messages={messages}
             loading={loadingMessages}

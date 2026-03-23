@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChatMessage } from '@/types/models';
 import { MessageBubble } from './message-bubble';
@@ -23,6 +23,8 @@ interface MessageListProps {
   loadingMore?: boolean;
   /** Callback to load older messages */
   onLoadMore?: () => void;
+  /** Number of unread messages — used to scroll to first unread */
+  unreadCount?: number;
 }
 
 function formatDateSeparator(date: Date): string {
@@ -79,11 +81,13 @@ export function MessageList({
   hasMore,
   loadingMore,
   onLoadMore,
+  unreadCount = 0,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const unreadMarkerRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showScrollDown, setShowScrollDown] = useState(false);
 
   // Close lightbox on ESC
   useEffect(() => {
@@ -93,21 +97,56 @@ export function MessageList({
     return () => window.removeEventListener('keydown', handleKey);
   }, [previewUrl]);
 
-  // Auto-scroll to bottom when new messages are added (not when loading older ones)
+  // Scroll to bottom helper
+  const scrollToBottom = useCallback((behavior?: string) => {
+    if (scrollRef.current) {
+      if (behavior === 'smooth') {
+        scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+      } else {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }
+  }, []);
+
+  // Scroll to bottom on first render via ref callback on last element
+  const lastMessageRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      setTimeout(() => {
+        if (unreadMarkerRef.current && prevMessageCountRef.current === 0) {
+          unreadMarkerRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
+        } else if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+  }, []);
+
+  // Track message count changes for new messages
   useEffect(() => {
-    const isNewMessage = messages.length > prevMessageCountRef.current;
-    const wasAtBottom = prevMessageCountRef.current === 0; // First load
+    if (messages.length === 0) {
+      prevMessageCountRef.current = 0;
+      return;
+    }
+
+    const isNewMessage = prevMessageCountRef.current > 0 && messages.length > prevMessageCountRef.current;
     prevMessageCountRef.current = messages.length;
 
-    if (isNewMessage || wasAtBottom) {
-      bottomRef.current?.scrollIntoView({ behavior: wasAtBottom ? 'auto' : 'smooth' });
+    if (isNewMessage) {
+      scrollToBottom('smooth');
     }
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
-  // Infinite scroll up — load more when scrolling to top
+  // Infinite scroll up + detect scroll position for floating button
   const handleScroll = useCallback(() => {
-    if (!scrollRef.current || !hasMore || loadingMore || !onLoadMore) return;
-    if (scrollRef.current.scrollTop < 100) {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+
+    // Show "scroll to bottom" button when scrolled up more than 300px from bottom
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollDown(distanceFromBottom > 300);
+
+    // Load more older messages when near top
+    if (hasMore && !loadingMore && onLoadMore && el.scrollTop < 100) {
       onLoadMore();
     }
   }, [hasMore, loadingMore, onLoadMore]);
@@ -152,9 +191,10 @@ export function MessageList({
         </div>
       )}
 
+      <div className="relative flex-1">
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50 dark:bg-slate-900"
+        className="absolute inset-0 overflow-y-auto px-4 py-4 bg-gray-50 dark:bg-slate-900"
         onScroll={handleScroll}
       >
         <div className="flex flex-col gap-0.5">
@@ -173,7 +213,10 @@ export function MessageList({
           </button>
         )}
 
-        {messages.map((msg, index) => {
+        {messages.map((msg, index, arr) => {
+          // Show unread marker before the first unread message
+          const unreadStartIndex = unreadCount > 0 ? arr.length - unreadCount : -1;
+          const showUnreadMarker = index === unreadStartIndex;
           const prevMsg = index > 0 ? messages[index - 1] : null;
           const showDateSeparator =
             !prevMsg || !isSameDay(prevMsg.createdAt, msg.createdAt);
@@ -198,6 +241,13 @@ export function MessageList({
 
           return (
             <div key={msg.id} className={cn(showDateSeparator ? 'mt-2' : '')}>
+              {showUnreadMarker && (
+                <div ref={unreadMarkerRef} className="flex items-center gap-2 py-2 my-2">
+                  <div className="h-px flex-1 bg-red-300 dark:bg-red-500" />
+                  <span className="text-xs text-red-500 dark:text-red-400 font-medium px-2">ข้อความใหม่</span>
+                  <div className="h-px flex-1 bg-red-300 dark:bg-red-500" />
+                </div>
+              )}
               {showDateSeparator && (
                 <div className="flex items-center justify-center py-3">
                   <div className="h-px flex-1 bg-gray-200 dark:bg-slate-700" />
@@ -236,8 +286,20 @@ export function MessageList({
             </div>
           );
         })}
-        <div ref={bottomRef} />
+        <div ref={lastMessageRef} />
       </div>
+      </div>
+
+      {/* Floating scroll-to-bottom button */}
+      {showScrollDown && (
+        <button
+          onClick={() => scrollToBottom('smooth')}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-white dark:bg-slate-700 shadow-lg border border-gray-200 dark:border-slate-600 flex items-center gap-1.5 hover:bg-gray-50 dark:hover:bg-slate-600 transition-all"
+        >
+          <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+          <span className="text-xs text-gray-600 dark:text-gray-300">ข้อความล่าสุด</span>
+        </button>
+      )}
       </div>
     </>
   );

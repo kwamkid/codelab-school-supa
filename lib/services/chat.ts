@@ -199,12 +199,18 @@ export async function getConversations(filters?: {
   status?: string;
   assignedTo?: string;
   search?: string;
+  limit?: number;
+  offset?: number;
 }): Promise<ChatConversation[]> {
   const supabase = getClient();
+  const limit = filters?.limit ?? 30;
+  const offset = filters?.offset ?? 0;
+
   let query = (supabase as any)
     .from('chat_conversations')
     .select('*, chat_contacts(*), chat_channels(id, type, name)')
-    .order('last_message_at', { ascending: false, nullsFirst: false });
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .range(offset, offset + limit - 1);
 
   if (filters?.channelId) query = query.eq('channel_id', filters.channelId);
   if (filters?.channelType) query = query.eq('chat_channels.type', filters.channelType);
