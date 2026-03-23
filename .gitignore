@@ -26,6 +26,15 @@ yarn-error.log*
 .env*.local
 .env
 .env.vercel
+.env.example
+
+# AI / Claude
+.claude/
+
+# docs not needed in git
+MIGRATION_SUMMARY.md
+SUPABASE_SCHEMA.md
+done.md
 
 # vercel
 .vercel
