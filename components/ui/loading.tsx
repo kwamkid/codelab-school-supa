@@ -53,7 +53,7 @@ export function Loading({
           width={config.logo}
           height={config.logo}
           className="relative z-10"
-          style={{ animation: 'loading-bounce 1.5s ease-in-out infinite' }}
+          style={{ animation: 'loading-bounce 1.5s ease-in-out infinite', width: 'auto', height: 'auto' }}
           priority
         />
       </div>

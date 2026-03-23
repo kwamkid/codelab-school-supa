@@ -432,10 +432,20 @@ export default function ChatChannelSettings() {
         }
       }
 
-      toast.success(`เชื่อมต่อ ${selectedPageIds.size} เพจสำเร็จ`);
+      toast.success(`เชื่อมต่อ ${selectedPageIds.size} เพจสำเร็จ กำลัง sync ข้อความเก่า...`);
       setShowPageSelectDialog(false);
       setFetchedPages([]);
       await loadChannels();
+
+      // Auto-sync old messages in background
+      fetch('/api/admin/chat/sync-messages', { method: 'POST' })
+        .then(r => r.json())
+        .then(result => {
+          if (result.success) {
+            toast.success(`Sync สำเร็จ: ${result.conversations} แชท, ${result.messagesSynced} ข้อความ`);
+          }
+        })
+        .catch(() => {});
     } catch (error: any) {
       toast.error(error.message || 'เกิดข้อผิดพลาด');
     } finally {

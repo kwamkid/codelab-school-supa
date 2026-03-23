@@ -86,25 +86,27 @@ export function BookingActionButtons({
             </Button>
           </PermissionGuard>
         ) : booking.status === 'completed' ? (
-          <Link href={`/enrollments/new?from=trial&bookingId=${booking.id}`}>
-            <Button
-              size="sm"
-              className={`h-7 gap-1 text-sm px-2.5 ${primary.color}`}
-            >
+          <Button
+            size="sm"
+            className={`h-7 gap-1 text-sm px-2.5 ${primary.color}`}
+            asChild
+          >
+            <Link href={`/enrollments/new?from=trial&bookingId=${booking.id}`}>
               <primary.icon className="h-3.5 w-3.5" />
               {primary.label}
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         ) : (
-          <Link href={`/trial/${booking.id}`}>
-            <Button
-              size="sm"
-              className={`h-7 gap-1 text-sm px-2.5 ${primary.color}`}
-            >
+          <Button
+            size="sm"
+            className={`h-7 gap-1 text-sm px-2.5 ${primary.color}`}
+            asChild
+          >
+            <Link href={`/trial/${booking.id}`}>
               <primary.icon className="h-3.5 w-3.5" />
               {primary.label}
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         )
       )}
 

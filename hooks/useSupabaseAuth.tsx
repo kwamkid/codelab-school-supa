@@ -363,27 +363,27 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
   const signOut = useCallback(async () => {
     try {
-      // Clear local state first
+      // Reset refs so next login will reload admin data
+      loadedEmailRef.current = null;
+      loadingAdminRef.current = false;
+
+      // Clear local state
       setAdminUser(null);
       setTeacher(null);
       setUser(null);
       setSession(null);
 
-      // Clear localStorage
-      if (typeof window !== 'undefined') {
-        // Clear all Supabase auth tokens
-        const keys = Object.keys(localStorage);
-        keys.forEach(key => {
-          if (key.startsWith('sb-') || key.includes('supabase')) {
-            localStorage.removeItem(key);
-          }
-        });
-      }
+      // Sign out from Supabase (invalidates session)
+      const supabase = getClient();
+      await supabase.auth.signOut();
 
       // Navigate to login
       router.push('/login');
     } catch (error) {
       console.error('Sign out error:', error);
+      // Reset refs even on error
+      loadedEmailRef.current = null;
+      loadingAdminRef.current = false;
       // Even if there's an error, still clear state and redirect
       setAdminUser(null);
       setTeacher(null);

@@ -572,6 +572,95 @@ async function checkTeacherAvailability(
 }
 
 /**
+ * Fast availability check using Supabase RPC (single query)
+ * Use this instead of checkAvailability() for much better performance
+ */
+export async function checkAvailabilityRpc(
+  params: AvailabilityCheckParams
+): Promise<AvailabilityCheckResult> {
+  try {
+    const supabase = getClient();
+    const year = params.date.getFullYear();
+    const month = String(params.date.getMonth() + 1).padStart(2, '0');
+    const day = String(params.date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+
+    const { data, error } = await supabase.rpc('check_availability', {
+      p_check_date: dateString,
+      p_start_time: params.startTime,
+      p_end_time: params.endTime,
+      p_branch_id: params.branchId,
+      p_room_id: params.roomId,
+      p_teacher_id: params.teacherId,
+      p_exclude_id: params.excludeId || null,
+      p_exclude_type: params.excludeType || null,
+    });
+
+    if (error) {
+      console.error('RPC check_availability error:', JSON.stringify(error));
+      return checkAvailability(params);
+    }
+
+    const conflicts: any[] = data || [];
+    const issues: AvailabilityIssue[] = [];
+    const warnings: AvailabilityWarning[] = [];
+
+    for (const c of conflicts) {
+      const issueData = {
+        type: c.type,
+        message: c.message,
+        details: {
+          conflictType: c.conflict_type,
+          conflictName: c.conflict_name,
+          conflictTime: c.conflict_time,
+        },
+      };
+
+      // Holiday = always block
+      if (c.type === 'holiday') {
+        issues.push(issueData);
+        continue;
+      }
+
+      // Class conflicts = always block (trial/makeup can't overlap with regular classes)
+      if (c.conflict_type === 'class') {
+        issues.push(issueData);
+        continue;
+      }
+
+      // Trial booking: trial+trial = warning (allow multiple trials same time)
+      // Trial booking: trial+makeup = warning
+      if (params.excludeType === 'trial') {
+        warnings.push(issueData as any);
+        continue;
+      }
+
+      // Makeup booking: makeup+makeup = warning, makeup+trial = warning
+      if (params.excludeType === 'makeup') {
+        warnings.push(issueData as any);
+        continue;
+      }
+
+      // Regular class: trial conflicts = warning, others = issue
+      if (c.conflict_type === 'trial') {
+        warnings.push(issueData as any);
+      } else {
+        issues.push(issueData);
+      }
+    }
+
+    return {
+      available: issues.length === 0,
+      reasons: issues,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    };
+  } catch (error) {
+    console.error('checkAvailabilityRpc error:', error);
+    return checkAvailability(params);
+  }
+}
+
+/**
  * Quick check if a specific time slot is available
  */
 export async function isTimeSlotAvailable(

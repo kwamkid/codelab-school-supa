@@ -534,7 +534,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
                     <div>
                       <p className="text-xs text-gray-500">ชื่อ-นามสกุล</p>
                       <p className="font-medium">{booking.parentName}</p>
@@ -742,38 +742,23 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                                             </DropdownMenuItem>
                                           ) : (
                                             <>
-                                              {session.status === 'scheduled' && isPast && (
-                                                <DropdownMenuItem
-                                                  onSelect={async () => {
-                                                    try {
-                                                      await updateTrialSession(session.id, { status: 'attended', attended: true });
-                                                      const allOther = sessions.filter(s => s.id !== session.id);
-                                                      if (allOther.every(s => s.status === 'attended' || s.status === 'absent' || s.status === 'cancelled' || s.converted)) {
-                                                        await updateBookingStatus(booking.id, 'completed');
-                                                      }
-                                                      toast.success('บันทึกการเข้าเรียนสำเร็จ');
-                                                      loadData();
-                                                    } catch { toast.error('เกิดข้อผิดพลาด'); }
-                                                  }}
-                                                >
-                                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                                  บันทึกว่าเข้าเรียนแล้ว
+                                              {(session.status === 'scheduled' || session.status === 'cancelled' || session.status === 'absent') && (
+                                                <DropdownMenuItem onSelect={() => { setSelectedSession(session); setRescheduleModalOpen(true); }}>
+                                                  <Edit className="h-4 w-4 mr-2" />
+                                                  {session.status === 'cancelled' ? 'นัดวันใหม่' : 'เลื่อนนัด'}
                                                 </DropdownMenuItem>
                                               )}
                                               {!session.converted && (
-                                                <DropdownMenuItem
-                                                  onSelect={() => router.push(`/enrollments/new?from=trial&bookingId=${booking.id}&sessionId=${session.id}`)}
-                                                  className="text-green-600 focus:text-green-600"
-                                                >
-                                                  <UserPlus className="h-4 w-4 mr-2" />
-                                                  ลงทะเบียนเรียน
-                                                </DropdownMenuItem>
-                                              )}
-                                              {((session.status === 'scheduled' && !isPast) || session.status === 'cancelled' || session.status === 'absent') && (
-                                                <DropdownMenuItem onSelect={() => { setSelectedSession(session); setRescheduleModalOpen(true); }}>
-                                                  <Edit className="h-4 w-4 mr-2" />
-                                                  {session.status === 'cancelled' ? 'นัดวันใหม่' : 'เปลี่ยนวันนัดหมาย'}
-                                                </DropdownMenuItem>
+                                                <>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem
+                                                    onSelect={() => router.push(`/enrollments/new?from=trial&bookingId=${booking.id}&sessionId=${session.id}`)}
+                                                    className="text-green-600 focus:text-green-600"
+                                                  >
+                                                    <UserPlus className="h-4 w-4 mr-2" />
+                                                    ลงทะเบียนเรียน
+                                                  </DropdownMenuItem>
+                                                </>
                                               )}
                                               {session.status === 'scheduled' && !isPast && (
                                                 <>

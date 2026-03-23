@@ -3,20 +3,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { Label } from '@/components/ui/label';
 import { FormSelect } from '@/components/ui/form-select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { th } from 'date-fns/locale';
-import { 
-  CalendarIcon,
+import {
   MapPin,
   User,
   Loader2,
@@ -27,12 +23,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TrialSession, Teacher, Branch, Room, Subject } from '@/types/models';
-import { updateTrialSession, checkTrialRoomAvailability } from '@/lib/services/trial-bookings';
+import { updateTrialSession, checkTrialRoomAvailability, rescheduleTrialSession, getTrialSessions } from '@/lib/services/trial-bookings';
 import { getTeachers } from '@/lib/services/teachers';
 import { getBranches } from '@/lib/services/branches';
 import { getRoomsByBranch } from '@/lib/services/rooms';
 import { getSubjects } from '@/lib/services/subjects';
-import { cn, formatDate } from '@/lib/utils';
+import { checkAvailabilityRpc as checkRoomAvailability } from '@/lib/utils/availability';
+import { getClient } from '@/lib/supabase/client';
+import { formatDate } from '@/lib/utils';
 
 interface RescheduleTrialDialogProps {
   isOpen: boolean;
@@ -93,21 +91,35 @@ export default function RescheduleTrialDialog({
     }
   }, [startTime, session.startTime]);
 
-  // Check room availability when all fields are filled
+  // Track if user has changed any field from original values
+  const hasChanged = React.useMemo(() => {
+    const origDate = new Date(session.scheduledDate).toDateString();
+    const currDate = selectedDate?.toDateString();
+    return (
+      currDate !== origDate ||
+      startTime !== session.startTime ||
+      endTime !== session.endTime ||
+      selectedTeacher !== session.teacherId ||
+      selectedRoom !== session.roomId
+    );
+  }, [selectedDate, startTime, endTime, selectedTeacher, selectedRoom, session]);
+
+  // Check availability only after user changes something
   useEffect(() => {
+    if (!hasChanged) {
+      setAvailabilityError('');
+      setExistingTrials([]);
+      return;
+    }
     if (selectedDate && startTime && endTime && selectedBranch && selectedRoom) {
       checkAvailability();
       checkExistingTrials();
-    } else {
-      setAvailabilityError('');
-      setExistingTrials([]);
     }
-  }, [selectedDate, startTime, endTime, selectedBranch, selectedRoom]);
+  }, [hasChanged, selectedDate, startTime, endTime, selectedRoom, selectedTeacher]);
 
   // ฟังก์ชันตรวจสอบ trial sessions ที่มีอยู่แล้ว
   const checkExistingTrials = async () => {
     try {
-      const { getTrialSessions } = await import('@/lib/services/trial-bookings');
       const allTrials = await getTrialSessions();
       
       const matchingTrials = allTrials.filter(trial =>
@@ -173,10 +185,7 @@ export default function RescheduleTrialDialog({
     setAvailabilityError('');
 
     try {
-      // ใช้ centralized availability checker
-      const { checkAvailability } = await import('@/lib/utils/availability');
-      
-      const result = await checkAvailability({
+      const result = await checkRoomAvailability({
         date: selectedDate,
         startTime,
         endTime,
@@ -243,10 +252,7 @@ export default function RescheduleTrialDialog({
     try {
       // Get room name for storing
       const selectedRoomData = rooms.find(r => r.id === selectedRoom);
-      
-      // ใช้ rescheduleTrialSession แทน updateTrialSession
-      const { rescheduleTrialSession } = await import('@/lib/services/trial-bookings');
-      const { getClient } = await import('@/lib/supabase/client');
+
       const supabase = getClient();
       const { data: { user: currentUser } } = await supabase.auth.getUser();
 
@@ -288,52 +294,30 @@ export default function RescheduleTrialDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>เปลี่ยนนัดหมายทดลองเรียน</DialogTitle>
+          <DialogDescription>เลือกวันที่ เวลา ครู และห้องเรียนใหม่สำหรับนัดหมายทดลอง</DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Current Info */}
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-1">
-                <div><strong>นักเรียน:</strong> {session.studentName}</div>
-                <div><strong>วิชา:</strong> {currentSubject?.name || session.subjectId}</div>
-                <div><strong>นัดหมายเดิม:</strong> {formatDate(session.scheduledDate, 'long')} เวลา {session.startTime?.slice(0, 5)} - {session.endTime?.slice(0, 5)}</div>
-              </div>
-            </AlertDescription>
-          </Alert>
+          <p className="text-sm text-gray-500 flex items-center gap-1.5">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span><strong>นัดหมายเดิม:</strong> {formatDate(session.scheduledDate, 'long')} เวลา {session.startTime?.slice(0, 5)} - {session.endTime?.slice(0, 5)}</span>
+          </p>
 
           {/* Date & Time */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>วันที่</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, 'PPP', { locale: th }) : "เลือกวันที่"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    initialFocus
-                    disabled={(date) => date < new Date()}
-                  />
-                </PopoverContent>
-              </Popover>
+              <DateRangePicker
+                mode="single"
+                value={selectedDate ? selectedDate.toISOString().split('T')[0] : ''}
+                onChange={(date) => setSelectedDate(date ? new Date(date) : undefined)}
+                minDate={new Date()}
+                placeholder="เลือกวันที่"
+              />
             </div>
 
             <div className="space-y-2">
@@ -347,31 +331,17 @@ export default function RescheduleTrialDialog({
             </div>
           </div>
 
-          {/* Teacher */}
-          <div className="space-y-2">
-            <Label>เลือกครู</Label>
-            <FormSelect
-              value={selectedTeacher}
-              onValueChange={setSelectedTeacher}
-              placeholder="เลือกครู"
-              options={getAvailableTeachers().map((teacher) => ({
-                value: teacher.id,
-                label: teacher.nickname || teacher.name,
-              }))}
-            />
-          </div>
-
-          {/* Branch & Room */}
+          {/* Teacher & Room */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>สาขา</Label>
+              <Label>เลือกครู</Label>
               <FormSelect
-                value={selectedBranch}
-                onValueChange={setSelectedBranch}
-                placeholder="เลือกสาขา"
-                options={branches.map((branch) => ({
-                  value: branch.id,
-                  label: branch.name,
+                value={selectedTeacher}
+                onValueChange={setSelectedTeacher}
+                placeholder="เลือกครู"
+                options={getAvailableTeachers().map((teacher) => ({
+                  value: teacher.id,
+                  label: teacher.nickname || teacher.name,
                 }))}
               />
             </div>
@@ -392,36 +362,8 @@ export default function RescheduleTrialDialog({
                   label: `${room.name} (จุ ${room.capacity} คน)`,
                 }))}
               />
-              {selectedDate && startTime && endTime && selectedRoom && (
-                <p className="text-xs text-gray-500">
-                  {checkingAvailability ? (
-                    <span className="flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      กำลังตรวจสอบห้องว่าง...
-                    </span>
-                  ) : availabilityError ? (
-                    <span className="flex items-center gap-1 text-red-600">
-                      <XCircle className="h-3 w-3" />
-                      ห้องไม่ว่าง
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-green-600">
-                      <CheckCircle className="h-3 w-3" />
-                      ห้องว่าง
-                    </span>
-                  )}
-                </p>
-              )}
             </div>
           </div>
-
-          {/* Availability Check Alert */}
-          {checkingAvailability && (
-            <Alert>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <AlertDescription>กำลังตรวจสอบห้องว่าง...</AlertDescription>
-            </Alert>
-          )}
 
           {availabilityError && (
             <Alert variant="destructive">
@@ -465,11 +407,31 @@ export default function RescheduleTrialDialog({
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex items-center justify-end gap-3 pt-4">
+            {hasChanged && selectedDate && startTime && endTime && selectedRoom && (
+              <p className="text-xs mr-auto">
+                {checkingAvailability ? (
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    กำลังตรวจสอบ...
+                  </span>
+                ) : availabilityError ? (
+                  <span className="flex items-center gap-1 text-red-600">
+                    <XCircle className="h-3 w-3" />
+                    ห้องไม่ว่าง
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-green-600">
+                    <CheckCircle className="h-3 w-3" />
+                    ห้องว่าง
+                  </span>
+                )}
+              </p>
+            )}
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               ยกเลิก
             </Button>
-            <Button 
+            <Button
               type="submit"
               disabled={loading || !!availabilityError || checkingAvailability}
               className="bg-red-500 hover:bg-red-600"
@@ -480,7 +442,7 @@ export default function RescheduleTrialDialog({
                   กำลังบันทึก...
                 </>
               ) : (
-                'บันทึกการเปลี่ยนแปลง'
+                'เลื่อนนัด'
               )}
             </Button>
           </div>

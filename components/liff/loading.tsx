@@ -12,6 +12,7 @@ export function LiffLoading() {
             width={80}
             height={80}
             className="mx-auto"
+            style={{ width: 'auto', height: 'auto' }}
             priority
           />
         </div>
