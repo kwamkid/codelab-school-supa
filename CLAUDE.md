@@ -8,7 +8,7 @@
 - **Forms:** React Hook Form + Zod
 - **State:** React Query, Context API (Branch, Loading, Makeup)
 - **Charts:** Recharts
-- **Calendar:** FullCalendar
+- **Calendar:** FullCalendar (used in class detail), Dashboard uses custom Time×Room grid
 - **Toast:** Sonner
 - **Export:** html2canvas
 - **LINE:** @line/liff, @line/bot-sdk
@@ -156,8 +156,15 @@ types/
 
 ## Key Rules
 - New pages must use `text-base` (16px), NOT `text-sm`/`text-xs`
+- Tables use `text-sm` (14px) — set in shared `components/ui/table.tsx`
 - `AdminUser.branchIds` (plural array), NOT `branchId`
 - `updateTrialSession(sessionId, data)` takes 2 args
 - `BranchContext` provides `selectedBranchId`, NOT `branches` array — load via `getBranches()`
 - Settings are sub-pages under `/settings/*`, not tabs
 - Use `useRef` guard for preventing double-submit
+- `adminMutation` route supports operations: `insert`, `update`, `delete`, `upsert`, `select` (with `order` option)
+- Super admin can edit all class fields regardless of status (`getEditableFields(classData, isSuperAdmin)`)
+- When super admin changes schedule fields → `regenerateClassSchedules()` auto-regenerates future schedules
+- Rooms use soft delete (`is_active = false`), never hard delete
+- Dashboard uses RPC `get_daily_timetable(p_date, p_branch_id)` for single-query data loading
+- Do NOT change existing `.toISOString()` patterns in services — they work correctly with the current data flow
