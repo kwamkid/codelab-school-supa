@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate operation
-    if (!['insert', 'update', 'delete', 'upsert'].includes(operation)) {
+    if (!['insert', 'update', 'delete', 'upsert', 'select'].includes(operation)) {
       return NextResponse.json(
         { error: `Invalid operation "${operation}"` },
         { status: 400 }
@@ -71,6 +71,11 @@ export async function POST(request: NextRequest) {
     let query: any
 
     switch (operation) {
+      case 'select':
+        query = supabase.from(table).select(
+          typeof options?.select === 'string' ? options.select : '*'
+        )
+        break
       case 'insert':
         query = supabase.from(table).insert(data)
         break
@@ -115,6 +120,12 @@ export async function POST(request: NextRequest) {
       query = query.select(
         typeof options.select === 'string' ? options.select : undefined
       )
+    }
+
+    // Apply order
+    if (options?.order) {
+      const [col, dir] = options.order.split('.')
+      query = query.order(col, { ascending: dir !== 'desc' })
     }
 
     // Apply single

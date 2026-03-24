@@ -13,11 +13,12 @@ interface MutationOptions {
   select?: boolean | string
   single?: boolean
   onConflict?: string
+  order?: string
 }
 
 interface MutationParams {
   table: string
-  operation: 'insert' | 'update' | 'delete' | 'upsert'
+  operation: 'insert' | 'update' | 'delete' | 'upsert' | 'select'
   data?: Record<string, any> | Record<string, any>[]
   match?: Record<string, any>
   filters?: MutationFilter[]

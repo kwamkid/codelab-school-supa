@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Room, Branch } from '@/types/models';
-import { getRoomsByBranch } from '@/lib/services/rooms';
+import { Room, Branch, Class } from '@/types/models';
+import { getRoomsByBranch, getActiveRoomsByBranch, updateRoom } from '@/lib/services/rooms';
 import { getBranches, getActiveBranches } from '@/lib/services/branches';
+import { getClasses, updateClass } from '@/lib/services/classes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +14,9 @@ import {
   DoorOpen,
   MapPin,
   Search,
+  Trash2,
+  AlertTriangle,
+  ArrowRight,
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
@@ -29,6 +33,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchInput } from '@/components/ui/search-input';
 import { EmptyState } from '@/components/ui/empty-state';
 import RoomDialog from '@/components/rooms/room-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { FormSelect } from '@/components/ui/form-select';
 import { useBranch } from '@/contexts/BranchContext';
 import { useAuth } from '@/hooks/useAuth';
 import { PermissionGuard } from '@/components/auth/permission-guard';
@@ -54,6 +67,10 @@ export default function RoomsPage() {
   const [dialogBranchId, setDialogBranchId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBranch, setFilterBranch] = useState<string>('all');
+  const [activeClasses, setActiveClasses] = useState<Class[]>([]);
+  // Deactivate dialog state
+  const [deactivateRoom, setDeactivateRoom] = useState<RoomWithBranch | null>(null);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -109,6 +126,10 @@ export default function RoomsPage() {
       const allRoomsData = roomsArrays.flat();
       setAllRooms(allRoomsData);
       setFilteredRooms(allRoomsData);
+
+      // Load active classes to count per room
+      const classesData = await getClasses();
+      setActiveClasses(classesData.filter(c => c.status === 'published' || c.status === 'started'));
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('ไม่สามารถโหลดข้อมูลได้');
@@ -173,8 +194,78 @@ export default function RoomsPage() {
     handleDialogClose();
   };
 
+  // Count active classes per room
+  const classCountByRoom = useMemo(() => {
+    const map = new Map<string, Class[]>();
+    for (const cls of activeClasses) {
+      if (!cls.roomId) continue;
+      if (!map.has(cls.roomId)) map.set(cls.roomId, []);
+      map.get(cls.roomId)!.push(cls);
+    }
+    return map;
+  }, [activeClasses]);
+
+  // Get other active rooms in same branch (for reassignment)
+  const getOtherRooms = (room: RoomWithBranch) => {
+    return allRooms.filter(r => r.branchId === room.branchId && r.id !== room.id && r.isActive);
+  };
+
+  // Deactivate room (soft delete)
+  const handleDeactivateRoom = async (room: RoomWithBranch) => {
+    const roomClasses = classCountByRoom.get(room.id) || [];
+    if (roomClasses.length > 0) {
+      // Has active classes — show reassignment dialog
+      setDeactivateRoom(room);
+    } else {
+      // No active classes — deactivate directly
+      if (!confirm(`ปิดห้อง "${room.name}" ใช่มั้ย?`)) return;
+      try {
+        await updateRoom(room.branchId, room.id, { isActive: false });
+        toast.success(`ปิดห้อง "${room.name}" เรียบร้อยแล้ว`);
+        loadData();
+      } catch {
+        toast.error('ไม่สามารถปิดห้องได้');
+      }
+    }
+  };
+
+  // Move a single class to a new room
+  const handleMoveClass = async (cls: Class, newRoomId: string) => {
+    try {
+      await updateClass(cls.id, { roomId: newRoomId } as any);
+      const newRoom = allRooms.find(r => r.id === newRoomId);
+      toast.success(`ย้าย "${cls.name}" ไปห้อง "${newRoom?.name}" แล้ว`);
+      // Reload
+      const classesData = await getClasses();
+      setActiveClasses(classesData.filter(c => c.status === 'published' || c.status === 'started'));
+    } catch {
+      toast.error('ไม่สามารถย้ายคลาสได้');
+    }
+  };
+
+  // Deactivate after all classes moved
+  const handleDeactivateAfterMove = async () => {
+    if (!deactivateRoom) return;
+    const remaining = classCountByRoom.get(deactivateRoom.id) || [];
+    if (remaining.length > 0) {
+      toast.error(`ยังมี ${remaining.length} คลาสใช้ห้องนี้อยู่ กรุณาย้ายให้หมดก่อน`);
+      return;
+    }
+    setDeactivateLoading(true);
+    try {
+      await updateRoom(deactivateRoom.branchId, deactivateRoom.id, { isActive: false });
+      toast.success(`ปิดห้อง "${deactivateRoom.name}" เรียบร้อยแล้ว`);
+      setDeactivateRoom(null);
+      loadData();
+    } catch {
+      toast.error('ไม่สามารถปิดห้องได้');
+    } finally {
+      setDeactivateLoading(false);
+    }
+  };
+
   // Count branches without rooms
-  const branchesWithoutRooms = branches.filter(branch => 
+  const branchesWithoutRooms = branches.filter(branch =>
     !allRooms.some(room => room.branchId === branch.id && room.isActive)
   ).length;
 
@@ -292,6 +383,7 @@ export default function RoomsPage() {
                   <TableHead>ชั้น</TableHead>
                   <TableHead className="text-center">ความจุ</TableHead>
                   <TableHead className="text-center">อุปกรณ์</TableHead>
+                  <TableHead className="text-center">คลาส active</TableHead>
                   <TableHead className="text-center">สถานะ</TableHead>
                   <TableHead className="text-right">จัดการ</TableHead>
                 </TableRow>
@@ -328,6 +420,13 @@ export default function RoomsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
+                      {(() => {
+                        const count = (classCountByRoom.get(room.id) || []).length;
+                        if (count === 0) return <span className="text-gray-400">-</span>;
+                        return <Badge variant="secondary">{count} คลาส</Badge>;
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-center">
                       {room.isActive ? (
                         <Badge className="bg-green-100 text-green-700">ใช้งานได้</Badge>
                       ) : (
@@ -337,13 +436,25 @@ export default function RoomsPage() {
                     <TableCell className="text-right">
                       <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
                         {canAccessBranch(room.branchId) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditRoom(room)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditRoom(room)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {room.isActive && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeactivateRoom(room)}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </PermissionGuard>
                     </TableCell>
@@ -365,6 +476,63 @@ export default function RoomsPage() {
         branches={branches}
         onBranchChange={(branchId: string) => setDialogBranchId(branchId)}
       />
+
+      {/* Deactivate Room Dialog */}
+      <Dialog open={!!deactivateRoom} onOpenChange={(open) => !open && setDeactivateRoom(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              ปิดห้อง "{deactivateRoom?.name}"
+            </DialogTitle>
+            <DialogDescription>
+              ห้องนี้มีคลาสที่ active อยู่ กรุณาย้ายคลาสไปห้องอื่นก่อนปิด
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 max-h-[400px] overflow-auto">
+            {deactivateRoom && (classCountByRoom.get(deactivateRoom.id) || []).map((cls) => (
+              <div key={cls.id} className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{cls.name}</p>
+                  <p className="text-xs text-gray-500">{cls.code}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <div className="w-[160px] flex-shrink-0">
+                  <FormSelect
+                    value=""
+                    onValueChange={(newRoomId) => handleMoveClass(cls, newRoomId)}
+                    placeholder="ย้ายไปห้อง..."
+                    options={getOtherRooms(deactivateRoom).map(r => ({
+                      value: r.id,
+                      label: `${r.name} (${r.capacity} คน)`,
+                    }))}
+                  />
+                </div>
+              </div>
+            ))}
+
+            {deactivateRoom && (classCountByRoom.get(deactivateRoom.id) || []).length === 0 && (
+              <div className="text-center py-4 text-green-600 font-medium">
+                ย้ายคลาสหมดแล้ว พร้อมปิดห้อง
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeactivateRoom(null)}>
+              ยกเลิก
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeactivateAfterMove}
+              disabled={deactivateLoading || (deactivateRoom ? (classCountByRoom.get(deactivateRoom.id) || []).length > 0 : true)}
+            >
+              {deactivateLoading ? 'กำลังปิด...' : 'ปิดห้อง'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -241,10 +241,10 @@ export async function createClass(
       holidayDates
     );
 
-    // Insert schedules
+    // Insert schedules (use local date string to avoid UTC timezone shift)
     const scheduleInserts = schedules.map((schedule, index) => ({
       class_id: classId,
-      session_date: schedule.toISOString(),
+      session_date: getLocalDateString(schedule),
       session_number: index + 1,
       status: 'scheduled',
     }));
@@ -1150,7 +1150,8 @@ export function canEditClassDates(classData: Class): {
 }
 
 // Get editable fields based on class status
-export function getEditableFields(classData: Class): {
+// isSuperAdmin overrides locks — super admin can edit all fields
+export function getEditableFields(classData: Class, isSuperAdmin = false): {
   basicInfo: boolean;
   schedule: boolean;
   resources: boolean;
@@ -1158,6 +1159,18 @@ export function getEditableFields(classData: Class): {
   capacity: boolean;
   status: boolean;
 } {
+  // Super admin can always edit everything
+  if (isSuperAdmin) {
+    return {
+      basicInfo: true,
+      schedule: true,
+      resources: true,
+      pricing: true,
+      capacity: true,
+      status: true
+    };
+  }
+
   if (classData.status === 'draft' || classData.status === 'cancelled') {
     return {
       basicInfo: true,
@@ -1210,6 +1223,91 @@ export function getEditableFields(classData: Class): {
     capacity: false,
     status: false
   };
+}
+
+// Regenerate future class schedules (keeps past/completed ones)
+export async function regenerateClassSchedules(
+  classId: string,
+  classData: {
+    startDate: Date;
+    endDate: Date;
+    daysOfWeek: number[];
+    totalSessions: number;
+    branchId: string;
+  }
+): Promise<{ deleted: number; created: number }> {
+  const today = getLocalDateString(new Date());
+
+  // 1. Get existing schedules (use admin route to bypass RLS)
+  const existingSchedules = (await adminMutation({
+    table: 'class_schedules',
+    operation: 'select',
+    match: { class_id: classId },
+    options: { select: '*', order: 'session_date.asc' },
+  })) as any[] || [];
+
+  // 2. Separate: keep past/attended, delete future unattended
+  const keepSchedules = (existingSchedules || []).filter(s => {
+    return s.session_date < today || s.status === 'completed';
+  });
+  const deleteSchedules = (existingSchedules || []).filter(s => {
+    return s.session_date >= today && s.status !== 'completed';
+  });
+
+  // 3. Delete future schedules
+  if (deleteSchedules.length > 0) {
+    const deleteIds = deleteSchedules.map(s => s.id);
+    for (const id of deleteIds) {
+      await adminMutation({
+        table: 'class_schedules',
+        operation: 'delete',
+        match: { id },
+      });
+    }
+  }
+
+  // 4. Generate new schedules from today onwards
+  const holidays = await getHolidaysForBranch(
+    classData.branchId,
+    new Date(),
+    classData.endDate
+  );
+  const holidayDates = holidays.map(h => h.date);
+
+  const remainingSessions = classData.totalSessions - keepSchedules.length;
+  if (remainingSessions <= 0) {
+    return { deleted: deleteSchedules.length, created: 0 };
+  }
+
+  const startFrom = new Date();
+  startFrom.setHours(0, 0, 0, 0);
+
+  const newDates = generateSchedules(
+    startFrom,
+    classData.endDate,
+    classData.daysOfWeek,
+    remainingSessions,
+    holidayDates
+  );
+
+  // 5. Insert new schedules (use local date string to avoid UTC timezone shift)
+  const nextSessionNumber = keepSchedules.length + 1;
+  const scheduleInserts = newDates.map((date, index) => ({
+    class_id: classId,
+    session_date: getLocalDateString(date),
+    session_number: nextSessionNumber + index,
+    status: 'scheduled',
+  }));
+
+  if (scheduleInserts.length > 0) {
+    await adminMutation({
+      table: 'class_schedules',
+      operation: 'insert',
+      data: scheduleInserts,
+    });
+  }
+
+  return { deleted: deleteSchedules.length, created: scheduleInserts.length };
 }
 
 // Get info for ending a class early (preview before confirming)

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect } from 'react'
-import Image from 'next/image'
 import { cn } from '@/lib/utils'
 
 interface LoadingProps {
@@ -47,14 +46,14 @@ export function Loading({
           }}
         />
         {/* Logo with bounce */}
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/logo-just-logo.svg"
           alt="Loading"
           width={config.logo}
           height={config.logo}
           className="relative z-10"
-          style={{ animation: 'loading-bounce 1.5s ease-in-out infinite', width: 'auto', height: 'auto' }}
-          priority
+          style={{ animation: 'loading-bounce 1.5s ease-in-out infinite' }}
         />
       </div>
       {text && (

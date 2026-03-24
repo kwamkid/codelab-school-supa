@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Class, Branch, Subject, Teacher, Room } from '@/types/models';
-import { createClass, updateClass, checkRoomAvailability, canEditClassDates, getEditableFields } from '@/lib/services/classes';
+import { createClass, updateClass, checkRoomAvailability, canEditClassDates, getEditableFields, regenerateClassSchedules } from '@/lib/services/classes';
 import { getHolidaysForBranch } from '@/lib/services/holidays';
 import { getActiveBranches } from '@/lib/services/branches';
 import { getActiveSubjects } from '@/lib/services/subjects';
@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { generateClassCode, getDayName } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ClassFormProps {
   classData?: Class;
@@ -43,6 +44,7 @@ const DAYS_OF_WEEK = [
 
 export default function ClassForm({ classData, isEdit = false }: ClassFormProps) {
   const router = useRouter();
+  const { isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -105,11 +107,11 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
     if (isEdit && classData) {
       const permission = canEditClassDates(classData);
       setEditPermission(permission);
-      
-      const fields = getEditableFields(classData);
+
+      const fields = getEditableFields(classData, isSuperAdmin);
       setEditableFields(fields);
     }
-  }, [isEdit, classData]);
+  }, [isEdit, classData, isSuperAdmin]);
 
   useEffect(() => {
     loadInitialData();
@@ -363,6 +365,28 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
 
       if (isEdit && classData?.id) {
         await updateClass(classData.id, classPayload);
+
+        // Regenerate schedules if super admin changed schedule fields
+        if (isSuperAdmin && editableFields.schedule) {
+          const scheduleChanged =
+            classData.startTime !== formData.startTime ||
+            classData.endTime !== formData.endTime ||
+            classData.startDate?.toISOString().slice(0, 10) !== formData.startDate ||
+            classData.totalSessions !== formData.totalSessions ||
+            JSON.stringify(classData.daysOfWeek) !== JSON.stringify(formData.daysOfWeek);
+
+          if (scheduleChanged) {
+            const result = await regenerateClassSchedules(classData.id, {
+              startDate: new Date(formData.startDate),
+              endDate: new Date(formData.endDate),
+              daysOfWeek: formData.daysOfWeek,
+              totalSessions: formData.totalSessions,
+              branchId: formData.branchId,
+            });
+            toast.success(`สร้างตารางใหม่: ลบ ${result.deleted} ครั้ง, สร้าง ${result.created} ครั้ง`);
+          }
+        }
+
         toast.success('อัปเดตข้อมูลคลาสเรียบร้อยแล้ว');
       } else {
         await createClass(classPayload);
@@ -541,6 +565,23 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
                 onEndTimeChange={(v) => setFormData({ ...formData, endTime: v })}
                 disabled={!editableFields.schedule}
               />
+              {formData.startTime && formData.endTime && (() => {
+                const [sh, sm] = formData.startTime.split(':').map(Number);
+                const [eh, em] = formData.endTime.split(':').map(Number);
+                let mins = (eh * 60 + em) - (sh * 60 + sm);
+                if (mins <= 0) mins += 24 * 60;
+                const hours = Math.floor(mins / 60);
+                const remainMins = mins % 60;
+                const label = remainMins > 0 ? `${hours} ชม. ${remainMins} นาที` : `${hours} ชม.`;
+                const isWarning = mins > 6 * 60;
+                return (
+                  <p className={`text-sm ${isWarning ? 'text-orange-600 font-medium' : 'text-gray-500'}`}>
+                    {isWarning && <AlertCircle className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />}
+                    ระยะเวลาเรียน {label}
+                    {isWarning && ' — เวลาเรียนมากกว่า 6 ชม. พิมพ์ถูกใช่มั้ยนะ?'}
+                  </p>
+                );
+              })()}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

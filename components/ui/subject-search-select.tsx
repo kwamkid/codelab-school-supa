@@ -38,8 +38,8 @@ export default function SubjectSearchSelect({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Filter active subjects only
-  const activeSubjects = subjects.filter(s => s.isActive);
+  // Use all provided subjects (caller decides filtering)
+  const activeSubjects = subjects;
 
   // Get selected subject
   const selectedSubject = activeSubjects.find(s => s.id === value);
@@ -180,31 +180,30 @@ export default function SubjectSearchSelect({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           
-          {selectedSubject && !isOpen ? (
-            // Display selected subject
-            <div 
+          {!isOpen ? (
+            // Display selected subject or placeholder
+            <div
               className={cn(
-                "flex items-center justify-between w-full px-10 py-2 text-sm bg-white border rounded-md cursor-pointer",
-                "hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
+                "flex items-center justify-between w-full pl-10 pr-3 py-2 text-sm bg-white border rounded-md cursor-pointer",
+                "hover:bg-gray-50",
                 disabled && "opacity-50 cursor-not-allowed"
               )}
               onClick={() => !disabled && setIsOpen(true)}
             >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div 
-                  className="w-3 h-3 rounded-full flex-shrink-0" 
-                  style={{ backgroundColor: selectedSubject.color }}
-                />
-                <div className="flex items-center gap-2 flex-wrap min-w-0">
+              {selectedSubject ? (
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: selectedSubject.color }}
+                  />
                   <span className="font-medium truncate">{selectedSubject.name}</span>
-                  <span className="text-gray-500 text-xs">({selectedSubject.code})</span>
-                  <Badge variant="outline" className={cn("text-xs", getLevelColor(selectedSubject.level))}>
-                    {getLevelLabel(selectedSubject.level)}
-                  </Badge>
+                  <span className="text-xs text-gray-400">{selectedSubject.code}</span>
                 </div>
-              </div>
+              ) : (
+                <span className="text-gray-400">--- ทุกวิชา ---</span>
+              )}
               <div className="flex items-center gap-1 flex-shrink-0">
-                {!disabled && (
+                {selectedSubject && !disabled && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -234,7 +233,7 @@ export default function SubjectSearchSelect({
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={disabled}
-              className="pl-10 pr-10"
+              className="pl-10 pr-10 text-sm"
             />
           )}
           
@@ -252,25 +251,22 @@ export default function SubjectSearchSelect({
 
         {/* Dropdown */}
         {isOpen && !disabled && (
-          <div 
+          <div
             ref={dropdownRef}
-            className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-80 overflow-auto"
+            className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-80 overflow-auto text-sm"
           >
             {filteredSubjects.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-gray-500 text-center">
+              <div className="px-3 py-2 text-sm text-gray-500 text-center">
                 {searchTerm ? 'ไม่พบวิชาที่ค้นหา' : 'ไม่มีวิชา'}
               </div>
             ) : (
-              <div className="py-1">
+              <div className="py-0.5">
                 {Array.from(groupedSubjects.entries()).map(([category, subjects]) => (
                   <div key={category}>
-                    {/* Category Header */}
-                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
+                    <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
                       {category}
                     </div>
-                    
-                    {/* Subjects in this category */}
-                    {subjects.map((subject, index) => {
+                    {subjects.map((subject) => {
                       const globalIndex = filteredSubjects.findIndex(s => s.id === subject.id);
                       return (
                         <div
@@ -278,40 +274,21 @@ export default function SubjectSearchSelect({
                           onClick={() => handleSelect(subject.id)}
                           onMouseEnter={() => setHighlightedIndex(globalIndex)}
                           className={cn(
-                            "px-4 py-2 cursor-pointer hover:bg-gray-100",
+                            "flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-100",
                             highlightedIndex === globalIndex && "bg-gray-100",
                             value === subject.id && "bg-red-50"
                           )}
                         >
-                          <div className="flex items-start gap-3">
-                            <div 
-                              className="w-3 h-3 rounded-full mt-1 flex-shrink-0" 
-                              style={{ backgroundColor: subject.color }}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium">
-                                  {highlightSearchTerm(subject.name, searchTerm)}
-                                </span>
-                                <span className="text-sm text-gray-500">
-                                  ({highlightSearchTerm(subject.code, searchTerm)})
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge 
-                                  variant="outline" 
-                                  className={cn("text-xs", getLevelColor(subject.level))}
-                                >
-                                  {getLevelLabel(subject.level)}
-                                </Badge>
-                                {subject.ageRange && (
-                                  <span className="text-xs text-gray-500">
-                                    อายุ {subject.ageRange.min}-{subject.ageRange.max} ปี
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                          <div
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: subject.color }}
+                          />
+                          <span className="font-medium truncate">
+                            {highlightSearchTerm(subject.name, searchTerm)}
+                          </span>
+                          <span className="text-xs text-gray-400 flex-shrink-0">
+                            {subject.code}
+                          </span>
                         </div>
                       );
                     })}

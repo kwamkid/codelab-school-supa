@@ -45,6 +45,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SearchInput } from '@/components/ui/search-input';
+import SubjectSearchSelect from '@/components/ui/subject-search-select';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import {
@@ -403,47 +404,21 @@ export default function ClassesPage() {
         </TabsList>
       </Tabs>
 
-      {/* Search + Subject Chips */}
-      <div className="flex flex-col gap-3 mb-6">
-        {/* Search */}
+      {/* Search + Subject Filter */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         <SearchInput
           placeholder="ค้นหาชื่อคลาส, รหัส, ครู, สาขา..."
           value={searchTerm}
           onChange={setSearchTerm}
-          className="max-w-md"
         />
 
-        {/* Subject Chips */}
         {usedSubjects.length > 1 && (
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setSelectedSubject('all')}
-              className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                selectedSubject === 'all'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              ทุกวิชา
-            </button>
-            {usedSubjects.map(subject => (
-              <button
-                key={subject.id}
-                onClick={() => setSelectedSubject(selectedSubject === subject.id ? 'all' : subject.id)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                  selectedSubject === subject.id
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: subject.color }}
-                />
-                {subject.name}
-              </button>
-            ))}
-          </div>
+          <SubjectSearchSelect
+            subjects={usedSubjects}
+            value={selectedSubject === 'all' ? '' : selectedSubject}
+            onValueChange={(val) => setSelectedSubject(val || 'all')}
+            placeholder="กรองวิชา..."
+          />
         )}
       </div>
 
