@@ -166,72 +166,39 @@ export interface EnrollmentStats {
 }
 
 export async function getEnrollmentStats(branchId?: string | null): Promise<EnrollmentStats> {
+  const emptyStats: EnrollmentStats = {
+    total: 0, active: 0, completed: 0, dropped: 0,
+    totalRevenue: 0, pendingPayments: 0, pendingAmount: 0,
+    partialRemainingAmount: 0, pendingCount: 0, partialCount: 0, paidCount: 0
+  };
+
   try {
     const supabase = getClient();
 
-    let query = supabase.from(TABLE_NAME).select('*');
-
-    if (branchId) {
-      query = query.eq('branch_id', branchId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    const stats: EnrollmentStats = {
-      total: data?.length || 0,
-      active: 0,
-      completed: 0,
-      dropped: 0,
-      totalRevenue: 0,
-      pendingPayments: 0,
-      pendingAmount: 0,
-      partialRemainingAmount: 0,
-      pendingCount: 0,
-      partialCount: 0,
-      paidCount: 0
-    };
-
-    (data || []).forEach((row: any) => {
-      // Count by status
-      if (row.status === 'active') stats.active++;
-      else if (row.status === 'completed') stats.completed++;
-      else if (row.status === 'dropped') stats.dropped++;
-
-      // Count by payment status
-      if (row.payment_status === 'pending') {
-        stats.pendingCount++;
-        const amount = row.final_price || 0;
-        stats.pendingAmount += amount;
-        stats.pendingPayments += amount;
-      } else if (row.payment_status === 'partial') {
-        stats.partialCount++;
-        const remaining = (row.final_price || 0) - (row.paid_amount || 0);
-        stats.partialRemainingAmount += remaining;
-        stats.pendingPayments += remaining;
-      } else if (row.payment_status === 'paid') {
-        stats.paidCount++;
-        stats.totalRevenue += row.paid_amount || 0;
-      }
+    // Use RPC to compute stats server-side (returns 1 JSON instead of all rows)
+    const { data, error } = await (supabase.rpc as any)('get_enrollment_stats', {
+      p_branch_id: branchId || null,
     });
 
-    return stats;
+    if (error) throw error;
+    if (!data) return emptyStats;
+
+    return {
+      total: data.total || 0,
+      active: data.active || 0,
+      completed: data.completed || 0,
+      dropped: data.dropped || 0,
+      totalRevenue: data.totalRevenue || 0,
+      pendingPayments: data.pendingPayments || 0,
+      pendingAmount: data.pendingAmount || 0,
+      partialRemainingAmount: data.partialRemainingAmount || 0,
+      pendingCount: data.pendingCount || 0,
+      partialCount: data.partialCount || 0,
+      paidCount: data.paidCount || 0,
+    };
   } catch (error) {
     console.error('Error getting enrollment stats:', error);
-    return {
-      total: 0,
-      active: 0,
-      completed: 0,
-      dropped: 0,
-      totalRevenue: 0,
-      pendingPayments: 0,
-      pendingAmount: 0,
-      partialRemainingAmount: 0,
-      pendingCount: 0,
-      partialCount: 0,
-      paidCount: 0
-    };
+    return emptyStats;
   }
 }
 
@@ -282,6 +249,28 @@ export async function getEnrollmentsByClass(classId: string): Promise<Enrollment
   } catch (error) {
     console.error('Error getting enrollments by class:', error);
     throw error;
+  }
+}
+
+// ============================================
+// Get enrollment count by class (lightweight - no data transfer)
+// ============================================
+export async function getEnrollmentCountByClass(classId: string): Promise<number> {
+  try {
+    const supabase = getClient();
+
+    const { count, error } = await supabase
+      .from(TABLE_NAME)
+      .select('id', { count: 'exact', head: true })
+      .eq('class_id', classId)
+      .in('status', ['active', 'completed']);
+
+    if (error) throw error;
+
+    return count || 0;
+  } catch (error) {
+    console.error('Error getting enrollment count by class:', error);
+    return 0;
   }
 }
 
@@ -470,8 +459,8 @@ export async function createEnrollment(
     const enrollmentId = result.id;
 
     // Sync enrolled count from actual enrollments (avoids double-count from race conditions)
-    const currentEnrollments = await getEnrollmentsByClass(enrollmentData.classId);
-    await fixEnrolledCount(enrollmentData.classId, currentEnrollments.length);
+    const currentCount = await getEnrollmentCountByClass(enrollmentData.classId);
+    await fixEnrolledCount(enrollmentData.classId, currentCount);
 
     // Create makeup requests for missed sessions
     await createMakeupForMissedSessions(
@@ -661,8 +650,8 @@ export async function cancelEnrollment(
     });
 
     // Sync enrolled count from actual enrollments
-    const currentEnrollments = await getEnrollmentsByClass(enrollment.classId);
-    await fixEnrolledCount(enrollment.classId, currentEnrollments.length);
+    const currentCount = await getEnrollmentCountByClass(enrollment.classId);
+    await fixEnrolledCount(enrollment.classId, currentCount);
 
     // Cancel all pending/scheduled makeup classes for this student+class
     try {
@@ -708,8 +697,7 @@ export async function checkAvailableSeats(classId: string): Promise<{
     if (!classData) throw new Error('Class not found');
 
     // Count actual enrollments instead of trusting cached enrolled_count
-    const actualEnrollments = await getEnrollmentsByClass(classId);
-    const actualCount = actualEnrollments.length;
+    const actualCount = await getEnrollmentCountByClass(classId);
 
     // Auto-fix cached counter if it drifted
     if (actualCount !== classData.enrolledCount) {
@@ -772,13 +760,13 @@ export async function transferEnrollment(
     });
 
     // Sync enrolled counts from actual enrollments for both classes
-    const [oldClassEnrollments, newClassEnrollments] = await Promise.all([
-      getEnrollmentsByClass(enrollment.classId),
-      getEnrollmentsByClass(newClassId),
+    const [oldCount, newCount] = await Promise.all([
+      getEnrollmentCountByClass(enrollment.classId),
+      getEnrollmentCountByClass(newClassId),
     ]);
     await Promise.all([
-      fixEnrolledCount(enrollment.classId, oldClassEnrollments.length),
-      fixEnrolledCount(newClassId, newClassEnrollments.length),
+      fixEnrolledCount(enrollment.classId, oldCount),
+      fixEnrolledCount(newClassId, newCount),
     ]);
   } catch (error) {
     console.error('Error transferring enrollment:', error);

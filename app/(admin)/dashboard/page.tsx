@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useBranch } from '@/contexts/BranchContext';
 import DailyTimetable, { TimetableEvent, TimetableRoom } from '@/components/dashboard/daily-timetable';
 import ClassDetailDialog from '@/components/dashboard/class-detail-dialog';
-import { CalendarEvent, clearDashboardCache } from '@/lib/services/dashboard-optimized';
+import { CalendarEvent, clearDashboardCache } from '@/lib/services/dashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';

@@ -1,4 +1,4 @@
-// lib/supabase/services/dashboard-optimized.ts
+// lib/supabase/services/dashboard.ts
 
 import { createServiceClient } from '../server'
 import { EventInput } from '@fullcalendar/core'

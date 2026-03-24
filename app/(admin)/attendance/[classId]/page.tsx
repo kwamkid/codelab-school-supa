@@ -16,7 +16,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { getClass, getClassSchedules } from '@/lib/services/classes';
 import { getSubject } from '@/lib/services/subjects';
-import { getEnrollmentsByClass } from '@/lib/services/enrollments';
+// Removed: getEnrollmentsByClass - use cls.enrolledCount instead to reduce egress
 import { Class, ClassSchedule, Subject } from '@/types/models';
 import { formatDate, formatDateWithDay } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -97,9 +97,8 @@ export default function AttendanceSessionSelectPage() {
       const subj = await getSubject(cls.subjectId);
       setSubject(subj);
 
-      // Load enrollments to get actual student count
-      const enrollments = await getEnrollmentsByClass(classId);
-      setTotalEnrolled(enrollments.length);
+      // Use cached enrolled count from class data instead of fetching all enrollments
+      setTotalEnrolled(cls.enrolledCount);
 
       // Load all schedules
       const schedules = await getClassSchedules(classId);

@@ -30,7 +30,7 @@ import { getActiveSubjects } from '@/lib/services/subjects';
 import { getActiveTeachers } from '@/lib/services/teachers';
 import { getActiveBranches } from '@/lib/services/branches';
 import { getRoomsByBranch } from '@/lib/services/rooms';
-import { getEnrollmentsByClass } from '@/lib/services/enrollments';
+// Removed: getEnrollmentsByClass - use cls.enrolledCount instead to reduce egress
 import { Class, ClassSchedule, Subject, Teacher, Branch, Room } from '@/types/models';
 import { formatTime, getDayName, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -167,17 +167,6 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
       // Build class details
       const classesWithDetails: ClassWithDetails[] = [];
 
-      // Batch load enrollments for all active classes
-      const enrollmentPromises = activeClasses.map(cls =>
-        getEnrollmentsByClass(cls.id).then(enrollments => ({
-          classId: cls.id,
-          enrollments
-        }))
-      );
-
-      const allEnrollments = await Promise.all(enrollmentPromises);
-      const enrollmentMap = new Map(allEnrollments.map(({ classId, enrollments }) => [classId, enrollments]));
-
       for (const cls of activeClasses) {
         if (!isSuperAdmin() && !canAccessBranch(cls.branchId)) continue;
 
@@ -194,10 +183,6 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
           const branchRooms = roomsByBranch.get(cls.branchId) || [];
           const room = branchRooms.find(r => r.id === cls.roomId);
 
-          // Get actual enrollment count (only active and completed enrollments)
-          const enrollments = enrollmentMap.get(cls.id) || [];
-          const actualEnrolledCount = enrollments.length;
-
           classesWithDetails.push({
             ...cls,
             subject,
@@ -205,7 +190,7 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
             branch,
             room,
             todaySchedule: selectedSchedule,
-            actualEnrolledCount
+            actualEnrolledCount: cls.enrolledCount
           });
         }
       }

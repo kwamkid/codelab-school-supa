@@ -1,4 +1,4 @@
-// lib/services/dashboard-optimized.ts
+// lib/services/dashboard.ts
 
 import { EventInput } from '@fullcalendar/core';
 import { Holiday, MakeupClass, TrialSession, Class, Subject, Teacher, Branch, Room } from '@/types/models';
@@ -129,29 +129,21 @@ async function getStaticData() {
 
   const supabase = getClient();
 
-  // Fetch fresh data
+  // Fetch fresh data - only select columns used by calendar events
   const [subjectsResult, teachersResult, branchesResult] = await Promise.all([
-    supabase.from('subjects').select('*'),
-    supabase.from('teachers').select('*'),
-    supabase.from('branches').select('*')
+    supabase.from('subjects').select('id, name, color'),
+    supabase.from('teachers').select('id, name, nickname'),
+    supabase.from('branches').select('id, name')
   ]);
 
+  // Only map fields needed by calendar events (reduces egress significantly)
   const subjects = new Map<string, Subject>(
     (subjectsResult.data || []).map(subjectData => {
-      const subject: Subject = {
+      const subject = {
         id: subjectData.id,
         name: subjectData.name,
-        code: subjectData.code,
-        description: subjectData.description,
-        category: subjectData.category,
-        level: subjectData.level,
-        ageRangeMin: subjectData.age_range_min,
-        ageRangeMax: subjectData.age_range_max,
         color: subjectData.color,
-        icon: subjectData.icon,
-        prerequisites: subjectData.prerequisites || [],
-        isActive: subjectData.is_active
-      };
+      } as Subject;
 
       return [subjectData.id, subject];
     })
@@ -159,67 +151,35 @@ async function getStaticData() {
 
   const teachers = new Map<string, Teacher>(
     (teachersResult.data || []).map(teacherData => {
-      const teacher: Teacher = {
+      const teacher = {
         id: teacherData.id,
         name: teacherData.name,
         nickname: teacherData.nickname,
-        email: teacherData.email,
-        phone: teacherData.phone,
-        lineUserId: teacherData.line_user_id,
-        specialties: teacherData.specialties || [],
-        availableBranches: teacherData.available_branches || [],
-        profileImage: teacherData.profile_image,
-        hourlyRate: teacherData.hourly_rate,
-        bankName: teacherData.bank_name,
-        bankAccountNumber: teacherData.bank_account_number,
-        bankAccountName: teacherData.bank_account_name,
-        isActive: teacherData.is_active,
-        hasLogin: teacherData.has_login,
-        createdAt: new Date(teacherData.created_at),
-        updatedAt: teacherData.updated_at ? new Date(teacherData.updated_at) : undefined
-      };
+      } as Teacher;
       return [teacherData.id, teacher];
     })
   );
 
   const branches = new Map<string, Branch>(
     (branchesResult.data || []).map(branchData => {
-      const branch: Branch = {
+      const branch = {
         id: branchData.id,
         name: branchData.name,
-        code: branchData.code,
-        address: branchData.address,
-        phone: branchData.phone,
-        locationLat: branchData.location_lat,
-        locationLng: branchData.location_lng,
-        openTime: branchData.open_time,
-        closeTime: branchData.close_time,
-        openDays: branchData.open_days || [],
-        isActive: branchData.is_active,
-        managerName: branchData.manager_name,
-        managerPhone: branchData.manager_phone,
-        lineGroupUrl: branchData.line_group_url,
-        createdAt: new Date(branchData.created_at)
-      };
+      } as Branch;
       return [branchData.id, branch];
     })
   );
 
   // Get all rooms for all branches
   const roomsMap = new Map<string, Room>();
-  const { data: roomsData } = await supabase.from('rooms').select('*');
+  const { data: roomsData } = await supabase.from('rooms').select('id, branch_id, name');
 
   (roomsData || []).forEach(roomData => {
-    const room: Room = {
+    const room = {
       id: roomData.id,
       branchId: roomData.branch_id,
       name: roomData.name,
-      capacity: roomData.capacity,
-      floor: roomData.floor,
-      hasProjector: roomData.has_projector,
-      hasWhiteboard: roomData.has_whiteboard,
-      isActive: roomData.is_active
-    };
+    } as Room;
     roomsMap.set(`${roomData.branch_id}-${roomData.id}`, room);
   });
 
@@ -512,7 +472,7 @@ export async function getOptimizedCalendarEvents(
     if (studentIds.length > 0) {
       const { data: studentsData } = await supabase
         .from('students')
-        .select('*')
+        .select('id, name, nickname')
         .in('id', studentIds);
 
       (studentsData || []).forEach(studentData => {

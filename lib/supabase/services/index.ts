@@ -47,7 +47,7 @@ export * from './feedback'
 
 // Reschedule & Calendar
 export * from './reschedule'
-export * from './dashboard-optimized'
+export * from './dashboard'
 
 // Data Management
 export * from './data-cleaning'

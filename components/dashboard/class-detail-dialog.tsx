@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarEvent } from '@/lib/services/dashboard-optimized'; // เปลี่ยนจาก dashboard เป็น dashboard-optimized
+import { CalendarEvent } from '@/lib/services/dashboard';
 import { formatDate } from '@/lib/utils';
 import { 
   Calendar, 

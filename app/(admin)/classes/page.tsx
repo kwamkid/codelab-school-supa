@@ -4,9 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Class } from '@/types/models';
 import { getClasses, deleteClass, batchUpdateClassStatuses } from '@/lib/services/classes';
-import { getActiveBranches } from '@/lib/services/branches';
-import { getActiveSubjects } from '@/lib/services/subjects';
-import { getActiveTeachers } from '@/lib/services/teachers';
+import { getClassLookupData } from '@/lib/services/lookup';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -116,25 +114,17 @@ export default function ClassesPage() {
   });
 
   // ============================================
-  // 🎯 Query 2-4: Supporting Data (Load After)
+  // 🎯 Query 2: Lookup Data (single RPC replaces 3 queries)
   // ============================================
-  const { data: branches = [], isLoading: loadingBranches } = useQuery({
-    queryKey: ['branches', 'active'],
-    queryFn: getActiveBranches,
+  const { data: lookupData, isLoading: loadingLookup } = useQuery({
+    queryKey: ['classLookupData', selectedBranchId],
+    queryFn: () => getClassLookupData(selectedBranchId),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
-    queryKey: ['subjects', 'active'],
-    queryFn: getActiveSubjects,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  const { data: teachers = [], isLoading: loadingTeachers } = useQuery({
-    queryKey: ['teachers', 'active', selectedBranchId],
-    queryFn: () => getActiveTeachers(selectedBranchId),
-    staleTime: 60000, // 1 minute
-  });
+  const branches = lookupData?.branches || [];
+  const subjects = lookupData?.subjects || [];
+  const teachers = lookupData?.teachers || [];
 
   // Create lookup maps for better performance
   const branchesMap = useMemo(() => 
@@ -290,7 +280,7 @@ export default function ClassesPage() {
           </h1>
           <p className="text-sm text-gray-600 mt-1">
             จัดการตารางเรียนและคลาสทั้งหมด
-            {(loadingSubjects || loadingTeachers || loadingBranches) && (
+            {(loadingLookup || loadingLookup || loadingLookup) && (
               <span className="text-orange-500 ml-2">(กำลังโหลดข้อมูลเพิ่มเติม...)</span>
             )}
           </p>
@@ -478,7 +468,7 @@ export default function ClassesPage() {
                             </Link>
                           </TableCell>
                           <TableCell className="align-top">
-                            {loadingSubjects ? (
+                            {loadingLookup ? (
                               <InlineLoading />
                             ) : (
                               <div className="break-words">{getSubjectName(cls.subjectId)}</div>
@@ -486,7 +476,7 @@ export default function ClassesPage() {
                           </TableCell>
                           {isAllBranches && (
                             <TableCell className="align-top">
-                              {loadingBranches ? (
+                              {loadingLookup ? (
                                 <InlineLoading />
                               ) : (
                                 <div className="break-words">{getBranchName(cls.branchId)}</div>
@@ -494,7 +484,7 @@ export default function ClassesPage() {
                             </TableCell>
                           )}
                           <TableCell className="align-top">
-                            {loadingTeachers ? (
+                            {loadingLookup ? (
                               <InlineLoading />
                             ) : (
                               getTeacherName(cls.teacherId)

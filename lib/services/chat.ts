@@ -208,7 +208,7 @@ export async function getConversations(filters?: {
 
   let query = (supabase as any)
     .from('chat_conversations')
-    .select('*, chat_contacts(*), chat_channels(id, type, name)')
+    .select('*, chat_contacts(id, display_name, avatar_url, phone, parent_id, tags, branch_ids), chat_channels(id, type, name)')
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .range(offset, offset + limit - 1);
 
@@ -239,7 +239,7 @@ export async function getConversation(id: string): Promise<ChatConversation | nu
   const supabase = getClient();
   const { data, error } = await (supabase as any)
     .from('chat_conversations')
-    .select('*, chat_contacts(*), chat_channels(id, type, name)')
+    .select('*, chat_contacts(id, display_name, avatar_url, phone, parent_id, tags, branch_ids), chat_channels(id, type, name)')
     .eq('id', id)
     .single();
   if (error) {

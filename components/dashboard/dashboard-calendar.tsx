@@ -8,7 +8,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
-import { CalendarEvent } from '@/lib/services/dashboard-optimized'; // เปลี่ยนจาก dashboard เป็น dashboard-optimized
+import { CalendarEvent } from '@/lib/services/dashboard';
 import { DatesSetArg, EventClickArg, EventContentArg } from '@fullcalendar/core';
 import { Clock, Users, MapPin, User, Calendar } from 'lucide-react';
 
