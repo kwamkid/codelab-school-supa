@@ -415,10 +415,16 @@ export async function updateStudent(
 // Delete student - Uses API route to bypass RLS restrictions
 export async function deleteStudent(
   parentId: string,
-  studentId: string
+  studentId: string,
+  options?: { force?: boolean; adminId?: string }
 ): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/students/${studentId}`, {
+    const params = new URLSearchParams();
+    if (options?.force) params.set('force', 'true');
+    if (options?.adminId) params.set('adminId', options.adminId);
+    const qs = params.toString();
+
+    const response = await fetch(`/api/admin/students/${studentId}${qs ? `?${qs}` : ''}`, {
       method: 'DELETE',
     });
 

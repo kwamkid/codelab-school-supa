@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/table";
 import { formatDate, calculateAge } from '@/lib/utils';
 import { PermissionGuard, usePermissions } from '@/components/auth/permission-guard';
+import { useAuth } from '@/hooks/useAuth';
 import { ActionButton } from '@/components/ui/action-button';
 import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
@@ -85,6 +86,7 @@ interface ParentWithInfo extends Parent {
 
 export default function ParentsPage() {
   const { isSuperAdmin } = usePermissions();
+  const { adminUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterBranch, setFilterBranch] = useState<string>('all');
@@ -285,7 +287,9 @@ export default function ParentsPage() {
   const handleDeleteStudent = async (parentId: string, student: StudentWithEnrollment) => {
     setDeletingStudentId(student.id);
     try {
-      await deleteStudent(parentId, student.id);
+      await deleteStudent(parentId, student.id,
+        isSuperAdmin ? { force: true, adminId: adminUser?.id } : undefined
+      );
       toast.success(`ลบนักเรียน "${student.nickname || student.name}" เรียบร้อยแล้ว`);
       queryClient.invalidateQueries({ queryKey: ['parents-with-students-enrollments'] });
       queryClient.invalidateQueries({ queryKey: ['students'] });

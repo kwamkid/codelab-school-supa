@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { calculateAge } from '@/lib/utils';
 import { toast } from 'sonner';
 import { usePermissions } from '@/components/auth/permission-guard';
+import { useAuth } from '@/hooks/useAuth';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,6 +70,7 @@ const QUERY_KEYS = {
 export default function StudentsPage() {
   const queryClient = useQueryClient();
   const { isSuperAdmin } = usePermissions();
+  const { adminUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('active');
@@ -179,7 +181,9 @@ export default function StudentsPage() {
   const handleDeleteStudent = async (student: StudentWithInfo) => {
     setDeletingId(student.id);
     try {
-      await deleteStudent(student.parentId, student.id);
+      await deleteStudent(student.parentId, student.id,
+        isSuperAdmin ? { force: true, adminId: adminUser?.id } : undefined
+      );
       toast.success(`ลบนักเรียน "${student.nickname || student.name}" เรียบร้อยแล้ว`);
       // Invalidate all student-related queries
       await queryClient.invalidateQueries({ queryKey: ['students'] });
