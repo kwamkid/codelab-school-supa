@@ -147,18 +147,15 @@ export default function LiffEventsPage() {
               return (
                 <Card key={event.id} className="overflow-hidden">
                   {event.imageUrl && (
-                    <div className="relative w-full flex justify-center bg-gray-50 p-4">
-                      <div className="relative" style={{ maxHeight: '200px' }}>
-                        <img
-                          src={event.imageUrl}
-                          alt={event.name}
-                          className="object-contain max-h-[200px] max-w-full rounded-lg"
-                          onError={(e) => {
-                            console.error('Image load error:', event.imageUrl);
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
+                    <div className="relative w-full bg-gray-100">
+                      <img
+                        src={event.imageUrl}
+                        alt={event.name}
+                        className="w-full aspect-video object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                       <div className="absolute top-2 right-2">
                         <Badge className={getEventTypeColor(event.eventType)}>
                           {getEventTypeLabel(event.eventType)}
@@ -181,21 +178,20 @@ export default function LiffEventsPage() {
                   
                   <CardContent className="space-y-3">
                     {/* Location */}
-                    <div className="flex items-start gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                      <div>
-                        <p className="font-medium">{event.location}</p>
-                        {event.locationUrl && (
-                          <a 
-                            href={event.locationUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 text-xs"
-                          >
-                            ดูแผนที่
-                          </a>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <p className="font-medium">{event.location}</p>
+                      {event.locationUrl && (
+                        <a
+                          href={event.locationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full hover:bg-blue-100 flex-shrink-0"
+                        >
+                          <MapPin className="h-3 w-3" />
+                          แผนที่
+                        </a>
+                      )}
                     </div>
                     
                     {/* Schedules */}
@@ -205,33 +201,31 @@ export default function LiffEventsPage() {
                           <Calendar className="h-4 w-4" />
                           รอบเวลา ({schedules.length} รอบ)
                         </p>
-                        <div className="grid gap-2">
-                          {schedules.slice(0, 3).map((schedule, idx) => {
-                            const available = schedule.maxAttendees - 
+                        <div className={`grid gap-2 ${schedules.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                          {schedules.slice(0, 4).map((schedule) => {
+                            const available = schedule.maxAttendees -
                               Object.values(schedule.attendeesByBranch).reduce((sum, count) => sum + count, 0);
-                            
+
                             return (
-                              <div key={schedule.id} className="text-xs bg-gray-50 p-2 rounded">
-                                <div className="flex justify-between items-center">
-                                  <span>
-                                    {formatDate(schedule.date, 'short')} • {schedule.startTime}-{schedule.endTime}
-                                  </span>
-                                  <Badge 
-                                    variant={available > 0 ? "outline" : "secondary"}
-                                    className="text-xs"
-                                  >
-                                    {available > 0 ? `${available} ที่ว่าง` : 'เต็ม'}
-                                  </Badge>
-                                </div>
+                              <div key={schedule.id} className="text-xs bg-gray-50 p-2 rounded flex justify-between items-center gap-1">
+                                <span className="truncate">
+                                  {formatDate(schedule.date, 'short')} {schedule.startTime?.substring(0, 5)}-{schedule.endTime?.substring(0, 5)}
+                                </span>
+                                <Badge
+                                  variant={available > 0 ? "outline" : "secondary"}
+                                  className="text-xs flex-shrink-0"
+                                >
+                                  {available > 0 ? `${available} ที่ว่าง` : 'เต็ม'}
+                                </Badge>
                               </div>
                             );
                           })}
-                          {schedules.length > 3 && (
-                            <p className="text-xs text-gray-500 text-center">
-                              และอีก {schedules.length - 3} รอบ
-                            </p>
-                          )}
                         </div>
+                        {schedules.length > 4 && (
+                          <p className="text-xs text-gray-500 text-center">
+                            และอีก {schedules.length - 4} รอบ
+                          </p>
+                        )}
                       </div>
                     )}
                     

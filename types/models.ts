@@ -748,13 +748,18 @@ export interface EventSchedule {
   date: Date;                            // วันที่จัด
   startTime: string;                     // เวลาเริ่ม "09:00"
   endTime: string;                       // เวลาจบ "12:00"
-  maxAttendees: number;                  // จำนวนรับสูงสุด
-  
+  maxAttendees: number;                  // จำนวนรับสูงสุดรวม
+
+  // โควต้าแยกตามสาขา
+  maxAttendeesByBranch: {
+    [branchId: string]: number;          // โควต้าแต่ละสาขา
+  };
+
   // นับแยกตามสาขา
   attendeesByBranch: {
     [branchId: string]: number;          // จำนวนที่ลงแต่ละสาขา
   };
-  
+
   status: 'available' | 'full' | 'cancelled';
 }
 

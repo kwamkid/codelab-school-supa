@@ -40,6 +40,7 @@ interface EventScheduleRow {
   start_time: string;
   end_time: string;
   max_attendees: number;
+  max_attendees_by_branch: Record<string, number>;
   attendees_by_branch: Record<string, number>;
   status: string;
 }
@@ -117,6 +118,7 @@ function mapToEventSchedule(row: EventScheduleRow): EventSchedule {
     startTime: row.start_time,
     endTime: row.end_time,
     maxAttendees: row.max_attendees,
+    maxAttendeesByBranch: row.max_attendees_by_branch || {},
     attendeesByBranch: row.attendees_by_branch || {},
     status: row.status as EventSchedule['status'],
   };
@@ -374,6 +376,7 @@ export async function createEventSchedule(
       start_time: scheduleData.startTime,
       end_time: scheduleData.endTime,
       max_attendees: scheduleData.maxAttendees,
+      max_attendees_by_branch: (scheduleData as any).maxAttendeesByBranch || {},
       attendees_by_branch: {},
       status: 'available',
     };
@@ -405,6 +408,7 @@ export async function updateEventSchedule(
     if (scheduleData.startTime !== undefined) updateData.start_time = scheduleData.startTime;
     if (scheduleData.endTime !== undefined) updateData.end_time = scheduleData.endTime;
     if (scheduleData.maxAttendees !== undefined) updateData.max_attendees = scheduleData.maxAttendees;
+    if ((scheduleData as any).maxAttendeesByBranch !== undefined) updateData.max_attendees_by_branch = (scheduleData as any).maxAttendeesByBranch;
     if (scheduleData.attendeesByBranch !== undefined) updateData.attendees_by_branch = scheduleData.attendeesByBranch;
     if (scheduleData.status !== undefined) updateData.status = scheduleData.status;
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Event, Branch, EventSchedule } from '@/types/models';
@@ -13,16 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FormSelect } from '@/components/ui/form-select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { 
@@ -37,7 +30,8 @@ import {
   Trash2,
   Image,
   Clock,
-  Edit
+  Edit,
+  Upload
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate, formatTime } from '@/lib/utils';
@@ -53,6 +47,7 @@ interface ScheduleFormData {
   startTime: string;
   endTime: string;
   maxAttendees: string;
+  maxAttendeesByBranch: Record<string, string>; // branchId -> count
 }
 
 interface TempSchedule extends ScheduleFormData {
@@ -64,6 +59,13 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [locationType, setLocationType] = useState<'branch' | 'external'>(
+    event?.locationUrl ? 'external' : 'branch'
+  );
   const [branches, setBranches] = useState<Branch[]>([]);
   const [existingSchedules, setExistingSchedules] = useState<EventSchedule[]>([]);
   const [schedules, setSchedules] = useState<TempSchedule[]>([]);
@@ -118,14 +120,20 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
       const data = await getEventSchedules(event.id);
       setExistingSchedules(data);
       // Convert to temp schedules for editing
-      const tempSchedules = data.map(s => ({
-        tempId: s.id,
-        date: new Date(s.date).toISOString().split('T')[0],
-        startTime: s.startTime,
-        endTime: s.endTime,
-        maxAttendees: s.maxAttendees.toString(),
-        isNew: false
-      }));
+      const tempSchedules = data.map(s => {
+        const mabb = (s as any).maxAttendeesByBranch || (s as any).max_attendees_by_branch || {};
+        return {
+          tempId: s.id,
+          date: new Date(s.date).toISOString().split('T')[0],
+          startTime: s.startTime,
+          endTime: s.endTime,
+          maxAttendees: s.maxAttendees.toString(),
+          maxAttendeesByBranch: Object.fromEntries(
+            Object.entries(mabb).map(([k, v]) => [k, String(v)])
+          ),
+          isNew: false
+        };
+      });
       setSchedules(tempSchedules);
     } catch (error) {
       console.error('Error loading schedules:', error);
@@ -139,6 +147,7 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
       startTime: '',
       endTime: '',
       maxAttendees: '',
+      maxAttendeesByBranch: {},
       tempId: `temp-${Date.now()}`,
       isNew: true
     };
@@ -163,19 +172,34 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
   const handleDuplicateSchedule = (schedule: TempSchedule) => {
     const newSchedule: TempSchedule = {
       ...schedule,
+      maxAttendeesByBranch: { ...schedule.maxAttendeesByBranch },
       tempId: `temp-${Date.now()}`,
       isNew: true
     };
     setSchedules([...schedules, newSchedule]);
   };
 
+  const handleUpdateScheduleBranch = (tempId: string, branchId: string, value: string) => {
+    setSchedules(schedules.map(s => {
+      if (s.tempId !== tempId) return s;
+      const updated = { ...s.maxAttendeesByBranch, [branchId]: value };
+      // Auto-calculate total
+      const total = Object.values(updated).reduce((sum, v) => sum + (parseInt(v) || 0), 0);
+      return { ...s, maxAttendeesByBranch: updated, maxAttendees: total.toString() };
+    }));
+  };
+
   const validateSchedule = (schedule: TempSchedule): boolean => {
-    if (!schedule.date || !schedule.startTime || !schedule.endTime || !schedule.maxAttendees) {
+    if (!schedule.date || !schedule.startTime || !schedule.endTime) {
       return false;
     }
-    
-    const maxAttendees = parseInt(schedule.maxAttendees);
-    if (isNaN(maxAttendees) || maxAttendees <= 0) {
+
+    // Check at least one branch has a quota
+    const hasQuota = formData.branchIds.some(bid => {
+      const v = parseInt(schedule.maxAttendeesByBranch[bid] || '0');
+      return v > 0;
+    });
+    if (!hasQuota) {
       return false;
     }
     
@@ -190,8 +214,13 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
     e.preventDefault();
     
     // Validate
-    if (!formData.name || !formData.description || !formData.location) {
+    if (!formData.name || !formData.description) {
       toast.error('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+      return;
+    }
+
+    if (locationType === 'external' && !formData.location) {
+      toast.error('กรุณากรอกสถานที่จัดงาน');
       return;
     }
 
@@ -227,13 +256,29 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
     setLoading(true);
 
     try {
+      // Upload pending image if any
+      let imageUrl = formData.imageUrl || '';
+      if (pendingFile) {
+        setUploading(true);
+        try {
+          const uploaded = await uploadPendingFile();
+          if (uploaded) imageUrl = uploaded;
+          setPendingFile(null);
+          setPreviewUrl('');
+        } finally {
+          setUploading(false);
+        }
+      }
+
       const eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'> = {
         name: formData.name,
         description: formData.description,
         fullDescription: formData.fullDescription || '',
-        imageUrl: formData.imageUrl || '',
-        location: formData.location,
-        locationUrl: formData.locationUrl || '',
+        imageUrl,
+        location: locationType === 'branch'
+          ? 'CodeLab ' + formData.branchIds.map(id => branches.find(b => b.id === id)?.name).filter(Boolean).join(' และ ')
+          : formData.location,
+        locationUrl: locationType === 'external' ? (formData.locationUrl || '') : '',
         branchIds: formData.branchIds,
         eventType: formData.eventType,
         highlights: formData.highlights.filter(h => h.trim()),
@@ -291,24 +336,32 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
 
         // 2. Update existing schedules
         for (const schedule of schedules.filter(s => !s.isNew && !deletedScheduleIds.includes(s.tempId))) {
-          const scheduleData = {
-            eventId,
-            date: new Date(schedule.date),
-            startTime: schedule.startTime,
-            endTime: schedule.endTime,
-            maxAttendees: parseInt(schedule.maxAttendees)
-          };
-          await updateEventSchedule(schedule.tempId, scheduleData);
-        }
-
-        // 3. Create new schedules
-        for (const schedule of schedules.filter(s => s.isNew)) {
+          const mabb = Object.fromEntries(
+            Object.entries(schedule.maxAttendeesByBranch).map(([k, v]) => [k, parseInt(v) || 0])
+          );
           const scheduleData = {
             eventId,
             date: new Date(schedule.date),
             startTime: schedule.startTime,
             endTime: schedule.endTime,
             maxAttendees: parseInt(schedule.maxAttendees),
+            maxAttendeesByBranch: mabb,
+          };
+          await updateEventSchedule(schedule.tempId, scheduleData);
+        }
+
+        // 3. Create new schedules
+        for (const schedule of schedules.filter(s => s.isNew)) {
+          const mabb = Object.fromEntries(
+            Object.entries(schedule.maxAttendeesByBranch).map(([k, v]) => [k, parseInt(v) || 0])
+          );
+          const scheduleData = {
+            eventId,
+            date: new Date(schedule.date),
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            maxAttendees: parseInt(schedule.maxAttendees),
+            maxAttendeesByBranch: mabb,
             status: 'available' as const,
             attendeesByBranch: {}
           };
@@ -321,12 +374,16 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
 
         // Create all schedules
         for (const schedule of schedules) {
+          const mabb = Object.fromEntries(
+            Object.entries(schedule.maxAttendeesByBranch).map(([k, v]) => [k, parseInt(v) || 0])
+          );
           const scheduleData = {
             eventId,
             date: new Date(schedule.date),
             startTime: schedule.startTime,
             endTime: schedule.endTime,
             maxAttendees: parseInt(schedule.maxAttendees),
+            maxAttendeesByBranch: mabb,
             status: 'available' as const,
             attendeesByBranch: {}
           };
@@ -341,6 +398,34 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFileSelect = (file: File) => {
+    // Validate
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error('รองรับเฉพาะ JPG, PNG, WebP, GIF');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('ไฟล์ต้องไม่เกิน 5MB');
+      return;
+    }
+
+    // Show local preview, store file for later upload
+    setPendingFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    setFormData(prev => ({ ...prev, imageUrl: '' })); // clear old URL
+  };
+
+  const uploadPendingFile = async (): Promise<string | null> => {
+    if (!pendingFile) return null;
+    const form = new FormData();
+    form.append('file', pendingFile);
+    const res = await fetch('/api/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'อัพโหลดรูปไม่สำเร็จ');
+    return data.url;
   };
 
   const addHighlight = () => {
@@ -439,86 +524,96 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
               <p className="text-xs text-gray-500">รองรับ Markdown สำหรับจัดรูปแบบข้อความ</p>
             </div>
 
-            <div className="space-y-2">
-  <Label htmlFor="imageUrl">URL รูปภาพ Event</Label>
-  <div className="flex gap-2">
-    <Input
-      id="imageUrl"
-      type="url"
-      value={formData.imageUrl}
-      onChange={(e) => {
-        let url = e.target.value;
-        console.log('Original URL:', url);
-        
-        // Convert Google Drive share link to direct image URL
-        if (url.includes('drive.google.com')) {
-          // Extract file ID from various Google Drive URL formats
-          let fileId = '';
-          
-          if (url.includes('/file/d/')) {
-            // Format: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
-            const match = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
-            if (match) fileId = match[1];
-          } else if (url.includes('id=')) {
-            // Format: https://drive.google.com/open?id=FILE_ID
-            const match = url.match(/id=([a-zA-Z0-9-_]+)/);
-            if (match) fileId = match[1];
-          }
-          
-          if (fileId) {
-            // Use thumbnail URL that works better with img tags
-            url = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`;
-            console.log('Converted URL:', url);
-          }
-        }
-        
-        // Convert Dropbox share link to direct image URL
-        else if (url.includes('dropbox.com')) {
-          // Replace www.dropbox.com with dl.dropboxusercontent.com
-          url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-          // Remove any dl parameter
-          url = url.replace(/[?&]dl=\d/, '');
-          console.log('Converted Dropbox URL:', url);
-        }
-        
-        setFormData({ ...formData, imageUrl: url });
-      }}
-      placeholder="https://example.com/image.jpg, Google Drive หรือ Dropbox link"
-      className="flex-1"
-    />
-    {formData.imageUrl && (
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => window.open(formData.imageUrl, '_blank')}
-      >
-        <Image className="h-4 w-4" />
-      </Button>
-    )}
-  </div>
-  <p className="text-xs text-gray-500">
-    รองรับ: URL รูปภาพ, Google Drive, Dropbox หรือ imgbb.com • แนะนำขนาด 16:9 (1200x675px)
-  </p>
-  
-  {/* Image Preview */}
-  {formData.imageUrl && (
-    <div className="mt-2 p-2 border rounded-lg bg-gray-50">
-      <p className="text-xs text-gray-600 mb-1">ตัวอย่างรูปภาพ:</p>
-      <img 
-        src={formData.imageUrl} 
-        alt="Preview" 
-        className="max-h-40 mx-auto rounded"
+            <div className="space-y-3">
+  <Label>รูปภาพ Event</Label>
+
+  {/* Upload area */}
+  <input
+    ref={fileInputRef}
+    type="file"
+    accept="image/jpeg,image/png,image/webp,image/gif"
+    className="hidden"
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (file) handleFileSelect(file);
+      e.target.value = '';
+    }}
+  />
+
+  {(previewUrl || formData.imageUrl) ? (
+    <div className="relative border rounded-lg overflow-hidden bg-gray-50">
+      <img
+        src={previewUrl || formData.imageUrl}
+        alt="Preview"
+        className="w-full aspect-video object-cover"
         onError={(e) => {
-          e.currentTarget.style.display = 'none';
-          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+          e.currentTarget.src = '';
+          e.currentTarget.alt = 'ไม่สามารถโหลดรูปได้';
         }}
       />
-      <p className="hidden text-xs text-red-500 text-center mt-2">
-        ไม่สามารถโหลดรูปได้ - ตรวจสอบ URL หรือการตั้งค่า Share
-      </p>
+      {pendingFile && (
+        <div className="absolute top-2 left-2">
+          <Badge className="bg-amber-500 text-white text-xs">ยังไม่ได้บันทึก</Badge>
+        </div>
+      )}
+      <div className="absolute top-2 right-2 flex gap-1">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          className="h-8 bg-black/60 hover:bg-black/80 text-white border-0 shadow-md"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          <span className="ml-1 text-xs">เปลี่ยนรูป</span>
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setFormData({ ...formData, imageUrl: '' });
+            setPendingFile(null);
+            setPreviewUrl('');
+          }}
+          className="h-8 bg-red-600/80 hover:bg-red-600 text-white border-0 shadow-md"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
+  ) : (
+    <button
+      type="button"
+      onClick={() => fileInputRef.current?.click()}
+      disabled={uploading}
+      className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-orange-400 hover:bg-orange-50/50 transition-colors cursor-pointer"
+    >
+      {uploading ? (
+        <Loader2 className="h-8 w-8 mx-auto text-gray-400 animate-spin" />
+      ) : (
+        <Upload className="h-8 w-8 mx-auto text-gray-400" />
+      )}
+      <p className="mt-2 text-sm font-medium text-gray-600">
+        {uploading ? 'กำลังอัพโหลด...' : 'คลิกเพื่ออัพโหลดรูป'}
+      </p>
+      <p className="text-xs text-gray-400 mt-1">JPG, PNG, WebP, GIF (สูงสุด 5MB)</p>
+    </button>
   )}
+
+  {/* Or paste URL */}
+  <details className="text-sm">
+    <summary className="text-gray-500 cursor-pointer hover:text-gray-700">หรือวาง URL รูปภาพ</summary>
+    <div className="mt-2 flex gap-2">
+      <Input
+        type="url"
+        value={formData.imageUrl}
+        onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+        placeholder="https://example.com/image.jpg"
+        className="flex-1"
+      />
+    </div>
+  </details>
 </div>
           </CardContent>
         </Card>
@@ -527,65 +622,127 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
         <Card>
           <CardHeader>
             <CardTitle>สถานที่และสาขา</CardTitle>
-            <CardDescription>กำหนดสถานที่จัดงานและสาขาที่เกี่ยวข้อง</CardDescription>
+            <CardDescription>เลือกว่าจัดที่สาขาหรือสถานที่ภายนอก</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="location">สถานที่จัดงาน *</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="เช่น อาคาร A ชั้น 3"
-                  required
-                />
+            {/* Location type toggle */}
+            <RadioGroup
+              value={locationType}
+              onValueChange={(v) => setLocationType(v as 'branch' | 'external')}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="branch" id="loc-branch" />
+                <Label htmlFor="loc-branch" className="font-normal cursor-pointer">จัดที่สาขา</Label>
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="locationUrl">Google Maps URL</Label>
-                <Input
-                  id="locationUrl"
-                  type="url"
-                  value={formData.locationUrl}
-                  onChange={(e) => setFormData({ ...formData, locationUrl: e.target.value })}
-                  placeholder="https://maps.google.com/..."
-                />
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="external" id="loc-external" />
+                <Label htmlFor="loc-external" className="font-normal cursor-pointer">จัดนอกสถานที่</Label>
               </div>
-            </div>
+            </RadioGroup>
 
-            <div className="space-y-2">
-              <Label>สาขาที่จัด Event *</Label>
-              <div className="space-y-2 p-4 border rounded-lg">
-                {branches.map((branch) => (
-                  <div key={branch.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={branch.id}
-                      checked={formData.branchIds.includes(branch.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setFormData({
-                            ...formData,
-                            branchIds: [...formData.branchIds, branch.id]
-                          });
-                        } else {
-                          setFormData({
-                            ...formData,
-                            branchIds: formData.branchIds.filter(id => id !== branch.id)
-                          });
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor={branch.id}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {branch.name}
-                    </label>
-                  </div>
-                ))}
+            {/* Branch: select branches */}
+            {locationType === 'branch' && (
+              <div className="space-y-2">
+                <Label>สาขาที่จัด Event *</Label>
+                <div className="space-y-2 p-4 border rounded-lg">
+                  {branches.map((branch) => (
+                    <div key={branch.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={branch.id}
+                        checked={formData.branchIds.includes(branch.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData({
+                              ...formData,
+                              branchIds: [...formData.branchIds, branch.id]
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              branchIds: formData.branchIds.filter(id => id !== branch.id)
+                            });
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor={branch.id}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {branch.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {formData.branchIds.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    สถานที่จะแสดงเป็น: CodeLab {formData.branchIds.map(id => branches.find(b => b.id === id)?.name).filter(Boolean).join(' และ ')}
+                  </p>
+                )}
               </div>
-            </div>
+            )}
+
+            {/* External: location + map + branch for quota */}
+            {locationType === 'external' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="location">สถานที่จัดงาน *</Label>
+                    <Input
+                      id="location"
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      placeholder="เช่น ศูนย์ประชุมแห่งชาติสิริกิติ์"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="locationUrl">Google Maps URL</Label>
+                    <Input
+                      id="locationUrl"
+                      type="url"
+                      value={formData.locationUrl}
+                      onChange={(e) => setFormData({ ...formData, locationUrl: e.target.value })}
+                      placeholder="https://maps.google.com/..."
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>สาขาที่รับลงทะเบียน *</Label>
+                  <p className="text-xs text-gray-500">เลือกสาขาที่เปิดรับลงทะเบียนสำหรับ Event นี้ (ใช้แบ่งโควต้า)</p>
+                  <div className="space-y-2 p-4 border rounded-lg">
+                    {branches.map((branch) => (
+                      <div key={branch.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`ext-${branch.id}`}
+                          checked={formData.branchIds.includes(branch.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setFormData({
+                                ...formData,
+                                branchIds: [...formData.branchIds, branch.id]
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                branchIds: formData.branchIds.filter(id => id !== branch.id)
+                              });
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`ext-${branch.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {branch.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -645,96 +802,106 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
             <CardDescription>กำหนดวันและเวลาที่จัด Event (สามารถเพิ่มได้หลายรอบ)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Schedules Table */}
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-40">วันที่</TableHead>
-                    <TableHead className="w-24">เวลาเริ่ม</TableHead>
-                    <TableHead className="w-24">เวลาจบ</TableHead>
-                    <TableHead className="w-28">จำนวนที่รับ</TableHead>
-                    <TableHead className="text-right">จัดการ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {schedules.map((schedule) => (
-                    <TableRow key={schedule.tempId}>
-                      <TableCell>
-                        <DateRangePicker
-                          mode="single"
-                          value={schedule.date}
-                          onChange={(date) => handleUpdateSchedule(schedule.tempId, 'date', date || '')}
-                          minDate={new Date()}
-                          placeholder="เลือกวันที่"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <TimePicker
-                          value={schedule.startTime}
-                          onChange={(v) => handleUpdateSchedule(schedule.tempId, 'startTime', v)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <TimePicker
-                          value={schedule.endTime}
-                          onChange={(v) => handleUpdateSchedule(schedule.tempId, 'endTime', v)}
-                          min={schedule.startTime}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={schedule.maxAttendees}
-                          onChange={(e) => handleUpdateSchedule(schedule.tempId, 'maxAttendees', e.target.value)}
-                          placeholder="50"
-                          className="h-9"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              if (validateSchedule(schedule)) {
-                                handleDuplicateSchedule(schedule);
-                                toast.success('คัดลอกรอบเวลาแล้ว');
-                              } else {
-                                toast.error('กรุณากรอกข้อมูลให้ครบก่อนคัดลอก');
-                              }
-                            }}
-                            title="คัดลอก"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteSchedule(schedule.tempId)}
-                            className="text-red-600 hover:text-red-700"
-                            title="ลบ"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+            {/* Schedule Cards */}
+            <div className="space-y-4">
+              {schedules.map((schedule) => (
+                <div key={schedule.tempId} className="border rounded-lg p-4 space-y-4 bg-gray-50/50">
+                  {/* Row 1: Date, Time, Actions */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-[180px]">
+                      <Label className="text-xs text-gray-500 mb-1 block">วันที่</Label>
+                      <DateRangePicker
+                        mode="single"
+                        value={schedule.date}
+                        onChange={(date) => handleUpdateSchedule(schedule.tempId, 'date', date || '')}
+                        minDate={new Date()}
+                        placeholder="เลือกวันที่"
+                      />
+                    </div>
+                    <div className="w-[120px]">
+                      <Label className="text-xs text-gray-500 mb-1 block">เวลาเริ่ม</Label>
+                      <TimePicker
+                        value={schedule.startTime}
+                        onChange={(v) => handleUpdateSchedule(schedule.tempId, 'startTime', v)}
+                      />
+                    </div>
+                    <div className="w-[120px]">
+                      <Label className="text-xs text-gray-500 mb-1 block">เวลาจบ</Label>
+                      <TimePicker
+                        value={schedule.endTime}
+                        onChange={(v) => handleUpdateSchedule(schedule.tempId, 'endTime', v)}
+                        min={schedule.startTime}
+                      />
+                    </div>
+                    <div className="flex items-end gap-1 pt-5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (validateSchedule(schedule)) {
+                            handleDuplicateSchedule(schedule);
+                            toast.success('คัดลอกรอบเวลาแล้ว');
+                          } else {
+                            toast.error('กรุณากรอกข้อมูลให้ครบก่อนคัดลอก');
+                          }
+                        }}
+                        title="คัดลอก"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSchedule(schedule.tempId)}
+                        className="text-red-600 hover:text-red-700"
+                        title="ลบ"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Per-branch quota */}
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-2 block">จำนวนที่รับแต่ละสาขา</Label>
+                    {formData.branchIds.length === 0 ? (
+                      <p className="text-sm text-gray-400">กรุณาเลือกสาขาก่อน</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-3">
+                        {formData.branchIds.map(bid => {
+                          const branch = branches.find(b => b.id === bid);
+                          return (
+                            <div key={bid} className="flex items-center gap-2">
+                              <span className="text-sm font-medium whitespace-nowrap">{branch?.name || 'สาขา'}</span>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={schedule.maxAttendeesByBranch[bid] || ''}
+                                onChange={(e) => handleUpdateScheduleBranch(schedule.tempId, bid, e.target.value)}
+                                placeholder="0"
+                                className="h-9 w-20"
+                              />
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center gap-2 text-sm text-gray-500 ml-2">
+                          <span>รวม:</span>
+                          <Badge variant="secondary">{schedule.maxAttendees || '0'} คน</Badge>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {schedules.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                        ยังไม่มีรอบเวลา คลิก "เพิ่มรอบเวลา" เพื่อเริ่มต้น
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {schedules.length === 0 && (
+                <div className="text-center py-8 text-gray-500 border rounded-lg">
+                  ยังไม่มีรอบเวลา คลิก &quot;เพิ่มรอบเวลา&quot; เพื่อเริ่มต้น
+                </div>
+              )}
             </div>
             
             {/* Add Button */}
