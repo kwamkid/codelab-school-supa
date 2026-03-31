@@ -782,10 +782,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                         <button
                           onClick={() => toggleExpanded(item.name)}
                           className={cn(
-                            'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-normal transition-colors',
+                            'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
                             isSubItemActive(item)
-                              ? 'bg-white/20 text-white font-medium'
-                              : 'text-white/80 hover:bg-white/10'
+                              ? 'bg-white/20 text-white font-semibold'
+                              : 'text-white/90 hover:bg-white/10'
                           )}
                         >
                           <div className="flex items-center">
@@ -808,10 +808,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                                   key={subItem.name}
                                   href={subItem.href}
                                   className={cn(
-                                    'flex items-center rounded-lg px-3 py-2 text-base font-normal transition-colors',
+                                    'flex items-center rounded-lg px-3 py-2 text-base font-medium transition-colors',
                                     isActive(subItem.href)
-                                      ? 'bg-white/20 text-white font-medium'
-                                      : 'text-white/70 hover:bg-white/10'
+                                      ? 'bg-white/20 text-white font-semibold'
+                                      : 'text-white/80 hover:bg-white/10'
                                   )}
                                   onClick={() => {
                                     // เช็คว่าถ้ากำลังอยู่ที่หน้านี้อยู่แล้ว ไม่ต้องทำอะไร
@@ -833,10 +833,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                       <MenuLink
                         href={item.href}
                         className={cn(
-                          'flex items-center rounded-lg px-3 py-2.5 text-base font-normal transition-colors',
+                          'flex items-center rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
                           isActive(item.href)
-                            ? 'bg-white/20 text-white font-medium'
-                            : 'text-white/80 hover:bg-white/10'
+                            ? 'bg-white/20 text-white font-semibold'
+                            : 'text-white/90 hover:bg-white/10'
                         )}
                         onClick={() => {
                           setSidebarOpen(false);

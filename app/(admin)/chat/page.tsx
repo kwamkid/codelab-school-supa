@@ -219,17 +219,27 @@ export default function ChatPage() {
         const updated = await getConversation(rawConversation.id);
         if (!updated) return;
 
+        // If this is the active conversation, force unread to 0
+        if (rawConversation.id === selectedConversationId) {
+          updated.unreadCount = 0;
+        }
+
         setConversations(prev => {
           const exists = prev.find(c => c.id === updated.id);
           if (exists) {
-            // Update existing conversation
+            // Check if this is a new message (lastMessageAt changed) — only re-sort then
+            const hasNewMessage = exists.lastMessageAt?.getTime() !== updated.lastMessageAt?.getTime();
+
             const newList = prev.map(c => (c.id === updated.id ? updated : c));
-            // Re-sort by lastMessageAt descending
-            newList.sort((a, b) => {
-              const aTime = a.lastMessageAt?.getTime() || 0;
-              const bTime = b.lastMessageAt?.getTime() || 0;
-              return bTime - aTime;
-            });
+
+            if (hasNewMessage) {
+              // New message came in — re-sort so it goes to top
+              newList.sort((a, b) => {
+                const aTime = a.lastMessageAt?.getTime() || 0;
+                const bTime = b.lastMessageAt?.getTime() || 0;
+                return bTime - aTime;
+              });
+            }
             return newList;
           } else if (eventType === 'INSERT') {
             // New conversation — prepend
@@ -237,15 +247,6 @@ export default function ChatPage() {
           }
           return prev;
         });
-
-        // If this is the active conversation, reset unread
-        if (rawConversation.id === selectedConversationId) {
-          setConversations(prev =>
-            prev.map(c =>
-              c.id === selectedConversationId ? { ...c, unreadCount: 0 } : c
-            )
-          );
-        }
       } catch (error) {
         console.error('Error handling conversation update:', error);
       }

@@ -100,13 +100,8 @@ export default function ConversationList({
       });
     }
 
-    // Sort: unread first, then by last message time descending
+    // Sort: by last message time descending (newest first)
     result = [...result].sort((a, b) => {
-      // Unread conversations first
-      const aUnread = a.unreadCount > 0 ? 1 : 0;
-      const bUnread = b.unreadCount > 0 ? 1 : 0;
-      if (aUnread !== bUnread) return bUnread - aUnread;
-      // Then by timestamp descending
       const aTime = a.lastMessageAt?.getTime() || 0;
       const bTime = b.lastMessageAt?.getTime() || 0;
       return bTime - aTime;

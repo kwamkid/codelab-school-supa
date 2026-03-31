@@ -288,15 +288,22 @@ export async function reopenConversation(conversationId: string): Promise<void> 
 }
 
 export async function markConversationRead(conversationId: string): Promise<void> {
-  await adminMutation({
-    table: 'chat_conversations',
-    operation: 'update',
-    data: {
-      unread_count: 0,
-      updated_at: new Date().toISOString(),
-    },
-    match: { id: conversationId },
-  });
+  console.log('[Chat] markConversationRead:', conversationId);
+  try {
+    await adminMutation({
+      table: 'chat_conversations',
+      operation: 'update',
+      data: {
+        unread_count: 0,
+        updated_at: new Date().toISOString(),
+      },
+      match: { id: conversationId },
+    });
+    console.log('[Chat] markConversationRead success');
+  } catch (error) {
+    console.error('[Chat] markConversationRead error:', error);
+    throw error;
+  }
 }
 
 export async function updateConversationAction(conversationId: string, data: {
