@@ -65,7 +65,18 @@ export function useChatConversationsRealtime(
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_conversations',
+        },
+        (payload) => {
+          callbackRef.current(payload.new, payload.eventType);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
           schema: 'public',
           table: 'chat_conversations',
         },

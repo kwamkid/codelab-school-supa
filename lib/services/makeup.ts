@@ -106,6 +106,28 @@ export async function getMakeupClasses(branchId?: string | null): Promise<Makeup
   }
 }
 
+// Get pending makeup count (lightweight query for sidebar badge)
+export async function getPendingMakeupCount(branchId?: string | null): Promise<number> {
+  try {
+    const supabase = getClient();
+    let query = supabase
+      .from('makeup_classes')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    const { count, error } = await query;
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.error('Error getting pending makeup count:', error);
+    return 0;
+  }
+}
+
 // Get makeup classes by student
 export async function getMakeupClassesByStudent(studentId: string): Promise<MakeupClass[]> {
   try {

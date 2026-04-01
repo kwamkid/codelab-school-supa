@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
-import { getMakeupClasses } from '@/lib/services/makeup';
+import { getPendingMakeupCount } from '@/lib/services/makeup';
+import { getClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 interface MakeupContextType {
@@ -20,22 +21,33 @@ export function MakeupProvider({ children }: { children: React.ReactNode }) {
 
   const refreshMakeupCount = async () => {
     try {
-      const makeupClasses = await getMakeupClasses();
-      const pendingAuto = makeupClasses.filter(
-        m => m.status === 'pending' && m.reason.includes('สมัครเรียนหลังจากคลาสเริ่มแล้ว')
-      ).length;
-      setPendingMakeupCount(pendingAuto);
+      const count = await getPendingMakeupCount();
+      setPendingMakeupCount(count);
     } catch (error) {
       console.error('Error loading makeup count:', error);
     }
   };
 
   useEffect(() => {
-    if (user) {
-      refreshMakeupCount();
-      const interval = setInterval(refreshMakeupCount, 30000);
-      return () => clearInterval(interval);
-    }
+    if (!user) return;
+
+    refreshMakeupCount();
+
+    // Fallback polling ทุก 5 นาที
+    const interval = setInterval(refreshMakeupCount, 300000);
+
+    // Realtime: refresh ทันทีเมื่อ makeup_classes เปลี่ยน
+    const supabase = getClient();
+    const channel = supabase
+      .channel('makeup-ctx-count')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'makeup_classes' }, () => refreshMakeupCount())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'makeup_classes' }, () => refreshMakeupCount())
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   return (

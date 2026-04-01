@@ -62,6 +62,28 @@ export async function getTrialBookings(branchId?: string | null): Promise<TrialB
   }
 }
 
+// Get new trial booking count (lightweight query for sidebar badge)
+export async function getNewTrialCount(branchId?: string | null): Promise<number> {
+  try {
+    const supabase = getClient();
+    let query = supabase
+      .from('trial_bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'new');
+
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    const { count, error } = await query;
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.error('Error getting new trial count:', error);
+    return 0;
+  }
+}
+
 // Get trial bookings by status
 export async function getTrialBookingsByStatus(status: TrialBooking['status']): Promise<TrialBooking[]> {
   try {

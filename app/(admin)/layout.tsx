@@ -54,11 +54,12 @@ import { LoadingProvider } from '@/contexts/LoadingContext';
 import { BranchProvider, useBranch } from '@/contexts/BranchContext';
 import { BranchSelector } from '@/components/layout/branch-selector';
 import { Loading, PageLoading } from '@/components/ui/loading';
-import { getMakeupClasses } from '@/lib/services/makeup';
-import { getTrialBookings } from '@/lib/services/trial-bookings';
+import { getPendingMakeupCount } from '@/lib/services/makeup';
+import { getNewTrialCount } from '@/lib/services/trial-bookings';
 import { getUnreadNotifications, markNotificationAsRead } from '@/lib/services/notifications';
 import { formatDate } from '@/lib/utils';
 import { getTotalUnreadCount } from '@/lib/services/chat';
+import { getClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Notification } from '@/types/models';
 
@@ -155,116 +156,100 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Load pending makeup count - กรองตาม branch ที่เลือก
+  // Load pending makeup count - realtime + fallback polling
   useEffect(() => {
+    if (!user) return;
+
     const loadMakeupCount = async () => {
       try {
-        const makeupClasses = await getMakeupClasses();
-        
-        // ถ้าเลือก "ทุกสาขา" ให้นับทั้งหมดที่ pending
-        if (!selectedBranchId) {
-          const pendingCount = makeupClasses.filter(
-            m => m.status === 'pending' // นับทั้งหมดที่ pending ไม่สนใจ requestedBy
-          ).length;
-          setPendingMakeupCount(pendingCount);
-          return;
-        }
-        
-        // ถ้าเลือกสาขาเฉพาะ ต้องโหลด classes เพื่อเช็ค branchId
-        const { getClass } = await import('@/lib/services/classes');
-        
-        // สร้าง map ของ classId -> branchId เพื่อประสิทธิภาพ
-        const classBranchMap = new Map<string, string>();
-        
-        // ดึง branchId ของ classes ที่เกี่ยวข้องเท่านั้น
-        const uniqueClassIds = [...new Set(makeupClasses.map(m => m.originalClassId))];
-        await Promise.all(
-          uniqueClassIds.map(async (classId) => {
-            try {
-              const classData = await getClass(classId);
-              if (classData) {
-                classBranchMap.set(classId, classData.branchId);
-              }
-            } catch (error) {
-              console.error(`Error loading class ${classId}:`, error);
-            }
-          })
-        );
-        
-        // กรอง makeup classes ที่อยู่ในสาขาที่เลือก
-        const filteredMakeups = makeupClasses.filter(m => {
-          // ถ้ามี makeupSchedule แล้ว ใช้ branchId จาก makeupSchedule
-          if (m.makeupSchedule?.branchId) {
-            return m.makeupSchedule.branchId === selectedBranchId;
-          }
-          // ถ้ายังไม่มี (pending) ใช้ branchId จาก original class
-          const classBranchId = classBranchMap.get(m.originalClassId);
-          return classBranchId === selectedBranchId;
-        });
-        
-        // นับทั้งหมดที่เป็น pending ไม่สนใจ requestedBy
-        const pendingCount = filteredMakeups.filter(
-          m => m.status === 'pending' // นับทั้งหมดที่ pending
-        ).length;
-
-        setPendingMakeupCount(pendingCount);
+        const count = await getPendingMakeupCount(selectedBranchId);
+        setPendingMakeupCount(count);
       } catch (error) {
         console.error('Error loading makeup count:', error);
       }
     };
-    
-    if (user) {
-      loadMakeupCount();
-      // Refresh ทุก 30 วินาที
-      const interval = setInterval(loadMakeupCount, 30000);
 
-      // Listen for makeup changes from other components
-      const handleMakeupChange = () => {
-        loadMakeupCount();
-      };
-      window.addEventListener('makeup-changed', handleMakeupChange);
+    loadMakeupCount();
 
-      return () => {
-        clearInterval(interval);
-        window.removeEventListener('makeup-changed', handleMakeupChange);
-      };
-    }
-  }, [user, selectedBranchId]); // เพิ่ม selectedBranchId ใน dependency
+    // Fallback polling ทุก 5 นาที (มี realtime แล้วไม่ต้องถี่)
+    const interval = setInterval(loadMakeupCount, 300000);
 
-  // Load new trial bookings count - กรองตาม branch ที่เลือก
+    // Listen for makeup changes from other components
+    const handleMakeupChange = () => loadMakeupCount();
+    window.addEventListener('makeup-changed', handleMakeupChange);
+
+    // Realtime: refresh ทันทีเมื่อ makeup_classes มีการ INSERT/UPDATE
+    const supabase = getClient();
+    const channel = supabase
+      .channel('layout-makeup-count')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'makeup_classes' },
+        () => loadMakeupCount()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'makeup_classes' },
+        () => loadMakeupCount()
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('makeup-changed', handleMakeupChange);
+      supabase.removeChannel(channel);
+    };
+  }, [user, selectedBranchId]);
+
+  // Load new trial bookings count - realtime + fallback polling
   useEffect(() => {
+    if (!user) return;
+
     const loadTrialCount = async () => {
       try {
-        // ดึงข้อมูล trial bookings (กรองตาม selectedBranchId)
-        const bookings = await getTrialBookings(selectedBranchId);
-
-        // นับเฉพาะที่มีสถานะ 'new' (รอติดต่อ)
-        const newBookings = bookings.filter(b => b.status === 'new').length;
-        setNewTrialCount(newBookings);
+        const count = await getNewTrialCount(selectedBranchId);
+        setNewTrialCount(count);
       } catch (error) {
         console.error('Error loading trial count:', error);
       }
     };
 
-    if (user) {
-      loadTrialCount();
-      const interval = setInterval(loadTrialCount, 30000);
+    loadTrialCount();
 
-      // Listen for trial booking changes from other components
-      const handleTrialChange = () => {
-        loadTrialCount();
-      };
-      window.addEventListener('trial-booking-changed', handleTrialChange);
+    // Fallback polling ทุก 5 นาที
+    const interval = setInterval(loadTrialCount, 300000);
 
-      return () => {
-        clearInterval(interval);
-        window.removeEventListener('trial-booking-changed', handleTrialChange);
-      };
-    }
+    // Listen for trial booking changes from other components
+    const handleTrialChange = () => loadTrialCount();
+    window.addEventListener('trial-booking-changed', handleTrialChange);
+
+    // Realtime: refresh ทันทีเมื่อ trial_bookings มีการ INSERT/UPDATE
+    const supabase = getClient();
+    const channel = supabase
+      .channel('layout-trial-count')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'trial_bookings' },
+        () => loadTrialCount()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'trial_bookings' },
+        () => loadTrialCount()
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('trial-booking-changed', handleTrialChange);
+      supabase.removeChannel(channel);
+    };
   }, [user, selectedBranchId]);
 
-  // Load chat unread count
+  // Load chat unread count — realtime + fallback polling
   useEffect(() => {
+    if (!user) return;
+
     const loadChatUnread = async () => {
       try {
         const count = await getTotalUnreadCount();
@@ -274,11 +259,43 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       }
     };
 
-    if (user) {
-      loadChatUnread();
-      const interval = setInterval(loadChatUnread, 15000);
-      return () => clearInterval(interval);
-    }
+    loadChatUnread();
+
+    // Fallback polling ทุก 2 นาที
+    const interval = setInterval(loadChatUnread, 120000);
+
+    // Realtime: refresh unread count ทันทีเมื่อ conversation เปลี่ยน
+    const supabase = getClient();
+    const channel = supabase
+      .channel('layout-chat-unread')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_conversations',
+        },
+        () => {
+          loadChatUnread();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_conversations',
+        },
+        () => {
+          loadChatUnread();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   // Load notifications
@@ -296,7 +313,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     
     if (user) {
       loadNotifications();
-      const interval = setInterval(loadNotifications, 60000);
+      const interval = setInterval(loadNotifications, 300000);
       return () => clearInterval(interval);
     }
   }, [user]);

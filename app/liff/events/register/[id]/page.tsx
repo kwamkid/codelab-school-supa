@@ -146,7 +146,8 @@ export default function EventRegistrationPage() {
       
     } catch (error) {
       console.error('Error loading data:', error);
-      toast.error('ไม่สามารถโหลดข้อมูลได้');
+      toast.error('ไม่พบกิจกรรมนี้');
+      router.push('/liff/events');
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getConversations, getMessages, sendMessage, markConversationRead, getConversation, addContactTag, removeContactTag, addContactBranch, updateContactInfo, unlinkContactFromParent } from '@/lib/services/chat';
+import { getConversations, getMessages, sendMessage, sendBatchMessage, markConversationRead, getConversation, addContactTag, removeContactTag, addContactBranch, updateContactInfo, unlinkContactFromParent } from '@/lib/services/chat';
 import { useChatMessagesRealtime, useChatConversationsRealtime } from '@/hooks/useChatRealtime';
 import { ChatConversation, ChatMessage, Branch } from '@/types/models';
 import { getBranches } from '@/lib/services/branches';
@@ -258,19 +258,24 @@ export default function ChatPage() {
 
   // Optimistic send message handler
   const handleSendMessage = useCallback(
-    (content: string) => {
-      if (!selectedConversationId || !content.trim()) return;
+    (content: string, messageType?: string, mediaUrl?: string) => {
+      if (!selectedConversationId) return;
       const trimmed = content.trim();
+      const msgType = messageType || 'text';
+      const isMedia = msgType === 'image' || msgType === 'video';
 
-      // 1. Create optimistic message and add to local state immediately
+      if (!trimmed && !isMedia) return;
+
+      // 1. Create optimistic message
       const tempId = `optimistic-${++optimisticIdRef.current}`;
       const optimisticMessage: ChatMessage = {
         id: tempId,
         conversationId: selectedConversationId,
         direction: 'outbound',
         senderType: 'admin',
-        messageType: 'text',
-        content: trimmed,
+        messageType: msgType as ChatMessage['messageType'],
+        content: trimmed || undefined,
+        mediaUrl,
         status: 'pending',
         createdAt: new Date(),
       };
@@ -278,23 +283,62 @@ export default function ChatPage() {
       setMessages(prev => [...prev, optimisticMessage]);
 
       // Update conversation preview locally
+      const preview = isMedia
+        ? (msgType === 'image' ? '📷 รูปภาพ' : '🎬 วิดีโอ') + (trimmed ? ` ${trimmed}` : '')
+        : trimmed;
       setConversations(prev =>
         prev.map(c =>
           c.id === selectedConversationId
-            ? { ...c, lastMessagePreview: trimmed, lastMessageAt: new Date() }
+            ? { ...c, lastMessagePreview: preview, lastMessageAt: new Date() }
             : c
         )
       );
 
-      // 2. Send via API in background — don't block UI
-      sendMessage(selectedConversationId, trimmed).catch((error) => {
+      // 2. Send via API
+      sendMessage(selectedConversationId, trimmed, msgType, mediaUrl).catch((error) => {
         console.error('Error sending message:', error);
-        // Mark optimistic message as failed
         setMessages(prev =>
           prev.map(m =>
             m.id === tempId ? { ...m, status: 'failed' as const } : m
           )
         );
+        toast.error('ส่งข้อความไม่สำเร็จ');
+      });
+    },
+    [selectedConversationId]
+  );
+
+  // Batch send (Quick Reply: text blocks + images in 1 request)
+  const handleSendBatch = useCallback(
+    (textBlocks: string[], imageUrls: string[]) => {
+      if (!selectedConversationId) return;
+      if (textBlocks.length === 0 && imageUrls.length === 0) return;
+
+      // Optimistic: add each block/image as separate message
+      for (const block of textBlocks) {
+        const tempId = `optimistic-${++optimisticIdRef.current}`;
+        setMessages(prev => [...prev, {
+          id: tempId, conversationId: selectedConversationId, direction: 'outbound',
+          senderType: 'admin', messageType: 'text', content: block, status: 'pending', createdAt: new Date(),
+        } as ChatMessage]);
+      }
+      for (const url of imageUrls) {
+        const tempId = `optimistic-${++optimisticIdRef.current}`;
+        setMessages(prev => [...prev, {
+          id: tempId, conversationId: selectedConversationId, direction: 'outbound',
+          senderType: 'admin', messageType: 'image', mediaUrl: url, status: 'pending', createdAt: new Date(),
+        } as ChatMessage]);
+      }
+
+      // Update conversation preview
+      const preview = textBlocks[0] || (imageUrls.length > 0 ? '📷 รูปภาพ' : '');
+      setConversations(prev => prev.map(c =>
+        c.id === selectedConversationId ? { ...c, lastMessagePreview: preview, lastMessageAt: new Date() } : c
+      ));
+
+      // Send 1 API request
+      sendBatchMessage(selectedConversationId, textBlocks, imageUrls).catch((error) => {
+        console.error('Batch send error:', error);
         toast.error('ส่งข้อความไม่สำเร็จ');
       });
     },
@@ -538,6 +582,7 @@ export default function ChatPage() {
             messages={messages}
             loading={loadingMessages}
             onSend={handleSendMessage}
+            onSendBatch={handleSendBatch}
             branches={branches}
             onBack={handleBack}
             onTogglePanel={handleTogglePanel}

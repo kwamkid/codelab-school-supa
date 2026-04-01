@@ -914,6 +914,8 @@ export interface ChatQuickReply {
   id: string;
   title: string;
   content: string;
+  imageUrl?: string;
+  images: string[];        // multiple image URLs
   category: string;
   sortOrder: number;
   isActive: boolean;

@@ -12,7 +12,8 @@ interface MessageAreaProps {
   conversation: ChatConversation | null;
   messages: ChatMessage[];
   loading: boolean;
-  onSend: (content: string) => void;
+  onSend: (content: string, messageType?: string, mediaUrl?: string) => void;
+  onSendBatch?: (textBlocks: string[], imageUrls: string[]) => void;
   branches?: Branch[];
   /** Mobile: go back to conversation list */
   onBack?: () => void;
@@ -42,6 +43,7 @@ export default function MessageArea({
   messages,
   loading,
   onSend,
+  onSendBatch,
   branches,
   onBack,
   onTogglePanel,
@@ -171,7 +173,7 @@ export default function MessageArea({
       />
 
       {/* Input — never disabled, optimistic sending */}
-      <MessageInput onSend={onSend} />
+      <MessageInput onSend={onSend} onSendBatch={onSendBatch} />
     </div>
   );
 }

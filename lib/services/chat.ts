@@ -97,6 +97,8 @@ function mapQuickReply(row: any): ChatQuickReply {
     id: row.id,
     title: row.title,
     content: row.content,
+    imageUrl: row.image_url || (row.images?.[0]) || undefined,
+    images: row.images || [],
     category: row.category || 'general',
     sortOrder: row.sort_order || 0,
     isActive: row.is_active ?? true,
@@ -342,15 +344,43 @@ export async function getMessages(conversationId: string, limit = 50, before?: s
   return (data || []).map(mapMessage).reverse(); // reverse to show oldest first
 }
 
-export async function sendMessage(conversationId: string, content: string, messageType = 'text', mediaUrl?: string): Promise<void> {
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+  messageType = 'text',
+  mediaUrl?: string,
+  quickReplyItems?: { label: string; text?: string }[]
+): Promise<void> {
   const res = await fetch('/api/admin/chat/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversationId, content, messageType, mediaUrl }),
+    body: JSON.stringify({ conversationId, content, messageType, mediaUrl, quickReplyItems }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Failed to send message');
+  }
+}
+
+/** Send text + multiple images in 1 API request (saves LINE credits) */
+export async function sendBatchMessage(
+  conversationId: string,
+  textBlocks: string[],
+  imageUrls: string[]
+): Promise<void> {
+  const res = await fetch('/api/admin/chat/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      conversationId,
+      content: textBlocks.join('\n\n'),
+      messageType: imageUrls.length > 0 ? 'image' : 'text',
+      mediaUrls: imageUrls.length > 0 ? imageUrls : undefined,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to send batch message');
   }
 }
 
@@ -458,6 +488,7 @@ export async function getQuickReplies(category?: string): Promise<ChatQuickReply
 export async function createQuickReply(data: {
   title: string;
   content: string;
+  images?: string[];
   category?: string;
   createdBy?: string;
 }): Promise<string> {
@@ -467,12 +498,34 @@ export async function createQuickReply(data: {
     data: {
       title: data.title,
       content: data.content,
+      image_url: data.images?.[0] || null,
+      images: data.images || [],
       category: data.category || 'general',
       created_by: data.createdBy || null,
     },
     options: { select: 'id', single: true },
   });
   return (result as any).id;
+}
+
+export async function updateQuickReply(id: string, data: {
+  title?: string;
+  content?: string;
+  images?: string[];
+}): Promise<void> {
+  const updateData: any = {};
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.content !== undefined) updateData.content = data.content;
+  if (data.images !== undefined) {
+    updateData.images = data.images;
+    updateData.image_url = data.images[0] || null;
+  }
+  await adminMutation({
+    table: 'chat_quick_replies',
+    operation: 'update',
+    data: updateData,
+    match: { id },
+  });
 }
 
 export async function deleteQuickReply(id: string): Promise<void> {
@@ -491,7 +544,8 @@ export async function getTotalUnreadCount(): Promise<number> {
   const { data, error } = await (supabase as any)
     .from('chat_conversations')
     .select('unread_count')
-    .gt('unread_count', 0);
+    .gt('unread_count', 0)
+    .limit(200);
   if (error) return 0;
   return (data || []).reduce((sum: number, row: any) => sum + (row.unread_count || 0), 0);
 }
