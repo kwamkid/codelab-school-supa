@@ -737,6 +737,7 @@ export interface Event {
   status: 'draft' | 'published' | 'completed' | 'cancelled';
   
   // Metadata
+  viewCount?: number;
   isActive: boolean;
   createdAt: Date;
   createdBy: string;                     // userId ของคนสร้าง

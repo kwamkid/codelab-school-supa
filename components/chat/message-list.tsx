@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useEffect, useCallback, useState } from 'react';
-import { Loader2, X, ChevronDown } from 'lucide-react';
+import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import { Loader2, X, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChatMessage } from '@/types/models';
 import { MessageBubble } from './message-bubble';
@@ -89,13 +89,49 @@ export function MessageList({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
-  // Close lightbox on ESC
+  // Image lightbox state
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Collect all image URLs from messages (resolve LINE proxy URLs)
+  const imageUrls = useMemo(() => {
+    return messages
+      .filter((m) => m.messageType === 'image' && m.mediaUrl)
+      .map((m) => {
+        const url = m.mediaUrl!;
+        if (url.includes('api-data.line.me') && channelId) {
+          return `/api/admin/chat/media?url=${encodeURIComponent(url)}&channelId=${encodeURIComponent(channelId)}`;
+        }
+        return url;
+      });
+  }, [messages, channelId]);
+
+  const handleClickImage = useCallback((url: string) => {
+    const idx = imageUrls.indexOf(url);
+    setLightboxIndex(idx >= 0 ? idx : 0);
+  }, [imageUrls]);
+
+  const lightboxOpen = lightboxIndex !== null && imageUrls.length > 0;
+
+  // Close lightbox on ESC, navigate with arrow keys
   useEffect(() => {
-    if (!previewUrl) return;
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPreviewUrl(null); };
+    if (!previewUrl && !lightboxOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPreviewUrl(null);
+        setLightboxIndex(null);
+      }
+      if (lightboxOpen) {
+        if (e.key === 'ArrowLeft') {
+          setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+        }
+        if (e.key === 'ArrowRight') {
+          setLightboxIndex((prev) => (prev !== null && prev < imageUrls.length - 1 ? prev + 1 : prev));
+        }
+      }
+    };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [previewUrl]);
+  }, [previewUrl, lightboxOpen, imageUrls.length]);
 
   // Scroll to bottom helper
   const scrollToBottom = useCallback((behavior?: string) => {
@@ -191,6 +227,58 @@ export function MessageList({
         </div>
       )}
 
+      {/* Image lightbox with navigation */}
+      {lightboxOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setLightboxIndex(null)}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/40 text-white hover:bg-black/60"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Counter */}
+          {imageUrls.length > 1 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full bg-black/40 text-white text-sm">
+              {lightboxIndex! + 1} / {imageUrls.length}
+            </div>
+          )}
+
+          {/* Previous button */}
+          {imageUrls.length > 1 && lightboxIndex! > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => prev! - 1); }}
+              className="absolute left-3 z-10 p-2 rounded-full bg-black/40 text-white hover:bg-black/60"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+          )}
+
+          {/* Image */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrls[lightboxIndex!]}
+            alt=""
+            className="max-w-[90vw] max-h-[90vh] rounded-xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Next button */}
+          {imageUrls.length > 1 && lightboxIndex! < imageUrls.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => prev! + 1); }}
+              className="absolute right-3 z-10 p-2 rounded-full bg-black/40 text-white hover:bg-black/60"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="relative flex-1">
       <div
         ref={scrollRef}
@@ -270,6 +358,7 @@ export function MessageList({
                     message={msg}
                     showSenderName={showSenderName}
                     channelId={channelId}
+                    onClickImage={handleClickImage}
                   />
                 </div>
               ) : (
@@ -280,6 +369,7 @@ export function MessageList({
                     message={msg}
                     showSenderName={false}
                     channelId={channelId}
+                    onClickImage={handleClickImage}
                   />
                 </div>
               )}

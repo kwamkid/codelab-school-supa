@@ -254,8 +254,11 @@ export default function EventDetailPage() {
           <CardContent>
             {(() => {
               const activeRegs = registrations.filter(r => r.status !== 'cancelled');
-              const totalAttendees = activeRegs.reduce((sum, r) => sum + r.attendeeCount, 0);
+              const totalAttendees = event.countingMethod === 'registrations'
+                ? activeRegs.length
+                : activeRegs.reduce((sum, r) => sum + r.attendeeCount, 0);
               const totalCapacity = statistics?.totalCapacity || 0;
+              const countLabel = event.countingMethod === 'students' ? 'คน' : event.countingMethod === 'parents' ? 'คน' : 'รายการ';
 
               // Group by branch
               const byBranch: Record<string, number> = {};
@@ -298,9 +301,6 @@ export default function EventDetailPage() {
                       })}
                     </div>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
-                    {activeRegs.length} รายการ
-                  </p>
                 </>
               );
             })()}
@@ -310,23 +310,42 @@ export default function EventDetailPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              การแจ้งเตือน
+              <BarChart3 className="h-4 w-4" />
+              เปิดดู / ลงทะเบียน
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {event.enableReminder ? (
-              <div>
-                <Badge className="bg-green-100 text-green-700">เปิด</Badge>
-                <p className="text-sm text-gray-500 mt-1">
-                  ล่วงหน้า {event.reminderDaysBefore} วัน
-                </p>
-              </div>
-            ) : (
-              <Badge variant="outline">ปิด</Badge>
-            )}
+            {(() => {
+              const views = event.viewCount || 0;
+              const activeRegsForView = registrations.filter(r => r.status !== 'cancelled');
+              const regs = event.countingMethod === 'registrations'
+                ? activeRegsForView.length
+                : activeRegsForView.reduce((sum, r) => sum + r.attendeeCount, 0);
+              const rate = views > 0 ? Math.round((regs / views) * 100) : 0;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-end gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500">เปิดดู</p>
+                      <p className="text-2xl font-bold">{views}</p>
+                    </div>
+                    <div className="text-gray-300 text-lg pb-1">→</div>
+                    <div>
+                      <p className="text-xs text-gray-500">ลงทะเบียน</p>
+                      <p className="text-2xl font-bold text-blue-600">{regs}</p>
+                    </div>
+                  </div>
+                  {views > 0 && (
+                    <p className="text-xs text-gray-500">
+                      Conversion rate: <span className="font-medium text-green-600">{rate}%</span>
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
+
       </div>
 
       {/* Tabs */}

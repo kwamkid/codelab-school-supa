@@ -102,6 +102,7 @@ function mapToEvent(row: EventRow): Event {
     reminderDaysBefore: row.reminder_days_before,
     reminderTime: row.reminder_time || undefined,
     status: row.status as Event['status'],
+    viewCount: row.view_count || 0,
     isActive: row.is_active,
     createdAt: new Date(row.created_at),
     createdBy: row.created_by || '',

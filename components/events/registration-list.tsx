@@ -450,50 +450,58 @@ export default function RegistrationList({
       </div>
 
       {/* Summary Cards */}
-      {mode === 'list' ? (
+      {mode === 'list' ? (() => {
+        const countLabel = countingMethod === 'students' ? 'คน' : countingMethod === 'parents' ? 'คน' : 'รายการ';
+        const getCount = (regs: EventRegistration[]) =>
+          countingMethod === 'registrations' ? regs.length : regs.reduce((sum, r) => sum + r.attendeeCount, 0);
+
+        return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{filteredRegistrations.length}</div>
+              <div className="text-2xl font-bold">{getCount(filteredRegistrations)}</div>
+              <p className="text-xs text-gray-500">{countLabel}</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">ลงทะเบียนแล้ว</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {filteredRegistrations.filter(r => r.status === 'confirmed').length}
+                {getCount(filteredRegistrations.filter(r => r.status === 'confirmed'))}
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">มางาน</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">
-                {filteredRegistrations.filter(r => r.status === 'attended').length}
+                {getCount(filteredRegistrations.filter(r => r.status === 'attended'))}
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">ยกเลิก</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {filteredRegistrations.filter(r => r.status === 'cancelled').length}
+                {getCount(filteredRegistrations.filter(r => r.status === 'cancelled'))}
               </div>
             </CardContent>
           </Card>
         </div>
+        );
+      })()
       ) : (
         <div className="grid grid-cols-3 gap-4">
           <Card>

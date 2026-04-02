@@ -8,6 +8,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
   showSenderName?: boolean;
   channelId?: string;
+  onClickImage?: (url: string) => void;
 }
 
 function formatMessageTime(date: Date): string {
@@ -41,7 +42,7 @@ function getStickerUrl(metadata?: Record<string, any>): string | undefined {
   return `https://stickershop.line-scdn.net/stickershop/v1/sticker/${metadata.stickerId}/iPhone/sticker.png`;
 }
 
-export function MessageBubble({ message, showSenderName = false, channelId }: MessageBubbleProps) {
+export function MessageBubble({ message, showSenderName = false, channelId, onClickImage }: MessageBubbleProps) {
   const isInbound = message.direction === 'inbound';
   const isOutbound = message.direction === 'outbound';
   const isSystem = message.senderType === 'system';
@@ -95,10 +96,9 @@ export function MessageBubble({ message, showSenderName = false, channelId }: Me
       <div className={wrapperCls}>
         {senderNameEl}
         <div className={rowCls}>
-          <a
-            href={mediaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => onClickImage?.(mediaUrl)}
             className={cn(
               'block rounded-2xl overflow-hidden cursor-pointer',
               isOutbound ? 'rounded-br-md' : 'rounded-bl-md'
@@ -111,7 +111,7 @@ export function MessageBubble({ message, showSenderName = false, channelId }: Me
               className="max-w-full max-h-[300px] h-auto rounded-2xl object-cover"
               loading="lazy"
             />
-          </a>
+          </button>
           {timeEl}
         </div>
       </div>
