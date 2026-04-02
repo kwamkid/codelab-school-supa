@@ -19,12 +19,21 @@ export async function getClassLookupData(branchId?: string | null): Promise<Clas
   try {
     const supabase = getClient();
 
+    console.log('[Lookup] Calling RPC get_class_lookup_data, branchId:', branchId || 'ALL');
     const { data, error } = await (supabase.rpc as any)('get_class_lookup_data', {
       p_branch_id: branchId || null,
     });
 
-    if (error) throw error;
-    if (!data) return { branches: [], subjects: [], teachers: [], rooms: [] };
+    if (error) {
+      console.error('[Lookup] RPC error:', error);
+      throw error;
+    }
+    if (!data) {
+      console.warn('[Lookup] RPC returned null data');
+      return { branches: [], subjects: [], teachers: [], rooms: [] };
+    }
+
+    console.log('[Lookup] RPC success — branches:', (data.branches || []).length, 'subjects:', (data.subjects || []).length, 'teachers:', (data.teachers || []).length, 'rooms:', (data.rooms || []).length);
 
     const branches: Branch[] = (data.branches || []).map((b: any) => ({
       id: b.id,

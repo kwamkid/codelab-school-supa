@@ -439,15 +439,13 @@ export default function ClassesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[180px]">คลาส</TableHead>
-                      <TableHead className="w-[100px]">วิชา</TableHead>
-                      {isAllBranches && <TableHead className="w-[100px]">สาขา</TableHead>}
-                      <TableHead className="w-[80px]">ครู</TableHead>
+                      <TableHead className="w-[200px]">คลาส</TableHead>
+                      {isAllBranches && <TableHead className="w-[80px]">สาขา</TableHead>}
+                      <TableHead className="w-[90px]">ครู/นักเรียน</TableHead>
                       <TableHead className="w-[100px]">วัน/เวลา</TableHead>
-                      <TableHead className="text-center w-[120px]">ระยะเวลา</TableHead>
-                      <TableHead className="text-center w-[70px]">นักเรียน</TableHead>
-                      <TableHead className="text-right w-[90px]">ราคา</TableHead>
-                      <TableHead className="text-center w-[90px]">สถานะ</TableHead>
+                      <TableHead className="text-center w-[110px]">ระยะเวลา</TableHead>
+                      <TableHead className="text-right w-[80px]">ราคา</TableHead>
+                      <TableHead className="text-center w-[80px]">สถานะ</TableHead>
                       <TableHead className="text-center w-[40px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -461,58 +459,49 @@ export default function ClassesPage() {
                           className="cursor-pointer"
                           onClick={() => router.push(`/classes/${cls.id}`)}
                         >
+                          {/* คลาส: name + subject */}
                           <TableCell className="align-top">
                             <div className="flex items-start gap-2">
                               <div
-                                className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
+                                className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5"
                                 style={{ backgroundColor: getSubjectColor(cls.subjectId) }}
                               />
-                              <div className="font-medium truncate" title={cls.name}>{cls.name}</div>
+                              <div className="min-w-0">
+                                <div className="font-medium truncate" title={cls.name}>{cls.name}</div>
+                                <div className="text-xs text-gray-500">{loadingLookup ? '...' : getSubjectName(cls.subjectId)}</div>
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="align-top">
-                            {loadingLookup ? (
-                              <InlineLoading />
-                            ) : (
-                              <div className="break-words">{getSubjectName(cls.subjectId)}</div>
-                            )}
                           </TableCell>
                           {isAllBranches && (
                             <TableCell className="align-top">
-                              {loadingLookup ? (
-                                <InlineLoading />
-                              ) : (
-                                <div className="break-words">{getBranchName(cls.branchId)}</div>
-                              )}
+                              {loadingLookup ? <InlineLoading /> : <div className="text-xs">{getBranchName(cls.branchId)}</div>}
                             </TableCell>
                           )}
+                          {/* นักเรียน: ครู + xx/xx */}
                           <TableCell className="align-top">
-                            {loadingLookup ? (
-                              <InlineLoading />
-                            ) : (
-                              getTeacherName(cls.teacherId)
-                            )}
-                          </TableCell>
-                          <TableCell className="align-top">
-                            <div>
-                              <div className="leading-tight break-words">
-                                {cls.daysOfWeek.map(d => getDayName(d)).join(', ')}
-                              </div>
-                              <div className="text-gray-500">{cls.startTime?.substring(0, 5)}-{cls.endTime?.substring(0, 5)}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center align-top">
-                            <div>
-                              <div>{formatDate(cls.startDate, 'short')}</div>
-                              <div className="text-gray-500">-{formatDate(cls.endDate, 'short')}</div>
-                              <div className="font-medium">{cls.totalSessions} ครั้ง</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center align-top">
+                            <div className="text-xs text-gray-500">{loadingLookup ? '...' : getTeacherName(cls.teacherId)}</div>
                             <span className={cls.enrolledCount >= cls.maxStudents ? 'text-red-600 font-medium' : ''}>
                               {cls.enrolledCount}/{cls.maxStudents}
                             </span>
                           </TableCell>
+                          {/* วัน/เวลา */}
+                          <TableCell className="align-top">
+                            <div className="leading-tight">{cls.daysOfWeek.map(d => getDayName(d)).join(', ')}</div>
+                            <div className="text-xs text-gray-500">{cls.startTime?.substring(0, 5)}-{cls.endTime?.substring(0, 5)}</div>
+                          </TableCell>
+                          {/* ระยะเวลา */}
+                          <TableCell className="text-center align-top">
+                            <div>{formatDate(cls.startDate, 'short')}</div>
+                            <div className="text-xs text-gray-500">-{formatDate(cls.endDate, 'short')}</div>
+                            <div className="text-xs font-medium">
+                              {cls.completedSessions !== undefined && cls.completedSessions > 0 ? (
+                                <span className="text-blue-600">{cls.completedSessions}/{cls.totalSessions} ครั้ง</span>
+                              ) : (
+                                <span>{cls.totalSessions} ครั้ง</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          {/* ราคา */}
                           <TableCell className="text-right font-medium text-green-600 align-top">
                             {formatCurrency(cls.pricing.totalPrice)}
                           </TableCell>

@@ -60,6 +60,7 @@ function mapToClass(row: any): Class {
       materialFee: row.material_fee,
       registrationFee: row.registration_fee,
     },
+    completedSessions: row.completed_sessions ?? undefined,
     status: row.status || 'draft',
     createdAt: new Date(row.created_at),
   };
@@ -71,7 +72,7 @@ export async function getClasses(branchId?: string, teacherId?: string): Promise
     const supabase = getClient();
     let query = supabase
       .from(TABLE_NAME)
-      .select('*')
+      .select('*, class_schedules(count)')
       .order('created_at', { ascending: false });
 
     if (branchId) {
@@ -86,7 +87,28 @@ export async function getClasses(branchId?: string, teacherId?: string): Promise
 
     if (error) throw error;
 
-    return (data || []).map(mapToClass);
+    // Also get completed session counts
+    const classIds = (data || []).map((d: any) => d.id);
+    let completedMap: Record<string, number> = {};
+
+    if (classIds.length > 0) {
+      const { data: completedData } = await (supabase as any)
+        .from('class_schedules')
+        .select('class_id')
+        .in('class_id', classIds)
+        .eq('status', 'completed');
+
+      if (completedData) {
+        for (const row of completedData) {
+          completedMap[row.class_id] = (completedMap[row.class_id] || 0) + 1;
+        }
+      }
+    }
+
+    return (data || []).map((row: any) => ({
+      ...mapToClass(row),
+      completedSessions: completedMap[row.id] || 0,
+    }));
   } catch (error) {
     console.error('Error getting classes:', error);
     throw error;

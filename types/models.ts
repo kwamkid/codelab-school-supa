@@ -155,6 +155,7 @@ export interface Class {
     materialFee?: number;
     registrationFee?: number;
   };
+  completedSessions?: number; // จำนวนครั้งที่เรียนไปแล้ว
   status: 'draft' | 'published' | 'started' | 'completed' | 'cancelled';
   createdAt: Date;
 }
