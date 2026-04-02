@@ -147,13 +147,13 @@ export default function MakeupPage() {
   const { data: makeupClasses = [], isLoading: loadingMakeup } = useQuery({
     queryKey: QUERY_KEYS.makeupClasses(selectedBranchId),
     queryFn: () => getMakeupClasses(selectedBranchId),
-    staleTime: 30000,
+    staleTime: Infinity,
   });
 
   const { data: branches = [] } = useQuery({
     queryKey: QUERY_KEYS.branches,
     queryFn: getActiveBranches,
-    staleTime: 300000,
+    staleTime: Infinity,
   });
 
   // Check if a scheduled makeup is overdue (past date but not recorded)

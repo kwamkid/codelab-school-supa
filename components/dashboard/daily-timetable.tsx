@@ -185,7 +185,7 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
                                 {event.class_name && (
                                   <p className="text-[11px] text-gray-500 truncate">
                                     {event.class_name}
-                                    {event.session_number && <span> #{event.session_number}</span>}
+                                    {event.session_number && <span className="text-orange-600 font-medium"> ครั้งที่ {event.session_number}</span>}
                                   </p>
                                 )}
 

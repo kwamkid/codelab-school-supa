@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Class } from '@/types/models';
 import { getClasses, deleteClass, batchUpdateClassStatuses } from '@/lib/services/classes';
@@ -77,6 +78,7 @@ const statusLabels = {
 export default function ClassesPage() {
   const { selectedBranchId, isAllBranches } = useBranch();
   const { isSuperAdmin } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
   
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -110,7 +112,7 @@ export default function ClassesPage() {
   const { data: classes = [], isLoading: loadingClasses } = useQuery({
     queryKey: ['classes', selectedBranchId],
     queryFn: () => getClasses(selectedBranchId),
-    staleTime: 60000, // 1 minute
+    staleTime: Infinity,
   });
 
   // ============================================
@@ -119,7 +121,7 @@ export default function ClassesPage() {
   const { data: lookupData, isLoading: loadingLookup } = useQuery({
     queryKey: ['classLookupData', selectedBranchId],
     queryFn: () => getClassLookupData(selectedBranchId),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: Infinity,
   });
 
   const branches = lookupData?.branches || [];
@@ -454,18 +456,19 @@ export default function ClassesPage() {
                       const isDeletable = cls.enrolledCount <= 0 || cls.status === 'cancelled';
                       
                       return (
-                        <TableRow key={cls.id}>
+                        <TableRow
+                          key={cls.id}
+                          className="cursor-pointer"
+                          onClick={() => router.push(`/classes/${cls.id}`)}
+                        >
                           <TableCell className="align-top">
-                            <Link href={`/classes/${cls.id}`} className="flex items-start gap-2 group">
+                            <div className="flex items-start gap-2">
                               <div
                                 className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
                                 style={{ backgroundColor: getSubjectColor(cls.subjectId) }}
                               />
-                              <div className="min-w-0">
-                                <div className="font-medium truncate group-hover:text-red-600 transition-colors" title={cls.name}>{cls.name}</div>
-                                <div className="text-gray-500">{cls.code}</div>
-                              </div>
-                            </Link>
+                              <div className="font-medium truncate" title={cls.name}>{cls.name}</div>
+                            </div>
                           </TableCell>
                           <TableCell className="align-top">
                             {loadingLookup ? (

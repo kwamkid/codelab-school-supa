@@ -64,7 +64,25 @@ export async function getClassLookupData(branchId?: string | null): Promise<Clas
 
     return { branches, subjects, teachers, rooms };
   } catch (error) {
-    console.error('Error getting class lookup data:', error);
-    return { branches: [], subjects: [], teachers: [], rooms: [] };
+    console.error('Error getting class lookup data via RPC, falling back to direct queries:', error);
+
+    // Fallback: load individually
+    try {
+      const { getActiveBranches } = await import('@/lib/services/branches');
+      const { getSubjects } = await import('@/lib/services/subjects');
+      const { getTeachers } = await import('@/lib/services/teachers');
+      const { getRooms } = await import('@/lib/services/rooms');
+
+      const [branches, subjects, teachers, rooms] = await Promise.all([
+        getActiveBranches(),
+        getSubjects(),
+        getTeachers(),
+        getRooms(),
+      ]);
+      return { branches, subjects, teachers, rooms };
+    } catch (fallbackError) {
+      console.error('Fallback lookup also failed:', fallbackError);
+      return { branches: [], subjects: [], teachers: [], rooms: [] };
+    }
   }
 }

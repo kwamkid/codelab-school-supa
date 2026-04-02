@@ -98,28 +98,28 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
       return [];
     },
     enabled: !!user && (!!selectedBranchId || isAllBranches),
-    staleTime: 60000, // 1 minute
+    staleTime: Infinity,
   });
-  
+
   // Fetch subjects
   const { data: subjects = [] } = useQuery({
     queryKey: QUERY_KEYS.subjects,
     queryFn: () => getActiveSubjects(),
-    staleTime: 300000, // 5 minutes
+    staleTime: Infinity,
   });
-  
+
   // Fetch teachers
   const { data: teachers = [] } = useQuery({
     queryKey: QUERY_KEYS.teachers,
     queryFn: () => getActiveTeachers(),
-    staleTime: 300000, // 5 minutes
+    staleTime: Infinity,
   });
-  
+
   // Fetch branches
   const { data: branches = [] } = useQuery({
     queryKey: QUERY_KEYS.branches,
     queryFn: () => getActiveBranches(),
-    staleTime: 300000, // 5 minutes
+    staleTime: Infinity,
   });
   
   // Process attendance data
@@ -210,7 +210,7 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
       return classesWithDetails;
     },
     enabled: classes.length > 0 && subjects.length > 0 && teachers.length > 0 && branches.length > 0,
-    staleTime: 30000, // 30 seconds
+    staleTime: Infinity,
   });
   
   return {

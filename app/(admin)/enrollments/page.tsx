@@ -182,7 +182,7 @@ export default function EnrollmentsPage() {
   const { data: stats, isLoading: loadingStats } = useQuery<EnrollmentStats>({
     queryKey: ['enrollment-stats', selectedBranchId],
     queryFn: () => getEnrollmentStats(selectedBranchId),
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // ============================================
@@ -213,8 +213,7 @@ export default function EnrollmentsPage() {
       });
     },
     enabled: !isSearchMode,
-    staleTime: 30 * 1000,
-    gcTime: 60 * 1000,
+    staleTime: Infinity,
     placeholderData: keepPreviousData,
   });
 
@@ -228,7 +227,7 @@ export default function EnrollmentsPage() {
     queryKey: ['enrollments-all', selectedBranchId],
     queryFn: () => getEnrollments(selectedBranchId),
     enabled: hasActiveFilters,
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // ============================================

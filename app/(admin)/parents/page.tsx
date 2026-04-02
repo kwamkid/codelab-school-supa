@@ -114,7 +114,7 @@ export default function ParentsPage() {
   const { data: parentsRaw = [], isLoading: loadingParents } = useQuery({
     queryKey: ['parents-with-students-enrollments'],
     queryFn: getParentsWithStudentsAndEnrollments,
-    staleTime: 5 * 60 * 1000, // 5 minutes (ลด egress)
+    staleTime: Infinity,
   });
 
   // ============================================
@@ -123,13 +123,13 @@ export default function ParentsPage() {
   const { data: branches = [], isLoading: loadingBranches } = useQuery({
     queryKey: ['branches', 'active'],
     queryFn: getActiveBranches,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: Infinity,
   });
 
   const { data: classes = [], isLoading: loadingClasses } = useQuery({
     queryKey: ['classes'],
     queryFn: () => getClasses(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: Infinity,
   });
 
   // Create lookup maps

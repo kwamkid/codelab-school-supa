@@ -168,6 +168,7 @@ export interface ClassSchedule {
   topic?: string;
   status: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
   actualTeacherId?: string;
+  actualRoomId?: string;
   note?: string;
   attendance?: {
     studentId: string;

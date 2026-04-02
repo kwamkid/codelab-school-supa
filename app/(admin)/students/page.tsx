@@ -100,8 +100,7 @@ export default function StudentsPage() {
   } = useQuery<StudentWithInfo[]>({
     queryKey: QUERY_KEYS.students,
     queryFn: getAllStudentsWithParents,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: Infinity,
   });
 
   // ============================================
@@ -110,8 +109,7 @@ export default function StudentsPage() {
   const { data: branches = [], isLoading: loadingBranches } = useQuery<Branch[]>({
     queryKey: QUERY_KEYS.branches,
     queryFn: getActiveBranches,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: Infinity,
   });
 
   // ============================================

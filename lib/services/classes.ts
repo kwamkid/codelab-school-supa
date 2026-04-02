@@ -363,6 +363,7 @@ export async function getClassSchedules(classId: string): Promise<ClassSchedule[
         topic: row.topic,
         status: row.status || 'scheduled',
         actualTeacherId: row.actual_teacher_id,
+        actualRoomId: row.actual_room_id,
         note: row.note,
         attendance: attendance.map(att => ({
           studentId: att.studentId,
@@ -418,6 +419,7 @@ export async function getClassSchedule(
       topic: data.topic,
       status: data.status || 'scheduled',
       actualTeacherId: data.actual_teacher_id,
+      actualRoomId: data.actual_room_id,
       note: data.note,
       attendance: attendance.map(att => ({
         studentId: att.studentId,
@@ -456,6 +458,7 @@ export async function updateClassSchedule(
     if (data.sessionNumber !== undefined) updateData.session_number = data.sessionNumber;
     if (data.topic !== undefined) updateData.topic = data.topic;
     if (data.actualTeacherId !== undefined) updateData.actual_teacher_id = data.actualTeacherId;
+    if (data.actualRoomId !== undefined) updateData.actual_room_id = data.actualRoomId;
     if (data.note !== undefined) updateData.note = data.note;
 
     // Handle attendance updates - save to separate attendance table
@@ -684,6 +687,7 @@ export async function getUpcomingSessions(
         topic: row.topic,
         status: row.status || 'scheduled',
         actualTeacherId: row.actual_teacher_id,
+        actualRoomId: row.actual_room_id,
         note: row.note,
         attendance: attendance.map(att => ({
           studentId: att.studentId,
@@ -1151,6 +1155,111 @@ export function canEditClassDates(classData: Class): {
 
 // Get editable fields based on class status
 // isSuperAdmin overrides locks — super admin can edit all fields
+// === Change Teacher/Room for active classes ===
+
+export async function changeClassResources(
+  classId: string,
+  params: {
+    newTeacherId?: string;
+    newRoomId?: string;
+    effectiveDate: string; // YYYY-MM-DD
+    reason?: string;
+    changedBy: string;
+  }
+): Promise<{ updatedSchedules: number }> {
+  if (!params.newTeacherId && !params.newRoomId) {
+    throw new Error('ต้องเลือกครูหรือห้องใหม่อย่างน้อย 1 อย่าง');
+  }
+
+  // Get current class data
+  const classData = await getClass(classId);
+  if (!classData) throw new Error('ไม่พบข้อมูลคลาส');
+
+  const oldTeacherId = classData.teacherId;
+  const oldRoomId = classData.roomId;
+
+  // Get future scheduled sessions
+  const schedules = await getClassSchedules(classId);
+  const futureSchedules = schedules.filter(s => {
+    const dateStr = s.sessionDate instanceof Date
+      ? s.sessionDate.toISOString().split('T')[0]
+      : String(s.sessionDate).split('T')[0];
+    return s.status === 'scheduled' && dateStr >= params.effectiveDate;
+  });
+
+  // 1. Update class level
+  const classUpdateData: any = {};
+  if (params.newTeacherId) classUpdateData.teacher_id = params.newTeacherId;
+  if (params.newRoomId) classUpdateData.room_id = params.newRoomId;
+
+  await adminMutation({
+    table: 'classes',
+    operation: 'update',
+    data: classUpdateData,
+    match: { id: classId },
+  });
+
+  // 2. Update future schedules
+  for (const schedule of futureSchedules) {
+    const scheduleUpdate: any = {};
+    if (params.newTeacherId) scheduleUpdate.actual_teacher_id = params.newTeacherId;
+    if (params.newRoomId) scheduleUpdate.actual_room_id = params.newRoomId;
+
+    await adminMutation({
+      table: 'class_schedules',
+      operation: 'update',
+      data: scheduleUpdate,
+      match: { id: schedule.id },
+    });
+  }
+
+  // 3. Set old teacher/room on past completed sessions (preserve history)
+  const pastCompleted = schedules.filter(s => s.status === 'completed' && !s.actualTeacherId);
+  if (params.newTeacherId && pastCompleted.length > 0) {
+    for (const schedule of pastCompleted) {
+      await adminMutation({
+        table: 'class_schedules',
+        operation: 'update',
+        data: { actual_teacher_id: oldTeacherId },
+        match: { id: schedule.id },
+      });
+    }
+  }
+
+  console.log(`[changeClassResources] classId=${classId}, updated ${futureSchedules.length} future schedules, preserved ${pastCompleted.length} past sessions`);
+
+  return { updatedSchedules: futureSchedules.length };
+}
+
+// === Auto-generate class code ===
+
+export function generateClassCode(params: {
+  subjectCode: string;   // e.g. "ROB", "COD"
+  dayOfWeek: number;     // 0=Sun, 1=Mon, ...
+  startTime: string;     // "09:00"
+  existingCodes: string[]; // existing codes to check duplicates
+}): string {
+  const dayMap: Record<number, string> = {
+    0: 'SUN', 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT'
+  };
+
+  const day = dayMap[params.dayOfWeek] || 'UNK';
+  const time = params.startTime.replace(':', '');
+  const base = `${params.subjectCode}-${day}-${time}`;
+
+  // Find next running number
+  const existing = params.existingCodes.filter(c => c.startsWith(base));
+  if (existing.length === 0) return base;
+
+  let max = 0;
+  for (const code of existing) {
+    const suffix = code.replace(`${base}-`, '');
+    const num = parseInt(suffix);
+    if (!isNaN(num) && num > max) max = num;
+  }
+  return `${base}-${String(max + 1).padStart(2, '0')}`;
+}
+
 export function getEditableFields(classData: Class, isSuperAdmin = false): {
   basicInfo: boolean;
   schedule: boolean;

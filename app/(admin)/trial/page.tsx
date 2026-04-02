@@ -124,19 +124,19 @@ export default function TrialBookingsPage() {
   const { data: bookings = [], isLoading: loadingBookings } = useQuery({
     queryKey: QUERY_KEYS.trialBookings(selectedBranchId),
     queryFn: () => getTrialBookings(selectedBranchId),
-    staleTime: 60000, // 1 minute
+    staleTime: Infinity,
   });
 
   const { data: stats, isLoading: loadingStats } = useQuery({
     queryKey: QUERY_KEYS.trialStats(selectedBranchId),
     queryFn: () => getTrialBookingStats(selectedBranchId),
-    staleTime: 60000, // 1 minute
+    staleTime: Infinity,
   });
 
   const { data: branches = [] } = useQuery({
     queryKey: QUERY_KEYS.branches,
     queryFn: getActiveBranches,
-    staleTime: 300000, // 5 minutes
+    staleTime: Infinity,
   });
 
   const { data: subjects = [] } = useQuery({
@@ -145,13 +145,13 @@ export default function TrialBookingsPage() {
       const allSubjects = await getSubjects();
       return allSubjects.filter(s => s.isActive);
     },
-    staleTime: 300000, // 5 minutes
+    staleTime: Infinity,
   });
 
   const { data: teachers = [] } = useQuery({
     queryKey: QUERY_KEYS.teachers,
     queryFn: () => getTeachers(),
-    staleTime: 300000, // 5 minutes
+    staleTime: Infinity,
   });
 
   // Create lookup map for branches

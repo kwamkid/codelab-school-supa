@@ -117,7 +117,8 @@ Use direct PostgREST fetch for server-side API routes. See `app/api/admin/invoic
 | payment-transactions | `lib/services/payment-transactions.ts` | createPaymentTransaction, getPaymentTransactions |
 | receipts | `lib/services/receipts.ts` | createReceipt, getReceipt, voidReceipt |
 | admin-users | `lib/services/admin-users.ts` | getAdminUser, createAdminUser |
-| chat | `lib/services/chat.ts` | getConversations, getMessages |
+| chat | `lib/services/chat.ts` | getConversations, getMessages, sendMessage, sendBatchMessage, markConversationRead, getQuickReplies, createQuickReply, updateQuickReply |
+| events | `lib/services/events.ts` | getEvents, createEvent, getEventSchedules, createEventSchedule, getEventRegistrations |
 | admin-mutation | `lib/admin-mutation.ts` | Generic mutation helper (table, operation, data, match) |
 
 ## File Organization
@@ -168,3 +169,23 @@ types/
 - Rooms use soft delete (`is_active = false`), never hard delete
 - Dashboard uses RPC `get_daily_timetable(p_date, p_branch_id)` for single-query data loading
 - Do NOT change existing `.toISOString()` patterns in services — they work correctly with the current data flow
+
+## Event System
+- Event registration API: `app/api/events/register/route.ts` — inserts into `event_registrations` + `event_registration_students` + `event_registration_parents`
+- Per-branch quota: `event_schedules.max_attendees_by_branch` (jsonb) — each branch has its own quota, `max_attendees` is total sum
+- Location: if `locationType === 'branch'` → auto-generates location from branch names, LIFF uses branch lat/lng for Google Maps link; if external → uses `event.locationUrl`
+- LIFF registration page: phone lookup auto-fills parent/student data via `searchParentsUnified()`
+- `fullDescription` shown as expandable section in LIFF registration page
+- Event images: uploaded to Supabase Storage bucket `event-images`, upload happens on form save (not on file select)
+
+## Chat System
+- Supabase Storage buckets: `event-images` (5MB, images), `chat-media` (25MB, images+video)
+- Upload API: `app/api/upload/route.ts` — supports `bucket` param to select storage bucket
+- Chat send API: `app/api/admin/chat/send/route.ts` — supports `mediaUrls` array for batch send
+- LINE batch: max 5 messages per push request, auto-splits if more → saves LINE credits
+- FB/IG: sends messages rapidly for image grouping (album effect)
+- Quick Replies: `chat_quick_replies` table with `images` (jsonb array) + `image_url` columns
+- Quick Reply Dialog: `components/chat/quick-reply-dialog.tsx` — list/create/edit/preview modes, multi-image dropzone
+- `sendBatchMessage()` sends text blocks + images in 1 API request; DB stores each block/image as separate message
+- Conversation list sorts by `lastMessageAt` only (NOT unread-first) to prevent jumping when marking read
+- Sidebar unread badge polls every 15 seconds via `getTotalUnreadCount()`

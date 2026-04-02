@@ -24,10 +24,12 @@ import {
   AlertCircle,
   History,
   CheckCircle,
-  Loader2
+  Loader2,
+  ArrowLeftRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { ChangeResourceDialog } from '@/components/classes/change-resource-dialog';
 import { formatDate, formatCurrency, getDayName } from '@/lib/utils';
 import {
   AlertDialog,
@@ -81,6 +83,7 @@ export default function ClassDetailPage() {
   const [schedules, setSchedules] = useState<ClassSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [changeResourceOpen, setChangeResourceOpen] = useState(false);
   const [showRescheduleHistory, setShowRescheduleHistory] = useState(false);
   const [endClassDialogOpen, setEndClassDialogOpen] = useState(false);
   const [endClassPreview, setEndClassPreview] = useState<{
@@ -267,6 +270,14 @@ export default function ClassDetailPage() {
         </Link>
         
         <div className="flex gap-2">
+          {/* Change teacher/room — available for active classes */}
+          {(classData.status === 'published' || classData.status === 'started') && (
+            <Button variant="outline" onClick={() => setChangeResourceOpen(true)}>
+              <ArrowLeftRight className="h-4 w-4 mr-2" />
+              เปลี่ยนครู/ห้อง
+            </Button>
+          )}
+
           {isEditable && (
             <Link href={`/classes/${classId}/edit`}>
               <Button variant="outline">
@@ -766,6 +777,17 @@ export default function ClassDetailPage() {
           onOpenChange={setShowRescheduleHistory}
           classId={classId}
           className={classData.name}
+        />
+      )}
+
+      {classData && teacher && room && (
+        <ChangeResourceDialog
+          open={changeResourceOpen}
+          onOpenChange={setChangeResourceOpen}
+          classData={classData}
+          currentTeacher={teacher}
+          currentRoom={room}
+          onSuccess={() => loadClassDetails()}
         />
       )}
     </div>
