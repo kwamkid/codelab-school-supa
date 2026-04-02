@@ -252,29 +252,58 @@ export default function EventDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
-              {registrations
-                .filter(r => r.status !== 'cancelled')
-                .reduce((sum, r) => sum + r.attendeeCount, 0)}
-              <span className="text-lg font-normal text-gray-500">/{statistics?.totalCapacity || 0}</span>
-            </p>
-            <div className="mt-2 mb-1">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-red-500 h-2 rounded-full transition-all"
-                  style={{ 
-                    width: `${Math.min(100, 
-                      (registrations
-                        .filter(r => r.status !== 'cancelled')
-                        .reduce((sum, r) => sum + r.attendeeCount, 0) / (statistics?.totalCapacity || 1)) * 100
-                    )}%` 
-                  }}
-                />
-              </div>
-            </div>
-            <p className="text-sm text-gray-500">
-              {registrations.filter(r => r.status !== 'cancelled').length} รายการ
-            </p>
+            {(() => {
+              const activeRegs = registrations.filter(r => r.status !== 'cancelled');
+              const totalAttendees = activeRegs.reduce((sum, r) => sum + r.attendeeCount, 0);
+              const totalCapacity = statistics?.totalCapacity || 0;
+
+              // Group by branch
+              const byBranch: Record<string, number> = {};
+              for (const r of activeRegs) {
+                byBranch[r.branchId] = (byBranch[r.branchId] || 0) + r.attendeeCount;
+              }
+
+              return (
+                <>
+                  <p className="text-2xl font-bold">
+                    {totalAttendees}
+                    <span className="text-lg font-normal text-gray-500">/{totalCapacity}</span>
+                  </p>
+                  <div className="mt-2 mb-1">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-red-500 h-2 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (totalAttendees / (totalCapacity || 1)) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Per branch breakdown */}
+                  {Object.keys(byBranch).length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {Object.entries(byBranch).map(([branchId, count]) => {
+                        const branch = branches.find(b => b.id === branchId);
+                        // Get branch max from schedules
+                        const branchMax = schedules.reduce((max, s) => {
+                          const mabb = (s as any).maxAttendeesByBranch || {};
+                          return max + (mabb[branchId] || 0);
+                        }, 0);
+                        return (
+                          <div key={branchId} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">{branch?.name || 'ไม่ระบุ'}</span>
+                            <span className="font-medium">
+                              {count}{branchMax > 0 ? `/${branchMax}` : ''} คน
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    {activeRegs.length} รายการ
+                  </p>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
         

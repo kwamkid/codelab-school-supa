@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Event, Branch } from '@/types/models';
-import { getEvents, deleteEvent } from '@/lib/services/events';
+import { deleteEvent } from '@/lib/services/events';
+import { getClient } from '@/lib/supabase/client';
 import { getActiveBranches } from '@/lib/services/branches';
 import { useAuth } from '@/hooks/useAuth';
 import { useBranch } from '@/contexts/BranchContext';
@@ -60,7 +61,7 @@ export default function EventsPage() {
   const router = useRouter();
   const { user, isSuperAdmin } = useAuth();
   const { selectedBranchId, isAllBranches } = useBranch();
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<(Event & { totalRegistrations?: number; totalAttendees?: number })[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,10 +77,43 @@ export default function EventsPage() {
   const loadEvents = async () => {
     try {
       setLoading(true);
-      const [eventsData, branchesData] = await Promise.all([
-        getEvents(isAllBranches ? undefined : selectedBranchId || undefined),
+      const supabase = getClient();
+      const branchParam = isAllBranches ? null : (selectedBranchId || null);
+
+      const [{ data: rpcData, error: rpcError }, branchesData] = await Promise.all([
+        (supabase.rpc as any)('get_events_with_stats', { p_branch_id: branchParam }),
         getActiveBranches()
       ]);
+
+      if (rpcError) throw rpcError;
+
+      const eventsData = (rpcData || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        fullDescription: row.full_description || undefined,
+        imageUrl: row.image_url || undefined,
+        location: row.location,
+        locationUrl: row.location_url || undefined,
+        branchIds: row.branch_ids || [],
+        eventType: row.event_type,
+        highlights: row.highlights || undefined,
+        targetAudience: row.target_audience || undefined,
+        whatToBring: row.what_to_bring || undefined,
+        registrationStartDate: new Date(row.registration_start_date),
+        registrationEndDate: new Date(row.registration_end_date),
+        countingMethod: row.counting_method,
+        enableReminder: row.enable_reminder,
+        reminderDaysBefore: row.reminder_days_before,
+        reminderTime: row.reminder_time || undefined,
+        status: row.status,
+        isActive: row.is_active,
+        createdAt: new Date(row.created_at),
+        createdBy: row.created_by || '',
+        totalRegistrations: row.total_registrations || 0,
+        totalAttendees: row.total_attendees || 0,
+      }));
+
       setEvents(eventsData);
       setBranches(branchesData);
     } catch (error) {
@@ -332,7 +366,18 @@ export default function EventsPage() {
                     <TableRow key={event.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{event.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{event.name}</p>
+                            {(event as any).totalAttendees > 0 ? (
+                              <Badge className="text-xs bg-blue-100 text-blue-700">
+                                {(event as any).totalAttendees} คนลงทะเบียน
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">
+                                ยังไม่มีคนลงทะเบียน
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1 text-gray-500 mt-1">
                             <MapPin className="h-3 w-3" />
                             {event.location}
