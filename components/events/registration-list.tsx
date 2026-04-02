@@ -501,8 +501,7 @@ export default function RegistrationList({
           </Card>
         </div>
         );
-      })()
-      ) : (
+      })() : (
         <div className="grid grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-2">
