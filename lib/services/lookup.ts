@@ -9,6 +9,7 @@ export interface ClassLookupData {
   subjects: Subject[];
   teachers: Teacher[];
   rooms: Room[];
+  classStats: Record<string, number>; // classId → completed sessions count
 }
 
 /**
@@ -30,7 +31,7 @@ export async function getClassLookupData(branchId?: string | null): Promise<Clas
     }
     if (!data) {
       console.warn('[Lookup] RPC returned null data');
-      return { branches: [], subjects: [], teachers: [], rooms: [] };
+      return { branches: [], subjects: [], teachers: [], rooms: [], classStats: {} };
     }
 
     console.log('[Lookup] RPC success — branches:', (data.branches || []).length, 'subjects:', (data.subjects || []).length, 'teachers:', (data.teachers || []).length, 'rooms:', (data.rooms || []).length);
@@ -71,7 +72,15 @@ export async function getClassLookupData(branchId?: string | null): Promise<Clas
       isActive: r.is_active,
     } as Room));
 
-    return { branches, subjects, teachers, rooms };
+    // Build classStats map: classId → completed_sessions
+    const classStats: Record<string, number> = {};
+    for (const cs of (data.classStats || [])) {
+      if (cs.class_id && cs.completed_sessions > 0) {
+        classStats[cs.class_id] = cs.completed_sessions;
+      }
+    }
+
+    return { branches, subjects, teachers, rooms, classStats };
   } catch (error) {
     console.error('Error getting class lookup data via RPC, falling back to direct queries:', error);
 
@@ -88,10 +97,10 @@ export async function getClassLookupData(branchId?: string | null): Promise<Clas
         getTeachers(),
         getRooms(),
       ]);
-      return { branches, subjects, teachers, rooms };
+      return { branches, subjects, teachers, rooms, classStats: {} };
     } catch (fallbackError) {
       console.error('Fallback lookup also failed:', fallbackError);
-      return { branches: [], subjects: [], teachers: [], rooms: [] };
+      return { branches: [], subjects: [], teachers: [], rooms: [], classStats: {} };
     }
   }
 }

@@ -127,6 +127,7 @@ export default function ClassesPage() {
   const branches = lookupData?.branches || [];
   const subjects = lookupData?.subjects || [];
   const teachers = lookupData?.teachers || [];
+  const classStats = lookupData?.classStats || {};
 
   // Create lookup maps for better performance
   const branchesMap = useMemo(() => 
@@ -494,8 +495,8 @@ export default function ClassesPage() {
                             <div>{formatDate(cls.startDate, 'short')}</div>
                             <div className="text-xs text-gray-500">-{formatDate(cls.endDate, 'short')}</div>
                             <div className="text-xs font-medium">
-                              {cls.completedSessions !== undefined && cls.completedSessions > 0 ? (
-                                <span className="text-blue-600">{cls.completedSessions}/{cls.totalSessions} ครั้ง</span>
+                              {(classStats[cls.id] || 0) > 0 ? (
+                                <span className="text-blue-600">{classStats[cls.id]}/{cls.totalSessions} ครั้ง</span>
                               ) : (
                                 <span>{cls.totalSessions} ครั้ง</span>
                               )}
