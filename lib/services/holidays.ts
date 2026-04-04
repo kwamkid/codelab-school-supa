@@ -116,11 +116,14 @@ export async function getHolidaysInRange(
 ): Promise<Holiday[]> {
   try {
     const supabase = getClient();
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
     const { data, error } = await supabase
       .from(TABLE_NAME)
       .select('*')
-      .gte('date', startDate.toISOString().split('T')[0])
-      .lte('date', endDate.toISOString().split('T')[0])
+      .gte('date', startStr)
+      .lte('date', endStr)
       .order('date', { ascending: true });
 
     if (error) throw error;

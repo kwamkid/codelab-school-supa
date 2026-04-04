@@ -6,7 +6,7 @@ import { getHolidays, deleteHoliday, deleteAllHolidays } from '@/lib/services/ho
 import { getActiveBranches } from '@/lib/services/branches';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Calendar, Edit, Trash2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { Plus, Calendar, Edit, Trash2, AlertTriangle, RefreshCw, Loader2, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { EmptyState } from '@/components/ui/empty-state';
 import { toast } from 'sonner';
@@ -41,6 +41,7 @@ import {
 import { useBranch } from '@/contexts/BranchContext';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
+import type { ReschedulePreview } from '@/lib/services/reschedule';
 
 export default function HolidaysPage() {
   const { selectedBranchId, isAllBranches } = useBranch();
@@ -56,6 +57,10 @@ export default function HolidaysPage() {
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [rescheduleAllDialogOpen, setRescheduleAllDialogOpen] = useState(false);
   const [rescheduleAllLoading, setRescheduleAllLoading] = useState(false);
+  const [reschedulePreview, setReschedulePreview] = useState<ReschedulePreview | null>(null);
+  const [reschedulePreviewLoading, setReschedulePreviewLoading] = useState(false);
+  const [rescheduleStep, setRescheduleStep] = useState<'preview' | 'confirm'>('preview');
+  const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -126,26 +131,40 @@ export default function HolidaysPage() {
     }
   };
 
+  const handleOpenRescheduleDialog = async () => {
+    setRescheduleAllDialogOpen(true);
+    setRescheduleStep('preview');
+    setReschedulePreview(null);
+    setExpandedClasses(new Set());
+    setReschedulePreviewLoading(true);
+    try {
+      const { previewRescheduleAllClasses } = await import('@/lib/services/reschedule');
+      const preview = await previewRescheduleAllClasses();
+      setReschedulePreview(preview);
+    } catch (error) {
+      console.error('Error loading preview:', error);
+      toast.error('ไม่สามารถโหลดข้อมูล preview ได้');
+      setRescheduleAllDialogOpen(false);
+    } finally {
+      setReschedulePreviewLoading(false);
+    }
+  };
+
   const confirmRescheduleAllClasses = async () => {
     setRescheduleAllLoading(true);
     try {
       const { rescheduleAllClasses } = await import('@/lib/services/reschedule');
       const result = await rescheduleAllClasses();
-      
+
       if (result.processedCount > 0) {
         toast.success(
           `จัดตารางเรียนใหม่เรียบร้อยแล้ว ประมวลผล ${result.processedCount} คลาส`,
           { duration: 5000 }
         );
-        
-        // แสดงรายละเอียด
-        if (result.details && result.details.length > 0) {
-          console.log('Rescheduled classes:', result.details);
-        }
       } else {
         toast.info('ไม่พบคลาสที่ต้องจัดตารางใหม่');
       }
-      
+
       setRescheduleAllDialogOpen(false);
     } catch (error) {
       console.error('Error rescheduling all classes:', error);
@@ -153,6 +172,15 @@ export default function HolidaysPage() {
     } finally {
       setRescheduleAllLoading(false);
     }
+  };
+
+  const toggleExpandClass = (classId: string) => {
+    setExpandedClasses(prev => {
+      const next = new Set(prev);
+      if (next.has(classId)) next.delete(classId);
+      else next.add(classId);
+      return next;
+    });
   };
 
   const handleHolidaySaved = () => {
@@ -225,8 +253,8 @@ export default function HolidaysPage() {
           <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
             <Button 
               variant="outline"
-              onClick={() => setRescheduleAllDialogOpen(true)}
-              className="border-blue-200 text-blue-600 hover:bg-blue-50"
+              onClick={handleOpenRescheduleDialog}
+              className="border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               จัดตารางใหม่ทั้งหมด
@@ -535,8 +563,12 @@ export default function HolidaysPage() {
       </AlertDialog>
 
       {/* Reschedule All Classes Dialog */}
-      <AlertDialog open={rescheduleAllDialogOpen} onOpenChange={setRescheduleAllDialogOpen}>
-        <AlertDialogContent className="max-w-xl">
+      <AlertDialog open={rescheduleAllDialogOpen} onOpenChange={(open) => {
+        if (!rescheduleAllLoading) {
+          setRescheduleAllDialogOpen(open);
+        }
+      }}>
+        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <AlertDialogHeader>
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-100 rounded-full">
@@ -546,49 +578,117 @@ export default function HolidaysPage() {
                 จัดตารางเรียนใหม่ทั้งหมด
               </AlertDialogTitle>
             </div>
-            <AlertDialogDescription className="mt-4">
-              <div className="space-y-3">
-                <p>
-                  ระบบจะจัดตารางเรียนใหม่ทั้งหมดให้ตรงกับจำนวนครั้งที่กำหนดในแต่ละคลาส
-                </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800 font-medium mb-2">
-                    ระบบจะดำเนินการ:
-                  </p>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• ลบตารางเรียนเดิมทั้งหมด</li>
-                    <li>• สร้างตารางเรียนใหม่โดยหลบวันหยุดปัจจุบัน</li>
-                    <li>• ปรับวันสิ้นสุดคลาสให้ตรงกับตารางจริง</li>
-                    <li>• รับประกันว่าจะได้จำนวนครั้งเรียนตามที่กำหนด</li>
-                  </ul>
-                </div>
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <p className="text-sm text-amber-800">
-                    <strong>คำเตือน:</strong> การทำงานนี้จะใช้เวลาสักครู่ กรุณาอย่าปิดหน้าจอ
-                  </p>
-                </div>
-              </div>
-            </AlertDialogDescription>
           </AlertDialogHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            {reschedulePreviewLoading ? (
+              <AlertDialogDescription asChild>
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  <span className="ml-3 text-gray-600">กำลังตรวจสอบคลาสทั้งหมด...</span>
+                </div>
+              </AlertDialogDescription>
+            ) : reschedulePreview && rescheduleStep === 'preview' ? (
+              <AlertDialogDescription asChild>
+                <div className="space-y-4">
+                  {reschedulePreview.affectedClasses > 0 ? (
+                    <>
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                        <p className="text-amber-800">
+                          พบ <strong className="text-xl">{reschedulePreview.affectedClasses}</strong> คลาส
+                          ที่ต้องจัดตารางใหม่
+                          (จากทั้งหมด {reschedulePreview.totalClasses} คลาส)
+                        </p>
+                      </div>
+
+                      <div className="border rounded-lg divide-y max-h-[40vh] overflow-y-auto">
+                        {reschedulePreview.classDetails
+                          .filter(c => !c.noChange)
+                          .map((cls) => {
+                            const isExpanded = expandedClasses.has(cls.classId);
+                            const changeCount = cls.datesToRemove.length + cls.datesToAdd.length;
+                            return (
+                              <div key={cls.classId} className="px-4 py-3">
+                                <div
+                                  className="flex items-center justify-between cursor-pointer"
+                                  onClick={() => toggleExpandClass(cls.classId)}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                    <span className="font-medium text-gray-900 truncate">{cls.className}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <span className="text-sm text-gray-500">เปลี่ยน {changeCount} วัน</span>
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-400" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                                    )}
+                                  </div>
+                                </div>
+                                {isExpanded && (
+                                  <div className="mt-2 pl-6 space-y-2 text-sm">
+                                    {cls.datesToRemove.length > 0 && (
+                                      <div className="bg-red-50 rounded p-2">
+                                        <p className="text-red-700 font-medium text-xs mb-1">เอาออก:</p>
+                                        <p className="text-red-600 text-xs">{cls.datesToRemove.join(', ')}</p>
+                                      </div>
+                                    )}
+                                    {cls.datesToAdd.length > 0 && (
+                                      <div className="bg-green-50 rounded p-2">
+                                        <p className="text-green-700 font-medium text-xs mb-1">เพิ่มเข้ามา:</p>
+                                        <p className="text-green-600 text-xs">{cls.datesToAdd.join(', ')}</p>
+                                      </div>
+                                    )}
+                                    <p className="text-gray-500 text-xs">วันสิ้นสุดใหม่: {cls.newEndDate}</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800">
+                          ระบบจะจัดตารางใหม่ให้ตรงกับวันหยุดปัจจุบัน พร้อมเรียงลำดับครั้งเรียนใหม่
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                      <Check className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                      <p className="text-green-800 font-medium">ตารางเรียนตรงกับวันหยุดแล้ว</p>
+                      <p className="text-sm text-green-600 mt-1">ทั้ง {reschedulePreview.totalClasses} คลาสไม่ต้องเปลี่ยนแปลง</p>
+                    </div>
+                  )}
+                </div>
+              </AlertDialogDescription>
+            ) : rescheduleStep === 'confirm' ? (
+              <AlertDialogDescription asChild>
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  <span className="ml-3 text-gray-600">กำลังจัดตารางใหม่... กรุณาอย่าปิดหน้าจอ</span>
+                </div>
+              </AlertDialogDescription>
+            ) : null}
+          </div>
+
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={rescheduleAllLoading}>ยกเลิก</AlertDialogCancel>
-            <Button
-              onClick={confirmRescheduleAllClasses}
-              className="bg-blue-500 hover:bg-blue-600"
-              disabled={rescheduleAllLoading}
-            >
-              {rescheduleAllLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  กำลังจัดตารางใหม่...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  เริ่มจัดตารางใหม่
-                </>
-              )}
-            </Button>
+            <AlertDialogCancel disabled={rescheduleAllLoading || reschedulePreviewLoading}>
+              ยกเลิก
+            </AlertDialogCancel>
+            {reschedulePreview && rescheduleStep === 'preview' && reschedulePreview.affectedClasses > 0 && (
+              <Button
+                onClick={() => {
+                  setRescheduleStep('confirm');
+                  confirmRescheduleAllClasses();
+                }}
+                className="bg-blue-500 hover:bg-blue-600"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                ยืนยันจัดตารางใหม่ ({reschedulePreview.affectedClasses} คลาส)
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
