@@ -1,9 +1,26 @@
 // lib/services/teaching-materials.ts
 
 import { TeachingMaterial } from '@/types/models';
-import { convertCanvaToEmbedUrl } from '@/lib/utils/canva';
+import { convertCanvaToEmbedUrl, needsServerResolution } from '@/lib/utils/canva';
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
+
+// Resolve redirect-style URLs (e.g. canva.link short links) to their final
+// URL by calling our server route, then return the embed URL.
+// For URLs that don't need resolution, this is effectively a sync conversion.
+async function resolveAndConvert(url: string): Promise<{ canvaUrl: string; embedUrl: string }> {
+  if (needsServerResolution(url)) {
+    const res = await fetch('/api/admin/resolve-slide-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body?.error || 'ไม่สามารถแปลง URL ได้');
+    return { canvaUrl: body.resolvedUrl, embedUrl: body.embedUrl };
+  }
+  return { canvaUrl: url, embedUrl: convertCanvaToEmbedUrl(url) };
+}
 
 // Database row interface
 interface TeachingMaterialRow {
@@ -151,8 +168,8 @@ export async function createTeachingMaterial(
       throw new Error(`ครั้งที่ ${data.sessionNumber} มีอยู่แล้ว (${checkResult.existingTitle}) กรุณาเลือกครั้งที่อื่น`);
     }
 
-    // Auto-generate embed URL
-    const embedUrl = convertCanvaToEmbedUrl(data.canvaUrl);
+    // Auto-generate embed URL (resolve canva.link short URLs via server)
+    const { canvaUrl: resolvedCanvaUrl, embedUrl } = await resolveAndConvert(data.canvaUrl);
 
     const result = await adminMutation({
       table: 'teaching_materials',
@@ -165,10 +182,10 @@ export async function createTeachingMaterial(
         objectives: data.objectives || [],
         materials: data.materials || [],
         preparation: data.preparation || [],
-        canva_url: data.canvaUrl,
+        canva_url: resolvedCanvaUrl,
         embed_url: embedUrl,
         thumbnail_url: data.thumbnailUrl || null,
-        duration: data.duration,
+        duration: data.duration ?? 60,
         teaching_notes: data.teachingNotes || null,
         tags: data.tags || null,
         is_active: data.isActive ?? true,
@@ -221,10 +238,11 @@ export async function updateTeachingMaterial(
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.isActive !== undefined) updateData.is_active = data.isActive;
 
-    // If Canva URL is updated, regenerate embed URL
+    // If slide URL is updated, resolve (if needed) and regenerate embed URL
     if (data.canvaUrl) {
-      updateData.canva_url = data.canvaUrl;
-      updateData.embed_url = convertCanvaToEmbedUrl(data.canvaUrl);
+      const { canvaUrl: resolvedCanvaUrl, embedUrl } = await resolveAndConvert(data.canvaUrl);
+      updateData.canva_url = resolvedCanvaUrl;
+      updateData.embed_url = embedUrl;
     }
 
     await adminMutation({ table: 'teaching_materials', operation: 'update', data: updateData, match: { id } })

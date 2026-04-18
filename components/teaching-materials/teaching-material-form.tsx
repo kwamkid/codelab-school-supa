@@ -10,7 +10,7 @@ import {
   checkSessionNumberExists,
   getTeachingMaterials
 } from '@/lib/services/teaching-materials';
-import { isValidCanvaUrl } from '@/lib/utils/canva';
+import { isValidSlideUrl } from '@/lib/utils/canva';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,15 @@ export default function TeachingMaterialForm({
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [testingUrl, setTestingUrl] = useState(false);
+
+  type FieldKey = 'title' | 'canvaUrl' | 'objectives';
+  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const clearError = (field: FieldKey) =>
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const { [field]: _, ...rest } = prev;
+      return rest;
+    });
   
   const [formData, setFormData] = useState({
     subjectId: subjectId,
@@ -142,23 +151,41 @@ export default function TeachingMaterialForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate
-    if (!formData.title || !formData.canvaUrl) {
-      toast.error('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
-      return;
+
+    const nextErrors: Partial<Record<FieldKey, string>> = {};
+
+    if (!formData.title.trim()) {
+      nextErrors.title = 'กรุณากรอกชื่อบทเรียน';
     }
 
-    // Validate Canva URL
-    if (!isValidCanvaUrl(formData.canvaUrl)) {
-      toast.error('URL ของ Canva ไม่ถูกต้อง');
+    if (!formData.canvaUrl.trim()) {
+      nextErrors.canvaUrl = 'กรุณากรอก URL ของสไลด์';
+    } else if (!isValidSlideUrl(formData.canvaUrl)) {
+      nextErrors.canvaUrl = 'URL ไม่ถูกต้อง รองรับเฉพาะ Canva, Google Slides หรือ PowerPoint Online';
+    }
+
+    const objectivesCleaned = formData.objectives.filter((obj) => obj.trim() !== '');
+    if (objectivesCleaned.length === 0) {
+      nextErrors.objectives = 'กรุณาระบุจุดประสงค์การเรียนรู้อย่างน้อย 1 ข้อ';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      const firstField = (Object.keys(nextErrors) as FieldKey[])[0];
+      const el =
+        firstField === 'objectives'
+          ? (document.querySelector('input[data-field="objectives"]') as HTMLElement | null)
+          : (document.getElementById(firstField) as HTMLElement | null);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.focus?.();
       return;
     }
+    setErrors({});
 
     // Check for duplicate session number
     try {
       const checkResult = await checkSessionNumberExists(
-        subjectId, 
+        subjectId,
         formData.sessionNumber,
         isEdit ? material?.id : undefined
       );
@@ -173,15 +200,10 @@ export default function TeachingMaterialForm({
     // Remove empty items from arrays
     const cleanedData = {
       ...formData,
-      objectives: formData.objectives.filter(obj => obj.trim() !== ''),
-      materials: formData.materials.filter(mat => mat.trim() !== ''),
-      preparation: formData.preparation.filter(prep => prep.trim() !== ''),
+      objectives: objectivesCleaned,
+      materials: formData.materials.filter((mat) => mat.trim() !== ''),
+      preparation: formData.preparation.filter((prep) => prep.trim() !== ''),
     };
-
-    if (cleanedData.objectives.length === 0) {
-      toast.error('กรุณาระบุจุดประสงค์การเรียนรู้อย่างน้อย 1 ข้อ');
-      return;
-    }
 
     setLoading(true);
 
@@ -258,12 +280,12 @@ export default function TeachingMaterialForm({
       toast.error('กรุณากรอก URL ก่อน');
       return;
     }
-    
-    if (!isValidCanvaUrl(formData.canvaUrl)) {
-      toast.error('URL ของ Canva ไม่ถูกต้อง');
+
+    if (!isValidSlideUrl(formData.canvaUrl)) {
+      toast.error('URL ไม่ถูกต้อง รองรับเฉพาะ Canva, Google Slides หรือ PowerPoint Online');
       return;
     }
-    
+
     setTestingUrl(true);
     window.open(formData.canvaUrl, '_blank');
     setTimeout(() => setTestingUrl(false), 1000);
@@ -384,10 +406,17 @@ export default function TeachingMaterialForm({
                 <Input
                   id="title"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    clearError('title');
+                  }}
                   placeholder="เช่น Introduction to VEX Robotics"
-                  required
+                  aria-invalid={!!errors.title}
+                  className={errors.title ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
+                {errors.title && (
+                  <p className="text-xs text-red-600">{errors.title}</p>
+                )}
               </div>
             </div>
 
@@ -404,23 +433,26 @@ export default function TeachingMaterialForm({
           </CardContent>
         </Card>
 
-        {/* Canva URL */}
+        {/* Slide Deck URL */}
         <Card>
           <CardHeader>
-            <CardTitle>Canva Presentation</CardTitle>
+            <CardTitle>Slide Deck</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="canvaUrl">Canva Share URL *</Label>
+              <Label htmlFor="canvaUrl">Share URL *</Label>
               <div className="flex gap-2">
                 <Input
                   id="canvaUrl"
                   type="url"
                   value={formData.canvaUrl}
-                  onChange={(e) => setFormData({ ...formData, canvaUrl: e.target.value })}
-                  placeholder="https://www.canva.com/design/..."
-                  required
-                  className="flex-1"
+                  onChange={(e) => {
+                    setFormData({ ...formData, canvaUrl: e.target.value });
+                    clearError('canvaUrl');
+                  }}
+                  placeholder="https://www.canva.com/design/... หรือ https://canva.link/..."
+                  aria-invalid={!!errors.canvaUrl}
+                  className={`flex-1 ${errors.canvaUrl ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                 />
                 <Button
                   type="button"
@@ -436,9 +468,13 @@ export default function TeachingMaterialForm({
                   ทดสอบ
                 </Button>
               </div>
-              <p className="text-xs text-gray-500">
-                วิธีการ: เปิด Canva → คลิก Share → คลิก Copy link
-              </p>
+              {errors.canvaUrl && (
+                <p className="text-xs text-red-600">{errors.canvaUrl}</p>
+              )}
+              <div className="text-xs text-gray-500 space-y-1">
+                <p>รองรับ: Canva (ลิงก์เต็มหรือ canva.link), Google Slides, PowerPoint Online</p>
+                <p>วิธีการ: เปิดสไลด์ → คลิก Share → Copy link (ต้องตั้งเป็น "Anyone with the link")</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -446,7 +482,7 @@ export default function TeachingMaterialForm({
         {/* Learning Objectives & Materials */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Learning Objectives */}
-          <Card>
+          <Card className={errors.objectives ? 'border-red-500' : ''}>
             <CardHeader>
               <CardTitle>จุดประสงค์การเรียนรู้ *</CardTitle>
             </CardHeader>
@@ -457,10 +493,14 @@ export default function TeachingMaterialForm({
                   <Input
                     data-field="objectives"
                     value={objective}
-                    onChange={(e) => handleArrayItemChange('objectives', index, e.target.value)}
+                    onChange={(e) => {
+                      handleArrayItemChange('objectives', index, e.target.value);
+                      if (e.target.value.trim()) clearError('objectives');
+                    }}
                     onKeyPress={(e) => handleArrayKeyPress(e, 'objectives', index)}
                     placeholder="เช่น เข้าใจหลักการทำงานของหุ่นยนต์"
-                    className="flex-1"
+                    aria-invalid={!!errors.objectives}
+                    className={`flex-1 ${errors.objectives ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
                   {formData.objectives.length > 1 && (
                     <Button
@@ -474,7 +514,11 @@ export default function TeachingMaterialForm({
                   )}
                 </div>
               ))}
-              <p className="text-xs text-gray-500">กด Enter เพื่อเพิ่มรายการใหม่</p>
+              {errors.objectives ? (
+                <p className="text-xs text-red-600">{errors.objectives}</p>
+              ) : (
+                <p className="text-xs text-gray-500">กด Enter เพื่อเพิ่มรายการใหม่</p>
+              )}
             </CardContent>
           </Card>
 

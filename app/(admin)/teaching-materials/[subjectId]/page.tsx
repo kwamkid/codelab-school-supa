@@ -31,6 +31,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Plus,
   ArrowLeft,
   MoreHorizontal,
@@ -44,7 +50,8 @@ import {
   ArrowDown,
   Clock,
   BookOpen,
-  Hash
+  Hash,
+  ExternalLink,
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { getSubject } from '@/lib/services/subjects';
@@ -71,6 +78,7 @@ export default function SubjectMaterialsPage() {
   const [reordering, setReordering] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [materialToDelete, setMaterialToDelete] = useState<TeachingMaterial | null>(null);
+  const [previewMaterial, setPreviewMaterial] = useState<TeachingMaterial | null>(null);
 
   useEffect(() => {
     loadData();
@@ -373,10 +381,7 @@ export default function SubjectMaterialsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              // Preview functionality
-                              toast.info('กำลังพัฒนาฟีเจอร์ Preview');
-                            }}
+                            onClick={() => setPreviewMaterial(material)}
                             title="ดูตัวอย่าง"
                           >
                             <Play className="h-4 w-4" />
@@ -461,6 +466,50 @@ export default function SubjectMaterialsPage() {
           )}
         </>
       )}
+
+      {/* Preview Dialog */}
+      <Dialog
+        open={!!previewMaterial}
+        onOpenChange={(open) => !open && setPreviewMaterial(null)}
+      >
+        <DialogContent className="max-w-6xl p-0 gap-0 sm:rounded-lg overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b">
+            <div className="flex items-center justify-between gap-4 pr-8">
+              <DialogTitle className="truncate">
+                {previewMaterial
+                  ? `ครั้งที่ ${previewMaterial.sessionNumber} - ${previewMaterial.title}`
+                  : 'ตัวอย่าง'}
+              </DialogTitle>
+              {previewMaterial?.canvaUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(previewMaterial.canvaUrl, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  เปิดในแท็บใหม่
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+          <div className="relative w-full bg-black" style={{ aspectRatio: '16 / 9' }}>
+            {previewMaterial?.embedUrl ? (
+              <iframe
+                key={previewMaterial.id}
+                src={previewMaterial.embedUrl}
+                className="absolute inset-0 w-full h-full"
+                allow="fullscreen; autoplay; encrypted-media"
+                allowFullScreen
+                loading="lazy"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-white text-sm">
+                ไม่มี URL สไลด์
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
