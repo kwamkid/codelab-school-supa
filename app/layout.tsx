@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/hooks/useSupabaseAuth";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from '@/providers/query-provider';
+import { ThemeProvider } from '@/providers/theme-provider';
 import '@/lib/suppress-warnings';
 
 
@@ -27,12 +28,19 @@ export default function RootLayout({
   return (
     <html lang="th" suppressHydrationWarning>
       <body className={ibmPlexSansThai.className}>
-        <QueryProvider>
-          <AuthProvider>
-            <Toaster />
-            {children}
-          </AuthProvider>
-        </QueryProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <QueryProvider>
+            <AuthProvider>
+              <Toaster />
+              {children}
+            </AuthProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

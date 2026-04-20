@@ -89,7 +89,7 @@ export default function EventStatistics({
   
   // Chart colors
   const COLORS = {
-    primary: '#ef4444', // red-500
+    primary: '#ef443a', // CodeLab Red
     secondary: '#3b82f6', // blue-500
     success: '#10b981', // green-500
     warning: '#f59e0b', // amber-500

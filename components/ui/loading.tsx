@@ -57,7 +57,7 @@ export function Loading({
         />
       </div>
       {text && (
-        <p className={cn('text-gray-500 mt-3 font-medium', config.text)}>
+        <p className={cn('text-muted-foreground mt-3 font-medium', config.text)}>
           {text}
         </p>
       )}
@@ -78,7 +78,7 @@ export function Loading({
   if (fullScreen) {
     return (
       <div className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-sm',
+        'fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm',
         className
       )}>
         {content}
@@ -102,7 +102,7 @@ export function PageLoading({ text }: { text?: string } = {}) {
 export function InlineLoading({ className }: { className?: string } = {}) {
   return (
     <svg
-      className={cn('animate-spin h-4 w-4 text-gray-300', className)}
+      className={cn('animate-spin h-4 w-4 text-muted-foreground/60', className)}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -118,7 +118,7 @@ export function SectionLoading({ text }: { text?: string } = {}) {
   return (
     <div className="flex flex-col items-center justify-center py-12 min-h-[200px]">
       <svg
-        className="animate-spin h-8 w-8 text-gray-400"
+        className="animate-spin h-8 w-8 text-muted-foreground"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
@@ -126,7 +126,7 @@ export function SectionLoading({ text }: { text?: string } = {}) {
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
-      {text && <p className="text-gray-500 mt-3 text-base font-medium">{text}</p>}
+      {text && <p className="text-muted-foreground mt-3 text-base font-medium">{text}</p>}
     </div>
   )
 }

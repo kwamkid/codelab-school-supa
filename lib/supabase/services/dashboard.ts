@@ -174,7 +174,7 @@ export async function getOptimizedCalendarEvents(
         start: holidayDate,
         end: holidayEndDate,
         allDay: true,
-        backgroundColor: '#EF4444',
+        backgroundColor: '#EF443A',
         borderColor: '#DC2626',
         textColor: '#FFFFFF',
         display: 'background',

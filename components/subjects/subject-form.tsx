@@ -34,7 +34,7 @@ const LEVELS = [
 ];
 
 const COLORS = [
-  '#ef4444', // red
+  '#ef443a', // red
   '#f97316', // orange
   '#f59e0b', // amber
   '#eab308', // yellow
@@ -65,7 +65,7 @@ export default function SubjectForm({ subject, isEdit = false }: SubjectFormProp
       min: subject?.ageRange?.min || 6,
       max: subject?.ageRange?.max || 12,
     },
-    color: subject?.color || '#ef4444',
+    color: subject?.color || '#ef443a',
     icon: subject?.icon || '',
     prerequisites: subject?.prerequisites || [],
     isActive: subject?.isActive ?? true,

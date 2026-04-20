@@ -62,6 +62,7 @@ import { getTotalUnreadCount } from '@/lib/services/chat';
 import { getClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Notification } from '@/types/models';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 // Navigation types
 interface NavigationItem {
@@ -701,11 +702,11 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   // auth โหลดเสร็จแล้วแต่ไม่พบข้อมูล admin user ในระบบ
   if (!adminUser) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center max-w-md p-8">
           <div className="text-red-500 text-5xl mb-4">⚠</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">ไม่พบข้อมูลผู้ดูแลระบบ</h2>
-          <p className="text-gray-600 mb-4">
+          <h2 className="text-xl font-bold text-foreground mb-2">ไม่พบข้อมูลผู้ดูแลระบบ</h2>
+          <p className="text-muted-foreground mb-4">
             ไม่พบข้อมูลสิทธิ์สำหรับ email: {user?.email || 'ไม่ทราบ'}
             <br />กรุณาติดต่อผู้ดูแลระบบเพื่อเพิ่มสิทธิ์การใช้งาน
           </p>
@@ -738,7 +739,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-gray-50">
+    <div className="h-[100dvh] overflow-hidden bg-background">
       <div className="flex h-full">
         {/* Loading overlay — z-[100] to cover sidebar (z-50) */}
         {navigating && <Loading fullScreen size="lg" className="z-[100]" />}
@@ -883,22 +884,22 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top bar */}
-          <header className="h-16 bg-white shadow-sm px-4 flex items-center justify-between">
+          <header className="h-16 bg-card border-b border-border shadow-sm px-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="lg:hidden"
               >
-                <Menu className="h-6 w-6 text-gray-500" />
+                <Menu className="h-6 w-6 text-muted-foreground" />
               </button>
 
               {/* Branch Selector - Desktop */}
               <div className="hidden lg:flex items-center gap-4">
                 <BranchSelector />
-                
+
                 {/* Role Indicator */}
                 {adminUser && (
-                  <div className="text-sm text-gray-600 px-3 py-1 bg-gray-100 rounded-md">
+                  <div className="text-sm text-muted-foreground px-3 py-1 bg-muted rounded-md">
                     {adminUser.role === 'super_admin' && (
                       <span className="flex items-center gap-1">
                         <Shield className="h-3.5 w-3.5 text-red-500" />
@@ -929,6 +930,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 <BranchSelector />
               </div>
 
+              {/* Theme Toggle */}
+              <ThemeToggle />
+
               {/* Notification Bell */}
               <div className="relative">
                 <Button
@@ -937,33 +941,33 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                   className="relative notification-bell"
                   onClick={() => setShowNotifications(!showNotifications)}
                 >
-                  <Bell className="h-5 w-5 text-gray-600" />
+                  <Bell className="h-5 w-5 text-muted-foreground" />
                   {notifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
                       {notifications.length}
                     </span>
                   )}
                 </Button>
-                
+
                 {/* Notification Dropdown */}
                 {showNotifications && (
-                  <div className="notification-dropdown absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border z-50">
-                    <div className="p-4 border-b">
+                  <div className="notification-dropdown absolute right-0 mt-2 w-80 bg-popover text-popover-foreground rounded-lg shadow-lg border border-border z-50">
+                    <div className="p-4 border-b border-border">
                       <h3 className="font-semibold">การแจ้งเตือน</h3>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       {notifications.length === 0 ? (
-                        <p className="p-4 text-gray-500 text-center">ไม่มีการแจ้งเตือนใหม่</p>
+                        <p className="p-4 text-muted-foreground text-center">ไม่มีการแจ้งเตือนใหม่</p>
                       ) : (
                         notifications.map(notif => (
                           <div
                             key={notif.id}
-                            className="p-4 border-b hover:bg-gray-50 cursor-pointer"
+                            className="p-4 border-b border-border hover:bg-muted cursor-pointer"
                             onClick={() => handleNotificationClick(notif)}
                           >
                             <p className="font-medium text-sm">{notif.title}</p>
-                            <p className="text-sm text-gray-600 mt-1">{notif.body}</p>
-                            <p className="text-xs text-gray-400 mt-2">
+                            <p className="text-sm text-muted-foreground mt-1">{notif.body}</p>
+                            <p className="text-xs text-muted-foreground/70 mt-2">
                               {formatDate(notif.sentAt, 'short')}
                             </p>
                           </div>
@@ -986,7 +990,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                         src={user.photoURL || ''}
                         alt={user.displayName || ''}
                       />
-                      <AvatarFallback className="bg-red-500 text-white">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
                         {user.displayName?.charAt(0) || 'A'}
                       </AvatarFallback>
                     </Avatar>

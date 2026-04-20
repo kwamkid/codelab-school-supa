@@ -717,7 +717,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                                       <div className="flex items-center gap-2 flex-wrap min-w-0">
                                         <Badge
                                           className="text-xs"
-                                          style={{ backgroundColor: `${subject?.color || '#EF4444'}20`, color: subject?.color || '#EF4444', borderColor: `${subject?.color || '#EF4444'}40` }}
+                                          style={{ backgroundColor: `${subject?.color || '#EF443A'}20`, color: subject?.color || '#EF443A', borderColor: `${subject?.color || '#EF443A'}40` }}
                                         >
                                           {subject?.name}
                                         </Badge>

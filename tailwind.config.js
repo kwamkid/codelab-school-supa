@@ -63,6 +63,19 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        cl: {
+          red: {
+            DEFAULT: "var(--cl-red)",
+            600: "var(--cl-red-600)",
+            50: "var(--cl-red-50)",
+          },
+          ink: "var(--cl-ink)",
+          success: "var(--cl-success)",
+          warning: "var(--cl-warning)",
+          danger: "var(--cl-danger)",
+          info: "var(--cl-info)",
+          line: "var(--cl-line)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

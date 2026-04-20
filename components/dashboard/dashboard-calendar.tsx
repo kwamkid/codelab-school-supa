@@ -658,7 +658,7 @@ const DashboardCalendar = forwardRef<FullCalendar, DashboardCalendarProps>(({
         
         /* More link styles */
         .dashboard-calendar .fc-more-link {
-          color: #EF4444;
+          color: var(--cl-red);
           font-weight: 600;
           font-size: 0.75rem;
           padding: 2px 4px;
@@ -817,17 +817,17 @@ const DashboardCalendar = forwardRef<FullCalendar, DashboardCalendarProps>(({
         
         /* Now indicator */
         .dashboard-calendar .fc-timegrid-now-indicator-line {
-          border-color: #EF4444;
+          border-color: var(--cl-red);
           border-width: 2px;
         }
         
         .dashboard-calendar .fc-timegrid-now-indicator-arrow {
-          border-color: #EF4444;
+          border-color: var(--cl-red);
         }
         
         /* Custom more link styling */
         .dashboard-calendar .fc-more-link {
-          color: #EF4444;
+          color: var(--cl-red);
           font-weight: 500;
           font-size: 0.75rem;
         }
@@ -866,9 +866,9 @@ const DashboardCalendar = forwardRef<FullCalendar, DashboardCalendarProps>(({
         }
         
         .dashboard-calendar .fc-button-active {
-          background-color: #EF4444 !important;
+          background-color: var(--cl-red) !important;
           color: white !important;
-          border-color: #EF4444 !important;
+          border-color: var(--cl-red) !important;
         }
         
         .dashboard-calendar .fc-button:disabled {
@@ -885,7 +885,7 @@ const DashboardCalendar = forwardRef<FullCalendar, DashboardCalendarProps>(({
         }
         
         .dashboard-calendar .fc-daygrid-day-number:hover {
-          color: #EF4444;
+          color: var(--cl-red);
           text-decoration: none;
         }
         
