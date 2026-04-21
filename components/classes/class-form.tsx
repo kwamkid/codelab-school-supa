@@ -561,8 +561,8 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
               <TimeRangePicker
                 startTime={formData.startTime}
                 endTime={formData.endTime}
-                onStartTimeChange={(v) => setFormData({ ...formData, startTime: v })}
-                onEndTimeChange={(v) => setFormData({ ...formData, endTime: v })}
+                onStartTimeChange={(v) => setFormData((prev) => ({ ...prev, startTime: v }))}
+                onEndTimeChange={(v) => setFormData((prev) => ({ ...prev, endTime: v }))}
                 disabled={!editableFields.schedule}
               />
               {formData.startTime && formData.endTime && (() => {
