@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Event, Branch } from '@/types/models';
-import { deleteEvent } from '@/lib/services/events';
+import { deleteEvent, duplicateEvent } from '@/lib/services/events';
 import { getClient } from '@/lib/supabase/client';
 import { getActiveBranches } from '@/lib/services/branches';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,7 +49,8 @@ import {
   Eye,
   CalendarX,
   Link as LinkIcon,
-  CheckCircle2
+  CheckCircle2,
+  Copy
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
@@ -69,6 +70,7 @@ export default function EventsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
+  const [duplicatingEventId, setDuplicatingEventId] = useState<string | null>(null);
 
   useEffect(() => {
     loadEvents();
@@ -135,6 +137,21 @@ export default function EventsPage() {
     } catch (error: any) {
       console.error('Error deleting event:', error);
       toast.error(error.message || 'ไม่สามารถลบ Event ได้');
+    }
+  };
+
+  const handleDuplicate = async (eventId: string) => {
+    if (!user?.id || duplicatingEventId) return;
+
+    try {
+      setDuplicatingEventId(eventId);
+      const newId = await duplicateEvent(eventId, user.id);
+      toast.success('คัดลอก Event เรียบร้อยแล้ว');
+      router.push(`/events/${newId}/edit`);
+    } catch (error: any) {
+      console.error('Error duplicating event:', error);
+      toast.error(error.message || 'ไม่สามารถคัดลอก Event ได้');
+      setDuplicatingEventId(null);
     }
   };
 
@@ -434,7 +451,20 @@ export default function EventsPage() {
                               </Button>
                             </Link>
                           </PermissionGuard>
-                          
+
+                          <PermissionGuard action="create">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDuplicate(event.id)}
+                              disabled={duplicatingEventId === event.id}
+                              className="text-purple-600 hover:text-purple-700 hover:bg-purple-100"
+                              title="คัดลอก Event (สถานะร่าง)"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </PermissionGuard>
+
                           {/* Copy Registration Link Button */}
                           {event.status === 'published' && (
                             <Button

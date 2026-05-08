@@ -899,26 +899,26 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
                 {/* Role Indicator */}
                 {adminUser && (
-                  <div className="text-sm text-muted-foreground px-3 py-1 bg-muted rounded-md">
+                  <>
                     {adminUser.role === 'super_admin' && (
-                      <span className="flex items-center gap-1">
-                        <Shield className="h-3.5 w-3.5 text-red-500" />
+                      <div className="text-sm font-medium px-3 py-1 rounded-md flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20">
+                        <Shield className="h-3.5 w-3.5" />
                         Super Admin
-                      </span>
+                      </div>
                     )}
                     {adminUser.role === 'branch_admin' && (
-                      <span className="flex items-center gap-1">
-                        <Building2 className="h-3.5 w-3.5 text-teal-500" />
+                      <div className="text-sm font-medium px-3 py-1 rounded-md flex items-center gap-1.5 bg-accent text-accent-foreground border border-border">
+                        <Building2 className="h-3.5 w-3.5" />
                         Branch Admin
-                      </span>
+                      </div>
                     )}
                     {adminUser.role === 'teacher' && (
-                      <span className="flex items-center gap-1">
-                        <UserCog className="h-3.5 w-3.5 text-purple-500" />
+                      <div className="text-sm font-medium px-3 py-1 rounded-md flex items-center gap-1.5 bg-muted text-muted-foreground border border-border">
+                        <UserCog className="h-3.5 w-3.5" />
                         Teacher
-                      </span>
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             </div>

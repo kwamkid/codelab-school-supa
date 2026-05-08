@@ -309,6 +309,70 @@ export async function updateEvent(
   }
 }
 
+// Duplicate event - Copy event + schedules, force status to 'draft'
+export async function duplicateEvent(
+  eventId: string,
+  userId: string
+): Promise<string> {
+  try {
+    const [sourceEvent, sourceSchedules] = await Promise.all([
+      getEvent(eventId),
+      getEventSchedules(eventId),
+    ]);
+
+    if (!sourceEvent) {
+      throw new Error('ไม่พบ Event ต้นฉบับ');
+    }
+
+    const newEventId = await createEvent(
+      {
+        name: `${sourceEvent.name} (สำเนา)`,
+        description: sourceEvent.description,
+        fullDescription: sourceEvent.fullDescription,
+        imageUrl: sourceEvent.imageUrl,
+        location: sourceEvent.location,
+        locationUrl: sourceEvent.locationUrl,
+        branchIds: sourceEvent.branchIds,
+        eventType: sourceEvent.eventType,
+        highlights: sourceEvent.highlights,
+        targetAudience: sourceEvent.targetAudience,
+        whatToBring: sourceEvent.whatToBring,
+        registrationStartDate: sourceEvent.registrationStartDate,
+        registrationEndDate: sourceEvent.registrationEndDate,
+        countingMethod: sourceEvent.countingMethod,
+        enableReminder: sourceEvent.enableReminder,
+        reminderDaysBefore: sourceEvent.reminderDaysBefore,
+        reminderTime: sourceEvent.reminderTime,
+        status: 'draft',
+        isActive: true,
+        createdBy: userId,
+      } as Omit<Event, 'id' | 'createdAt' | 'updatedAt'>,
+      userId
+    );
+
+    if (sourceSchedules.length > 0) {
+      await Promise.all(
+        sourceSchedules.map((schedule) =>
+          createEventSchedule({
+            eventId: newEventId,
+            date: schedule.date,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            maxAttendees: schedule.maxAttendees,
+            maxAttendeesByBranch: schedule.maxAttendeesByBranch,
+            status: 'available',
+          })
+        )
+      );
+    }
+
+    return newEventId;
+  } catch (error) {
+    console.error('Error duplicating event:', error);
+    throw error;
+  }
+}
+
 // Delete event - Uses API route to bypass RLS restrictions
 export async function deleteEvent(id: string): Promise<void> {
   try {
@@ -651,6 +715,159 @@ export async function createEventRegistration(
     return result.id;
   } catch (error) {
     console.error('Error creating event registration:', error);
+    throw error;
+  }
+}
+
+// Update registration schedule and/or branch (admin only)
+export async function updateRegistrationSchedule(
+  registrationId: string,
+  newScheduleId: string,
+  newBranchId: string
+): Promise<void> {
+  try {
+    const supabase = getClient();
+
+    // Load registration
+    const { data: regData, error: regError } = await supabase
+      .from('event_registrations')
+      .select('*')
+      .eq('id', registrationId)
+      .single();
+
+    if (regError) {
+      if (regError.code === 'PGRST116') {
+        throw new Error('ไม่พบข้อมูลการลงทะเบียน');
+      }
+      throw regError;
+    }
+
+    const registration = mapToEventRegistration(regData);
+
+    if (registration.status === 'cancelled') {
+      throw new Error('ไม่สามารถแก้ไขการลงทะเบียนที่ยกเลิกแล้ว');
+    }
+
+    const noScheduleChange = registration.scheduleId === newScheduleId;
+    const noBranchChange = registration.branchId === newBranchId;
+    if (noScheduleChange && noBranchChange) {
+      return;
+    }
+
+    // Load new schedule
+    const { data: newSchedData, error: newSchedError } = await supabase
+      .from('event_schedules')
+      .select('*')
+      .eq('id', newScheduleId)
+      .single();
+
+    if (newSchedError) {
+      if (newSchedError.code === 'PGRST116') {
+        throw new Error('ไม่พบรอบเวลาที่เลือก');
+      }
+      throw newSchedError;
+    }
+
+    const newSchedule = mapToEventSchedule(newSchedData);
+    const attendeeCount = registration.attendeeCount;
+
+    // Compute current attendees in target schedule (excluding this registration if same schedule)
+    const newBranchCurrent = newSchedule.attendeesByBranch[newBranchId] || 0;
+    const totalCurrent = Object.values(newSchedule.attendeesByBranch).reduce(
+      (sum, count) => sum + count,
+      0
+    );
+
+    // Subtract this registration's count if it's already in the new schedule (same schedule, different branch only)
+    const sameScheduleOldBranchCount =
+      noScheduleChange && registration.branchId === newBranchId ? attendeeCount : 0;
+    const sameScheduleOldBranchInOtherBranch =
+      noScheduleChange && registration.branchId !== newBranchId ? attendeeCount : 0;
+
+    const effectiveTotal = totalCurrent - (noScheduleChange ? attendeeCount : 0);
+    const effectiveBranch = newBranchCurrent - sameScheduleOldBranchCount;
+
+    // Capacity check: per-branch first, then total
+    const mabb = (newSchedule as any).maxAttendeesByBranch as Record<string, number> | undefined;
+    const branchMax = mabb && mabb[newBranchId];
+    if (typeof branchMax === 'number' && branchMax > 0) {
+      if (effectiveBranch + attendeeCount > branchMax) {
+        throw new Error(
+          `รอบนี้สาขาที่เลือกเหลือที่ว่างเพียง ${Math.max(0, branchMax - effectiveBranch)} ที่`
+        );
+      }
+    }
+    if (effectiveTotal + attendeeCount > newSchedule.maxAttendees) {
+      throw new Error(
+        `รอบนี้เหลือที่ว่างเพียง ${Math.max(0, newSchedule.maxAttendees - effectiveTotal)} ที่`
+      );
+    }
+
+    // Update old schedule (decrement) — only if schedule actually changes
+    if (!noScheduleChange) {
+      const { data: oldSchedData, error: oldSchedError } = await supabase
+        .from('event_schedules')
+        .select('*')
+        .eq('id', registration.scheduleId)
+        .single();
+
+      if (oldSchedError && oldSchedError.code !== 'PGRST116') throw oldSchedError;
+
+      if (oldSchedData) {
+        const oldSchedule = mapToEventSchedule(oldSchedData);
+        const oldBranchCount = oldSchedule.attendeesByBranch[registration.branchId] || 0;
+        const updatedOldByBranch = {
+          ...oldSchedule.attendeesByBranch,
+          [registration.branchId]: Math.max(0, oldBranchCount - attendeeCount),
+        };
+        await adminMutation({
+          table: 'event_schedules',
+          operation: 'update',
+          data: {
+            attendees_by_branch: updatedOldByBranch,
+            status: 'available',
+          },
+          match: { id: registration.scheduleId },
+        });
+      }
+    }
+
+    // Update new schedule (increment) — handles both same-schedule branch swap and schedule change
+    const updatedNewByBranch: Record<string, number> = { ...newSchedule.attendeesByBranch };
+    if (noScheduleChange && registration.branchId !== newBranchId) {
+      // Branch swap within same schedule: subtract from old branch, add to new branch
+      const oldBranchInSame = updatedNewByBranch[registration.branchId] || 0;
+      updatedNewByBranch[registration.branchId] = Math.max(0, oldBranchInSame - attendeeCount);
+      updatedNewByBranch[newBranchId] = (updatedNewByBranch[newBranchId] || 0) + attendeeCount;
+    } else if (!noScheduleChange) {
+      updatedNewByBranch[newBranchId] = (updatedNewByBranch[newBranchId] || 0) + attendeeCount;
+    }
+
+    const newTotalAfter = Object.values(updatedNewByBranch).reduce((sum, count) => sum + count, 0);
+    await adminMutation({
+      table: 'event_schedules',
+      operation: 'update',
+      data: {
+        attendees_by_branch: updatedNewByBranch,
+        status: newTotalAfter >= newSchedule.maxAttendees ? 'full' : 'available',
+      },
+      match: { id: newScheduleId },
+    });
+
+    // Update registration row
+    await adminMutation({
+      table: 'event_registrations',
+      operation: 'update',
+      data: {
+        schedule_id: newScheduleId,
+        schedule_date: newSchedule.date.toISOString().split('T')[0],
+        schedule_time: `${newSchedule.startTime}-${newSchedule.endTime}`,
+        branch_id: newBranchId,
+      },
+      match: { id: registrationId },
+    });
+  } catch (error) {
+    console.error('Error updating registration schedule:', error);
     throw error;
   }
 }

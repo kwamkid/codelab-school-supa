@@ -512,6 +512,7 @@ export default function EventDetailPage() {
         <TabsContent value="registrations">
           <RegistrationList
             eventId={eventId}
+            eventName={event.name}
             registrations={registrations}
             schedules={schedules}
             branches={branches}

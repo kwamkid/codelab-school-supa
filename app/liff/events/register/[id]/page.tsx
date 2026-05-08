@@ -41,7 +41,36 @@ import {
 } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { SectionLoading } from '@/components/ui/loading';
-import { formatDate, formatPhoneNumber } from '@/lib/utils';
+import { formatDate, formatPhoneNumber, getShortDayNameEN } from '@/lib/utils';
+
+const THAI_MONTH_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+const DAY_BADGE_COLORS = [
+  'bg-red-100 text-red-700',       // SUN
+  'bg-yellow-100 text-yellow-800', // MON
+  'bg-pink-100 text-pink-700',     // TUE
+  'bg-green-100 text-green-700',   // WED
+  'bg-orange-100 text-orange-700', // THU
+  'bg-sky-100 text-sky-700',       // FRI
+  'bg-purple-100 text-purple-700', // SAT
+];
+
+function formatScheduleDate(date: Date): { dayName: string; rest: string; dayClass: string } {
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) {
+    return { dayName: '', rest: '-', dayClass: 'bg-gray-100 text-gray-700' };
+  }
+  const dayIdx = d.getDay();
+  const dayName = getShortDayNameEN(dayIdx);
+  const day = d.getDate();
+  const month = THAI_MONTH_SHORT[d.getMonth()];
+  const year = String(d.getFullYear() + 543).slice(-2);
+  return {
+    dayName,
+    rest: `${day} ${month} ${year}`,
+    dayClass: DAY_BADGE_COLORS[dayIdx],
+  };
+}
 import { toast } from 'sonner';
 
 interface StudentFormData {
@@ -770,6 +799,7 @@ export default function EventRegistrationPage() {
                 <SelectContent>
                   {schedules.map(schedule => {
                     const available = getAvailableSeats(schedule, selectedBranch);
+                    const { dayName, rest, dayClass } = formatScheduleDate(schedule.date);
                     return (
                       <SelectItem
                         key={schedule.id}
@@ -777,7 +807,15 @@ export default function EventRegistrationPage() {
                         disabled={available <= 0}
                       >
                         <div className="flex items-center justify-between w-full gap-2">
-                          <span className="truncate">{formatDate(schedule.date, 'long')} {schedule.startTime?.substring(0, 5)}-{schedule.endTime?.substring(0, 5)}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold whitespace-nowrap ${dayClass}`}>
+                              {dayName}
+                            </span>
+                            <span className="truncate">{rest}</span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-xs font-medium whitespace-nowrap">
+                              {schedule.startTime?.substring(0, 5)}-{schedule.endTime?.substring(0, 5)}
+                            </span>
+                          </div>
                           <span className={`text-xs whitespace-nowrap ${available <= 2 && available > 0 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
                             {available <= 0 ? '(เต็ม)' : `(เหลือ ${available} ที่)`}
                           </span>
@@ -787,7 +825,7 @@ export default function EventRegistrationPage() {
                   })}
                 </SelectContent>
               </Select>
-              {selectedScheduleData && availableSeats <= 5 && availableSeats > 0 && (
+              {selectedScheduleData && availableSeats <= 2 && availableSeats > 0 && (
                 <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg">
                   <AlertCircle className="h-3 w-3" />
                   เหลือที่ว่างน้อย รีบจองด่วน!

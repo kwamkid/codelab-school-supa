@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { EventRegistration, EventSchedule, Branch } from '@/types/models';
-import { cancelEventRegistration, updateEventAttendance } from '@/lib/services/events';
+import { cancelEventRegistration, updateEventAttendance, updateRegistrationSchedule } from '@/lib/services/events';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,8 +51,9 @@ import {
   CheckCircle2,
   XCircle,
   Save,
-  ArrowLeft,
-  ClipboardList
+  ClipboardList,
+  Printer,
+  Pencil
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDate, formatPhoneNumber } from '@/lib/utils';
@@ -60,6 +61,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface RegistrationListProps {
   eventId: string;
+  eventName?: string;
   registrations: EventRegistration[];
   schedules: EventSchedule[];
   branches: Branch[];
@@ -73,16 +75,19 @@ interface AttendanceRecord {
   note?: string;
 }
 
-export default function RegistrationList({ 
+export default function RegistrationList({
   eventId,
-  registrations, 
-  schedules, 
+  eventName,
+  registrations,
+  schedules,
   branches,
   countingMethod,
-  onUpdate 
+  onUpdate
 }: RegistrationListProps) {
-  const { user } = useAuth();
-  const [mode, setMode] = useState<'list' | 'attendance'>('list');
+  const { user, adminUser } = useAuth();
+  const [showPrintBranchDialog, setShowPrintBranchDialog] = useState(false);
+  const [printBranchChoice, setPrintBranchChoice] = useState<string>('');
+  const [showAttendanceDialog, setShowAttendanceDialog] = useState(false);
   
   // List mode states
   const [searchTerm, setSearchTerm] = useState('');
@@ -91,6 +96,10 @@ export default function RegistrationList({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedRegistration, setSelectedRegistration] = useState<EventRegistration | null>(null);
   const [cancelRegistrationId, setCancelRegistrationId] = useState<string | null>(null);
+  const [editingRegistration, setEditingRegistration] = useState<EventRegistration | null>(null);
+  const [editScheduleId, setEditScheduleId] = useState<string>('');
+  const [editBranchId, setEditBranchId] = useState<string>('');
+  const [savingEdit, setSavingEdit] = useState(false);
   
   // Attendance mode states
   const [attendanceSearchTerm, setAttendanceSearchTerm] = useState('');
@@ -115,44 +124,37 @@ export default function RegistrationList({
     setAttendanceRecords(initialRecords);
   };
 
-  // Filter registrations based on mode
-  const getFilteredRegistrations = () => {
-    const isAttendanceMode = mode === 'attendance';
-    const searchValue = isAttendanceMode ? attendanceSearchTerm : searchTerm;
-    const schedule = isAttendanceMode ? attendanceScheduleFilter : scheduleFilter;
-    const branch = isAttendanceMode ? attendanceBranchFilter : branchFilter;
-    
-    let filtered = registrations.filter(reg => {
-      const matchSearch = 
-        reg.parentName.toLowerCase().includes(searchValue.toLowerCase()) ||
-        reg.parentPhone.includes(searchValue) ||
-        reg.parentEmail?.toLowerCase().includes(searchValue.toLowerCase()) ||
-        reg.students.some(s => s.name.toLowerCase().includes(searchValue.toLowerCase()));
-      
-      const matchSchedule = schedule === 'all' || reg.scheduleId === schedule;
-      const matchBranch = branch === 'all' || reg.branchId === branch;
-      
-      // In attendance mode, only show confirmed registrations
-      if (isAttendanceMode) {
-        return matchSearch && matchSchedule && matchBranch && reg.status !== 'cancelled';
-      }
-      
-      // In list mode, apply status filter
-      const matchStatus = statusFilter === 'all' || reg.status === statusFilter;
-      return matchSearch && matchSchedule && matchBranch && matchStatus;
-    });
-    
-    return filtered;
-  };
+  // Filter registrations for list view
+  const filteredRegistrations = registrations.filter(reg => {
+    const matchSearch =
+      reg.parentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reg.parentPhone.includes(searchTerm) ||
+      reg.parentEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reg.students.some(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const filteredRegistrations = getFilteredRegistrations();
+    const matchSchedule = scheduleFilter === 'all' || reg.scheduleId === scheduleFilter;
+    const matchBranch = branchFilter === 'all' || reg.branchId === branchFilter;
+    const matchStatus = statusFilter === 'all' || reg.status === statusFilter;
+    return matchSearch && matchSchedule && matchBranch && matchStatus;
+  });
 
-  // Handle mode switch
-  const handleModeSwitch = (newMode: 'list' | 'attendance') => {
-    if (newMode === 'attendance') {
-      initializeAttendanceRecords();
-    }
-    setMode(newMode);
+  // Filter registrations for attendance dialog
+  const attendanceFiltered = registrations.filter(reg => {
+    if (reg.status === 'cancelled') return false;
+    const matchSearch =
+      reg.parentName.toLowerCase().includes(attendanceSearchTerm.toLowerCase()) ||
+      reg.parentPhone.includes(attendanceSearchTerm) ||
+      reg.parentEmail?.toLowerCase().includes(attendanceSearchTerm.toLowerCase()) ||
+      reg.students.some(s => s.name.toLowerCase().includes(attendanceSearchTerm.toLowerCase()));
+
+    const matchSchedule = attendanceScheduleFilter === 'all' || reg.scheduleId === attendanceScheduleFilter;
+    const matchBranch = attendanceBranchFilter === 'all' || reg.branchId === attendanceBranchFilter;
+    return matchSearch && matchSchedule && matchBranch;
+  });
+
+  const openAttendanceDialog = () => {
+    initializeAttendanceRecords();
+    setShowAttendanceDialog(true);
   };
 
   // Attendance functions
@@ -174,19 +176,6 @@ export default function RegistrationList({
         note
       }
     }));
-  };
-
-  const handleCheckAll = (checked: boolean) => {
-    const newRecords = { ...attendanceRecords };
-    filteredRegistrations.forEach(reg => {
-      if (newRecords[reg.id]) {
-        newRecords[reg.id] = {
-          ...newRecords[reg.id],
-          attended: checked
-        };
-      }
-    });
-    setAttendanceRecords(newRecords);
   };
 
   const handleSaveAttendance = async () => {
@@ -214,13 +203,67 @@ export default function RegistrationList({
       await updateEventAttendance(attendanceData, user!.uid);
       toast.success('บันทึกการเช็คชื่อเรียบร้อยแล้ว');
       setShowSaveConfirm(false);
+      setShowAttendanceDialog(false);
       onUpdate();
-      setMode('list'); // กลับไปโหมด list หลังบันทึก
     } catch (error) {
       console.error('Error saving attendance:', error);
       toast.error('ไม่สามารถบันทึกการเช็คชื่อได้');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Edit registration schedule/branch
+  const openEditDialog = (registration: EventRegistration) => {
+    setEditingRegistration(registration);
+    setEditScheduleId(registration.scheduleId);
+    setEditBranchId(registration.branchId);
+  };
+
+  const closeEditDialog = () => {
+    setEditingRegistration(null);
+    setEditScheduleId('');
+    setEditBranchId('');
+  };
+
+  const getEditAvailableSeats = (schedule: EventSchedule, branchId: string, currentRegId: string) => {
+    if (!schedule) return 0;
+    const isCurrentSchedule = editingRegistration?.scheduleId === schedule.id;
+    const isCurrentBranch = editingRegistration?.branchId === branchId;
+    const myCount = editingRegistration?.attendeeCount || 0;
+    const mabb = (schedule as any).maxAttendeesByBranch as Record<string, number> | undefined;
+    const branchMax = mabb && mabb[branchId];
+    const branchCurrent = (schedule.attendeesByBranch?.[branchId] || 0) -
+      (isCurrentSchedule && isCurrentBranch ? myCount : 0);
+    if (typeof branchMax === 'number' && branchMax > 0) {
+      return Math.max(0, branchMax - branchCurrent);
+    }
+    const total = Object.values(schedule.attendeesByBranch || {}).reduce((sum, c) => sum + c, 0)
+      - (isCurrentSchedule ? myCount : 0);
+    return Math.max(0, schedule.maxAttendees - total);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingRegistration || !editScheduleId || !editBranchId) return;
+    if (
+      editingRegistration.scheduleId === editScheduleId &&
+      editingRegistration.branchId === editBranchId
+    ) {
+      closeEditDialog();
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      await updateRegistrationSchedule(editingRegistration.id, editScheduleId, editBranchId);
+      toast.success('แก้ไขรอบเวลา/สาขาเรียบร้อยแล้ว');
+      closeEditDialog();
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error updating registration schedule:', error);
+      toast.error(error.message || 'ไม่สามารถแก้ไขได้');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -320,64 +363,259 @@ export default function RegistrationList({
     document.body.removeChild(link);
   };
 
-  // Calculate stats for attendance mode
+  const trimSeconds = (time: string) => (time || '').slice(0, 5);
+
+  const printAttendanceSheet = (branchIdOverride?: string) => {
+    const escapeHtml = (text: string) =>
+      String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+    const targetBranchId = branchIdOverride ?? branchFilter;
+
+    const printable = filteredRegistrations.filter(r => {
+      if (r.status === 'cancelled') return false;
+      if (targetBranchId !== 'all' && r.branchId !== targetBranchId) return false;
+      return true;
+    });
+
+    const filterParts: string[] = [];
+    if (scheduleFilter !== 'all') {
+      const sched = schedules.find(s => s.id === scheduleFilter);
+      if (sched) filterParts.push(`\u0e23\u0e2d\u0e1a: ${formatDate(sched.date, 'short')} ${trimSeconds(sched.startTime)}-${trimSeconds(sched.endTime)}`);
+    }
+    if (targetBranchId !== 'all') {
+      const br = branches.find(b => b.id === targetBranchId);
+      if (br) filterParts.push(`\u0e2a\u0e32\u0e02\u0e32: ${br.name}`);
+    }
+    if (statusFilter !== 'all') {
+      filterParts.push(`\u0e2a\u0e16\u0e32\u0e19\u0e30: ${getStatusText(statusFilter)}`);
+    }
+    const filterText = filterParts.length > 0 ? filterParts.join(' \u2022 ') : '\u0e17\u0e38\u0e01\u0e23\u0e2d\u0e1a \u0e17\u0e38\u0e01\u0e2a\u0e32\u0e02\u0e32';
+
+    const showStudents = countingMethod === 'students';
+
+    const formatScheduleNoSeconds = (scheduleId: string) => {
+      const schedule = schedules.find(s => s.id === scheduleId);
+      if (!schedule) return '-';
+      return `${formatDate(schedule.date, 'short')} ${trimSeconds(schedule.startTime)}-${trimSeconds(schedule.endTime)}`;
+    };
+
+    const rowsHtml = printable.map((reg, idx) => {
+      const namesList = showStudents
+        ? (reg.students.length > 0
+            ? reg.students.map(s => `${escapeHtml(s.name)}${s.nickname ? ` (${escapeHtml(s.nickname)})` : ''}`).join('<br/>')
+            : '-')
+        : (reg.parents.length > 0
+            ? reg.parents.map(p => escapeHtml(p.name)).join('<br/>')
+            : escapeHtml(reg.parentName));
+
+      return `
+        <tr>
+          <td class="center">${idx + 1}</td>
+          <td>${escapeHtml(reg.parentName)}</td>
+          <td>${escapeHtml(formatPhoneNumber(reg.parentPhone))}</td>
+          <td>${namesList}</td>
+          <td class="center">${reg.attendeeCount}</td>
+          <td>${escapeHtml(getBranchName(reg.branchId))}</td>
+          <td>${escapeHtml(formatScheduleNoSeconds(reg.scheduleId))}</td>
+          <td class="sign-cell"></td>
+          <td class="note-cell"></td>
+        </tr>
+      `;
+    }).join('');
+
+    const totalAttendees = printable.reduce((sum, r) => sum + r.attendeeCount, 0);
+    const printedAt = new Date().toLocaleString('th-TH', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const html = `
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<title>\u0e43\u0e1a\u0e40\u0e0a\u0e47\u0e04\u0e0a\u0e37\u0e48\u0e2d - ${escapeHtml(eventName || 'Event')}${targetBranchId !== 'all' ? ` (${escapeHtml(branches.find(b => b.id === targetBranchId)?.name || '')})` : ''}</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #111;
+    margin: 0;
+    padding: 0;
+    font-size: 12pt;
+  }
+  .header { margin-bottom: 12px; border-bottom: 2px solid #111; padding-bottom: 8px; }
+  .header h1 { margin: 0 0 4px 0; font-size: 18pt; }
+  .header .subtitle { font-size: 11pt; color: #444; }
+  .meta { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; font-size: 10pt; color: #444; }
+  .meta .summary { font-weight: 600; color: #111; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #333; padding: 8px 10px; vertical-align: top; font-size: 11pt; }
+  th { background: #f0f0f0; text-align: left; font-weight: 600; }
+  td.center, th.center { text-align: center; }
+  td.sign-cell { width: 150px; height: 56px; }
+  td.note-cell { width: 120px; height: 56px; }
+  tbody tr { page-break-inside: avoid; }
+  .footer { margin-top: 16px; display: flex; justify-content: space-between; font-size: 10pt; color: #555; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>\u0e43\u0e1a\u0e40\u0e0a\u0e47\u0e04\u0e0a\u0e37\u0e48\u0e2d\u0e1c\u0e39\u0e49\u0e40\u0e02\u0e49\u0e32\u0e23\u0e48\u0e27\u0e21\u0e01\u0e34\u0e08\u0e01\u0e23\u0e23\u0e21</h1>
+    <div class="subtitle">${escapeHtml(eventName || '-')}</div>
+  </div>
+
+  <div class="meta">
+    <div>${escapeHtml(filterText)}</div>
+    <div class="summary">
+      \u0e08\u0e33\u0e19\u0e27\u0e19\u0e1c\u0e39\u0e49\u0e25\u0e07\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19: ${printable.length} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23 \u2022 \u0e23\u0e27\u0e21 ${totalAttendees} \u0e04\u0e19
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="center" style="width: 40px;">\u0e25\u0e33\u0e14\u0e31\u0e1a</th>
+        <th style="width: 140px;">\u0e1c\u0e39\u0e49\u0e1b\u0e01\u0e04\u0e23\u0e2d\u0e07</th>
+        <th style="width: 110px;">\u0e40\u0e1a\u0e2d\u0e23\u0e4c\u0e42\u0e17\u0e23</th>
+        <th>${showStudents ? '\u0e23\u0e32\u0e22\u0e0a\u0e37\u0e48\u0e2d\u0e19\u0e31\u0e01\u0e40\u0e23\u0e35\u0e22\u0e19' : '\u0e23\u0e32\u0e22\u0e0a\u0e37\u0e48\u0e2d\u0e1c\u0e39\u0e49\u0e40\u0e02\u0e49\u0e32\u0e23\u0e48\u0e27\u0e21'}</th>
+        <th class="center" style="width: 60px;">\u0e08\u0e33\u0e19\u0e27\u0e19</th>
+        <th style="width: 90px;">\u0e2a\u0e32\u0e02\u0e32</th>
+        <th style="width: 130px;">\u0e23\u0e2d\u0e1a\u0e40\u0e27\u0e25\u0e32</th>
+        <th style="width: 150px;">\u0e25\u0e32\u0e22\u0e40\u0e0b\u0e47\u0e19</th>
+        <th style="width: 120px;">\u0e2b\u0e21\u0e32\u0e22\u0e40\u0e2b\u0e15\u0e38</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml || '<tr><td colspan="9" class="center">\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25</td></tr>'}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div>\u0e1e\u0e34\u0e21\u0e1e\u0e4c\u0e40\u0e21\u0e37\u0e48\u0e2d: ${escapeHtml(printedAt)}</div>
+    <div>\u0e1c\u0e39\u0e49\u0e40\u0e0a\u0e47\u0e04\u0e0a\u0e37\u0e48\u0e2d / \u0e25\u0e07\u0e19\u0e32\u0e21 ____________________________</div>
+  </div>
+</body>
+</html>
+    `;
+
+    // Use a hidden iframe so the browser shows only the print dialog (no extra preview window).
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const cleanup = () => {
+      setTimeout(() => {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      }, 1000);
+    };
+
+    iframe.onload = () => {
+      try {
+        const win = iframe.contentWindow;
+        if (!win) return;
+        win.focus();
+        win.print();
+      } finally {
+        const w = iframe.contentWindow as Window & { onafterprint?: () => void } | null;
+        if (w) {
+          w.onafterprint = cleanup;
+        }
+        // Fallback cleanup in case onafterprint never fires
+        setTimeout(cleanup, 60_000);
+      }
+    };
+
+    const doc = iframe.contentDocument;
+    if (!doc) {
+      toast.error('\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e1e\u0e34\u0e21\u0e1e\u0e4c\u0e44\u0e14\u0e49');
+      iframe.remove();
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+  };
+
+  // Branches that the current admin can print: super_admin or empty branchIds → all event branches; otherwise intersection
+  const accessibleBranches = (() => {
+    const eventBranchIds = Array.from(new Set(registrations.map(r => r.branchId)));
+    const eventBranches = branches.filter(b => eventBranchIds.includes(b.id));
+    if (!adminUser) return eventBranches;
+    if (adminUser.role === 'super_admin') return eventBranches;
+    if (!adminUser.branchIds || adminUser.branchIds.length === 0) return eventBranches;
+    return eventBranches.filter(b => adminUser.branchIds.includes(b.id));
+  })();
+
+  const handlePrintClick = () => {
+    // If branch filter already pinned to a specific branch, print that one directly
+    if (branchFilter !== 'all') {
+      printAttendanceSheet(branchFilter);
+      return;
+    }
+    // If admin can only access one branch in this event, print it directly
+    if (accessibleBranches.length === 1) {
+      printAttendanceSheet(accessibleBranches[0].id);
+      return;
+    }
+    // Otherwise ask which branch
+    setPrintBranchChoice(accessibleBranches[0]?.id || '');
+    setShowPrintBranchDialog(true);
+  };
+
+  // Calculate stats for attendance dialog
   const attendanceStats = (() => {
-    if (mode !== 'attendance') return null;
-    
-    const total = filteredRegistrations.length;
-    const attended = filteredRegistrations.filter(reg => 
+    const total = attendanceFiltered.length;
+    const attended = attendanceFiltered.filter(reg =>
       attendanceRecords[reg.id]?.attended || false
     ).length;
     const absent = total - attended;
-    
     return { total, attended, absent };
   })();
 
+  const countLabel = countingMethod === 'students' ? 'คน' : countingMethod === 'parents' ? 'คน' : 'รายการ';
+  const getCount = (regs: EventRegistration[]) =>
+    countingMethod === 'registrations' ? regs.length : regs.reduce((sum, r) => sum + r.attendeeCount, 0);
+
   return (
     <div className="space-y-6">
-      {/* Header with Mode Toggle */}
+      {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">
-          {mode === 'list' ? 'รายชื่อผู้ลงทะเบียน' : 'เช็คชื่อผู้เข้าร่วม'}
-        </h2>
+        <h2 className="text-lg font-semibold">รายชื่อผู้ลงทะเบียน</h2>
         <div className="flex gap-2">
-          {mode === 'list' ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={exportToCSV}
-                disabled={filteredRegistrations.length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-              <Button 
-                onClick={() => handleModeSwitch('attendance')}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <ClipboardList className="h-4 w-4 mr-2" />
-                เช็คชื่อ
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button 
-                variant="outline"
-                onClick={() => setMode('list')}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                กลับ
-              </Button>
-              <Button 
-                onClick={() => setShowSaveConfirm(true)}
-                className="bg-green-600 hover:bg-green-700"
-                disabled={Object.keys(attendanceRecords).length === 0}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                บันทึกการเช็คชื่อ
-              </Button>
-            </>
-          )}
+          <Button
+            variant="outline"
+            onClick={handlePrintClick}
+            disabled={filteredRegistrations.length === 0 || accessibleBranches.length === 0}
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            พิมพ์ใบเช็คชื่อ
+          </Button>
+          <Button
+            variant="outline"
+            onClick={exportToCSV}
+            disabled={filteredRegistrations.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button
+            onClick={openAttendanceDialog}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <ClipboardList className="h-4 w-4 mr-2" />
+            เช็คชื่อ
+          </Button>
         </div>
       </div>
 
@@ -387,27 +625,27 @@ export default function RegistrationList({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="ค้นหาชื่อ, เบอร์โทร, อีเมล..."
-            value={mode === 'list' ? searchTerm : attendanceSearchTerm}
-            onChange={(e) => mode === 'list' ? setSearchTerm(e.target.value) : setAttendanceSearchTerm(e.target.value)}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
-        
+
         <div className="flex flex-col md:flex-row gap-4">
           <FormSelect
-            value={mode === 'list' ? scheduleFilter : attendanceScheduleFilter}
-            onValueChange={mode === 'list' ? setScheduleFilter : setAttendanceScheduleFilter}
+            value={scheduleFilter}
+            onValueChange={setScheduleFilter}
             placeholder="รอบเวลาทั้งหมด"
             className="w-full md:w-[200px]"
             options={[
               { value: 'all', label: 'รอบเวลาทั้งหมด' },
-              ...schedules.map(s => ({ value: s.id, label: `${formatDate(s.date, 'short')} ${s.startTime}` })),
+              ...schedules.map(s => ({ value: s.id, label: `${formatDate(s.date, 'short')} ${trimSeconds(s.startTime)}` })),
             ]}
           />
 
           <FormSelect
-            value={mode === 'list' ? branchFilter : attendanceBranchFilter}
-            onValueChange={mode === 'list' ? setBranchFilter : setAttendanceBranchFilter}
+            value={branchFilter}
+            onValueChange={setBranchFilter}
             placeholder="สาขาทั้งหมด"
             className="w-full md:w-[200px]"
             options={[
@@ -416,132 +654,69 @@ export default function RegistrationList({
             ]}
           />
 
-          {mode === 'list' && (
-            <FormSelect
-              value={statusFilter}
-              onValueChange={setStatusFilter}
-              placeholder="สถานะทั้งหมด"
-              className="w-full md:w-[200px]"
-              options={[
-                { value: 'all', label: 'สถานะทั้งหมด' },
-                { value: 'confirmed', label: 'ลงทะเบียนแล้ว' },
-                { value: 'cancelled', label: 'ยกเลิก' },
-                { value: 'attended', label: 'มางาน' },
-                { value: 'no-show', label: 'ไม่มา' },
-              ]}
-            />
-          )}
-          
-          {mode === 'attendance' && (
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="check-all"
-                onCheckedChange={handleCheckAll}
-              />
-              <label
-                htmlFor="check-all"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                เลือกทั้งหมด
-              </label>
-            </div>
-          )}
+          <FormSelect
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+            placeholder="สถานะทั้งหมด"
+            className="w-full md:w-[200px]"
+            options={[
+              { value: 'all', label: 'สถานะทั้งหมด' },
+              { value: 'confirmed', label: 'ลงทะเบียนแล้ว' },
+              { value: 'cancelled', label: 'ยกเลิก' },
+              { value: 'attended', label: 'มางาน' },
+              { value: 'no-show', label: 'ไม่มา' },
+            ]}
+          />
         </div>
       </div>
 
       {/* Summary Cards */}
-      {mode === 'list' ? (() => {
-        const countLabel = countingMethod === 'students' ? 'คน' : countingMethod === 'parents' ? 'คน' : 'รายการ';
-        const getCount = (regs: EventRegistration[]) =>
-          countingMethod === 'registrations' ? regs.length : regs.reduce((sum, r) => sum + r.attendeeCount, 0);
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{getCount(filteredRegistrations)}</div>
+            <p className="text-xs text-gray-500">{countLabel}</p>
+          </CardContent>
+        </Card>
 
-        return (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{getCount(filteredRegistrations)}</div>
-              <p className="text-xs text-gray-500">{countLabel}</p>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">ลงทะเบียนแล้ว</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {getCount(filteredRegistrations.filter(r => r.status === 'confirmed'))}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">ลงทะเบียนแล้ว</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {getCount(filteredRegistrations.filter(r => r.status === 'confirmed'))}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">มางาน</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {getCount(filteredRegistrations.filter(r => r.status === 'attended'))}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">มางาน</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {getCount(filteredRegistrations.filter(r => r.status === 'attended'))}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">ยกเลิก</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {getCount(filteredRegistrations.filter(r => r.status === 'cancelled'))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">ยกเลิก</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {getCount(filteredRegistrations.filter(r => r.status === 'cancelled'))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        );
-      })() : (
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                ทั้งหมด
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{attendanceStats?.total || 0}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                มา
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{attendanceStats?.attended || 0}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-600" />
-                ไม่มา
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{attendanceStats?.absent || 0}</div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Main Content */}
+      {/* List Table */}
       <Card>
         <CardContent className="p-0">
           {filteredRegistrations.length === 0 ? (
@@ -551,22 +726,19 @@ export default function RegistrationList({
                 ไม่พบข้อมูลผู้ลงทะเบียน
               </h3>
               <p className="text-gray-600">
-                {(mode === 'list' ? searchTerm : attendanceSearchTerm) || 
-                 (mode === 'list' ? scheduleFilter : attendanceScheduleFilter) !== 'all' || 
-                 (mode === 'list' ? branchFilter : attendanceBranchFilter) !== 'all' || 
-                 (mode === 'list' && statusFilter !== 'all')
+                {searchTerm || scheduleFilter !== 'all' || branchFilter !== 'all' || statusFilter !== 'all'
                   ? 'ลองปรับเงื่อนไขการค้นหา'
                   : 'ยังไม่มีผู้ลงทะเบียน'}
               </p>
             </div>
-          ) : mode === 'list' ? (
-            // List Mode - Table View
+          ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>ผู้ลงทะเบียน</TableHead>
                     <TableHead>ติดต่อ</TableHead>
+                    <TableHead>นักเรียน</TableHead>
                     <TableHead>รอบเวลา</TableHead>
                     <TableHead>สาขา</TableHead>
                     <TableHead className="text-center">จำนวน</TableHead>
@@ -605,9 +777,32 @@ export default function RegistrationList({
                         </div>
                       </TableCell>
                       <TableCell>
+                        {registration.students.length === 0 ? (
+                          <span className="text-sm text-gray-400">-</span>
+                        ) : (
+                          <div className="space-y-1.5 text-sm">
+                            {registration.students.map((s, i) => (
+                              <div key={i}>
+                                <p className="font-medium">
+                                  {s.name}
+                                  {s.nickname && (
+                                    <span className="text-gray-500 font-normal"> ({s.nickname})</span>
+                                  )}
+                                </p>
+                                {(s.schoolName || s.gradeLevel) && (
+                                  <p className="text-xs text-gray-500">
+                                    {[s.schoolName, s.gradeLevel].filter(Boolean).join(' • ')}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="text-sm">
                           <p>{formatDate(registration.scheduleDate, 'short')}</p>
-                          <p className="text-gray-500">{registration.scheduleTime}</p>
+                          <p className="text-gray-500">{trimSeconds(registration.scheduleTime)}</p>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -638,6 +833,17 @@ export default function RegistrationList({
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => openEditDialog(registration)}
+                              className="text-blue-600 hover:text-blue-700"
+                              title="แก้ไขรอบเวลา/สาขา"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {registration.status === 'confirmed' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => setCancelRegistrationId(registration.id)}
                               className="text-red-600 hover:text-red-700"
                             >
@@ -651,67 +857,139 @@ export default function RegistrationList({
                 </TableBody>
               </Table>
             </div>
-          ) : (
-            // Attendance Mode - Card View
-            <div className="p-6 space-y-4">
-              {filteredRegistrations.map((registration) => (
-                <div
-                  key={registration.id}
-                  className={`p-4 border rounded-lg transition-colors ${
-                    attendanceRecords[registration.id]?.attended
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-white'
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    <Checkbox
-                      checked={attendanceRecords[registration.id]?.attended || false}
-                      onCheckedChange={(checked) => 
-                        handleAttendanceChange(registration.id, checked as boolean)
-                      }
-                      className="mt-1"
-                    />
-                    
-                    <div className="flex-1 space-y-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium">{registration.parentName}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {formatPhoneNumber(registration.parentPhone)}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Building2 className="h-3 w-3" />
-                              {getBranchName(registration.branchId)}
-                            </span>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Attendance Dialog */}
+      <Dialog open={showAttendanceDialog} onOpenChange={setShowAttendanceDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-green-600" />
+              เช็คชื่อผู้เข้าร่วม
+            </DialogTitle>
+            <DialogDescription>
+              ติ๊กรายชื่อผู้ที่มางาน — กดบันทึกเมื่อเช็คเสร็จ
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Filters + stats */}
+          <div className="px-6 py-4 space-y-3 border-b bg-gray-50">
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="ค้นหาชื่อ, เบอร์โทร..."
+                  value={attendanceSearchTerm}
+                  onChange={(e) => setAttendanceSearchTerm(e.target.value)}
+                  className="pl-10 bg-white"
+                />
+              </div>
+              <FormSelect
+                value={attendanceScheduleFilter}
+                onValueChange={setAttendanceScheduleFilter}
+                placeholder="รอบเวลาทั้งหมด"
+                className="w-full md:w-[200px] bg-white"
+                options={[
+                  { value: 'all', label: 'รอบเวลาทั้งหมด' },
+                  ...schedules.map(s => ({ value: s.id, label: `${formatDate(s.date, 'short')} ${trimSeconds(s.startTime)}` })),
+                ]}
+              />
+              <FormSelect
+                value={attendanceBranchFilter}
+                onValueChange={setAttendanceBranchFilter}
+                placeholder="สาขาทั้งหมด"
+                className="w-full md:w-[180px] bg-white"
+                options={[
+                  { value: 'all', label: 'สาขาทั้งหมด' },
+                  ...branches.map(b => ({ value: b.id, label: b.name })),
+                ]}
+              />
+            </div>
+
+            <div className="flex items-center gap-4 text-sm">
+              <span className="flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-gray-500" />
+                ทั้งหมด <strong>{attendanceStats.total}</strong>
+              </span>
+              <span className="flex items-center gap-1.5 text-green-600">
+                <CheckCircle2 className="h-4 w-4" />
+                มา <strong>{attendanceStats.attended}</strong>
+              </span>
+              <span className="flex items-center gap-1.5 text-red-600">
+                <XCircle className="h-4 w-4" />
+                ไม่มา <strong>{attendanceStats.absent}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+            {attendanceFiltered.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p>ไม่พบรายการ</p>
+              </div>
+            ) : (
+              attendanceFiltered.map((registration) => {
+                const checked = attendanceRecords[registration.id]?.attended || false;
+                return (
+                  <div
+                    key={registration.id}
+                    onClick={() => handleAttendanceChange(registration.id, !checked)}
+                    className={`p-4 border rounded-lg transition-colors cursor-pointer ${
+                      checked
+                        ? 'bg-green-50 border-green-300'
+                        : 'bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(c) =>
+                          handleAttendanceChange(registration.id, c as boolean)
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <p className="font-medium">{registration.parentName}</p>
+                            <div className="flex items-center gap-3 text-sm text-gray-500 mt-1 flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                {formatPhoneNumber(registration.parentPhone)}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Building2 className="h-3 w-3" />
+                                {getBranchName(registration.branchId)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <Badge variant="outline">
+                              {getScheduleDisplay(registration.scheduleId)}
+                            </Badge>
+                            <p className="text-sm text-gray-500 mt-1">
+                              {registration.attendeeCount} คน
+                            </p>
                           </div>
                         </div>
-                        
-                        <div className="text-right">
-                          <Badge variant="outline">
-                            {getScheduleDisplay(registration.scheduleId)}
-                          </Badge>
-                          <p className="text-sm text-gray-500 mt-1">
-                            {registration.attendeeCount} คน
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {/* Show students/parents based on counting method */}
-                      {registration.students.length > 0 && (
-                        <div className="text-sm text-gray-600">
-                          <span className="font-medium">นักเรียน:</span>{' '}
-                          {registration.students.map(s => s.name).join(', ')}
-                        </div>
-                      )}
-                      
-                      {/* Note input */}
-                      <div className="mt-2">
+
+                        {registration.students.length > 0 && (
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">นักเรียน:</span>{' '}
+                            {registration.students.map(s => s.name).join(', ')}
+                          </div>
+                        )}
+
                         <Input
                           placeholder="หมายเหตุ (ถ้ามี)"
                           value={attendanceRecords[registration.id]?.note || ''}
-                          onChange={(e) => 
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
                             handleNoteChange(registration.id, e.target.value)
                           }
                           className="h-8 text-sm"
@@ -719,12 +997,27 @@ export default function RegistrationList({
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer actions */}
+          <div className="px-6 py-4 border-t flex justify-end gap-2 bg-white">
+            <Button variant="outline" onClick={() => setShowAttendanceDialog(false)}>
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={() => setShowSaveConfirm(true)}
+              className="bg-green-600 hover:bg-green-700"
+              disabled={Object.keys(attendanceRecords).length === 0}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              บันทึกการเช็คชื่อ
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Registration Detail Dialog */}
       <Dialog open={!!selectedRegistration} onOpenChange={() => setSelectedRegistration(null)}>
@@ -880,6 +1173,144 @@ export default function RegistrationList({
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Print Branch Selection Dialog */}
+      <Dialog open={showPrintBranchDialog} onOpenChange={setShowPrintBranchDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>เลือกสาขาที่จะพิมพ์</DialogTitle>
+            <DialogDescription>
+              พิมพ์ใบเช็คชื่อแยกต่อสาขา เลือก 1 สาขาต่อใบ
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <FormSelect
+              value={printBranchChoice}
+              onValueChange={setPrintBranchChoice}
+              placeholder="เลือกสาขา"
+              options={accessibleBranches.map(b => {
+                const count = registrations.filter(
+                  r => r.branchId === b.id && r.status !== 'cancelled'
+                ).length;
+                return { value: b.id, label: `${b.name} (${count} รายการ)` };
+              })}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowPrintBranchDialog(false)}>
+                ยกเลิก
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!printBranchChoice) return;
+                  setShowPrintBranchDialog(false);
+                  printAttendanceSheet(printBranchChoice);
+                }}
+                disabled={!printBranchChoice}
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                พิมพ์
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Schedule/Branch Dialog */}
+      <Dialog open={!!editingRegistration} onOpenChange={(open) => !open && closeEditDialog()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>แก้ไขรอบเวลา / สาขา</DialogTitle>
+            <DialogDescription>
+              {editingRegistration?.parentName} • {editingRegistration?.attendeeCount} คน
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingRegistration && (() => {
+            const eventBranches = branches.filter(b =>
+              schedules.some(s => {
+                const mabb = (s as any).maxAttendeesByBranch as Record<string, number> | undefined;
+                return mabb && mabb[b.id] !== undefined;
+              })
+            );
+            const branchOptions = eventBranches.length > 0 ? eventBranches : branches;
+            const selectedSchedule = schedules.find(s => s.id === editScheduleId);
+            const seatsLeft = selectedSchedule
+              ? getEditAvailableSeats(selectedSchedule, editBranchId, editingRegistration.id)
+              : 0;
+            const myCount = editingRegistration.attendeeCount;
+            const insufficient = seatsLeft < myCount;
+            const noChange =
+              editingRegistration.scheduleId === editScheduleId &&
+              editingRegistration.branchId === editBranchId;
+
+            return (
+              <div className="space-y-4 py-2">
+                <div className="text-sm bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p className="text-gray-500 text-xs">ปัจจุบัน</p>
+                  <p className="font-medium">
+                    {getScheduleDisplay(editingRegistration.scheduleId)}
+                  </p>
+                  <p className="text-gray-700">
+                    สาขา: {getBranchName(editingRegistration.branchId)}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">สาขา</label>
+                  <FormSelect
+                    value={editBranchId}
+                    onValueChange={setEditBranchId}
+                    placeholder="เลือกสาขา"
+                    options={branchOptions.map(b => ({ value: b.id, label: b.name }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">รอบเวลา</label>
+                  <FormSelect
+                    value={editScheduleId}
+                    onValueChange={setEditScheduleId}
+                    placeholder="เลือกรอบเวลา"
+                    options={schedules.map(s => {
+                      const left = editBranchId
+                        ? getEditAvailableSeats(s, editBranchId, editingRegistration.id)
+                        : 0;
+                      const label = `${formatDate(s.date, 'short')} ${trimSeconds(s.startTime)}-${trimSeconds(s.endTime)} (เหลือ ${left} ที่)`;
+                      return { value: s.id, label };
+                    })}
+                  />
+                </div>
+
+                {selectedSchedule && editBranchId && !noChange && (
+                  <div
+                    className={`text-sm rounded-lg px-3 py-2 ${
+                      insufficient
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'bg-green-50 text-green-700 border border-green-200'
+                    }`}
+                  >
+                    {insufficient
+                      ? `ที่ว่างไม่พอ (เหลือ ${seatsLeft} ที่ ต้องใช้ ${myCount} ที่)`
+                      : `เหลือที่ว่าง ${seatsLeft} ที่ • ใช้ ${myCount} ที่`}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={closeEditDialog} disabled={savingEdit}>
+                    ยกเลิก
+                  </Button>
+                  <Button
+                    onClick={handleSaveEdit}
+                    disabled={savingEdit || noChange || insufficient || !editScheduleId || !editBranchId}
+                  >
+                    {savingEdit ? 'กำลังบันทึก...' : 'บันทึก'}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
