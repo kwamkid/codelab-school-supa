@@ -420,8 +420,8 @@ export default function RegistrationList({
           <td>${escapeHtml(formatPhoneNumber(reg.parentPhone))}</td>
           <td>${namesList}</td>
           <td class="center">${reg.attendeeCount}</td>
-          <td>${escapeHtml(getBranchName(reg.branchId))}</td>
           <td>${escapeHtml(formatScheduleNoSeconds(reg.scheduleId))}</td>
+          <td class="pdpa-cell"><span class="pdpa-box"></span></td>
           <td class="sign-cell"></td>
           <td class="note-cell"></td>
         </tr>
@@ -460,6 +460,8 @@ export default function RegistrationList({
   td.center, th.center { text-align: center; }
   td.sign-cell { width: 150px; height: 56px; }
   td.note-cell { width: 120px; height: 56px; }
+  td.pdpa-cell { width: 110px; height: 56px; text-align: center; vertical-align: middle; }
+  .pdpa-box { display: inline-block; width: 18px; height: 18px; border: 1.5px solid #111; vertical-align: middle; }
   tbody tr { page-break-inside: avoid; }
   .footer { margin-top: 16px; display: flex; justify-content: space-between; font-size: 10pt; color: #555; }
 </style>
@@ -485,8 +487,8 @@ export default function RegistrationList({
         <th style="width: 110px;">\u0e40\u0e1a\u0e2d\u0e23\u0e4c\u0e42\u0e17\u0e23</th>
         <th>${showStudents ? '\u0e23\u0e32\u0e22\u0e0a\u0e37\u0e48\u0e2d\u0e19\u0e31\u0e01\u0e40\u0e23\u0e35\u0e22\u0e19' : '\u0e23\u0e32\u0e22\u0e0a\u0e37\u0e48\u0e2d\u0e1c\u0e39\u0e49\u0e40\u0e02\u0e49\u0e32\u0e23\u0e48\u0e27\u0e21'}</th>
         <th class="center" style="width: 60px;">\u0e08\u0e33\u0e19\u0e27\u0e19</th>
-        <th style="width: 90px;">\u0e2a\u0e32\u0e02\u0e32</th>
         <th style="width: 130px;">\u0e23\u0e2d\u0e1a\u0e40\u0e27\u0e25\u0e32</th>
+        <th class="center" style="width: 110px;">\u0e22\u0e34\u0e19\u0e22\u0e2d\u0e21 PDPA<br/>(\u0e20\u0e32\u0e1e/\u0e27\u0e35\u0e14\u0e35\u0e42\u0e2d)</th>
         <th style="width: 150px;">\u0e25\u0e32\u0e22\u0e40\u0e0b\u0e47\u0e19</th>
         <th style="width: 120px;">\u0e2b\u0e21\u0e32\u0e22\u0e40\u0e2b\u0e15\u0e38</th>
       </tr>
