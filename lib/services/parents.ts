@@ -286,6 +286,7 @@ export async function getStudentsByParent(parentId: string): Promise<Student[]> 
 
     return (data || []).map((row: any) => ({
       id: row.id,
+      studentCode: row.student_code,
       parentId: row.parent_id,
       name: row.name,
       nickname: row.nickname,
@@ -326,6 +327,7 @@ export async function getStudent(parentId: string, studentId: string): Promise<S
 
     return {
       id: data.id,
+      studentCode: data.student_code,
       parentId: data.parent_id,
       name: data.name,
       nickname: data.nickname,
@@ -558,6 +560,7 @@ export async function searchParentsUnified(searchTerm: string): Promise<ParentSe
         parent: mapToParent(row as ParentRow),
         students: (row.students || []).map((s: any) => ({
           id: s.id,
+          studentCode: s.student_code,
           parentId: s.parent_id,
           name: s.name,
           nickname: s.nickname,
@@ -656,6 +659,7 @@ export async function getAllStudentsWithParents(): Promise<(Student & {
 
     return (data || []).map((row: any) => ({
       id: row.id,
+      studentCode: row.student_code,
       parentId: row.parent_id,
       name: row.name,
       nickname: row.nickname,
@@ -764,6 +768,7 @@ export async function getStudentWithParent(studentId: string): Promise<(Student 
 
     return {
       id: data.id,
+      studentCode: data.student_code,
       parentId: data.parent_id,
       name: data.name,
       nickname: data.nickname,

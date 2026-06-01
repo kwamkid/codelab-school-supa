@@ -484,27 +484,21 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         },
       ]
     },
+    // Super admin: single unified page (admins + teachers + invites)
     {
       name: 'ผู้ใช้งาน และครู',
+      href: '/users',
       icon: Users,
       iconColor: 'text-orange-500',
-      requiredRole: ['super_admin', 'branch_admin'],
-      subItems: [
-        {
-          name: 'ผู้ดูแลระบบ',
-          href: '/users',
-          icon: Shield,
-          iconColor: 'text-red-500',
-          requiredRole: ['super_admin']
-        },
-        {
-          name: 'ครูผู้สอน',
-          href: '/teachers',
-          icon: UserCog,
-          iconColor: 'text-purple-500',
-          requiredRole: ['super_admin', 'branch_admin']
-        },
-      ]
+      requiredRole: ['super_admin']
+    },
+    // Branch admin: teacher profile management only (cannot access /users)
+    {
+      name: 'ครูผู้สอน',
+      href: '/teachers',
+      icon: UserCog,
+      iconColor: 'text-purple-500',
+      requiredRole: ['branch_admin']
     },
     {
       name: 'กิจกรรม',
@@ -547,6 +541,20 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       icon: UserCheck,
       iconColor: 'text-emerald-500',
       requiredRole: ['super_admin', 'branch_admin', 'teacher']
+    },
+    {
+      name: 'Quiz',
+      href: '/quizzes',
+      icon: FileText,
+      iconColor: 'text-sky-500',
+      requiredRole: ['super_admin', 'teacher']
+    },
+    {
+      name: 'คะแนนนักเรียน',
+      href: '/quizzes/scores',
+      icon: BarChart3,
+      iconColor: 'text-indigo-500',
+      requiredRole: ['super_admin', 'teacher']
     },
     {
       name: 'divider-4',
@@ -718,15 +726,26 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     );
   }
 
+  // collect every leaf href so we can pick the MOST specific match.
+  // plain const (NOT useMemo) — this runs after early returns above, so a hook here
+  // would break the rules of hooks ("rendered more hooks than previous render").
+  const allHrefs: string[] = [];
+  const collectHrefs = (items: NavigationItem[]) => items.forEach((it) => {
+    if (it.href) allHrefs.push(it.href);
+    if (it.subItems) collectHrefs(it.subItems);
+  });
+  collectHrefs(navigation);
+
   const isActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === href;
-    }
-    return pathname.startsWith(href);
+    if (href === '/dashboard') return pathname === href;
+    if (pathname === href) return true;
+    if (!pathname.startsWith(href + '/')) return false;
+    // not active if a more-specific menu item also matches (e.g. /quizzes vs /quizzes/scores)
+    return !allHrefs.some((h) => h !== href && h.startsWith(href + '/') && (pathname === h || pathname.startsWith(h + '/')));
   };
 
   const isSubItemActive = (item: NavigationItem) => {
-    return item.subItems?.some((sub) => sub.href && pathname.startsWith(sub.href));
+    return item.subItems?.some((sub) => sub.href && isActive(sub.href));
   };
 
   const handleNotificationClick = async (notif: Notification) => {

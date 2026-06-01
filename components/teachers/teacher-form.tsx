@@ -35,7 +35,6 @@ export default function TeacherForm({ teacher, isEdit = false }: TeacherFormProp
     specialties: teacher?.specialties || [],
     availableBranches: teacher?.availableBranches || [],
     profileImage: teacher?.profileImage || '',
-    hourlyRate: teacher?.hourlyRate || 0,
     bankAccount: teacher?.bankAccount || {
       bankName: '',
       accountNumber: '',
@@ -312,17 +311,6 @@ export default function TeacherForm({ teacher, isEdit = false }: TeacherFormProp
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="hourlyRate">ค่าสอนต่อชั่วโมง (บาท)</Label>
-              <Input
-                id="hourlyRate"
-                type="number"
-                min="0"
-                value={formData.hourlyRate}
-                onChange={(e) => setFormData({ ...formData, hourlyRate: parseInt(e.target.value) || 0 })}
-                placeholder="500"
-              />
-            </div>
           </CardContent>
         </Card>
 

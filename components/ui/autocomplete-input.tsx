@@ -204,8 +204,8 @@ export function AutocompleteInput({
                         handleSelect(opt)
                       }}
                       className={cn(
-                        "flex items-center justify-between px-3 py-2 text-sm cursor-pointer",
-                        idx === highlightIndex ? "bg-accent" : "hover:bg-accent/50"
+                        "flex items-center justify-between px-3 py-2 text-sm cursor-pointer text-gray-900",
+                        idx === highlightIndex ? "bg-red-50 text-red-700" : "hover:bg-gray-100"
                       )}
                     >
                       <span>{opt.label}</span>

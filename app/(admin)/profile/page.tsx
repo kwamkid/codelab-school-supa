@@ -380,16 +380,6 @@ export default function ProfilePage() {
             </div>
             <p className="font-medium">{getBranchNames(teacher!.availableBranches)}</p>
           </div>
-
-          {teacher!.hourlyRate && teacher!.hourlyRate > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="h-5 w-5 text-gray-400" />
-                <p className="text-sm text-gray-500">ค่าสอนต่อชั่วโมง</p>
-              </div>
-              <p className="font-medium">{formatCurrency(teacher!.hourlyRate)}</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 

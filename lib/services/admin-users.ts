@@ -9,6 +9,7 @@ interface AdminUserRow {
   auth_user_id: string | null;
   email: string;
   display_name: string;
+  nickname: string | null;
   role: 'super_admin' | 'branch_admin' | 'teacher';
   branch_ids: string[];
   teacher_id: string | null;
@@ -29,6 +30,7 @@ function mapToAdminUser(row: AdminUserRow): AdminUser {
     id: row.id,
     email: row.email,
     displayName: row.display_name,
+    nickname: row.nickname || undefined,
     role: row.role,
     branchIds: row.branch_ids || [],
     teacherId: row.teacher_id || undefined,
@@ -76,6 +78,25 @@ export async function getAdminUsers(branchId?: string): Promise<AdminUser[]> {
     return users;
   } catch (error) {
     console.error('Error getting admin users:', error);
+    throw error;
+  }
+}
+
+// Get ALL admin users across every role (super_admin, branch_admin, teacher)
+export async function getAllAdminUsers(): Promise<AdminUser[]> {
+  try {
+    const supabase = getClient();
+
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).map(row => mapToAdminUser(row as AdminUserRow));
+  } catch (error) {
+    console.error('Error getting all admin users:', error);
     throw error;
   }
 }

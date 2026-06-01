@@ -36,7 +36,7 @@ const formSchema = z.object({
   displayName: z.string().min(1, 'กรุณาระบุชื่อ'),
   email: z.string().email('อีเมลไม่ถูกต้อง'),
   password: z.string().min(6, 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร').optional(),
-  role: z.enum(['super_admin', 'branch_admin']),
+  role: z.enum(['super_admin', 'branch_admin', 'teacher']),
   branchIds: z.array(z.string()),
   permissions: z.object({
     canManageUsers: z.boolean(),
@@ -91,9 +91,9 @@ export default function UserFormDialog({
   useEffect(() => {
     if (editingUser) {
       form.reset({
-        displayName: editingUser.email, // ใช้ email เป็น displayName
+        displayName: editingUser.displayName || editingUser.email,
         email: editingUser.email,
-        role: editingUser.role === 'teacher' ? 'branch_admin' : editingUser.role, // ถ้าเป็น teacher ให้เปลี่ยนเป็น branch_admin
+        role: editingUser.role,
         branchIds: editingUser.branchIds || [],
         permissions: editingUser.permissions || {
           canManageUsers: false,
@@ -154,7 +154,7 @@ export default function UserFormDialog({
         await updateAdminUser(
           editingUser!.id,
           {
-            displayName: data.email, // ใช้ email เป็น displayName
+            // Keep the existing display_name (esp. teachers whose name != email)
             role: data.role,
             branchIds: data.branchIds,
             permissions: data.permissions,
@@ -333,11 +333,13 @@ export default function UserFormDialog({
                       options={[
                         { value: 'super_admin', label: 'Super Admin' },
                         { value: 'branch_admin', label: 'Branch Admin' },
+                        { value: 'teacher', label: 'ครูผู้สอน (Teacher)' },
                       ]}
                     />
                     <FormDescription>
                       {field.value === 'super_admin' && 'มีสิทธิ์เข้าถึงและจัดการทุกอย่างในระบบ'}
                       {field.value === 'branch_admin' && 'จัดการเฉพาะสาขาที่ได้รับมอบหมาย'}
+                      {field.value === 'teacher' && 'เข้าถึงเมนูฝั่งครู (เช็คชื่อ, สื่อการสอน)'}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
