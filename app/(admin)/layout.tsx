@@ -650,7 +650,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         { name: 'บริษัท (ออกบิล)', href: '/settings/invoice-company' },
         { name: 'เชื่อมแชท', href: '/settings/chat' },
         { name: 'Facebook Ads', href: '/settings/facebook' },
+        { name: 'จัดการโรงเรียน', href: '/settings/schools' },
         { name: 'Backup', href: '/settings/backup' },
+        { name: 'Data Cleaning', href: '/data-cleaning' },
       ]
     },
   ], [pendingMakeupCount, newTrialCount, chatUnreadCount]); // dependencies สำหรับ badges
@@ -886,7 +888,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                             {item.name}
                           </div>
                           {item.badge && (
-                            <span className="ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-bold text-[#ef443a] bg-white rounded-full">
+                            <span className="ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-bold text-[#ef443a] bg-[#ffffff] rounded-full">
                               {item.badge}
                             </span>
                           )}

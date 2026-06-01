@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     // NOTE: deliberately omit correct_answer
     const questions = await restSelect('quiz_questions', {
       quiz_id: `eq.${id}`,
-      select: 'id,sort_order,question,question_th,question_en,options,options_th,options_en,points',
+      select: 'id,sort_order,question,question_th,question_en,options,options_th,options_en,points,image_url',
       order: 'sort_order.asc',
     })
     return NextResponse.json({ quiz, questions })

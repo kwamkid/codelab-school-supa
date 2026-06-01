@@ -22,9 +22,9 @@ export function ThemeToggle() {
       aria-label="Toggle theme"
     >
       {mounted && isDark ? (
-        <Sun className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+        <Sun className="h-5 w-5 text-amber-400" />
       ) : (
-        <Moon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+        <Moon className="h-5 w-5" />
       )}
     </Button>
   );

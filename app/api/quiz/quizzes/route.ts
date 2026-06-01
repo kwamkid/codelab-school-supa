@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
         correct_answer: q.correctAnswer ?? 0,
         points: q.points ?? 10,
         competency: q.competency ?? null,
+        image_url: q.imageUrl ?? null,
       }))
       await restInsert('quiz_questions', rows)
     }

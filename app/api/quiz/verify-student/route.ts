@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { restSelect } from '@/lib/supabase/rest'
+import { resolveSchoolName } from '@/lib/server/resolve-school'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,10 @@ export async function POST(request: NextRequest) {
     })
     const s = rows?.[0]
 
-    if (!s || s.is_active === false || norm(s.school_name) !== norm(school)) {
+    // accept full name / English / abbreviation / alias by resolving to canonical
+    const resolved = await resolveSchoolName(school)
+    const schoolOk = s && (norm(s.school_name) === norm(resolved) || norm(s.school_name) === norm(school))
+    if (!s || s.is_active === false || !schoolOk) {
       return NextResponse.json({ ok: false, error: 'ไม่พบรหัสนักเรียนนี้ หรือโรงเรียนไม่ตรง' }, { status: 404 })
     }
 

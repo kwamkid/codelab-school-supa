@@ -70,14 +70,14 @@ export default function QuizBrowsePage() {
               const diff = DIFF[q.difficulty];
               return (
                 <Link key={q.id} href={`/quiz/${q.id}`} className="block group">
-                  <div className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-4">
+                  <div className="rounded-2xl p-4 border border-white/15 bg-white/10 backdrop-blur-xl hover:bg-white/15 hover:-translate-y-0.5 transition-all flex items-center gap-4">
                     <span className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ef443a] to-[#ff7a3c] text-white flex items-center justify-center shrink-0 shadow-inner">
                       <QuizIcon name={q.icon} className="h-7 w-7" />
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-gray-900 truncate">{(lang === 'en' ? q.title_en : q.title_th) || q.title}</div>
-                      <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5 flex-wrap">
-                        {q.categoryName && <span className="font-medium text-gray-600">{q.categoryName}</span>}
+                      <div className="font-bold text-white truncate">{(lang === 'en' ? q.title_en : q.title_th) || q.title}</div>
+                      <div className="flex items-center gap-2 text-sm text-white/70 mt-0.5 flex-wrap">
+                        {q.categoryName && <span className="font-medium text-white/90">{q.categoryName}</span>}
                         <span>{q.questionCount} {t('ข้อ', 'questions')}</span>
                         {diff && (
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${diff.chip}`}>
@@ -86,7 +86,7 @@ export default function QuizBrowsePage() {
                         )}
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-[#ef443a] group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="h-5 w-5 text-white/40 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </Link>
               );

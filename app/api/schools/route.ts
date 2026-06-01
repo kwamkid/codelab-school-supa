@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizeSchoolName } from '@/lib/utils/normalize-school-name'
+import { restSelect } from '@/lib/supabase/rest'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -25,37 +26,26 @@ async function fetchAllRows<T>(
   return allRows
 }
 
-// GET /api/schools?search=xxx - search distinct school names
+// GET /api/schools?search=xxx - search schools (alias-aware: name / English / abbreviation / aliases)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServiceClient()
-    const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
+    const search = (new URL(request.url).searchParams.get('search') || '').trim().toLowerCase()
 
-    const data = await fetchAllRows<{ school_name: string | null }>((from, to) => {
-      let q = supabase
-        .from('students')
-        .select('school_name')
-        .not('school_name', 'is', null)
-        .neq('school_name', '')
-      if (search) {
-        q = q.ilike('school_name', `%${search}%`)
-      }
-      return q.range(from, to)
+    const all = await restSelect<any>('schools', {
+      is_active: 'eq.true',
+      select: 'name,name_en,abbreviation,aliases',
+      order: 'name.asc',
     })
 
-    // Get distinct school names with counts
-    const countMap = new Map<string, number>()
-    for (const row of data) {
-      if (row.school_name) {
-        countMap.set(row.school_name, (countMap.get(row.school_name) || 0) + 1)
-      }
-    }
+    const matched = (search
+      ? all.filter((s) =>
+          [s.name, s.name_en, s.abbreviation, ...(s.aliases || [])]
+            .some((v: string) => (v || '').toLowerCase().includes(search))
+        )
+      : all
+    ).slice(0, 50)
 
-    const schools = Array.from(countMap.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-
+    const schools = matched.map((s) => ({ name: s.name, abbreviation: s.abbreviation, nameEn: s.name_en }))
     return NextResponse.json({ success: true, schools })
   } catch (error) {
     console.error('Error fetching schools:', error)
@@ -94,7 +84,7 @@ export async function POST(request: NextRequest) {
     if (body.action === 'normalize') {
       // Normalize all school names: strip prefixes, trim
       const students = await fetchAllRows<{ id: string; school_name: string }>((from, to) =>
-        supabase
+        (supabase as any)
           .from('students')
           .select('id, school_name')
           .not('school_name', 'is', null)

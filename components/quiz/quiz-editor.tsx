@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormSelect } from '@/components/ui/form-select';
 import { Switch } from '@/components/ui/switch';
 import { SectionLoading } from '@/components/ui/loading';
-import { Plus, Trash2, Loader2, Check, ArrowLeft, Upload } from 'lucide-react';
+import { Plus, Trash2, Loader2, Check, ArrowLeft, Upload, Image as ImageIcon, X } from 'lucide-react';
 import Link from 'next/link';
 import { getCategories, getQuizForEdit, createQuiz, updateQuiz } from '@/lib/services/quiz';
 import { DIFFICULTY_OPTIONS } from '@/lib/quiz/translations';
@@ -26,11 +26,34 @@ interface QForm {
   correctAnswer: number;
   points: number;
   competency: string;
+  imageUrl: string;
 }
 
 const emptyQuestion = (): QForm => ({
-  questionTh: '', questionEn: '', optionsTh: ['', '', '', ''], optionsEn: ['', '', '', ''], correctAnswer: 0, points: 10, competency: '',
+  questionTh: '', questionEn: '', optionsTh: ['', '', '', ''], optionsEn: ['', '', '', ''], correctAnswer: 0, points: 10, competency: '', imageUrl: '',
 });
+
+// resize/compress an image client-side before upload (max width, jpeg quality)
+function resizeImage(file: File, maxW = 1000, quality = 0.82): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('no canvas ctx'));
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('resize failed'))), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load failed')); };
+    img.src = url;
+  });
+}
 
 export default function QuizEditor({ quizId }: { quizId?: string }) {
   const router = useRouter();
@@ -48,6 +71,7 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
   const [isActive, setIsActive] = useState(true);
   const [questions, setQuestions] = useState<QForm[]>([emptyQuestion()]);
   const [showImport, setShowImport] = useState(false);
+  const [uploadingQi, setUploadingQi] = useState<number | null>(null);
 
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {});
@@ -73,6 +97,7 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
             correctAnswer: q.correct_answer ?? 0,
             points: q.points ?? 10,
             competency: q.competency ?? '',
+            imageUrl: q.image_url ?? '',
           }))
         );
       })
@@ -82,6 +107,24 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
 
   const updateQ = (i: number, patch: Partial<QForm>) =>
     setQuestions((qs) => qs.map((q, idx) => (idx === i ? { ...q, ...patch } : q)));
+  const uploadImage = async (qi: number, file: File) => {
+    setUploadingQi(qi);
+    try {
+      const blob = await resizeImage(file);
+      const fd = new FormData();
+      fd.append('file', new File([blob], 'question.jpg', { type: 'image/jpeg' }));
+      fd.append('bucket', 'quiz-images');
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'อัพโหลดไม่สำเร็จ');
+      updateQ(qi, { imageUrl: json.url });
+    } catch (e: any) {
+      toast.error(e.message || 'อัพโหลดรูปไม่สำเร็จ');
+    } finally {
+      setUploadingQi(null);
+    }
+  };
+
   const setOption = (qi: number, oi: number, lang: 'th' | 'en', val: string) =>
     setQuestions((qs) => qs.map((q, idx) => {
       if (idx !== qi) return q;
@@ -113,6 +156,7 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
           correctAnswer: q.correctAnswer,
           points: q.points,
           competency: q.competency.trim() || undefined,
+          imageUrl: q.imageUrl || undefined,
         })),
       };
       if (isEdit) await updateQuiz(quizId!, payload);
@@ -193,6 +237,28 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
               <div className="space-y-1"><Label className="text-xs">คำถาม (ไทย)</Label><Textarea value={q.questionTh} onChange={(e) => updateQ(qi, { questionTh: e.target.value })} rows={2} /></div>
               <div className="space-y-1"><Label className="text-xs">คำถาม (EN)</Label><Textarea value={q.questionEn} onChange={(e) => updateQ(qi, { questionEn: e.target.value })} rows={2} placeholder="optional" /></div>
             </div>
+
+            {/* question image (optional, resized on upload) */}
+            <div className="space-y-1">
+              <Label className="text-xs">รูปประกอบคำถาม (ไม่บังคับ)</Label>
+              {q.imageUrl ? (
+                <div className="relative inline-block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={q.imageUrl} alt="" className="max-h-40 rounded-lg border" />
+                  <button type="button" onClick={() => updateQ(qi, { imageUrl: '' })} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow" title="ลบรูป">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-2 w-full sm:w-64 h-20 rounded-lg border-2 border-dashed cursor-pointer hover:bg-gray-50 text-sm text-gray-500">
+                  {uploadingQi === qi ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                  {uploadingQi === qi ? 'กำลังอัพโหลด...' : 'อัพโหลดรูป'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingQi === qi}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(qi, f); e.target.value = ''; }} />
+                </label>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label className="text-xs">ตัวเลือก (เลือกข้อที่ถูก)</Label>
               {[0, 1, 2, 3].map((oi) => (
@@ -234,7 +300,7 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
         onImport={(imported) => {
           setQuestions((qs) => {
             const base = qs.length === 1 && !qs[0].questionTh.trim() ? [] : qs;
-            return [...base, ...imported];
+            return [...base, ...imported.map((q) => ({ ...q, imageUrl: '' }))];
           });
           toast.success(`นำเข้า ${imported.length} ข้อ`);
         }}

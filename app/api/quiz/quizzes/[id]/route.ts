@@ -57,6 +57,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           correct_answer: q.correctAnswer ?? 0,
           points: q.points ?? 10,
           competency: q.competency ?? null,
+          image_url: q.imageUrl ?? null,
         }))
         await restInsert('quiz_questions', rows)
       }
