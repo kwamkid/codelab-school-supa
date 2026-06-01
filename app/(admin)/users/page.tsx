@@ -47,16 +47,18 @@ import {
   Trash2,
   ShieldAlert,
   UserCog,
-  ChevronLeft
+  ChevronLeft,
+  ChevronDown
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { AdminUser } from '@/types/models';
-import { getAdminUsers, updateAdminUser, sendPasswordReset, deleteAdminUser } from '@/lib/services/admin-users';
+import { getAllAdminUsers, updateAdminUser, sendPasswordReset, deleteAdminUser } from '@/lib/services/admin-users';
 import { getBranches } from '@/lib/services/branches';
 import { Branch } from '@/types/models';
 import { toast } from 'sonner';
 import UserFormDialog from '@/components/users/user-form-dialog';
 import AddRightsDialog from '@/components/users/add-rights-dialog';
+import CreateInviteDialog from '@/components/users/create-invite-dialog';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import {
@@ -75,7 +77,11 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'super_admin' | 'branch_admin' | 'teacher'>('all');
+  const [branchFilter, setBranchFilter] = useState<string>('all');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteRole, setInviteRole] = useState<'super_admin' | 'branch_admin' | 'teacher'>('branch_admin');
   const [showAddRightsDialog, setShowAddRightsDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<AdminUser | null>(null);
@@ -102,7 +108,7 @@ export default function UsersPage() {
     try {
       setLoading(true);
       const [usersData, branchesData] = await Promise.all([
-        getAdminUsers(),
+        getAllAdminUsers(),
         getBranches()
       ]);
       setUsers(usersData);
@@ -168,11 +174,21 @@ export default function UsersPage() {
     // Filter by status
     if (statusFilter === 'active' && !user.isActive) return false;
     if (statusFilter === 'inactive' && user.isActive) return false;
-    
+
+    // Filter by role
+    if (roleFilter !== 'all' && user.role !== roleFilter) return false;
+
+    // Filter by branch (empty branchIds = all branches → always matches)
+    if (branchFilter !== 'all') {
+      const coversAll = user.branchIds.length === 0;
+      if (!coversAll && !user.branchIds.includes(branchFilter)) return false;
+    }
+
     // Filter by search term
     const search = searchTerm.toLowerCase();
     return (
       user.displayName.toLowerCase().includes(search) ||
+      (user.nickname || '').toLowerCase().includes(search) ||
       user.email.toLowerCase().includes(search)
     );
   });
@@ -187,14 +203,14 @@ export default function UsersPage() {
     return roleMap[role as keyof typeof roleMap] || role;
   };
 
-  // Get role color
-  const getRoleColor = (role: string) => {
-    const colorMap = {
-      'super_admin': 'destructive',
-      'branch_admin': 'default',
-      'teacher': 'secondary'
+  // Get role badge color classes (distinct color per role)
+  const getRoleBadgeClass = (role: string) => {
+    const map: Record<string, string> = {
+      super_admin: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-100',
+      branch_admin: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100',
+      teacher: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100',
     };
-    return colorMap[role as keyof typeof colorMap] as any || 'default';
+    return map[role] || 'bg-gray-100 text-gray-700 border-gray-200';
   };
 
   // Get role icon
@@ -275,15 +291,31 @@ export default function UsersPage() {
           <p className="text-gray-600 mt-1">จัดการผู้ใช้งานและสิทธิ์การเข้าถึง (Super Admin Only)</p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            onClick={() => setShowCreateDialog(true)}
-            className="bg-red-500 hover:bg-red-600"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            เพิ่มผู้ใช้งาน
-          </Button>
-          
-       
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="bg-red-500 hover:bg-red-600">
+                <Plus className="h-4 w-4 mr-2" />
+                เพิ่มผู้ใช้งาน
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>สร้างลิงก์เชิญสำหรับ</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { setInviteRole('super_admin'); setShowInviteDialog(true); }}>
+                <Shield className="h-4 w-4 mr-2 text-red-500" />
+                Super Admin
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setInviteRole('branch_admin'); setShowInviteDialog(true); }}>
+                <Building2 className="h-4 w-4 mr-2 text-blue-500" />
+                Branch Admin
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setInviteRole('teacher'); setShowInviteDialog(true); }}>
+                <UserCog className="h-4 w-4 mr-2 text-green-500" />
+                ครูผู้สอน
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -302,25 +334,10 @@ export default function UsersPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">ระงับการใช้งาน</CardTitle>
-            <Ban className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {users.filter(u => !u.isActive).length}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              ไม่สามารถเข้าใช้งานได้
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
+        <Card className="border-l-4 border-l-red-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Super Admin</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <Shield className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
@@ -332,10 +349,10 @@ export default function UsersPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Branch Admin</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Building2 className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
@@ -343,6 +360,21 @@ export default function UsersPage() {
             </div>
             <p className="text-xs text-muted-foreground">
               จัดการเฉพาะสาขา
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">ครูผู้สอน</CardTitle>
+            <UserCog className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {users.filter(u => u.role === 'teacher').length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              เข้าถึงเมนูฝั่งครู
             </p>
           </CardContent>
         </Card>
@@ -359,6 +391,49 @@ export default function UsersPage() {
               className="flex-1 max-w-sm"
             />
             
+            {/* Role Filter */}
+            <Select value={roleFilter} onValueChange={(value: any) => setRoleFilter(value)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="บทบาท" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกบทบาท</SelectItem>
+                <SelectItem value="super_admin">
+                  <span className="flex items-center gap-2">
+                    <Shield className="h-3 w-3 text-red-500" />
+                    Super Admin
+                  </span>
+                </SelectItem>
+                <SelectItem value="branch_admin">
+                  <span className="flex items-center gap-2">
+                    <Building2 className="h-3 w-3 text-blue-500" />
+                    Branch Admin
+                  </span>
+                </SelectItem>
+                <SelectItem value="teacher">
+                  <span className="flex items-center gap-2">
+                    <UserCog className="h-3 w-3 text-green-500" />
+                    ครูผู้สอน
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Branch Filter */}
+            <Select value={branchFilter} onValueChange={setBranchFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="สาขา" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกสาขา</SelectItem>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
               <SelectTrigger className="w-[180px]">
@@ -404,12 +479,17 @@ export default function UsersPage() {
                 <TableRow key={user.id} className={!user.isActive ? 'bg-gray-50' : ''}>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{user.displayName}</div>
+                      <div className="font-medium">
+                        {user.displayName}
+                        {user.nickname && (
+                          <span className="text-gray-500 font-normal"> ({user.nickname})</span>
+                        )}
+                      </div>
                       <div className="text-gray-500">{user.email}</div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getRoleColor(user.role)}>
+                    <Badge variant="outline" className={getRoleBadgeClass(user.role)}>
                       <span className="flex items-center gap-1">
                         {getRoleIcon(user.role)}
                         {getRoleDisplay(user.role)}
@@ -513,7 +593,15 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      {/* Create/Edit Dialog */}
+      {/* Create Invite Dialog (replaces email/password creation) */}
+      <CreateInviteDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        branches={branches}
+        initialRole={inviteRole}
+      />
+
+      {/* Edit Dialog */}
       <UserFormDialog
         open={showCreateDialog}
         onOpenChange={(open) => {

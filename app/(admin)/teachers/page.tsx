@@ -169,8 +169,6 @@ export default function TeachersPage() {
   }
 
   const activeTeachers = teachers.filter(t => t.isActive);
-  const totalHourlyRate = activeTeachers.reduce((sum, t) => sum + (t.hourlyRate || 0), 0);
-  const avgHourlyRate = activeTeachers.length > 0 ? totalHourlyRate / activeTeachers.length : 0;
 
   return (
     <div>
@@ -200,7 +198,7 @@ export default function TeachersPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">ครูทั้งหมด</CardTitle>
@@ -230,16 +228,6 @@ export default function TeachersPage() {
             <div className="text-2xl font-bold">
               {[...new Set(teachers.flatMap(t => t.specialties))].length}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">ค่าสอนเฉลี่ย/ชม.</CardTitle>
-            <Users className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(avgHourlyRate)}</div>
           </CardContent>
         </Card>
       </div>
@@ -298,7 +286,6 @@ export default function TeachersPage() {
                     <TableHead>ติดต่อ</TableHead>
                     <TableHead>วิชาที่สอน</TableHead>
                     <TableHead>สาขาที่สอน</TableHead>
-                    <TableHead className="text-center">ค่าสอน/ชม.</TableHead>
                     <TableHead className="text-center">สถานะ</TableHead>
                     <TableHead className="text-right">จัดการ</TableHead>
                   </TableRow>
@@ -374,9 +361,6 @@ export default function TeachersPage() {
                             </>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {teacher.hourlyRate ? formatCurrency(teacher.hourlyRate) : '-'}
                       </TableCell>
                       <TableCell className="text-center">
                         {teacher.isActive ? (

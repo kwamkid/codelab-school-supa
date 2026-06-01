@@ -132,6 +132,7 @@ export default function StudentsPage() {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(student => 
         student.name.toLowerCase().includes(searchLower) ||
+        student.studentCode?.toLowerCase().includes(searchLower) ||
         student.nickname.toLowerCase().includes(searchLower) ||
         student.parentName.toLowerCase().includes(searchLower) ||
         student.schoolName?.toLowerCase().includes(searchLower) ||
@@ -394,6 +395,9 @@ export default function StudentsPage() {
                               </div>
                             )}
                             <div className="min-w-0">
+                              {student.studentCode && (
+                                <p className="font-mono text-xs text-red-600">{student.studentCode}</p>
+                              )}
                               <p className="font-medium truncate">{student.name}</p>
                               <p className="text-gray-600 truncate">{student.nickname || '-'}</p>
                               {!student.isActive && (

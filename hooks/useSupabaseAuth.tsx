@@ -97,6 +97,7 @@ interface AuthContextType {
   teacher: Teacher | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   canAccessBranch: (branchId: string) => boolean;
   isSuperAdmin: () => boolean;
@@ -175,8 +176,16 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  // Load admin user data from Supabase
-  const loadAdminUser = useCallback(async (client: SupabaseClient<Database>, authUserId: string, userEmail?: string) => {
+  // Load admin user data from Supabase.
+  // Returns an access status so the caller can enforce the membership guard:
+  //   'ok'        → email found in admin_users AND is_active
+  //   'inactive'  → email found but is_active = false (does NOT set adminUser)
+  //   'not_found' → email not in admin_users at all
+  const loadAdminUser = useCallback(async (
+    client: SupabaseClient<Database>,
+    authUserId: string,
+    userEmail?: string
+  ): Promise<'ok' | 'inactive' | 'not_found'> => {
     try {
       // Use provided email or fetch it
       let email = userEmail;
@@ -188,19 +197,19 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
       if (!email) {
         console.error('[loadAdminUser] No user email found');
-        return;
+        return 'not_found';
       }
 
       const emailLower = email.toLowerCase();
 
-      // Skip if already loaded for this email
+      // Skip if already loaded for this email (already confirmed active)
       if (loadedEmailRef.current === emailLower) {
-        return;
+        return 'ok';
       }
 
       // Prevent duplicate concurrent calls
       if (loadingAdminRef.current) {
-        return;
+        return 'ok';
       }
 
       loadingAdminRef.current = true;
@@ -215,23 +224,30 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         if (!response.ok) {
           console.error('[loadAdminUser] Fetch error:', response.status);
           loadingAdminRef.current = false;
-          return;
+          return 'not_found';
         }
 
         adminDataArray = await response.json();
       } catch (queryError) {
         console.error('[loadAdminUser] Query exception:', queryError);
         loadingAdminRef.current = false;
-        return;
+        return 'not_found';
       }
 
       if (!adminDataArray || adminDataArray.length === 0) {
         console.error('[loadAdminUser] No admin user found for email:', emailLower);
         loadingAdminRef.current = false;
-        return;
+        return 'not_found';
       }
 
       const adminData = adminDataArray[0];
+
+      // Reject deactivated accounts — do not expose admin data
+      if (adminData.is_active === false) {
+        loadingAdminRef.current = false;
+        return 'inactive';
+      }
+
       const mappedAdmin = mapAdminUser(adminData as unknown as AdminUserData);
 
       // Add default permissions for super_admin
@@ -248,7 +264,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       setAdminUser(mappedAdmin);
 
       // Mark as successfully loaded only after setting admin user
-      loadedEmailRef.current = email;
+      loadedEmailRef.current = emailLower;
 
       // Load teacher data if role is teacher
       if (adminData.role === 'teacher' && adminData.teacher_id) {
@@ -256,11 +272,45 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       }
 
       loadingAdminRef.current = false;
+      return 'ok';
     } catch (error) {
       console.error('Exception in loadAdminUser:', error);
       loadingAdminRef.current = false;
+      return 'not_found';
     }
   }, [loadTeacherData]);
+
+  // Enforce the membership guard after a session is established.
+  // Unauthorized (not in admin_users) or deactivated accounts are signed out
+  // and bounced to /login. Skipped on /invite/* pages, where the invite landing
+  // page is responsible for creating the admin_users record first.
+  const enforceAccess = useCallback(async (
+    client: SupabaseClient<Database>,
+    status: 'ok' | 'inactive' | 'not_found'
+  ): Promise<boolean> => {
+    if (status === 'ok') return true;
+
+    const onInvitePage = typeof window !== 'undefined'
+      && window.location.pathname.startsWith('/invite');
+    if (onInvitePage) return true;
+
+    try {
+      sessionStorage.setItem('auth_denied', status);
+    } catch { /* ignore */ }
+
+    loadedEmailRef.current = null;
+    loadingAdminRef.current = false;
+    setAdminUser(null);
+    setTeacher(null);
+    setUser(null);
+    setSession(null);
+    await client.auth.signOut();
+
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+    return false;
+  }, []);
 
   // Initialize auth state - only runs on client side
   useEffect(() => {
@@ -288,7 +338,10 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         setUser(toCompatibleUser(session?.user ?? null));
 
         if (session?.user) {
-          await loadAdminUser(supabase, session.user.id, session.user.email);
+          const status = await loadAdminUser(supabase, session.user.id, session.user.email);
+          if (!mounted) return;
+          const allowed = await enforceAccess(supabase, status);
+          if (!allowed) return; // signed out + redirecting
         }
 
         if (!mounted) return;
@@ -309,7 +362,10 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         setUser(toCompatibleUser(session?.user ?? null));
 
         if (session?.user) {
-          await loadAdminUser(supabase, session.user.id, session.user.email);
+          const status = await loadAdminUser(supabase, session.user.id, session.user.email);
+          if (!mounted) return;
+          const allowed = await enforceAccess(supabase, status);
+          if (!allowed) return; // signed out + redirecting
         } else {
           setAdminUser(null);
           setTeacher(null);
@@ -360,6 +416,21 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // router is used but stable in Next.js
+
+  const signInWithGoogle = useCallback(async () => {
+    const supabase = getClient();
+    // PKCE flow: Google redirects to Supabase callback, then back here.
+    // The browser client (detectSessionInUrl) exchanges the code on return,
+    // onAuthStateChange fires → loadAdminUser runs → login page redirects.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/login`,
+        queryParams: { prompt: 'select_account' },
+      },
+    });
+    if (error) throw error;
+  }, []);
 
   const signOut = useCallback(async () => {
     try {
@@ -426,6 +497,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     teacher,
     loading,
     signIn,
+    signInWithGoogle,
     signOut,
     canAccessBranch,
     isSuperAdmin,

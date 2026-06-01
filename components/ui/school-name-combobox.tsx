@@ -22,10 +22,10 @@ export function SchoolNameCombobox({
     const res = await fetch(`/api/schools?${params}`)
     const data = await res.json()
     if (data.success) {
-      return (data.schools || []).map((s: { name: string; count: number }) => ({
+      return (data.schools || []).map((s: { name: string; abbreviation?: string; nameEn?: string }) => ({
         value: s.name,
         label: s.name,
-        description: `(${s.count})`,
+        description: s.abbreviation ? `(${s.abbreviation})` : (s.nameEn || ''),
       }))
     }
     return []

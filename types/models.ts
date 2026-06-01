@@ -25,6 +25,7 @@ export interface AdminUser {
   id: string; // uid จาก Firebase Auth
   email: string;
   displayName: string;
+  nickname?: string;
   role: 'super_admin' | 'branch_admin' | 'teacher';
   branchIds: string[]; // สาขาที่ดูแลได้ (empty array = ทุกสาขา)
   permissions?: {
@@ -43,6 +44,7 @@ export interface AdminUser {
 
 export interface Student {
   id: string;
+  studentCode?: string;
   parentId: string;
   name: string;
   nickname: string;
