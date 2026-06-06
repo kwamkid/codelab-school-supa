@@ -3,6 +3,7 @@ export interface Parent {
   id: string;
   lineUserId?: string;
   displayName: string;
+  lineDisplayName?: string;
   pictureUrl?: string;
   phone: string;
   emergencyPhone?: string;

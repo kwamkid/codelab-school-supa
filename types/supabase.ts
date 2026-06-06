@@ -127,6 +127,7 @@ export interface Database {
         Row: {
           id: string
           line_user_id: string | null
+          line_display_name: string | null
           display_name: string
           picture_url: string | null
           phone: string
@@ -145,6 +146,7 @@ export interface Database {
         Insert: {
           id?: string
           line_user_id?: string | null
+          line_display_name?: string | null
           display_name: string
           picture_url?: string | null
           phone: string
@@ -163,6 +165,7 @@ export interface Database {
         Update: {
           id?: string
           line_user_id?: string | null
+          line_display_name?: string | null
           display_name?: string
           picture_url?: string | null
           phone?: string

@@ -55,6 +55,16 @@ export async function findOrCreateContact(
     insertData.is_group = true;
     insertData.group_id = groupOptions.groupId || platformUserId;
     insertData.member_count = groupOptions.memberCount || null;
+  } else {
+    // Auto-link to an existing parent that already registered with this LINE id.
+    // (For FB/IG the PSID won't match any parent.line_user_id, so this is a no-op.)
+    const { data: parentMatch } = await (supabase as any)
+      .from('parents')
+      .select('id')
+      .eq('line_user_id', platformUserId)
+      .limit(1)
+      .maybeSingle();
+    if (parentMatch?.id) insertData.parent_id = parentMatch.id;
   }
 
   const { data: newContact, error } = await (supabase as any)

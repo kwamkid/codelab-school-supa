@@ -6,6 +6,8 @@ import { useChatMessagesRealtime, useChatConversationsRealtime } from '@/hooks/u
 import { ChatConversation, ChatMessage, Branch } from '@/types/models';
 import { getBranches } from '@/lib/services/branches';
 import { getParent, getStudentsByParent } from '@/lib/services/parents';
+import { getEnrollmentsByParent } from '@/lib/services/enrollments';
+import { getClass } from '@/lib/services/classes';
 import { useBranch } from '@/contexts/BranchContext';
 import { toast } from 'sonner';
 import ConversationList from '@/components/chat/conversation-list';
@@ -18,6 +20,21 @@ import { CompactEnrollmentForm } from '@/components/shared/compact-enrollment-fo
 import { adminMutation } from '@/lib/admin-mutation';
 
 type PanelView = 'info' | 'trial' | 'enrollment';
+
+export interface LinkedParentInfo {
+  id: string;
+  displayName: string;
+  phone: string;
+  createdAt?: Date;
+  students?: {
+    id: string;
+    name: string;
+    nickname?: string;
+    schoolName?: string;
+    gradeLevel?: string;
+    enrollments?: { className: string; enrolledAt: Date }[];
+  }[];
+}
 
 const MESSAGES_PER_PAGE = 50;
 
@@ -37,7 +54,7 @@ export default function ChatPage() {
   const [mobileView, setMobileView] = useState<MobileView>('list');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [showLinkModal, setShowLinkModal] = useState(false);
-  const [linkedParent, setLinkedParent] = useState<{ id: string; displayName: string; phone: string; students?: { id: string; name: string }[] } | null>(null);
+  const [linkedParent, setLinkedParent] = useState<LinkedParentInfo | null>(null);
   const [panelView, setPanelView] = useState<PanelView>('info');
 
   // Counter for generating unique optimistic message IDs
@@ -50,6 +67,17 @@ export default function ChatPage() {
   const handleSelectConversation = useCallback((id: string) => {
     setSelectedConversationId(id);
     setMobileView('messages');
+    // A DB-search result may not be in the loaded list yet — fetch & add it so
+    // the message thread and info panel can resolve `selectedConversation`.
+    setConversations(prev => {
+      if (prev.some(c => c.id === id)) return prev;
+      getConversation(id)
+        .then(conv => {
+          if (conv) setConversations(p => (p.some(c => c.id === id) ? p : [conv, ...p]));
+        })
+        .catch(() => {});
+      return prev;
+    });
   }, []);
 
   // Mobile: back to conversation list
@@ -373,29 +401,53 @@ export default function ChatPage() {
     }
   }, [selectedConversation]);
 
+  // Build the enriched linked-parent object (students + nickname + school + enrollments)
+  const loadLinkedParentData = useCallback(async (parentId: string): Promise<LinkedParentInfo | null> => {
+    const parent = await getParent(parentId);
+    if (!parent) return null;
+    const [students, enrollments] = await Promise.all([
+      getStudentsByParent(parent.id),
+      getEnrollmentsByParent(parent.id).catch(() => []),
+    ]);
+    // Resolve class names for the (few) enrolled classes
+    const classIds = Array.from(new Set(enrollments.map(e => e.classId)));
+    const classNames = new Map<string, string>();
+    await Promise.all(classIds.map(async (cid) => {
+      try {
+        const c = await getClass(cid);
+        if (c) classNames.set(cid, c.name);
+      } catch { /* ignore */ }
+    }));
+    return {
+      id: parent.id,
+      displayName: parent.displayName || '',
+      phone: parent.phone || '',
+      createdAt: parent.createdAt,
+      students: students.map(s => ({
+        id: s.id,
+        name: s.name,
+        nickname: s.nickname || undefined,
+        schoolName: s.schoolName || undefined,
+        gradeLevel: s.gradeLevel || undefined,
+        enrollments: enrollments
+          .filter(e => e.studentId === s.id)
+          .map(e => ({ className: classNames.get(e.classId) || 'คอร์ส', enrolledAt: e.enrolledAt })),
+      })),
+    };
+  }, []);
+
   // Load linked parent when conversation changes
   useEffect(() => {
     if (!selectedConversation?.contact?.parentId) {
       setLinkedParent(null);
       return;
     }
-    const loadParent = async () => {
-      try {
-        const parent = await getParent(selectedConversation.contact!.parentId!);
-        if (!parent) { setLinkedParent(null); return; }
-        const students = await getStudentsByParent(parent.id);
-        setLinkedParent({
-          id: parent.id,
-          displayName: parent.displayName || '',
-          phone: parent.phone || '',
-          students: students.map(s => ({ id: s.id, name: s.name })),
-        });
-      } catch {
-        setLinkedParent(null);
-      }
-    };
-    loadParent();
-  }, [selectedConversation?.contact?.parentId]);
+    let cancelled = false;
+    loadLinkedParentData(selectedConversation.contact.parentId)
+      .then(data => { if (!cancelled) setLinkedParent(data); })
+      .catch(() => { if (!cancelled) setLinkedParent(null); });
+    return () => { cancelled = true; };
+  }, [selectedConversation?.contact?.parentId, loadLinkedParentData]);
 
   // Helper to update contact in local conversations state
   const updateLocalContact = useCallback((contactId: string, patch: Record<string, any>) => {
@@ -468,18 +520,10 @@ export default function ChatPage() {
     updateLocalContact(contactId, { parentId });
     // Load parent details
     try {
-      const parent = await getParent(parentId);
-      if (parent) {
-        const students = await getStudentsByParent(parent.id);
-        setLinkedParent({
-          id: parent.id,
-          displayName: parent.displayName || '',
-          phone: parent.phone || '',
-          students: students.map(s => ({ id: s.id, name: s.name })),
-        });
-      }
+      const data = await loadLinkedParentData(parentId);
+      if (data) setLinkedParent(data);
     } catch {}
-  }, [selectedConversation, updateLocalContact]);
+  }, [selectedConversation, updateLocalContact, loadLinkedParentData]);
 
   const handleUnlinkParent = useCallback(async () => {
     const contactId = selectedConversation?.contact?.id;
