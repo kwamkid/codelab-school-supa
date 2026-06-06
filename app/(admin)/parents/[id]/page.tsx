@@ -132,6 +132,7 @@ export default function ParentDetailPage() {
       // Clear LINE data by passing null (will use deleteField in service)
       await updateParent(parent.id, {
         lineUserId: null,
+        lineDisplayName: null,
         pictureUrl: null
       });
       
@@ -449,14 +450,14 @@ export default function ParentDetailPage() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       {parent.pictureUrl && (
-                        <img 
-                          src={parent.pictureUrl} 
-                          alt={parent.displayName}
+                        <img
+                          src={parent.pictureUrl}
+                          alt={parent.lineDisplayName || parent.displayName}
                           className="w-12 h-12 rounded-full"
                         />
                       )}
                       <div>
-                        <p className="font-medium">{parent.displayName}</p>
+                        <p className="font-medium">{parent.lineDisplayName || parent.displayName}</p>
                         <p className="text-xs text-gray-500">LINE Display Name</p>
                       </div>
                     </div>

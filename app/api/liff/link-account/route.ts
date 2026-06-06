@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update parent with LINE info
-    const linked = await linkParentToLine(result.parent.id, lineUserId, lineDisplayName)
+    const linked = await linkParentToLine(result.parent.id, lineUserId, lineDisplayName, linePictureUrl)
 
     if (!linked) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อได้' }, { status: 500 })

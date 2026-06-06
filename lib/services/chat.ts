@@ -237,6 +237,81 @@ export async function getConversations(filters?: {
   return conversations;
 }
 
+/**
+ * Server-side search across ALL conversations (not just the loaded page).
+ * Matches contacts by display name (partial), phone (partial), or tag (exact).
+ * Used as the 2nd step when the in-memory search over loaded conversations finds nothing.
+ */
+export async function searchConversations(query: string, limit = 30): Promise<ChatConversation[]> {
+  const raw = query.trim();
+  if (!raw) return [];
+  const supabase = getClient();
+
+  // Sanitize for the PostgREST or() filter (commas/parens break its grammar)
+  const safe = raw.replace(/[,()]/g, ' ').trim();
+
+  const contactIds = new Set<string>();
+
+  // Name / phone partial match
+  if (safe) {
+    const { data: nameMatches } = await (supabase as any)
+      .from('chat_contacts')
+      .select('id')
+      .or(`display_name.ilike.*${safe}*,phone.ilike.*${safe}*`)
+      .limit(200);
+    (nameMatches || []).forEach((r: any) => contactIds.add(r.id));
+  }
+
+  // Tag exact match (text[] contains)
+  const { data: tagMatches } = await (supabase as any)
+    .from('chat_contacts')
+    .select('id')
+    .contains('tags', [raw])
+    .limit(200);
+  (tagMatches || []).forEach((r: any) => contactIds.add(r.id));
+
+  if (contactIds.size === 0) return [];
+
+  const { data, error } = await (supabase as any)
+    .from('chat_conversations')
+    .select('*, chat_contacts(id, display_name, avatar_url, phone, parent_id, tags, branch_ids), chat_channels(id, type, name)')
+    .in('contact_id', Array.from(contactIds))
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []).map(mapConversation);
+}
+
+/**
+ * Fetch conversations across the whole DB whose contact has ANY of the given tags.
+ * Used to make the tag filter search the entire database, not just loaded rows.
+ */
+export async function getConversationsByTags(tags: string[], limit = 200): Promise<ChatConversation[]> {
+  const list = (tags || []).filter(Boolean);
+  if (list.length === 0) return [];
+  const supabase = getClient();
+
+  const { data: contacts } = await (supabase as any)
+    .from('chat_contacts')
+    .select('id')
+    .overlaps('tags', list)
+    .limit(500);
+
+  const contactIds = (contacts || []).map((r: any) => r.id);
+  if (contactIds.length === 0) return [];
+
+  const { data, error } = await (supabase as any)
+    .from('chat_conversations')
+    .select('*, chat_contacts(id, display_name, avatar_url, phone, parent_id, tags, branch_ids), chat_channels(id, type, name)')
+    .in('contact_id', contactIds)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []).map(mapConversation);
+}
+
 export async function getConversation(id: string): Promise<ChatConversation | null> {
   const supabase = getClient();
   const { data, error } = await (supabase as any)
@@ -410,6 +485,32 @@ export async function linkContactToParent(contactId: string, parentId: string): 
     },
     match: { id: contactId },
   });
+
+  // For LINE contacts, sync the LINE profile (name/avatar/user id) onto the parent
+  // so the parent detail page shows the real LINE display name instead of being blank.
+  try {
+    const contact = await getContact(contactId);
+    if (!contact) return;
+    const channel = await getChannel(contact.channelId);
+    if (channel?.type !== 'line' || !contact.platformUserId) return;
+
+    // NOTE: parents has no updated_at column — do not include it here.
+    const parentUpdate: Record<string, any> = {
+      line_user_id: contact.platformUserId,
+    };
+    if (contact.displayName) parentUpdate.line_display_name = contact.displayName;
+    if (contact.avatarUrl) parentUpdate.picture_url = contact.avatarUrl;
+
+    await adminMutation({
+      table: 'parents',
+      operation: 'update',
+      data: parentUpdate,
+      match: { id: parentId },
+    });
+  } catch (err) {
+    // Non-fatal: the contact↔parent link already succeeded above.
+    console.error('Error syncing LINE profile to parent:', err);
+  }
 }
 
 export async function updateContactInfo(contactId: string, data: {

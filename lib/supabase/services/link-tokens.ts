@@ -272,23 +272,38 @@ export async function getActiveTokensForParent(parentId: string): Promise<LinkTo
 export async function linkParentToLine(
   parentId: string,
   lineUserId: string,
-  lineDisplayName?: string
+  lineDisplayName?: string,
+  linePictureUrl?: string
 ): Promise<boolean> {
   const supabase = createServiceClient()
 
   try {
+    // NOTE: parents has no updated_at column — do not include it here.
+    const updateData: Record<string, any> = {
+      line_user_id: lineUserId,
+    }
+    if (lineDisplayName) updateData.line_display_name = lineDisplayName
+    if (linePictureUrl) updateData.picture_url = linePictureUrl
+
     const { error } = await supabase
       .from('parents')
-      .update({
-        line_user_id: lineUserId,
-        line_display_name: lineDisplayName,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', parentId)
 
     if (error) {
       console.error('Error linking parent to LINE:', error)
       return false
+    }
+
+    // Also link any existing chat contact with the same LINE id to this parent,
+    // so the chat panel shows the registered parent's data right away.
+    const { error: contactErr } = await (supabase as any)
+      .from('chat_contacts')
+      .update({ parent_id: parentId })
+      .eq('platform_user_id', lineUserId)
+      .is('parent_id', null)
+    if (contactErr) {
+      console.error('Error linking chat contact to parent:', contactErr)
     }
 
     return true

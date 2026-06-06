@@ -20,12 +20,14 @@ import {
   CheckCircle,
   UserCircle,
   School,
-  ClipboardCheck
+  ClipboardCheck,
+  Pencil
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getEnrollmentsByClass } from '@/lib/services/enrollments';
 import { getStudent } from '@/lib/services/parents';
 import { Enrollment } from '@/types/models';
+import ChangeTeacherDialog from './change-teacher-dialog';
 
 interface ClassDetailDialogProps {
   open: boolean;
@@ -33,6 +35,7 @@ interface ClassDetailDialogProps {
   event: CalendarEvent | null;
   scheduleId: string;
   onAttendanceSaved?: () => void;
+  onTeacherChanged?: () => void;
 }
 
 interface EnrolledStudent {
@@ -47,11 +50,13 @@ export default function ClassDetailDialog({
   onOpenChange, 
   event,
   scheduleId,
-  onAttendanceSaved
+  onAttendanceSaved,
+  onTeacherChanged
 }: ClassDetailDialogProps) {
   const router = useRouter();
   const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [showChangeTeacher, setShowChangeTeacher] = useState(false);
 
   useEffect(() => {
     if (open && event && event.extendedProps.type === 'class') {
@@ -267,6 +272,14 @@ export default function ClassDetailDialog({
                 <span className="text-gray-500">ครูผู้สอน:</span>{' '}
                 <span className="font-medium">{event.extendedProps.teacherName}</span>
               </span>
+              <button
+                onClick={() => setShowChangeTeacher(true)}
+                className="ml-auto inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                title="เปลี่ยนครูผู้สอน"
+              >
+                <Pencil className="h-3 w-3" />
+                เปลี่ยนครู
+              </button>
             </div>
           </div>
 
@@ -405,6 +418,18 @@ export default function ClassDetailDialog({
           </Button>
         </div>
       </DialogContent>
+
+      {/* Change teacher (this session / whole class) */}
+      <ChangeTeacherDialog
+        open={showChangeTeacher}
+        onOpenChange={setShowChangeTeacher}
+        event={event}
+        scheduleId={scheduleId}
+        onChanged={() => {
+          setShowChangeTeacher(false);
+          onTeacherChanged?.();
+        }}
+      />
     </Dialog>
   );
 }

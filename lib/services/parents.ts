@@ -8,6 +8,7 @@ const TABLE_NAME = 'parents';
 interface ParentRow {
   id: string;
   line_user_id: string | null;
+  line_display_name: string | null;
   display_name: string;
   picture_url: string | null;
   phone: string;
@@ -32,6 +33,8 @@ function mapToParent(row: ParentRow): Parent {
     displayName: row.display_name,
     phone: row.phone,
     lineUserId: row.line_user_id || undefined,
+    lineDisplayName: row.line_display_name || undefined,
+    pictureUrl: row.picture_url || undefined,
     email: row.email || undefined,
     address: hasAddress ? {
       houseNumber: row.address_house_number || '',
@@ -204,6 +207,8 @@ export async function updateParent(id: string, parentData: Partial<Parent>): Pro
     if (parentData.phone !== undefined) updateData.phone = parentData.phone;
     if (parentData.email !== undefined) updateData.email = parentData.email;
     if (parentData.lineUserId !== undefined) updateData.line_user_id = parentData.lineUserId || null;
+    if (parentData.lineDisplayName !== undefined) updateData.line_display_name = parentData.lineDisplayName || null;
+    if (parentData.pictureUrl !== undefined) updateData.picture_url = parentData.pictureUrl || null;
 
     if (Object.keys(updateData).length === 0) {
       return;

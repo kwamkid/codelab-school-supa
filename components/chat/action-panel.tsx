@@ -4,11 +4,27 @@ import { useState, useEffect, ReactNode } from 'react';
 import { Phone, Mail, Tag, Link as LinkIcon, BookOpen, GraduationCap, ArrowLeft, X, Plus, MapPin, UserCheck, Unlink, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { ChatConversation, Branch } from '@/types/models';
+import { formatDate } from '@/lib/utils';
+import { School, CalendarDays } from 'lucide-react';
 import { ChannelIcon } from './channel-icon';
+
+export interface LinkedParentInfo {
+  id: string;
+  displayName: string;
+  phone: string;
+  createdAt?: Date;
+  students?: {
+    id: string;
+    name: string;
+    nickname?: string;
+    schoolName?: string;
+    gradeLevel?: string;
+    enrollments?: { className: string; enrolledAt: Date }[];
+  }[];
+}
 
 type PanelView = 'info' | 'trial' | 'enrollment';
 
@@ -25,7 +41,7 @@ interface ActionPanelProps {
   onLinkParent: () => void;
   onUnlinkParent: () => void;
   onRefreshProfile?: () => Promise<void>;
-  linkedParent?: { id: string; displayName: string; phone: string; students?: { id: string; name: string }[] } | null;
+  linkedParent?: LinkedParentInfo | null;
   onBack?: () => void;
   trialFormNode?: ReactNode;
   enrollFormNode?: ReactNode;
@@ -164,7 +180,7 @@ export default function ActionPanel({
     <div className="flex flex-col h-full overflow-y-auto bg-white dark:bg-slate-800">
       {/* Mobile back header */}
       {onBack && (
-        <div className="flex items-center gap-2 px-3 py-3 border-b dark:border-slate-700 lg:hidden">
+        <div className="flex items-center gap-2 px-3 py-3 border-b dark:border-slate-700 2xl:hidden">
           <Button variant="ghost" size="icon" onClick={onBack} className="-ml-1">
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -235,24 +251,93 @@ export default function ActionPanel({
         )}
       </div>
 
-      {/* Contact details */}
-      <div className="px-6 py-4 border-b dark:border-slate-700 space-y-3">
-        {contact?.phone && (
-          <div className="flex items-center gap-3 text-base">
-            <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="text-gray-700 dark:text-gray-300">{contact.phone}</span>
+      {/* Parent link section — kept next to the LINE/profile info */}
+      <div className="px-6 py-4 border-b dark:border-slate-700">
+        <div className="flex items-center gap-2 mb-2">
+          <UserCheck className="w-4 h-4 text-gray-400" />
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">ผู้ปกครอง</span>
+        </div>
+
+        {linkedParent ? (
+          <div className="space-y-2">
+            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <p className="text-sm font-semibold text-green-800 dark:text-green-300">{linkedParent.displayName}</p>
+              {linkedParent.phone && (
+                <p className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 mt-0.5">
+                  <Phone className="w-3 h-3 shrink-0" />
+                  {linkedParent.phone}
+                </p>
+              )}
+
+              {linkedParent.students && linkedParent.students.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {linkedParent.students.map((s) => (
+                    <div key={s.id} className="pt-2 border-t border-green-200/70 dark:border-green-800/70">
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                        {s.name}
+                        {s.nickname && <span className="text-gray-500 dark:text-gray-400"> ({s.nickname})</span>}
+                      </p>
+                      {(s.schoolName || s.gradeLevel) && (
+                        <p className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          <School className="w-3 h-3 shrink-0" />
+                          <span>{[s.schoolName, s.gradeLevel].filter(Boolean).join(' · ')}</span>
+                        </p>
+                      )}
+                      {s.enrollments && s.enrollments.length > 0 && (
+                        <div className="mt-1 space-y-0.5">
+                          {s.enrollments.map((en, i) => (
+                            <p key={i} className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                              <CalendarDays className="w-3 h-3 shrink-0" />
+                              <span>{en.className} · สมัคร {formatDate(en.enrolledAt)}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onUnlinkParent}
+              className="text-red-500 hover:text-red-600 hover:bg-red-50 w-full text-xs"
+            >
+              <Unlink className="w-3 h-3" />
+              ยกเลิกการผูก
+            </Button>
           </div>
-        )}
-        {contact?.email && (
-          <div className="flex items-center gap-3 text-base">
-            <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="text-gray-700 dark:text-gray-300 break-all">{contact.email}</span>
-          </div>
-        )}
-        {!contact?.phone && !contact?.email && (
-          <p className="text-sm text-gray-400">ยังไม่มีข้อมูลติดต่อ</p>
+        ) : (
+          <Button
+            variant="outline"
+            onClick={onLinkParent}
+            className="w-full text-base dark:border-slate-600"
+          >
+            <LinkIcon className="w-4 h-4" />
+            เชื่อมกับผู้ปกครอง
+          </Button>
         )}
       </div>
+
+      {/* Contact details — only when the contact has its own phone/email
+          (the linked parent's phone is already shown in the parent section above) */}
+      {(contact?.phone || contact?.email) && (
+        <div className="px-6 py-4 border-b dark:border-slate-700 space-y-3">
+          {contact?.phone && (
+            <div className="flex items-center gap-3 text-base">
+              <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+              <span className="text-gray-700 dark:text-gray-300">{contact.phone}</span>
+            </div>
+          )}
+          {contact?.email && (
+            <div className="flex items-center gap-3 text-base">
+              <Mail className="w-4 h-4 text-gray-400 shrink-0" />
+              <span className="text-gray-700 dark:text-gray-300 break-all">{contact.email}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tags section */}
       <div className="px-6 py-4 border-b dark:border-slate-700">
@@ -369,50 +454,6 @@ export default function ActionPanel({
               </button>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* Parent link section */}
-      <div className="px-6 py-4 border-b dark:border-slate-700">
-        <div className="flex items-center gap-2 mb-2">
-          <UserCheck className="w-4 h-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">ผู้ปกครอง</span>
-        </div>
-
-        {linkedParent ? (
-          <div className="space-y-2">
-            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <p className="text-sm font-medium text-green-800 dark:text-green-300">{linkedParent.displayName}</p>
-              <p className="text-xs text-green-600 dark:text-green-400">{linkedParent.phone}</p>
-              {linkedParent.students && linkedParent.students.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {linkedParent.students.map((s) => (
-                    <Badge key={s.id} variant="secondary" className="text-xs">
-                      {s.name}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onUnlinkParent}
-              className="text-red-500 hover:text-red-600 hover:bg-red-50 w-full text-xs"
-            >
-              <Unlink className="w-3 h-3" />
-              ยกเลิกการผูก
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="outline"
-            onClick={onLinkParent}
-            className="w-full text-base dark:border-slate-600"
-          >
-            <LinkIcon className="w-4 h-4" />
-            เชื่อมกับผู้ปกครอง
-          </Button>
         )}
       </div>
 

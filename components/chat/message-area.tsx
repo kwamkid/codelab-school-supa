@@ -98,10 +98,11 @@ export default function MessageArea({
           </div>
 
           {/* Quick action buttons */}
+          {/* Hidden at 2xl: the persistent info panel already shows these actions */}
           {onTrialBooking && (
             <button
               onClick={onTrialBooking}
-              className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50 transition-colors"
+              className="2xl:hidden shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50 transition-colors"
               title="จองทดลองเรียน"
             >
               <BookOpen className="w-3.5 h-3.5" />
@@ -111,7 +112,7 @@ export default function MessageArea({
           {onEnrollment && (
             <button
               onClick={onEnrollment}
-              className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors"
+              className="2xl:hidden shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors"
               title="ลงทะเบียน"
             >
               <GraduationCap className="w-3.5 h-3.5" />
@@ -125,7 +126,7 @@ export default function MessageArea({
               variant="ghost"
               size="icon"
               onClick={onTogglePanel}
-              className="lg:hidden shrink-0"
+              className="2xl:hidden shrink-0"
             >
               <User className="w-5 h-5" />
             </Button>

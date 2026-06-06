@@ -95,6 +95,7 @@ export default function DashboardPage() {
         branchId: event.branch_id,
         branchName: event.branch_name,
         roomName: event.room_name,
+        roomId: event.room_id,
         teacherName: event.teacher_name,
         subjectColor: event.subject_color,
         enrolled: event.enrolled_count ?? undefined,
@@ -130,6 +131,12 @@ export default function DashboardPage() {
     clearDashboardCache();
     await loadTimetable(selectedDate);
     toast.success('บันทึกการเช็คชื่อเรียบร้อยแล้ว');
+  };
+
+  const handleTeacherChanged = async () => {
+    setDialogOpen(false);
+    clearDashboardCache();
+    await loadTimetable(selectedDate);
   };
 
   const handleRefresh = async () => {
@@ -218,6 +225,7 @@ export default function DashboardPage() {
         event={selectedEvent}
         scheduleId={selectedScheduleId}
         onAttendanceSaved={handleAttendanceSaved}
+        onTeacherChanged={handleTeacherChanged}
       />
     </div>
   );
