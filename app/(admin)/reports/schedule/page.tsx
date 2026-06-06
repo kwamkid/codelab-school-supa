@@ -14,8 +14,11 @@ interface ScheduleStudent {
   name: string
 }
 
+type ScheduleItemType = 'class' | 'makeup' | 'trial'
+
 interface ScheduleClassItem {
   id: string
+  type?: ScheduleItemType
   name: string
   days_of_week: number[]
   start_time: string
@@ -112,8 +115,12 @@ function formatWeekLabel(satDate: Date): string {
   return `${formatThaiDate(satDate)} ${satYear} - ${formatThaiDate(friDate)} ${friYear}`
 }
 
+function isRegularClass(item: ScheduleClassItem): boolean {
+  return !item.type || item.type === 'class'
+}
+
 function buildTeacherColorMap(data: ScheduleClassItem[]): Record<string, string> {
-  const uniqueIds = [...new Set(data.map(c => c.teacher_id))].filter(Boolean)
+  const uniqueIds = [...new Set(data.filter(isRegularClass).map(c => c.teacher_id))].filter(Boolean)
   const map: Record<string, string> = {}
   uniqueIds.forEach((id, i) => {
     map[id] = TEACHER_COLORS[i % TEACHER_COLORS.length]
@@ -207,7 +214,7 @@ function TeacherLegend({
   data: ScheduleClassItem[]
   colorMap: Record<string, string>
 }) {
-  const teachers = [...new Map(data.map(c => [c.teacher_id, c])).values()]
+  const teachers = [...new Map(data.filter(isRegularClass).map(c => [c.teacher_id, c])).values()]
     .filter(t => t.teacher_id)
 
   if (teachers.length === 0) return null
@@ -237,6 +244,37 @@ function ClassCell({
   const studentNames = cls.students
     .map(s => s.nickname || s.name)
     .join(' ')
+
+  // Makeup / trial slots: distinct styling like the dashboard (purple = makeup, orange = trial)
+  if (cls.type === 'makeup' || cls.type === 'trial') {
+    const isMakeup = cls.type === 'makeup'
+    const accent = isMakeup ? '#9333EA' : '#F97316'
+    const styles = isMakeup
+      ? { bg: 'bg-purple-50', badge: 'bg-purple-100 text-purple-700', label: 'เรียนชดเชย', tag: 'M' }
+      : { bg: 'bg-orange-50', badge: 'bg-orange-100 text-orange-700', label: 'ทดลองเรียน', tag: 'T' }
+
+    return (
+      <div className={`rounded-lg p-2 mb-1 last:mb-0 text-xs ${styles.bg}`}>
+        <div className="flex items-center gap-1">
+          <span className={`${styles.badge} rounded px-1 text-[10px] font-bold leading-tight`}>
+            {styles.tag}
+          </span>
+          <span className="font-bold" style={{ color: accent }}>
+            {styles.label}
+          </span>
+        </div>
+        {cls.subject_name && (
+          <div className="text-gray-800 font-medium mt-0.5">{cls.subject_name}</div>
+        )}
+        {studentNames && (
+          <div className="text-gray-500 mt-0.5">{studentNames}</div>
+        )}
+        {cls.teacher_nickname && (
+          <div className="text-gray-400 mt-0.5">ครู{cls.teacher_nickname}</div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div
