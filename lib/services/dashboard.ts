@@ -16,6 +16,7 @@ export interface CalendarEvent extends EventInput {
     roomName: string;
     roomId?: string;
     teacherName: string;
+    teacherImage?: string;
     subjectColor?: string;
     enrolled?: number;
     maxStudents?: number;

@@ -46,6 +46,8 @@ import {
   Receipt,
   CreditCard,
   MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
   LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,11 +85,12 @@ interface MenuLinkProps {
   href: string;
   children: ReactNode;
   className?: string;
+  title?: string;
   onClick?: () => void;
 }
 
 // Custom Link component with loading
-const MenuLink = ({ href, children, className, onClick }: MenuLinkProps) => {
+const MenuLink = ({ href, children, className, title, onClick }: MenuLinkProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -121,7 +124,7 @@ const MenuLink = ({ href, children, className, onClick }: MenuLinkProps) => {
   };
 
   return (
-    <Link href={href} onClick={handleClick} className={className}>
+    <Link href={href} onClick={handleClick} className={className} title={title}>
       {isLoading ? (
         <div className="flex items-center text-white/70">
           <Loader2 className="mr-3 h-4 w-4 animate-spin" />
@@ -141,6 +144,14 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Desktop: collapse sidebar to an icon rail (persisted)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('sidebarCollapsed') === 'true';
+    return false;
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [navigating, setNavigating] = useState(false);
   
@@ -776,23 +787,36 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         {/* Sidebar */}
         <div
           className={cn(
-            'fixed inset-y-0 left-0 z-50 w-64 transform bg-[#ef443a] shadow-lg transition-transform duration-200 ease-in-out lg:static lg:translate-x-0',
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            'fixed inset-y-0 left-0 z-50 w-64 transform bg-[#ef443a] shadow-lg transition-all duration-200 ease-in-out lg:static lg:translate-x-0',
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+            sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'
           )}
         >
           <div className="flex h-full flex-col">
             {/* Logo */}
-            <div className="flex h-16 items-center justify-between px-6 border-b border-white/20">
-              <div className="w-full">
+            <div className={cn('flex h-16 items-center justify-between border-b border-white/20 px-6', sidebarCollapsed && 'lg:justify-center lg:px-2')}>
+              {/* Wordmark — hidden on desktop when collapsed (still shown in mobile drawer) */}
+              <div className={cn('flex items-center', sidebarCollapsed && 'lg:hidden')}>
                 <Image
                   src="/logo.svg"
                   alt="CodeLab School"
                   width={150}
                   height={40}
-                  className="w-full max-w-[180px] brightness-0 invert"
+                  className="h-8 w-auto brightness-0 invert"
                   priority
                 />
               </div>
+              {/* Collapsed (desktop): small logo mark */}
+              {sidebarCollapsed && (
+                <Image
+                  src="/logo-just-logo.svg"
+                  alt="CodeLab"
+                  width={32}
+                  height={32}
+                  className="hidden lg:block h-8 w-8 brightness-0 invert"
+                />
+              )}
+              {/* Mobile close */}
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="lg:hidden ml-2"
@@ -811,7 +835,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                     {item.isDivider ? (
                       <div className="my-3 border-t border-white/20">
                         {item.sectionLabel && (
-                          <div className="pt-2 px-3 text-xs font-semibold text-white/60 uppercase tracking-wider">
+                          <div className={cn('pt-2 px-3 text-xs font-semibold text-white/60 uppercase tracking-wider', sidebarCollapsed && 'lg:hidden')}>
                             {item.sectionLabel}
                           </div>
                         )}
@@ -819,26 +843,34 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                     ) : item.subItems ? (
                       <>
                         <button
-                          onClick={() => toggleExpanded(item.name)}
+                          onClick={() => {
+                            // In collapsed rail, expand the sidebar first so submenu is usable
+                            if (sidebarCollapsed) setSidebarCollapsed(false);
+                            toggleExpanded(item.name);
+                          }}
+                          title={item.name}
                           className={cn(
                             'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
+                            sidebarCollapsed && 'lg:justify-center',
                             isSubItemActive(item)
                               ? 'bg-white/20 text-white font-semibold'
                               : 'text-white/90 hover:bg-white/10'
                           )}
                         >
                           <div className="flex items-center">
-                            {ItemIcon && <ItemIcon className="mr-3 h-5 w-5 text-white/80" />}
-                            {item.name}
+                            {ItemIcon && <ItemIcon className={cn('mr-3 h-5 w-5 text-white/80', sidebarCollapsed && 'lg:mr-0')} />}
+                            <span className={cn(sidebarCollapsed && 'lg:hidden')}>{item.name}</span>
                           </div>
-                          {expandedItems.includes(item.name) ? (
-                            <ChevronDown className="h-4 w-4 text-white/60" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-white/60" />
-                          )}
+                          <span className={cn(sidebarCollapsed && 'lg:hidden')}>
+                            {expandedItems.includes(item.name) ? (
+                              <ChevronDown className="h-4 w-4 text-white/60" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-white/60" />
+                            )}
+                          </span>
                         </button>
                         {expandedItems.includes(item.name) && (
-                          <div className="mt-2 ml-8 space-y-1">
+                          <div className={cn('mt-2 ml-8 space-y-1', sidebarCollapsed && 'lg:hidden')}>
                             {item.subItems.map((subItem) => {
                               const SubItemIcon = subItem.icon;
 
@@ -871,8 +903,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                     ) : item.href ? (
                       <MenuLink
                         href={item.href}
+                        title={item.name}
                         className={cn(
-                          'flex items-center rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
+                          'relative flex items-center rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
+                          sidebarCollapsed && 'lg:justify-center',
                           isActive(item.href)
                             ? 'bg-white/20 text-white font-semibold'
                             : 'text-white/90 hover:bg-white/10'
@@ -884,15 +918,19 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center">
-                            {ItemIcon && <ItemIcon className="mr-3 h-5 w-5 text-white/80" />}
-                            {item.name}
+                            {ItemIcon && <ItemIcon className={cn('mr-3 h-5 w-5 text-white/80', sidebarCollapsed && 'lg:mr-0')} />}
+                            <span className={cn(sidebarCollapsed && 'lg:hidden')}>{item.name}</span>
                           </div>
                           {item.badge && (
-                            <span className="ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-bold text-[#ef443a] bg-[#ffffff] rounded-full">
+                            <span className={cn('ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-bold text-[#ef443a] bg-[#ffffff] rounded-full', sidebarCollapsed && 'lg:hidden')}>
                               {item.badge}
                             </span>
                           )}
                         </div>
+                        {/* Collapsed rail: show a dot instead of the count */}
+                        {item.badge && sidebarCollapsed && (
+                          <span className="hidden lg:block absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-white" />
+                        )}
                       </MenuLink>
                     ) : null}
                   </div>
@@ -912,6 +950,15 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 className="lg:hidden"
               >
                 <Menu className="h-6 w-6 text-muted-foreground" />
+              </button>
+
+              {/* Desktop sidebar collapse/expand toggle */}
+              <button
+                onClick={() => setSidebarCollapsed((v) => !v)}
+                className="hidden lg:inline-flex text-muted-foreground hover:text-foreground"
+                title={sidebarCollapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+              >
+                {sidebarCollapsed ? <PanelLeftOpen className="h-6 w-6" /> : <PanelLeftClose className="h-6 w-6" />}
               </button>
 
               {/* Branch Selector - Desktop */}

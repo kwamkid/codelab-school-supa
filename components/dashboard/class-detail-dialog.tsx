@@ -9,25 +9,38 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { CalendarEvent } from '@/lib/services/dashboard';
-import { formatDate } from '@/lib/utils';
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  User, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
   Users,
   CheckCircle,
   UserCircle,
   School,
   ClipboardCheck,
-  Pencil
+  Pencil,
+  Check,
+  X
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { getEnrollmentsByClass } from '@/lib/services/enrollments';
 import { getStudent } from '@/lib/services/parents';
+import { updateTrialSession } from '@/lib/services/trial-bookings';
+import { recordMakeupAttendance, updateMakeupAttendance } from '@/lib/services/makeup';
+import { useAuth } from '@/hooks/useSupabaseAuth';
 import { Enrollment } from '@/types/models';
-import ChangeTeacherDialog from './change-teacher-dialog';
+import { ChangeTeacherPanel } from './change-teacher-dialog';
+
+const THAI_MONTHS_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+// e.g. "6 มิ.ย. 69"
+function formatThaiShortDate(d: Date): string {
+  const yy = String((d.getFullYear() + 543) % 100).padStart(2, '0');
+  return `${d.getDate()} ${THAI_MONTHS_ABBR[d.getMonth()]} ${yy}`;
+}
 
 interface ClassDetailDialogProps {
   open: boolean;
@@ -54,9 +67,19 @@ export default function ClassDetailDialog({
   onTeacherChanged
 }: ClassDetailDialogProps) {
   const router = useRouter();
+  const { adminUser } = useAuth();
   const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [showChangeTeacher, setShowChangeTeacher] = useState(false);
+  const [savingAttendance, setSavingAttendance] = useState(false);
+  // Locally reflect a teacher change without closing/reopening the modal
+  const [teacherOverride, setTeacherOverride] = useState<{ name: string; image?: string } | null>(null);
+
+  // Reset transient state whenever a different session is opened
+  useEffect(() => {
+    setShowChangeTeacher(false);
+    setTeacherOverride(null);
+  }, [scheduleId]);
 
   useEffect(() => {
     if (open && event && event.extendedProps.type === 'class') {
@@ -108,6 +131,36 @@ export default function ClassDetailDialog({
   const isMakeup = event.extendedProps.type === 'makeup';
   const isTrial = event.extendedProps.type === 'trial';
   const isRegularClass = event.extendedProps.type === 'class';
+
+  // Quick attendance for trial / makeup (single student)
+  const markAttendance = async (present: boolean) => {
+    if (!event) return;
+    setSavingAttendance(true);
+    try {
+      if (isTrial) {
+        await updateTrialSession(scheduleId, {
+          status: present ? 'attended' : 'absent',
+          attended: present,
+        });
+      } else if (isMakeup) {
+        const payload = {
+          status: (present ? 'present' : 'absent') as 'present' | 'absent',
+          checkedBy: adminUser?.id || 'system',
+        };
+        if (event.extendedProps.status === 'completed') {
+          await updateMakeupAttendance(scheduleId, payload);
+        } else {
+          await recordMakeupAttendance(scheduleId, payload);
+        }
+      }
+      onAttendanceSaved?.();
+    } catch (error) {
+      console.error('Error saving attendance:', error);
+      toast.error('บันทึกการเช็คชื่อไม่สำเร็จ');
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
   const eventDate = event.start as Date;
   const eventEndDate = event.end as Date | null;
 
@@ -208,6 +261,19 @@ export default function ClassDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {showChangeTeacher ? (
+          <ChangeTeacherPanel
+            event={event}
+            scheduleId={scheduleId}
+            onCancel={() => setShowChangeTeacher(false)}
+            onChanged={(t) => {
+              setTeacherOverride(t);
+              setShowChangeTeacher(false);
+              onTeacherChanged?.();
+            }}
+          />
+        ) : (
+        <>
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -246,9 +312,7 @@ export default function ClassDetailDialog({
               </p>
               <div className="flex items-center gap-2 mt-2 text-sm">
                 <Calendar className="h-4 w-4 text-gray-400" />
-                <span className="font-medium">{formatDate(eventDate, 'full')}</span>
-                <Clock className="h-4 w-4 text-gray-400 ml-3" />
-                <span className="font-medium">{formatEventTime()}</span>
+                <span className="font-medium">{formatThaiShortDate(eventDate)} {formatEventTime()}</span>
               </div>
             </div>
             {getStatusBadge()}
@@ -267,10 +331,17 @@ export default function ClassDetailDialog({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-gray-500" />
+              <Avatar className="h-6 w-6 shrink-0 ring-1 ring-gray-200">
+                {(teacherOverride?.image ?? event.extendedProps.teacherImage) ? (
+                  <AvatarImage src={teacherOverride?.image ?? event.extendedProps.teacherImage} alt={teacherOverride?.name ?? event.extendedProps.teacherName} />
+                ) : null}
+                <AvatarFallback className="bg-gray-200 text-gray-600 text-[10px]">
+                  {((teacherOverride?.name ?? event.extendedProps.teacherName) || '?').trim().slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <span className="text-sm">
                 <span className="text-gray-500">ครูผู้สอน:</span>{' '}
-                <span className="font-medium">{event.extendedProps.teacherName}</span>
+                <span className="font-medium">{teacherOverride?.name ?? event.extendedProps.teacherName}</span>
               </span>
               <button
                 onClick={() => setShowChangeTeacher(true)}
@@ -395,21 +466,47 @@ export default function ClassDetailDialog({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-between gap-2 pt-4 border-t">
-          <div>
-            {/* Check attendance button - for future use */}
+        <div className="flex justify-between items-center gap-2 pt-4 border-t">
+          <div className="flex items-center gap-2">
+            {/* Regular class → full attendance page */}
             {isRegularClass && (
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => {
-                  // TODO: Link to attendance module
-                  console.log('Go to attendance module');
+                  router.push(`/attendance/${event.classId}/${scheduleId}`);
+                  onOpenChange(false);
                 }}
-                disabled // Disable for now
               >
                 <ClipboardCheck className="h-4 w-4 mr-2" />
                 เช็คชื่อ
               </Button>
+            )}
+
+            {/* Trial / Makeup (single student) → quick มาเรียน / ขาด */}
+            {(isTrial || isMakeup) && (
+              <>
+                <span className="text-sm text-gray-500 mr-1">เช็คชื่อ:</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingAttendance}
+                  onClick={() => markAttendance(true)}
+                  className="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  มาเรียน
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingAttendance}
+                  onClick={() => markAttendance(false)}
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  ขาด
+                </Button>
+              </>
             )}
           </div>
 
@@ -417,19 +514,9 @@ export default function ClassDetailDialog({
             ปิด
           </Button>
         </div>
+        </>
+        )}
       </DialogContent>
-
-      {/* Change teacher (this session / whole class) */}
-      <ChangeTeacherDialog
-        open={showChangeTeacher}
-        onOpenChange={setShowChangeTeacher}
-        event={event}
-        scheduleId={scheduleId}
-        onChanged={() => {
-          setShowChangeTeacher(false);
-          onTeacherChanged?.();
-        }}
-      />
     </Dialog>
   );
 }
