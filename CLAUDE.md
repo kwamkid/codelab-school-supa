@@ -204,6 +204,34 @@ types/
 - Save logic centralized in `saveAttendanceWithMakeup()` (`lib/services/attendance.ts`): saves attendance + auto creates/cancels makeup per settings (`getMakeupSettings` → `allowMakeupForStatuses` default `['absent','sick','leave']`, `autoCreateMakeup`, `makeupLimitPerCourse`).
 - Status meaning: present/late = attended (NO makeup, shows Teacher Feedback shown to parents); absent/leave/sick = makeup auto-created (differ only by recorded reason). UI status order: มา/สาย/ขาด/ลา/ป่วย.
 - Dashboard modal also checks attendance inline: regular class → full checker; makeup/trial → quick มาเรียน/ขาด (`recordMakeupAttendance` / `updateTrialSession`).
+- **Teacher feedback + photos (Jun 2026):** `AttendanceChecker` shows a feedback textarea + 1 photo (present/late students). Photos are resized client-side (`lib/utils/image.ts` `resizeImageToJpeg`, canvas→JPEG, iPhone-safe), **staged in memory only** and uploaded **on save** (bucket `attendance-photos`, public). Don't upload on add. Stored in `attendance.photos text[]` (migration `20260608_attendance_photos`).
+- On save, `saveAttendanceWithMakeup` snapshots old feedback/photos and enqueues a LINE notification **only for students whose feedback/photos changed** (no spam; re-edit re-sends) → see LINE Notification Queue below.
+- Admin `/attendance` list status badge colors: green=มาครบ, yellow=มาไม่ครบ, orange=ขาดหมด, red=ยังไม่เช็ค ("came" = present+late). Shows the substitute teacher's name (not just a "แทน" badge) via `actualTeacher` resolved from `cls.todaySchedule.actualTeacherId`.
+- Teacher class filter MUST use `adminUser.teacherId` (the linked `teachers.id`), NOT `adminUser.id` — they differ for newer teacher accounts. Using the wrong id shows 0 classes + infinite spinner.
+
+## Teacher Home Page (`/teacher`)
+- One-stop page for `role=teacher`: today's classes + makeup + trial, with per-card **check-in button** (opens shared `AttendanceDialog`) and **open-slide button**.
+- Data via RPC `get_teacher_daily_schedule(p_teacher_id, p_date, p_branch_id)` (migration `20260608_teacher_daily_schedule_rpc`). Honors `COALESCE(class_schedules.actual_teacher_id, classes.teacher_id)` so **both teacher-change cases** (per-session substitute + permanent `changeClassResources`) show up on the right teacher's page after refresh.
+- RPC returns `subject_id`, `total_sessions`, `material_id`. Slide link = match `teaching_materials` by `subject_id` + `session_number` (active only); makeup resolves the session from `original_schedule_id`. Button → `/teaching/slides/{subjectId}/{materialId}`; disabled "ยังไม่มีสไลด์" when no `material_id`.
+- Sidebar: `ลาและชดเชย` (`/makeup`) and `คลาสเรียน` (`/classes`) are hidden from `role=teacher` (`requiredRole: ['super_admin','branch_admin']`). Menu-only — pages are not route-guarded.
+
+## LINE Notification Queue (outbox) — central LINE noti
+- All new LINE notifications go through an outbox: table `line_notification_queue` (migrations `20260608_line_notification_queue` + `_generalize`). Columns: `type` (feedback|makeup|custom), `schedule_id`/`student_id` (feedback), `ref_id`+`payload` (generic), `status` (pending|sent|failed), `retry_count` (max 5). RLS on, service-role only. Whitelisted in `ALLOWED_TABLES`.
+- Enqueue = reliable awaited `adminMutation` insert (so it can't be lost). Processor `lib/supabase/services/line-queue.ts` `processLineQueue()` dispatches by type, sends via LINE push (text + image), marks sent/failed, retries. **feedback rows also `logNotification(...)`** so they appear in the log page.
+- Triggers: immediate best-effort `POST /api/admin/notifications/process` (fire-and-forget after save) + hourly safety-net cron `GET /api/cron/process-line-queue?secret=<CRON_SECRET>` (registered on cron-job.org). Sends are NOT real-time-guaranteed but never lost (cron drains pending).
+- Makeup "scheduled" notification now enqueues `type:'makeup'` (was broken Firebase). Cron reminders (class/makeup-reminder/event) still send directly server-side — fine, already working.
+- Settings toggle `enableFeedbackNotifications` (LINE settings → การแจ้งเตือนอัตโนมัติ, sub-toggle under `enableNotifications`); processor skips feedback when off.
+- **Notification logs view = Reports menu → "Notification Logs" (`/reports/notification-logs`)**, NOT under Settings.
+- LIFF parent "Teacher Feedback" page `/liff/feedback` reads via server route `POST /api/liff/feedback` (service role, avoids LIFF RLS issues), shows feedback text + photos. `lib/services/feedback.ts` was rewritten Firebase→Supabase.
+
+## Auth / Login
+- **Google-only login.** Email/password form is hidden behind `SHOW_PASSWORD_LOGIN = false` in `app/(public)/login/page.tsx` (flip to re-enable). To fully disable, also turn off Email provider in Supabase Auth.
+- `useSupabaseAuth`: `signInWithGoogle` (PKCE, redirectTo `/login`), membership guard `enforceAccess` signs out + bounces non-members/inactive. Invite flow at `/invite/[token]`.
+- `admin_users.teacher_id` links a login → `teachers` profile; exposed as `adminUser.teacherId`.
+
+## Known Firebase leftovers (tech debt — migrate to Supabase, do NOT bulk-delete; still imported)
+- `hooks/useSettings.ts` (Firestore `onSnapshot`), `lib/services/liff-schedule.ts`, `lib/services/link-tokens.ts`, `lib/services/data-cleaning.ts`, `lib/services/factory-reset.ts` still contain Firebase code but are imported by live features — migrate individually.
+- Deleted: `lib/services/line-notifications.ts` (dead Firebase). The working notifier is `lib/supabase/services/line-notifications.ts` (server-side, `createServiceClient`); client code must enqueue/use API routes, not import it directly.
 
 ## Dashboard Timetable (Time×Room grid)
 - `components/dashboard/daily-timetable.tsx` — full-width table (`w-full`, room cols `min-w-[150px]`); each cell: subject + `(sessionNumber/totalSessions)` inline, de-emphasised class code, teacher avatar (2-char fallback). makeup/trial show student name in the count slot. Dark-mode variants added.

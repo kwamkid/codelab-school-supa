@@ -718,6 +718,23 @@ export default function LineSettingsComponent() {
               </div>
               
               {settings.enableNotifications && (
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">แจ้งเตือน Feedback ถึงผู้ปกครอง</Label>
+                    <p className="text-sm text-gray-500">
+                      ส่ง LINE หาผู้ปกครองเมื่อครูบันทึก feedback/รูป ตอนเช็คชื่อ
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.enableFeedbackNotifications !== false}
+                    onCheckedChange={(checked) =>
+                      setSettings({ ...settings, enableFeedbackNotifications: checked })
+                    }
+                  />
+                </div>
+              )}
+
+              {settings.enableNotifications && (
                 <div className="space-y-4">
                   <h4 className="font-medium text-sm">ประเภทการแจ้งเตือนที่ส่ง:</h4>
                   <div className="grid gap-3">

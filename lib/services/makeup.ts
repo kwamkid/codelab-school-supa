@@ -6,7 +6,6 @@ import { getClassSchedule, updateClassSchedule, getClass } from './classes';
 import { getStudentWithParent } from './parents';
 import { getBranch } from './branches';
 import { getSubject } from './subjects';
-import { sendMakeupNotification } from './line-notifications';
 import { adminMutation } from '@/lib/admin-mutation';
 
 // Helper function to convert database row to MakeupClass
@@ -475,12 +474,16 @@ export async function scheduleMakeupClass(
       match: { id: makeupId }
     });
 
-    // Send LINE notification
+    // Enqueue LINE notification via the central queue (sent by processor + hourly cron)
     try {
-      await sendMakeupNotification(makeupId, 'scheduled');
-      console.log(`LINE notification sent for scheduled makeup ${makeupId}`);
+      await adminMutation({
+        table: 'line_notification_queue',
+        operation: 'insert',
+        data: { type: 'makeup', ref_id: makeupId, payload: { kind: 'scheduled' }, status: 'pending' },
+      });
+      fetch('/api/admin/notifications/process', { method: 'POST' }).catch(() => {});
     } catch (notificationError) {
-      console.error('Error sending LINE notification:', notificationError);
+      console.error('Error enqueueing makeup LINE notification:', notificationError);
     }
   } catch (error) {
     console.error('Error scheduling makeup class:', error);

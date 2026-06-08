@@ -27,6 +27,8 @@ export interface LineSettings {
 
   // Settings - เปิด/ปิด
   enableNotifications: boolean
+  // เปิด/ปิด การแจ้งเตือน feedback ถึงผู้ปกครอง (ย่อยภายใต้ enableNotifications)
+  enableFeedbackNotifications?: boolean
 
   // Metadata
   updatedAt?: Date
@@ -82,6 +84,7 @@ export async function getLineSettings(): Promise<LineSettings> {
       richMenuId: value.richMenuId,
       richMenuEnabled: value.richMenuEnabled || false,
       enableNotifications: value.enableNotifications !== false,
+      enableFeedbackNotifications: value.enableFeedbackNotifications !== false,
       updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
       updatedBy: value.updatedBy
     }
@@ -137,7 +140,8 @@ export function getDefaultLineSettings(): LineSettings {
   return {
     webhookVerified: false,
     richMenuEnabled: false,
-    enableNotifications: true
+    enableNotifications: true,
+    enableFeedbackNotifications: true
   }
 }
 

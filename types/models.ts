@@ -182,6 +182,7 @@ export interface ClassSchedule {
     checkedBy?: string;
     // เพิ่ม feedback field (optional)
     feedback?: string; // เปลี่ยนเป็น string ธรรมดา
+    photos?: string[]; // รูปแนบ feedback (URL ใน storage)
   }[];
   originalDate?: Date;
   rescheduledAt?: Date;

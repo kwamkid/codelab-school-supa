@@ -372,7 +372,8 @@ export async function getClassSchedules(classId: string): Promise<ClassSchedule[
           note: att.note,
           checkedAt: att.checkedAt,
           checkedBy: att.checkedBy,
-          feedback: att.feedback
+          feedback: att.feedback,
+          photos: att.photos
         })),
         originalDate: row.original_date ? new Date(row.original_date) : undefined,
         rescheduledAt: row.rescheduled_at ? new Date(row.rescheduled_at) : undefined,
@@ -428,7 +429,8 @@ export async function getClassSchedule(
         note: att.note,
         checkedAt: att.checkedAt,
         checkedBy: att.checkedBy,
-        feedback: att.feedback
+        feedback: att.feedback,
+        photos: att.photos
       })),
       originalDate: data.original_date ? new Date(data.original_date) : undefined,
       rescheduledAt: data.rescheduled_at ? new Date(data.rescheduled_at) : undefined,
@@ -696,7 +698,8 @@ export async function getUpcomingSessions(
           note: att.note,
           checkedAt: att.checkedAt,
           checkedBy: att.checkedBy,
-          feedback: att.feedback
+          feedback: att.feedback,
+          photos: att.photos
         })),
         originalDate: row.original_date ? new Date(row.original_date) : undefined,
         rescheduledAt: row.rescheduled_at ? new Date(row.rescheduled_at) : undefined,

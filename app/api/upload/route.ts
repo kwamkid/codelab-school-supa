@@ -19,6 +19,11 @@ const BUCKET_CONFIG: Record<string, { maxSize: number; allowedTypes: string[]; f
     allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
     folder: 'questions',
   },
+  'attendance-photos': {
+    maxSize: 5 * 1024 * 1024, // 5MB (images are resized client-side before upload)
+    allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+    folder: 'feedback',
+  },
 }
 
 export async function POST(request: NextRequest) {

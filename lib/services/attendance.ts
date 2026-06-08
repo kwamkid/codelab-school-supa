@@ -2,6 +2,18 @@
 
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
+// Static imports (no static cycle: only classes.ts imports attendance.ts and it does
+// so dynamically). Dynamic await import() here tripped Turbopack's async loader
+// ("module factory is not available"), so we import these statically.
+import { updateClassSchedule } from './classes';
+import { getMakeupSettings } from './settings';
+import {
+  getMakeupCount,
+  getMakeupByOriginalSchedule,
+  deleteMakeupForSchedule,
+  createMakeupRequest,
+} from './makeup';
+import { getStudentWithParent } from './parents';
 
 // Attendance record interface
 export interface AttendanceRecord {
@@ -11,6 +23,7 @@ export interface AttendanceRecord {
   status: 'present' | 'absent' | 'late' | 'sick' | 'leave';
   note?: string;
   feedback?: string;
+  photos?: string[];
   checkedAt?: Date;
   checkedBy?: string;
 }
@@ -23,6 +36,7 @@ interface AttendanceRow {
   status: 'present' | 'absent' | 'late' | 'sick' | 'leave';
   note: string | null;
   feedback: string | null;
+  photos: string[] | null;
   checked_at: string | null;
   checked_by: string | null;
 }
@@ -36,6 +50,7 @@ function mapToAttendance(row: AttendanceRow): AttendanceRecord {
     status: row.status,
     note: row.note || undefined,
     feedback: row.feedback || undefined,
+    photos: row.photos || [],
     checkedAt: row.checked_at ? new Date(row.checked_at) : undefined,
     checkedBy: row.checked_by || undefined
   };
@@ -93,6 +108,7 @@ export async function saveAttendance(
     status: 'present' | 'absent' | 'late' | 'sick' | 'leave';
     note?: string;
     feedback?: string;
+    photos?: string[];
     checkedAt?: Date;
     checkedBy?: string;
   }>
@@ -118,6 +134,7 @@ export async function saveAttendance(
         status: record.status,
         note: record.note || null,
         feedback: record.feedback || null,
+        photos: record.photos || [],
         checked_at: record.checkedAt ? record.checkedAt.toISOString() : new Date().toISOString(),
         checked_by: record.checkedBy || null
       };
@@ -267,7 +284,7 @@ export type AttendanceStatus = 'present' | 'absent' | 'late' | 'sick' | 'leave';
 export async function saveAttendanceWithMakeup(params: {
   classId: string;
   scheduleId: string;
-  records: Array<{ studentId: string; studentName?: string; status: AttendanceStatus | ''; note?: string; feedback?: string }>;
+  records: Array<{ studentId: string; studentName?: string; status: AttendanceStatus | ''; note?: string; feedback?: string; photos?: string[] }>;
   initialStatuses?: Record<string, string>;
   checkedBy: string;
   actualTeacherId?: string;
@@ -275,15 +292,15 @@ export async function saveAttendanceWithMakeup(params: {
   sessionNumber?: number;
   sessionDate?: Date;
 }): Promise<{ makeupCreated: number; makeupCancelled: number; limitExceeded: string[] }> {
-  const { updateClassSchedule } = await import('./classes');
-  const { getMakeupSettings } = await import('./settings');
-  const { getMakeupCount, getMakeupByOriginalSchedule, deleteMakeupForSchedule, createMakeupRequest } = await import('./makeup');
-  const { getStudentWithParent } = await import('./parents');
-
   const { classId, scheduleId, initialStatuses = {}, checkedBy, actualTeacherId, globalNote, sessionNumber, sessionDate } = params;
 
+  // Snapshot existing feedback/photos BEFORE overwriting, so we can notify the
+  // parent's LINE only when feedback/photos are new or changed (avoid spam).
+  const existingBefore = await getAttendanceBySchedule(scheduleId);
+  const beforeMap = new Map(existingBefore.map(r => [r.studentId, r]));
+
   const toSave = params.records.filter(
-    (r): r is { studentId: string; studentName?: string; status: AttendanceStatus; note?: string; feedback?: string } => r.status !== ''
+    (r): r is { studentId: string; studentName?: string; status: AttendanceStatus; note?: string; feedback?: string; photos?: string[] } => r.status !== ''
   );
 
   const attendanceData = toSave.map((r) => ({
@@ -291,6 +308,7 @@ export async function saveAttendanceWithMakeup(params: {
     status: r.status,
     note: r.note,
     feedback: r.feedback,
+    photos: r.photos,
     checkedAt: new Date(),
     checkedBy,
   }));
@@ -359,6 +377,54 @@ export async function saveAttendanceWithMakeup(params: {
       } catch (e) {
         console.error('Error creating makeup for student', s.studentId, e);
       }
+    }
+  }
+
+  // Notify parents on LINE for feedback/photos that are new or changed
+  const samePhotos = (a: string[] = [], b: string[] = []) =>
+    a.length === b.length && a.every((x, i) => x === b[i]);
+  const changedStudentIds = toSave
+    .filter((r) => {
+      const newFeedback = (r.feedback || '').trim();
+      const newPhotos = r.photos || [];
+      const hasContent = newFeedback.length > 0 || newPhotos.length > 0;
+      if (!hasContent) return false;
+      const old = beforeMap.get(r.studentId);
+      const oldFeedback = (old?.feedback || '').trim();
+      const oldPhotos = old?.photos || [];
+      return newFeedback !== oldFeedback || !samePhotos(newPhotos, oldPhotos);
+    })
+    .map((r) => r.studentId);
+
+  if (changedStudentIds.length > 0) {
+    try {
+      // Enqueue (outbox): reliable insert now, sent later by processor + hourly cron.
+      // Drop any still-pending rows for these students first so we don't double-send.
+      await adminMutation({
+        table: 'line_notification_queue',
+        operation: 'delete',
+        filters: [
+          { column: 'type', op: 'eq', value: 'feedback' },
+          { column: 'schedule_id', op: 'eq', value: scheduleId },
+          { column: 'status', op: 'eq', value: 'pending' },
+          { column: 'student_id', op: 'in', value: changedStudentIds },
+        ],
+      });
+      await adminMutation({
+        table: 'line_notification_queue',
+        operation: 'insert',
+        data: changedStudentIds.map((sid) => ({
+          type: 'feedback',
+          schedule_id: scheduleId,
+          student_id: sid,
+          status: 'pending',
+        })),
+      });
+      // Best-effort immediate send — don't block the save; cron is the safety net.
+      fetch('/api/admin/notifications/process', { method: 'POST' }).catch(() => {});
+    } catch (e) {
+      // Never let enqueue failure break the save (cron will not have it, but save is safe)
+      console.error('[saveAttendanceWithMakeup] enqueue feedback failed', e);
     }
   }
 

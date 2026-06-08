@@ -42,6 +42,7 @@ const ALLOWED_TABLES = [
   'chat_conversations',
   'chat_messages',
   'chat_quick_replies',
+  'line_notification_queue',
 ]
 
 export async function POST(request: NextRequest) {

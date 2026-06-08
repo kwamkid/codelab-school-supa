@@ -57,6 +57,7 @@ import { AttendanceDialog } from '@/components/attendance/attendance-dialog';
 interface ClassWithDetails extends Class {
   subject?: Subject;
   teacher?: Teacher;
+  actualTeacher?: Teacher; // substitute who actually taught this session (if any)
   branch?: Branch;
   room?: Room;
   todaySchedule?: ClassSchedule;
@@ -78,23 +79,24 @@ const QUERY_KEYS = {
 const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, isAllBranches: boolean) => {
   const { user, adminUser, isTeacher, isSuperAdmin, canAccessBranch } = useAuth();
   
+  // A teacher only ever sees their own classes — filter by their linked teacher
+  // profile id (admin_users.teacher_id), NOT the admin_users row id.
+  const teacherFilterId = isTeacher() ? adminUser?.teacherId : undefined;
+
   // Fetch classes
-  const { data: classes = [] } = useQuery({
-    queryKey: QUERY_KEYS.classes(selectedBranchId, isTeacher() ? adminUser?.id : undefined),
+  const { data: classes = [], isLoading: classesLoading } = useQuery({
+    queryKey: QUERY_KEYS.classes(selectedBranchId, teacherFilterId),
     queryFn: async () => {
       if (!user) return [];
-      
+
+      // Teacher account not linked to a teacher profile → no classes to show
+      if (isTeacher() && !teacherFilterId) return [];
+
       if (isAllBranches && isSuperAdmin()) {
-        if (isTeacher() && adminUser) {
-          return getClasses(undefined, adminUser.id);
-        }
-        return getClasses();
+        return getClasses(undefined, teacherFilterId);
       } else if (selectedBranchId) {
         if (!canAccessBranch(selectedBranchId)) return [];
-        if (isTeacher() && adminUser) {
-          return getClasses(selectedBranchId, adminUser.id);
-        }
-        return getClasses(selectedBranchId);
+        return getClasses(selectedBranchId, teacherFilterId);
       }
       return [];
     },
@@ -103,28 +105,33 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
   });
 
   // Fetch subjects
-  const { data: subjects = [] } = useQuery({
+  const { data: subjects = [], isLoading: subjectsLoading } = useQuery({
     queryKey: QUERY_KEYS.subjects,
     queryFn: () => getActiveSubjects(),
     staleTime: Infinity,
   });
 
   // Fetch teachers
-  const { data: teachers = [] } = useQuery({
+  const { data: teachers = [], isLoading: teachersLoading } = useQuery({
     queryKey: QUERY_KEYS.teachers,
     queryFn: () => getActiveTeachers(),
     staleTime: Infinity,
   });
 
   // Fetch branches
-  const { data: branches = [] } = useQuery({
+  const { data: branches = [], isLoading: branchesLoading } = useQuery({
     queryKey: QUERY_KEYS.branches,
     queryFn: () => getActiveBranches(),
     staleTime: Infinity,
   });
   
+  // attendanceData only runs once all source data is present. When a teacher has
+  // no classes, this stays disabled — so we must NOT treat "no data" as loading.
+  const attendanceEnabled =
+    classes.length > 0 && subjects.length > 0 && teachers.length > 0 && branches.length > 0;
+
   // Process attendance data
-  const { data: attendanceData, isLoading, refetch: refetchAttendance } = useQuery({
+  const { data: attendanceData, isLoading: attendanceLoading, refetch: refetchAttendance } = useQuery({
     queryKey: QUERY_KEYS.attendanceData(selectedDate.toISOString(), selectedBranchId),
     queryFn: async () => {
       const dayOfWeek = selectedDate.getDay();
@@ -180,6 +187,11 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
         if (selectedSchedule) {
           const subject = subjectMap.get(cls.subjectId);
           const teacher = teacherMap.get(cls.teacherId);
+          // Substitute teacher for this specific session (if any)
+          const actualTeacher = selectedSchedule.actualTeacherId
+            && selectedSchedule.actualTeacherId !== cls.teacherId
+            ? teacherMap.get(selectedSchedule.actualTeacherId)
+            : undefined;
           const branch = branchMap.get(cls.branchId);
           const branchRooms = roomsByBranch.get(cls.branchId) || [];
           const room = branchRooms.find(r => r.id === cls.roomId);
@@ -188,6 +200,7 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
             ...cls,
             subject,
             teacher,
+            actualTeacher,
             branch,
             room,
             todaySchedule: selectedSchedule,
@@ -210,16 +223,20 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
       
       return classesWithDetails;
     },
-    enabled: classes.length > 0 && subjects.length > 0 && teachers.length > 0 && branches.length > 0,
+    enabled: attendanceEnabled,
     staleTime: Infinity,
   });
-  
+
   return {
     classes: attendanceData || [],
     subjects,
     teachers,
     branches,
-    isLoading: isLoading || !attendanceData,
+    // Spinner only while something is actually fetching — not when the attendance
+    // query is idle because there are simply no classes to process.
+    isLoading:
+      classesLoading || subjectsLoading || teachersLoading || branchesLoading ||
+      (attendanceEnabled && attendanceLoading),
     refetch: refetchAttendance,
   };
 };
@@ -263,9 +280,9 @@ export default function AttendancePage() {
       filteredTeachers = filteredTeachers.filter(t => t.availableBranches.includes(selectedBranchId));
     }
     
-    // If teacher role, only show themselves
-    if (isTeacher() && adminUser) {
-      filteredTeachers = filteredTeachers.filter(t => t.id === adminUser.id);
+    // If teacher role, only show themselves (match the linked teacher profile id)
+    if (isTeacher() && adminUser?.teacherId) {
+      filteredTeachers = filteredTeachers.filter(t => t.id === adminUser.teacherId);
     }
     
     return filteredTeachers;
@@ -301,33 +318,39 @@ export default function AttendancePage() {
     return filtered;
   }, [classes, searchTerm, selectedSubject, selectedTeacher]);
   
+  // Status badge color rule:
+  //   มาครบ (all came)        → green
+  //   มาไม่ครบ (some came)     → yellow
+  //   ขาดหมด (no one came)     → orange
+  //   ยังไม่เช็ค               → red
+  //   ยกเลิก                  → gray
+  // "came" = present or late.
   const getAttendanceStatus = (schedule?: ClassSchedule) => {
-    if (!schedule) return { status: 'pending', label: 'ยังไม่เช็คชื่อ', variant: 'secondary' as const };
-    
-    if (schedule.status === 'completed' || (schedule.attendance && schedule.attendance.length > 0)) {
-      const attendanceCount = schedule.attendance?.filter(a => a.status === 'present').length || 0;
-      const totalStudents = schedule.attendance?.length || 0;
-      
-      if (totalStudents === 0) {
-        return { 
-          status: 'completed', 
-          label: 'เช็คแล้ว', 
-          variant: 'default' as const 
-        };
+    type Icon = 'check' | 'alert' | 'cancel';
+    const checked = schedule?.status === 'completed' || (schedule?.attendance && schedule.attendance.length > 0);
+
+    if (schedule && checked) {
+      const att = schedule.attendance || [];
+      const total = att.length;
+      const came = att.filter(a => a.status === 'present' || a.status === 'late').length;
+
+      if (total === 0) {
+        return { label: 'เช็คแล้ว', icon: 'check' as Icon, className: 'bg-green-100 text-green-700' };
       }
-      
-      return { 
-        status: 'completed', 
-        label: `มาเรียน ${attendanceCount} คน`, 
-        variant: 'default' as const 
-      };
+      if (came === total) {
+        return { label: `มาครบ ${came}/${total}`, icon: 'check' as Icon, className: 'bg-green-100 text-green-700' };
+      }
+      if (came === 0) {
+        return { label: `ขาดหมด 0/${total}`, icon: 'cancel' as Icon, className: 'bg-orange-100 text-orange-700' };
+      }
+      return { label: `มาเรียน ${came}/${total}`, icon: 'alert' as Icon, className: 'bg-yellow-100 text-yellow-700' };
     }
-    
-    if (schedule.status === 'cancelled') {
-      return { status: 'cancelled', label: 'ยกเลิก', variant: 'destructive' as const };
+
+    if (schedule?.status === 'cancelled') {
+      return { label: 'ยกเลิก', icon: 'cancel' as Icon, className: 'bg-gray-100 text-gray-500' };
     }
-    
-    return { status: 'pending', label: 'ยังไม่เช็คชื่อ', variant: 'secondary' as const };
+
+    return { label: 'ยังไม่เช็คชื่อ', icon: 'alert' as Icon, className: 'bg-red-100 text-red-700' };
   };
   
   // Open the attendance modal for a class (defaults to the selected date's session)
@@ -575,14 +598,23 @@ export default function AttendancePage() {
                         )}
                         <TableCell>
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">
-                                {cls.teacher?.nickname || cls.teacher?.name}
-                              </span>
-                              {cls.todaySchedule?.actualTeacherId && 
-                               cls.todaySchedule.actualTeacherId !== cls.teacherId && (
-                                <Badge variant="outline" className="text-xs">แทน</Badge>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+                              {cls.actualTeacher ? (
+                                <>
+                                  {/* Substitute actually taught this session */}
+                                  <span className="text-sm font-medium">
+                                    {cls.actualTeacher.nickname || cls.actualTeacher.name}
+                                  </span>
+                                  <Badge variant="outline" className="text-xs border-amber-300 text-amber-700">แทน</Badge>
+                                  <span className="text-xs text-muted-foreground line-through">
+                                    {cls.teacher?.nickname || cls.teacher?.name}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-sm">
+                                  {cls.teacher?.nickname || cls.teacher?.name}
+                                </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2">
@@ -597,13 +629,10 @@ export default function AttendancePage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant={attendanceStatus.variant}
-                            className="gap-1"
-                          >
-                            {attendanceStatus.status === 'completed' && <CheckCircle className="h-3 w-3" />}
-                            {attendanceStatus.status === 'pending' && <AlertCircle className="h-3 w-3" />}
-                            {attendanceStatus.status === 'cancelled' && <XCircle className="h-3 w-3" />}
+                          <Badge className={cn('gap-1 border-0', attendanceStatus.className)}>
+                            {attendanceStatus.icon === 'check' && <CheckCircle className="h-3 w-3" />}
+                            {attendanceStatus.icon === 'alert' && <AlertCircle className="h-3 w-3" />}
+                            {attendanceStatus.icon === 'cancel' && <XCircle className="h-3 w-3" />}
                             {attendanceStatus.label}
                           </Badge>
                         </TableCell>

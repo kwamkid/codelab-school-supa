@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, CheckCircle2, Send, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { sendMakeupNotification } from '@/lib/services/line-notifications';
 import { getMakeupClass } from '@/lib/services/makeup';
 
 export default function TestMakeupNotificationPage() {
@@ -59,9 +58,15 @@ export default function TestMakeupNotificationPage() {
         return;
       }
 
-      // Send notification
-      const success = await sendMakeupNotification(makeupId, 'scheduled');
-      
+      // Send notification via the server route (LINE send is server-side)
+      const resp = await fetch('/api/test/makeup-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ makeupId, type: 'scheduled' }),
+      });
+      const respJson = await resp.json();
+      const success = resp.ok && respJson.success !== false;
+
       setResult({
         success,
         message: success ? 'ส่งการแจ้งเตือนสำเร็จ!' : 'ส่งการแจ้งเตือนไม่สำเร็จ',

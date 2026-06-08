@@ -17,8 +17,10 @@ import {
   CalendarDays,
   GraduationCap,
   Presentation,
+  ClipboardCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { AttendanceDialog } from '@/components/attendance/attendance-dialog';
 
 // --- Types ---
 
@@ -79,7 +81,13 @@ const TYPE_BADGE: Record<string, { label: string; className: string }> = {
 
 // --- Class Card ---
 
-function ScheduleCard({ item }: { item: TeacherScheduleItem }) {
+function ScheduleCard({
+  item,
+  onCheckAttendance,
+}: {
+  item: TeacherScheduleItem;
+  onCheckAttendance: (item: TeacherScheduleItem) => void;
+}) {
   const badge = TYPE_BADGE[item.type];
   const studentCount = item.students.length;
 
@@ -151,10 +159,20 @@ function ScheduleCard({ item }: { item: TeacherScheduleItem }) {
             </div>
           )}
 
-          {/* Slide button — classes + makeup; matched by subject + session number.
-              Makeup resolves the session from the original missed session. */}
+          {/* Actions: check-in (regular classes) + open slide (classes + makeup).
+              Slide is matched by subject + session number; makeup uses the original session. */}
           {(item.type === 'class' || item.type === 'makeup') && (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-2">
+              {item.type === 'class' && (
+                <Button
+                  variant="outline"
+                  onClick={() => onCheckAttendance(item)}
+                  className="border-green-300 text-green-700 hover:bg-green-50 hover:text-green-700"
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  เช็คชื่อ
+                </Button>
+              )}
               {item.material_id && item.subject_id ? (
                 <Button
                   asChild
@@ -210,6 +228,9 @@ export default function TeacherHomePage() {
 
   const isToday = selectedDate === toDateStr(new Date());
   const teacherLabel = teacher?.nickname || teacher?.name || adminUser?.displayName || '';
+
+  // Attendance dialog (opened from a class card)
+  const [attItem, setAttItem] = useState<TeacherScheduleItem | null>(null);
 
   const loadSchedule = useCallback(async () => {
     if (!teacherId) {
@@ -312,9 +333,26 @@ export default function TeacherHomePage() {
       ) : (
         <div className="space-y-3">
           {items.map(item => (
-            <ScheduleCard key={`${item.type}-${item.schedule_id}`} item={item} />
+            <ScheduleCard
+              key={`${item.type}-${item.schedule_id}`}
+              item={item}
+              onCheckAttendance={setAttItem}
+            />
           ))}
         </div>
+      )}
+
+      {/* Attendance check-in (regular classes) */}
+      {attItem && attItem.type === 'class' && (
+        <AttendanceDialog
+          open={!!attItem}
+          onOpenChange={(o) => { if (!o) setAttItem(null); }}
+          classId={attItem.class_id}
+          className={`${attItem.subject_name} · ${attItem.class_name}`}
+          classCode={attItem.class_code}
+          scheduleId={attItem.schedule_id}
+          onSaved={() => { setAttItem(null); loadSchedule(); }}
+        />
       )}
     </div>
   );

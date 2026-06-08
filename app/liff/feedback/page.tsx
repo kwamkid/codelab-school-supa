@@ -10,8 +10,6 @@ import { ChevronLeft, Loader2, MessageSquare, Calendar, User, BookOpen, School }
 import { useLiff } from '@/components/liff/liff-provider'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { PageLoading } from '@/components/ui/loading'
-import { getParentByLineId, getStudentsByParent } from '@/lib/services/parents'
-import { getStudentFeedbackHistory } from '@/lib/services/feedback'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -24,6 +22,7 @@ interface FeedbackData {
   sessionNumber: number
   sessionDate: Date
   feedback: string
+  photos: string[]
   teacherName: string
 }
 
@@ -47,36 +46,28 @@ function FeedbackContent() {
 
     try {
       setLoading(true)
-      
-      // Get parent and students
-      const parent = await getParentByLineId(profile.userId)
-      if (!parent) {
-        toast.error('ไม่พบข้อมูลผู้ปกครอง')
-        return
+
+      // Fetch via server route (service role) — reliable regardless of LIFF RLS context
+      const res = await fetch('/api/liff/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineUserId: profile.userId }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error || 'load failed')
+
+      const studentsData = json.students || []
+      setStudents(studentsData)
+      if (studentsData.length > 0) {
+        setSelectedStudentId(studentsData[0].id)
       }
 
-      const studentsData = await getStudentsByParent(parent.id)
-      setStudents(studentsData.filter(s => s.isActive))
-      
-      if (studentsData.length > 0) {
-        // Default to first student
-        const defaultStudentId = studentsData[0].id
-        setSelectedStudentId(defaultStudentId)
-        
-        // Load feedback for all students
-        const allFeedbacks: FeedbackData[] = []
-        for (const student of studentsData) {
-          const feedbacks = await getStudentFeedbackHistory(student.id)
-          allFeedbacks.push(...feedbacks.map(f => ({
-            ...f,
-            studentName: student.nickname || student.name
-          })))
-        }
-        
-        setFeedbacks(allFeedbacks.sort((a, b) => 
-          b.sessionDate.getTime() - a.sessionDate.getTime()
-        ))
-      }
+      // Server returns ISO date strings → revive to Date for formatting
+      const feedbacks: FeedbackData[] = (json.feedbacks || []).map((f: any) => ({
+        ...f,
+        sessionDate: new Date(f.sessionDate),
+      }))
+      setFeedbacks(feedbacks)
     } catch (error) {
       console.error('Error loading feedback:', error)
       toast.error('ไม่สามารถโหลดข้อมูลได้')
@@ -176,9 +167,25 @@ function FeedbackContent() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-sm whitespace-pre-wrap">{feedback.feedback}</p>
-                    </div>
+                    {feedback.feedback && (
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <p className="text-sm whitespace-pre-wrap">{feedback.feedback}</p>
+                      </div>
+                    )}
+                    {feedback.photos && feedback.photos.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {feedback.photos.map((url) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={url}
+                              alt="รูปจากครู"
+                              className="h-28 w-28 rounded-lg object-cover border"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <User className="h-3 w-3" />
                       <span>ครู{feedback.teacherName}</span>

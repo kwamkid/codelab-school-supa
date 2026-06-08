@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { resizeImageToJpeg } from '@/lib/utils/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +38,16 @@ import {
   AlertTriangle,
   CheckCheck,
   Loader2,
+  ImagePlus,
+  X,
 } from 'lucide-react';
+
+// A photo staged locally (resized, not yet uploaded). Uploaded only on save.
+interface PendingPhoto {
+  id: string;
+  blob: Blob;
+  previewUrl: string;
+}
 
 interface StudentAttendance {
   studentId: string;
@@ -48,6 +58,8 @@ interface StudentAttendance {
   status: 'present' | 'absent' | 'late' | 'sick' | 'leave' | '';
   note: string;
   feedback: string;
+  photos: string[];          // already-uploaded photo URLs
+  pendingPhotos: PendingPhoto[]; // staged in memory, uploaded on save
 }
 
 export interface AttendanceCheckerProps {
@@ -129,6 +141,8 @@ export function AttendanceChecker({
               status: existing?.status || '',
               note: existing?.note || '',
               feedback: existing?.feedback || '',
+              photos: existing?.photos || [],
+              pendingPhotos: [],
             } as StudentAttendance;
           })
         );
@@ -175,19 +189,93 @@ export function AttendanceChecker({
     setHasChanges(true);
   };
 
+  // Track every object URL we create so we can revoke them on unmount
+  const previewUrlsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const urls = previewUrlsRef.current;
+    return () => { urls.forEach(u => URL.revokeObjectURL(u)); };
+  }, []);
+
+  // Add a photo: resize client-side and stage in memory only (NOT uploaded yet).
+  // Only 1 photo per student — the actual upload happens on save (confirm).
+  const handleAddPhoto = async (studentId: string, files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('กรุณาเลือกไฟล์รูปภาพ'); return; }
+    try {
+      const blob = await resizeImageToJpeg(file);
+      const previewUrl = URL.createObjectURL(blob);
+      previewUrlsRef.current.add(previewUrl);
+      const staged: PendingPhoto = { id: crypto.randomUUID(), blob, previewUrl };
+      setAttendance(prev => prev.map(att =>
+        att.studentId === studentId ? { ...att, pendingPhotos: [staged] } : att
+      ));
+      setHasChanges(true);
+    } catch (e) {
+      console.error('resize failed', e);
+      toast.error('ย่อรูปไม่สำเร็จ (ไฟล์อาจไม่ใช่รูปภาพ)');
+    }
+  };
+
+  const handleRemovePending = (studentId: string, pendingId: string) => {
+    setAttendance(prev => prev.map(att => {
+      if (att.studentId !== studentId) return att;
+      const target = att.pendingPhotos.find(p => p.id === pendingId);
+      if (target) {
+        URL.revokeObjectURL(target.previewUrl);
+        previewUrlsRef.current.delete(target.previewUrl);
+      }
+      return { ...att, pendingPhotos: att.pendingPhotos.filter(p => p.id !== pendingId) };
+    }));
+    setHasChanges(true);
+  };
+
+  const handleRemovePhoto = (studentId: string, url: string) => {
+    setAttendance(prev => prev.map(att =>
+      att.studentId === studentId
+        ? { ...att, photos: att.photos.filter(p => p !== url) }
+        : att
+    ));
+    setHasChanges(true);
+  };
+
+  // Upload one staged photo to storage, return its public URL
+  const uploadPhoto = async (blob: Blob): Promise<string> => {
+    const fd = new FormData();
+    fd.append('file', new File([blob], 'feedback.jpg', { type: 'image/jpeg' }));
+    fd.append('bucket', 'attendance-photos');
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'อัพโหลดรูปไม่สำเร็จ');
+    return json.url as string;
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Upload all staged photos now (on confirm), then attach their URLs.
+      const recordsWithPhotos = await Promise.all(
+        attendance.map(async (a) => {
+          let photos = a.photos;
+          if (a.pendingPhotos.length > 0) {
+            const uploaded = await Promise.all(a.pendingPhotos.map(p => uploadPhoto(p.blob)));
+            photos = [...a.photos, ...uploaded];
+          }
+          return {
+            studentId: a.studentId,
+            studentName: a.studentNickname || a.studentName,
+            status: a.status,
+            note: a.note,
+            feedback: a.feedback,
+            photos,
+          };
+        })
+      );
+
       const res = await saveAttendanceWithMakeup({
         classId,
         scheduleId,
-        records: attendance.map(a => ({
-          studentId: a.studentId,
-          studentName: a.studentNickname || a.studentName,
-          status: a.status,
-          note: a.note,
-          feedback: a.feedback,
-        })),
+        records: recordsWithPhotos,
         initialStatuses: initialAttendance,
         checkedBy: user?.uid || '',
         actualTeacherId,
@@ -202,9 +290,9 @@ export function AttendanceChecker({
       if (res.limitExceeded.length > 0) parts.push(`เกินลิมิต: ${res.limitExceeded.join(', ')}`);
       toast.success(parts.length ? `บันทึกการเช็คชื่อเรียบร้อยแล้ว (${parts.join(' / ')})` : 'บันทึกการเช็คชื่อเรียบร้อยแล้ว');
       onSaved?.(res);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving attendance:', error);
-      toast.error('เกิดข้อผิดพลาดในการบันทึก');
+      toast.error(error?.message || 'เกิดข้อผิดพลาดในการบันทึก');
     } finally {
       setSaving(false);
     }
@@ -362,12 +450,61 @@ export function AttendanceChecker({
                   )}
 
                   {(student.status === 'present' || student.status === 'late') && (
-                    <Textarea
-                      placeholder="Feedback ถึงผู้ปกครอง (ไม่บังคับ)..."
-                      value={student.feedback}
-                      onChange={(e) => handleFeedbackChange(student.studentId, e.target.value)}
-                      className="h-14 mt-2 text-sm"
-                    />
+                    <div className="mt-2 grid grid-cols-[1fr_auto] gap-2 items-start">
+                      <Textarea
+                        placeholder="Feedback ถึงผู้ปกครอง (ไม่บังคับ)..."
+                        value={student.feedback}
+                        onChange={(e) => handleFeedbackChange(student.studentId, e.target.value)}
+                        className="h-16 text-sm w-full"
+                      />
+
+                      {/* Photo: max 1 per student (uploaded or staged) */}
+                      <div className="flex items-center gap-2">
+                        {student.photos.map((url) => (
+                          <div key={url} className="relative h-16 w-16 shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt="feedback" className="h-16 w-16 rounded-md object-cover border" />
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePhoto(student.studentId, url)}
+                              className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 text-white p-0.5 shadow"
+                              aria-label="ลบรูป"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+
+                        {student.pendingPhotos.map((p) => (
+                          <div key={p.id} className="relative h-16 w-16 shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={p.previewUrl} alt="รอบันทึก" className="h-16 w-16 rounded-md object-cover border border-dashed border-orange-300" />
+                            <span className="absolute inset-x-0 bottom-0 bg-orange-500/80 text-white text-[9px] text-center leading-tight">รอบันทึก</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePending(student.studentId, p.id)}
+                              className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 text-white p-0.5 shadow"
+                              aria-label="ลบรูป"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+
+                        {student.photos.length + student.pendingPhotos.length === 0 && (
+                          <label className="flex h-16 w-16 shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-gray-300 text-gray-400 hover:border-orange-400 hover:text-orange-500 transition-colors">
+                            <ImagePlus className="h-5 w-5" />
+                            <span className="text-[10px]">เพิ่มรูป</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => { handleAddPhoto(student.studentId, e.target.files); e.target.value = ''; }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}
