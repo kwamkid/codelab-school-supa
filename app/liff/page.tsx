@@ -17,8 +17,7 @@ import {
 } from 'lucide-react'
 import { SectionLoading } from '@/components/ui/loading'
 import { getGeneralSettings } from '@/lib/services/settings'
-import { getParentByLineId, getStudentsByParent } from '@/lib/services/parents'
-import { getMakeupClassesByStudent } from '@/lib/services/makeup'
+import { getParentByLineId } from '@/lib/services/parents'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { useLiff } from '@/components/liff/liff-provider'
 import Image from 'next/image'
@@ -144,19 +143,18 @@ function LiffHome() {
           const parent = await getParentByLineId(profile.userId)
           setHasParent(!!parent)
 
-          // Count makeup sessions still owed (status 'pending' = not scheduled yet)
-          // across all of the parent's active students, for the home alert/badge.
+          // Count makeup sessions still owed (status 'pending' = not scheduled yet),
+          // via server route (service role) — makeup_classes is RLS-blocked for the
+          // LIFF browser client since parents aren't Supabase-authenticated.
           if (parent) {
             try {
-              const students = await getStudentsByParent(parent.id)
-              const activeStudents = students.filter(s => s.isActive)
-              const counts = await Promise.all(
-                activeStudents.map(async (s) => {
-                  const makeups = await getMakeupClassesByStudent(s.id)
-                  return makeups.filter(m => m.status === 'pending').length
-                })
-              )
-              setPendingMakeupCount(counts.reduce((a, b) => a + b, 0))
+              const res = await fetch('/api/liff/pending-makeup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lineUserId: profile.userId }),
+              })
+              const data = await res.json()
+              if (data?.success) setPendingMakeupCount(data.count || 0)
             } catch (e) {
               console.error('Error counting pending makeups:', e)
             }

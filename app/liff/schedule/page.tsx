@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { ChevronLeft, Loader2, Calendar, Users, Clock, MapPin, User, List, CalendarDays, CalendarRange, AlertCircle } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
-import { getParentScheduleEvents, getStudentOverallStats, StudentStats } from '@/lib/services/liff-schedule'
+import type { StudentStats } from '@/lib/services/liff-schedule'
 import { toast } from 'sonner'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { PageLoading, SectionLoading } from '@/components/ui/loading'
@@ -65,15 +65,35 @@ function ScheduleContent() {
       const yearEnd = new Date(now.getFullYear() + 1, 11, 31) // December 31st next year
       
       console.log(`Loading data from ${yearStart.toDateString()} to ${yearEnd.toDateString()} (covering cross-year courses)`)
-      
-      const { events: fetchedEvents, students: studentsData } = await getParentScheduleEvents(
-        profile.userId,
-        yearStart,
-        yearEnd
-      )
-      
+
+      // Fetch via server route (service role) — LIFF users aren't Supabase-authed,
+      // so reading enrollments/schedules client-side is blocked by RLS.
+      const res = await fetch('/api/liff/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lineUserId: profile.userId,
+          start: yearStart.toISOString(),
+          end: yearEnd.toISOString(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to load schedule')
+      }
+
+      // JSON turns Date into ISO strings — revive start/end back into Date objects.
+      const fetchedEvents: ScheduleEvent[] = (data.events || []).map((e: any) => ({
+        ...e,
+        start: new Date(e.start),
+        end: new Date(e.end),
+      }))
+      const studentsData = data.students || []
+
       setEvents(fetchedEvents)
       setStudents(studentsData)
+      setOverallStats(data.stats || {})
+      setLoadingStats(false)
       setDataLoaded(true)
       
       // Set default selected student
@@ -100,30 +120,8 @@ function ScheduleContent() {
     await loadYearData()
   }, [loadYearData])
 
-  // Load overall stats for all students
-  const loadOverallStats = useCallback(async () => {
-    if (!profile?.userId || students.length === 0) return
-
-    try {
-      setLoadingStats(true)
-      const statsPromises = students.map(async (studentData) => {
-        const stats = await getStudentOverallStats(profile.userId, studentData.student.id)
-        return { studentId: studentData.student.id, stats }
-      })
-
-      const results = await Promise.all(statsPromises)
-      const statsMap: Record<string, StudentStats> = {}
-      results.forEach(({ studentId, stats }) => {
-        statsMap[studentId] = stats
-      })
-      
-      setOverallStats(statsMap)
-    } catch (error) {
-      console.error('Error loading overall stats:', error)
-    } finally {
-      setLoadingStats(false)
-    }
-  }, [profile, students])
+  // Overall stats are returned by the /api/liff/schedule route (set in loadYearData),
+  // so there's nothing extra to load here.
 
   // Initial load
   useEffect(() => {
@@ -131,13 +129,6 @@ function ScheduleContent() {
       loadYearData()
     }
   }, [profile?.userId, authChecked, loadYearData])
-
-  // Load overall stats when students data is available
-  useEffect(() => {
-    if (students.length > 0) {
-      loadOverallStats()
-    }
-  }, [students, loadOverallStats])
 
   // Handle leave request
   const handleLeaveRequest = (event: ScheduleEvent) => {
