@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
     const teacherId = authData.user.id
 
     try {
-      // Create teacher document
-      const { error: teacherError } = await supabase.from('teachers').insert({
+      // Create teacher document (capture its id to link the admin_users row)
+      const { data: teacherRow, error: teacherError } = await supabase.from('teachers').insert({
         name: teacherData.name,
         email: email.toLowerCase(),
         phone: teacherData.phone || null,
@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as any)
+        .select('id')
+        .single()
 
       if (teacherError) throw teacherError
 
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
         can_manage_settings: false,
         can_view_reports: false,
         can_manage_all_branches: false,
-        teacher_id: null,
+        teacher_id: (teacherRow as any)?.id ?? null,
         is_active: teacherData.isActive !== false,
         created_at: new Date().toISOString(),
         created_by: adminUser.id,

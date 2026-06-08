@@ -5,6 +5,7 @@ import { AuthProvider } from "@/hooks/useSupabaseAuth";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import '@/lib/suppress-warnings';
 
 
@@ -36,8 +37,10 @@ export default function RootLayout({
         >
           <QueryProvider>
             <AuthProvider>
-              <Toaster />
-              {children}
+              <TooltipProvider delayDuration={200}>
+                <Toaster />
+                {children}
+              </TooltipProvider>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

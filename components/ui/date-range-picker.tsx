@@ -1,8 +1,10 @@
 "use client"
 
 import Datepicker from "react-tailwindcss-datepicker"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Tooltip } from "@/components/ui/tooltip"
 
 function toDateStr(d: Date | string | null | undefined): string {
   if (!d) return ""
@@ -44,6 +46,8 @@ interface DateRangePickerSingleProps {
   maxDate?: Date
   disabled?: boolean
   popoverDirection?: "up" | "down"
+  /** Show ‹ › prev/next-day buttons around the picker */
+  withStepper?: boolean
 }
 
 type DateRangePickerProps = DateRangePickerRangeProps | DateRangePickerSingleProps
@@ -67,8 +71,8 @@ export function DateRangePicker(props: DateRangePickerProps) {
       props.onChange(date || undefined)
     }
 
-    return (
-      <div className={cn("w-full datepicker-custom", className)}>
+    const picker = (
+      <div className={cn("w-full datepicker-custom", props.withStepper ? "flex-1" : className)}>
         <Datepicker
           i18n="en"
           asSingle={true}
@@ -87,6 +91,39 @@ export function DateRangePicker(props: DateRangePickerProps) {
           popoverDirection={popoverDirection}
           startFrom={dateObj ?? undefined}
         />
+      </div>
+    )
+
+    if (!props.withStepper) return picker
+
+    // ‹ [picker] › with prev/next-day stepping
+    const shiftDay = (delta: number) => {
+      const base = toDate(props.value) ?? new Date()
+      base.setDate(base.getDate() + delta)
+      props.onChange(toDateStr(base))
+    }
+    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    const cur = dateObj ?? startOfDay(now)
+    const prevDay = new Date(cur); prevDay.setDate(prevDay.getDate() - 1)
+    const nextDay = new Date(cur); nextDay.setDate(nextDay.getDate() + 1)
+    const canPrev = !disabled && (!minDate || prevDay >= startOfDay(minDate))
+    const canNext = !disabled && (!maxDate || nextDay <= startOfDay(maxDate))
+    const stepBtn =
+      "h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-slate-700 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+
+    return (
+      <div className={cn("flex items-center gap-1.5", className)}>
+        <Tooltip label="วันก่อนหน้า">
+          <button type="button" onClick={() => shiftDay(-1)} disabled={!canPrev} className={stepBtn} aria-label="วันก่อนหน้า">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        </Tooltip>
+        {picker}
+        <Tooltip label="วันถัดไป">
+          <button type="button" onClick={() => shiftDay(1)} disabled={!canNext} className={stepBtn} aria-label="วันถัดไป">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </Tooltip>
       </div>
     )
   }

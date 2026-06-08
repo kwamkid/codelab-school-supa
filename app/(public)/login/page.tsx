@@ -14,6 +14,10 @@ import Image from 'next/image';
 import { getClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
+// Password login is disabled — sign-in is Google-only.
+// Flip to true to bring back the email/password form + reset-password flow.
+const SHOW_PASSWORD_LOGIN = false;
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -242,14 +246,15 @@ export default function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {error && (
-                  <Alert variant="destructive" className="border-red-200 bg-red-50">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+              {error && (
+                <Alert variant="destructive" className="border-red-200 bg-red-50 mb-5">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
+              {SHOW_PASSWORD_LOGIN && (
+              <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-gray-700 font-medium">อีเมล</Label>
                   <Input
@@ -317,16 +322,19 @@ export default function LoginPage() {
                   )}
                 </Button>
               </form>
+              )}
 
-              {/* Divider */}
-              <div className="relative my-5">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-gray-200" />
+              {SHOW_PASSWORD_LOGIN && (
+                /* Divider */
+                <div className="relative my-5">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-gray-200" />
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="bg-white px-3 text-gray-400">หรือ</span>
+                  </div>
                 </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-3 text-gray-400">หรือ</span>
-                </div>
-              </div>
+              )}
 
               {/* Google Sign In */}
               <Button
@@ -371,7 +379,7 @@ export default function LoginPage() {
       </div>
 
       {/* Reset Password Dialog */}
-      {showResetDialog && (
+      {SHOW_PASSWORD_LOGIN && showResetDialog && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md border-0 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <CardHeader className="pb-4">

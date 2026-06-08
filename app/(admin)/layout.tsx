@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { Tooltip } from '@/components/ui/tooltip';
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import { BranchProvider, useBranch } from '@/contexts/BranchContext';
 import { BranchSelector } from '@/components/layout/branch-selector';
@@ -336,6 +337,13 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     }
   }, [user, authLoading, router]);
 
+  // Teachers land on their own home page, not the admin dashboard
+  useEffect(() => {
+    if (adminUser?.role === 'teacher' && pathname === '/dashboard') {
+      router.replace('/teacher');
+    }
+  }, [adminUser, pathname, router]);
+
   // Click outside to close notifications
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -394,11 +402,20 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
 
   // ใช้ useMemo สำหรับ navigation array
   const navigation = useMemo<NavigationItem[]>(() => [
+    // Teacher home — today's classes for the logged-in teacher
+    {
+      name: 'หน้าหลัก',
+      href: '/teacher',
+      icon: Home,
+      iconColor: 'text-orange-500',
+      requiredRole: ['teacher']
+    },
     {
       name: 'Dashboard',
       href: '/dashboard',
       icon: Home,
-      iconColor: 'text-blue-500'
+      iconColor: 'text-blue-500',
+      requiredRole: ['super_admin', 'branch_admin']
     },
     {
       name: 'divider-1',
@@ -433,7 +450,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       href: '/makeup',
       icon: Repeat,
       iconColor: 'text-yellow-600',
-      badge: pendingMakeupCount > 0 ? pendingMakeupCount : undefined
+      badge: pendingMakeupCount > 0 ? pendingMakeupCount : undefined,
+      requiredRole: ['super_admin', 'branch_admin']
     },
     {
       name: 'ลูกค้า',
@@ -465,7 +483,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       name: 'คลาสเรียน',
       href: '/classes',
       icon: GraduationCap,
-      iconColor: 'text-orange-600'
+      iconColor: 'text-orange-600',
+      requiredRole: ['super_admin', 'branch_admin']
     },
     {
       name: 'ข้อมูลพื้นฐาน',
@@ -842,13 +861,13 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                       </div>
                     ) : item.subItems ? (
                       <>
+                        <Tooltip label={sidebarCollapsed ? item.name : ''} side="right">
                         <button
                           onClick={() => {
                             // In collapsed rail, expand the sidebar first so submenu is usable
                             if (sidebarCollapsed) setSidebarCollapsed(false);
                             toggleExpanded(item.name);
                           }}
-                          title={item.name}
                           className={cn(
                             'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
                             sidebarCollapsed && 'lg:justify-center',
@@ -869,6 +888,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                             )}
                           </span>
                         </button>
+                        </Tooltip>
                         {expandedItems.includes(item.name) && (
                           <div className={cn('mt-2 ml-8 space-y-1', sidebarCollapsed && 'lg:hidden')}>
                             {item.subItems.map((subItem) => {
@@ -901,9 +921,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                         )}
                       </>
                     ) : item.href ? (
+                      <Tooltip label={sidebarCollapsed ? item.name : ''} side="right">
+                      <span className="block">
                       <MenuLink
                         href={item.href}
-                        title={item.name}
                         className={cn(
                           'relative flex items-center rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
                           sidebarCollapsed && 'lg:justify-center',
@@ -932,6 +953,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                           <span className="hidden lg:block absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-white" />
                         )}
                       </MenuLink>
+                      </span>
+                      </Tooltip>
                     ) : null}
                   </div>
                 );
@@ -953,13 +976,15 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
               </button>
 
               {/* Desktop sidebar collapse/expand toggle */}
-              <button
-                onClick={() => setSidebarCollapsed((v) => !v)}
-                className="hidden lg:inline-flex text-muted-foreground hover:text-foreground"
-                title={sidebarCollapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
-              >
-                {sidebarCollapsed ? <PanelLeftOpen className="h-6 w-6" /> : <PanelLeftClose className="h-6 w-6" />}
-              </button>
+              <Tooltip label={sidebarCollapsed ? 'ขยายเมนู' : 'ย่อเมนู'}>
+                <button
+                  onClick={() => setSidebarCollapsed((v) => !v)}
+                  className="hidden lg:inline-flex text-muted-foreground hover:text-foreground"
+                  aria-label={sidebarCollapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+                >
+                  {sidebarCollapsed ? <PanelLeftOpen className="h-6 w-6" /> : <PanelLeftClose className="h-6 w-6" />}
+                </button>
+              </Tooltip>
 
               {/* Branch Selector - Desktop */}
               <div className="hidden lg:flex items-center gap-4">

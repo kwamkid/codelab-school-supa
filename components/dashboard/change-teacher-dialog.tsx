@@ -19,6 +19,7 @@ import { updateClassSchedule, changeClassResources } from '@/lib/services/classe
 import { updateTrialSession } from '@/lib/services/trial-bookings';
 import { adminMutation } from '@/lib/admin-mutation';
 import { checkAvailability } from '@/lib/utils/availability';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useSupabaseAuth';
 
 interface ChangeTeacherPanelProps {
@@ -138,9 +139,11 @@ export function ChangeTeacherPanel({ event, scheduleId, onCancel, onChanged }: C
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600" title="กลับ">
-            <ArrowLeft className="h-5 w-5" />
-          </button>
+          <Tooltip label="กลับ">
+            <button onClick={onCancel} className="text-gray-400 hover:text-gray-600" aria-label="กลับ">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          </Tooltip>
           <UserCog className="h-5 w-5 text-blue-500" />
           เปลี่ยนครูผู้สอน
         </DialogTitle>

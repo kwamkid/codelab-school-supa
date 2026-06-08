@@ -328,7 +328,8 @@ export async function createAdminUserSimple(
         display_name: userData.displayName,
         role: userData.role,
         branch_ids: userData.branchIds,
-        teacher_id: null,
+        // Dual-creation passes the teachers.id as userId, so a teacher account links to itself
+        teacher_id: userData.role === 'teacher' ? userId : null,
         can_manage_users: userData.permissions?.canManageUsers ?? false,
         can_manage_settings: userData.permissions?.canManageSettings ?? false,
         can_view_reports: userData.permissions?.canViewReports ?? false,

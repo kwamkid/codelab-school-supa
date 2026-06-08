@@ -266,9 +266,10 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       // Mark as successfully loaded only after setting admin user
       loadedEmailRef.current = emailLower;
 
-      // Load teacher data if role is teacher
+      // Load teacher profile in the background — it's display-only data and must
+      // never block auth init (a slow/blocked query here would hang the whole app).
       if (adminData.role === 'teacher' && adminData.teacher_id) {
-        await loadTeacherData(client, adminData.teacher_id);
+        loadTeacherData(client, adminData.teacher_id).catch(() => {});
       }
 
       loadingAdminRef.current = false;

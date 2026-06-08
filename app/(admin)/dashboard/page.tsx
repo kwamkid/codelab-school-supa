@@ -166,22 +166,23 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10"
+            disabled={isToday(selectedDate)}
+            onClick={() => setSelectedDate(toDateStr(new Date()))}
+          >
+            วันนี้
+          </Button>
           <DateRangePicker
             mode="single"
             value={selectedDate}
             onChange={handleDateChange}
             placeholder="เลือกวันที่"
-            className="w-[200px]"
+            withStepper
+            className="w-[260px]"
           />
-          {!isToday(selectedDate) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedDate(toDateStr(new Date()))}
-            >
-              วันนี้
-            </Button>
-          )}
           <Button
             variant="outline"
             size="icon"

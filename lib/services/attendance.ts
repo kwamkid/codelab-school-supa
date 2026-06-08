@@ -258,3 +258,109 @@ export async function getAttendanceStats(scheduleId: string): Promise<{
     };
   }
 }
+
+// ============================================
+// Save attendance + auto create/cancel makeup (shared by attendance page & dashboard modal)
+// ============================================
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'sick' | 'leave';
+
+export async function saveAttendanceWithMakeup(params: {
+  classId: string;
+  scheduleId: string;
+  records: Array<{ studentId: string; studentName?: string; status: AttendanceStatus | ''; note?: string; feedback?: string }>;
+  initialStatuses?: Record<string, string>;
+  checkedBy: string;
+  actualTeacherId?: string;
+  globalNote?: string;
+  sessionNumber?: number;
+  sessionDate?: Date;
+}): Promise<{ makeupCreated: number; makeupCancelled: number; limitExceeded: string[] }> {
+  const { updateClassSchedule } = await import('./classes');
+  const { getMakeupSettings } = await import('./settings');
+  const { getMakeupCount, getMakeupByOriginalSchedule, deleteMakeupForSchedule, createMakeupRequest } = await import('./makeup');
+  const { getStudentWithParent } = await import('./parents');
+
+  const { classId, scheduleId, initialStatuses = {}, checkedBy, actualTeacherId, globalNote, sessionNumber, sessionDate } = params;
+
+  const toSave = params.records.filter(
+    (r): r is { studentId: string; studentName?: string; status: AttendanceStatus; note?: string; feedback?: string } => r.status !== ''
+  );
+
+  const attendanceData = toSave.map((r) => ({
+    studentId: r.studentId,
+    status: r.status,
+    note: r.note,
+    feedback: r.feedback,
+    checkedAt: new Date(),
+    checkedBy,
+  }));
+
+  // Save the schedule + attendance (status completed when at least one record)
+  await updateClassSchedule(classId, scheduleId, {
+    actualTeacherId,
+    attendance: attendanceData,
+    note: globalNote,
+    status: attendanceData.length > 0 ? 'completed' : 'scheduled',
+  });
+
+  const makeupSettings = await getMakeupSettings();
+  const absentStatuses = makeupSettings.allowMakeupForStatuses as string[];
+  let makeupCancelled = 0;
+  let makeupCreated = 0;
+  const limitExceeded: string[] = [];
+
+  // 1) Cancel makeup for students changed FROM absent/sick/leave TO present/late
+  const changedToPresent = toSave.filter((r) => {
+    const prev = initialStatuses[r.studentId];
+    const wasAbsent = !!prev && absentStatuses.includes(prev);
+    const nowPresent = r.status === 'present' || r.status === 'late';
+    return wasAbsent && nowPresent;
+  });
+  for (const s of changedToPresent) {
+    try {
+      await deleteMakeupForSchedule(s.studentId, classId, scheduleId, checkedBy, 'แก้ไขการเช็คชื่อ - เปลี่ยนเป็นมาเรียน');
+      makeupCancelled++;
+    } catch (e) {
+      console.warn('Failed to cancel makeup', s.studentId, e);
+    }
+  }
+
+  // 2) Create makeup for newly absent students
+  const forMakeup = toSave.filter((r) => absentStatuses.includes(r.status));
+  if (makeupSettings.autoCreateMakeup && forMakeup.length > 0) {
+    for (const s of forMakeup) {
+      try {
+        const existing = await getMakeupByOriginalSchedule(s.studentId, classId, scheduleId);
+        if (existing) continue;
+        if (makeupSettings.makeupLimitPerCourse > 0) {
+          const cnt = await getMakeupCount(s.studentId, classId);
+          if (cnt >= makeupSettings.makeupLimitPerCourse) {
+            limitExceeded.push(s.studentName || s.studentId);
+            continue;
+          }
+        }
+        const sd = await getStudentWithParent(s.studentId);
+        if (sd) {
+          await createMakeupRequest({
+            type: 'ad-hoc',
+            originalClassId: classId,
+            originalScheduleId: scheduleId,
+            studentId: s.studentId,
+            parentId: sd.parentId,
+            requestDate: new Date(),
+            requestedBy: checkedBy,
+            reason: s.status === 'sick' ? 'ป่วย' : s.status === 'leave' ? 'ลา' : 'ขาดเรียน',
+            status: 'pending',
+            originalSessionNumber: sessionNumber,
+            originalSessionDate: sessionDate,
+          } as any);
+          makeupCreated++;
+        }
+      } catch (e) {
+        console.error('Error creating makeup for student', s.studentId, e);
+      }
+    }
+  }
+
+  return { makeupCreated, makeupCancelled, limitExceeded };
+}

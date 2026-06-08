@@ -66,13 +66,13 @@ function getEventBg(event: TimetableEvent): string {
 
   // Completed (past time or status)
   if (endTime < now || event.schedule_status === 'completed') {
-    return 'bg-green-50 border-green-200';
+    return 'bg-green-50 border-green-200 dark:bg-green-950/40 dark:border-green-800';
   }
 
   switch (event.event_type) {
-    case 'makeup': return 'bg-purple-50 border-purple-200';
-    case 'trial': return 'bg-orange-50 border-orange-200';
-    default: return 'bg-white border-gray-200';
+    case 'makeup': return 'bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800';
+    case 'trial': return 'bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800';
+    default: return 'bg-white border-gray-200 dark:bg-slate-800 dark:border-slate-700';
   }
 }
 
@@ -127,13 +127,13 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-gray-50 border border-gray-200 px-3 py-2.5 text-xs font-semibold text-gray-600 text-left w-[96px] min-w-[96px]">
+              <th className="sticky left-0 z-10 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 text-left w-[96px] min-w-[96px]">
                 เวลา
               </th>
               {sortedRooms.map((room) => (
                 <th
                   key={room.room_id}
-                  className="border border-gray-200 px-3 py-2.5 text-sm font-semibold text-gray-700 text-center bg-gray-50 min-w-[200px]"
+                  className="border border-gray-200 dark:border-slate-700 px-2 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 text-center bg-gray-50 dark:bg-slate-800 min-w-[150px]"
                 >
                   {room.room_name}
                 </th>
@@ -146,13 +146,13 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
               return (
                 <tr key={timeKey}>
                   {/* Time column */}
-                  <td className="sticky left-0 z-10 bg-gray-50 border border-gray-200 px-2 py-2 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
-                    {slot.start.substring(0, 5)}
+                  <td className="sticky left-0 z-10 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2 py-2 font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap align-top">
+                    <span className="text-base font-semibold">{slot.start.substring(0, 5)}</span>
                     <br />
-                    <span className="text-gray-400">{slot.end.substring(0, 5)}</span>
+                    <span className="text-sm text-gray-400">{slot.end.substring(0, 5)}</span>
                     {(() => {
                       const count = events.filter(e => `${e.start_time}-${e.end_time}` === timeKey).length;
-                      return <span className="text-gray-400 ml-0.5"> ({count})</span>;
+                      return <span className="text-xs text-gray-400 ml-0.5">({count})</span>;
                     })()}
                   </td>
 
@@ -164,7 +164,7 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
                     return (
                       <td
                         key={room.room_id}
-                        className="border border-gray-200 p-1.5 align-top"
+                        className="border border-gray-200 dark:border-slate-700 p-1.5 align-top"
                       >
                         {cellEvents.length === 0 ? (
                           <div className="h-full min-h-[84px]" />
@@ -185,11 +185,11 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
                                     className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                     style={{ backgroundColor: event.subject_color }}
                                   />
-                                  <span className="font-semibold text-gray-900 text-sm truncate min-w-0">
+                                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate min-w-0">
                                     {event.subject_name}
                                   </span>
                                   {event.session_number != null && (
-                                    <span className="text-orange-600 font-semibold text-[11px] shrink-0 whitespace-nowrap">
+                                    <span className="text-orange-600 dark:text-orange-400 font-semibold text-[11px] shrink-0 whitespace-nowrap">
                                       ({event.session_number}{event.total_sessions != null ? `/${event.total_sessions}` : ''})
                                     </span>
                                   )}
@@ -198,7 +198,7 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
 
                                 {/* Class code (de-emphasised) */}
                                 {event.class_name && (
-                                  <p className="text-[10px] text-gray-400 truncate mb-1.5">
+                                  <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mb-1.5">
                                     {event.class_name}
                                   </p>
                                 )}
@@ -206,12 +206,12 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
                                 {/* Teacher (avatar + name) + right info */}
                                 <div className="flex items-center justify-between gap-2 mt-1">
                                   {event.teacher_name ? (
-                                    <span className="flex items-center gap-1.5 min-w-0 text-xs text-gray-700">
-                                      <Avatar className="h-6 w-6 shrink-0 ring-1 ring-gray-200">
+                                    <span className="flex items-center gap-1.5 min-w-0 text-xs text-gray-700 dark:text-gray-200">
+                                      <Avatar className="h-6 w-6 shrink-0 ring-1 ring-gray-200 dark:ring-slate-600">
                                         {event.teacher_image ? (
                                           <AvatarImage src={event.teacher_image} alt={event.teacher_name} />
                                         ) : null}
-                                        <AvatarFallback className="bg-gray-200 text-gray-600 text-[10px]">
+                                        <AvatarFallback className="bg-gray-200 text-gray-600 dark:bg-slate-600 dark:text-gray-200 text-[10px]">
                                           {getInitials(event.teacher_name)}
                                         </AvatarFallback>
                                       </Avatar>
@@ -221,7 +221,7 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
 
                                   {/* Regular class → enrolled count; makeup/trial → student name */}
                                   {event.event_type === 'class' && event.enrolled_count != null && (
-                                    <span className="flex items-center gap-0.5 text-xs text-gray-500 shrink-0">
+                                    <span className="flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400 shrink-0">
                                       <Users className="h-3.5 w-3.5" />
                                       {event.enrolled_count}/{event.max_students}
                                     </span>
@@ -230,7 +230,7 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
                                     <span
                                       className={cn(
                                         'flex items-center gap-0.5 text-xs shrink-0 truncate max-w-[55%]',
-                                        event.event_type === 'makeup' ? 'text-purple-600' : 'text-orange-600'
+                                        event.event_type === 'makeup' ? 'text-purple-600 dark:text-purple-300' : 'text-orange-600 dark:text-orange-300'
                                       )}
                                     >
                                       <User className="h-3.5 w-3.5 shrink-0" />
