@@ -1264,7 +1264,7 @@ export function generateClassCode(params: {
   return `${base}-${String(max + 1).padStart(2, '0')}`;
 }
 
-export function getEditableFields(classData: Class, isSuperAdmin = false): {
+export function getEditableFields(classData: Class, canEditAll = false): {
   basicInfo: boolean;
   schedule: boolean;
   resources: boolean;
@@ -1272,8 +1272,8 @@ export function getEditableFields(classData: Class, isSuperAdmin = false): {
   capacity: boolean;
   status: boolean;
 } {
-  // Super admin can always edit everything
-  if (isSuperAdmin) {
+  // Super admin / branch admin can always edit everything (incl. schedule → regen)
+  if (canEditAll) {
     return {
       basicInfo: true,
       schedule: true,

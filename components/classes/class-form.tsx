@@ -44,7 +44,7 @@ const DAYS_OF_WEEK = [
 
 export default function ClassForm({ classData, isEdit = false }: ClassFormProps) {
   const router = useRouter();
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, isBranchAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -108,10 +108,11 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
       const permission = canEditClassDates(classData);
       setEditPermission(permission);
 
-      const fields = getEditableFields(classData, isSuperAdmin());
+      // Both super admin and branch admin can edit all class fields (incl. schedule → regen)
+      const fields = getEditableFields(classData, isSuperAdmin() || isBranchAdmin());
       setEditableFields(fields);
     }
-  }, [isEdit, classData, isSuperAdmin]);
+  }, [isEdit, classData, isSuperAdmin, isBranchAdmin]);
 
   useEffect(() => {
     loadInitialData();
