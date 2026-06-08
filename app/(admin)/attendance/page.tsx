@@ -52,6 +52,7 @@ import {
   Building2
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
+import { AttendanceDialog } from '@/components/attendance/attendance-dialog';
 
 interface ClassWithDetails extends Class {
   subject?: Subject;
@@ -123,7 +124,7 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
   });
   
   // Process attendance data
-  const { data: attendanceData, isLoading } = useQuery({
+  const { data: attendanceData, isLoading, refetch: refetchAttendance } = useQuery({
     queryKey: QUERY_KEYS.attendanceData(selectedDate.toISOString(), selectedBranchId),
     queryFn: async () => {
       const dayOfWeek = selectedDate.getDay();
@@ -219,6 +220,7 @@ const useAttendanceData = (selectedDate: Date, selectedBranchId: string | null, 
     teachers,
     branches,
     isLoading: isLoading || !attendanceData,
+    refetch: refetchAttendance,
   };
 };
 
@@ -243,11 +245,14 @@ export default function AttendancePage() {
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
   
   // Fetch attendance data
-  const { classes, subjects, teachers, isLoading } = useAttendanceData(
+  const { classes, subjects, teachers, isLoading, refetch: refetchAttendance } = useAttendanceData(
     selectedDate,
     selectedBranchId,
     isAllBranches
   );
+
+  // Attendance modal state
+  const [attClass, setAttClass] = useState<ClassWithDetails | null>(null);
   
   // Filter teachers based on selection and role
   const availableTeachers = useMemo(() => {
@@ -325,8 +330,13 @@ export default function AttendancePage() {
     return { status: 'pending', label: 'ยังไม่เช็คชื่อ', variant: 'secondary' as const };
   };
   
-  const handleClassClick = (classId: string) => {
-    router.push(`/attendance/${classId}`);
+  // Open the attendance modal for a class (defaults to the selected date's session)
+  const openAttendance = (cls: ClassWithDetails) => {
+    if (cls.todaySchedule) {
+      setAttClass(cls);
+    } else {
+      router.push(`/attendance/${cls.id}`);
+    }
   };
   
   const clearFilters = () => {
@@ -532,7 +542,7 @@ export default function AttendancePage() {
                       <TableRow 
                         key={cls.id}
                         className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleClassClick(cls.id)}
+                        onClick={() => openAttendance(cls)}
                       >
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -603,7 +613,7 @@ export default function AttendancePage() {
                             variant="ghost"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleClassClick(cls.id);
+                              openAttendance(cls);
                             }}
                             title="เช็คชื่อ"
                           >
@@ -618,6 +628,19 @@ export default function AttendancePage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Attendance modal */}
+      {attClass?.todaySchedule && (
+        <AttendanceDialog
+          open={!!attClass}
+          onOpenChange={(o) => { if (!o) setAttClass(null); }}
+          classId={attClass.id}
+          className={attClass.name}
+          classCode={attClass.code}
+          scheduleId={attClass.todaySchedule.id}
+          onSaved={() => { refetchAttendance(); }}
+        />
       )}
     </div>
   );

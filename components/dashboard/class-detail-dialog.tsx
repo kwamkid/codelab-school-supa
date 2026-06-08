@@ -9,25 +9,49 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Tooltip } from "@/components/ui/tooltip";
 import { CalendarEvent } from '@/lib/services/dashboard';
-import { formatDate } from '@/lib/utils';
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  User, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
   Users,
   CheckCircle,
   UserCircle,
   School,
   ClipboardCheck,
-  Pencil
+  Pencil,
+  Check,
+  X,
+  ArrowLeft,
+  Loader2
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { getEnrollmentsByClass } from '@/lib/services/enrollments';
 import { getStudent } from '@/lib/services/parents';
+import { updateTrialSession } from '@/lib/services/trial-bookings';
+import { recordMakeupAttendance, updateMakeupAttendance } from '@/lib/services/makeup';
+import { getAttendanceBySchedule, saveAttendanceWithMakeup, type AttendanceStatus } from '@/lib/services/attendance';
+import { useAuth } from '@/hooks/useSupabaseAuth';
 import { Enrollment } from '@/types/models';
-import ChangeTeacherDialog from './change-teacher-dialog';
+
+const ATTENDANCE_STATUSES: { value: AttendanceStatus; label: string; active: string }[] = [
+  { value: 'present', label: 'มา', active: 'bg-green-500 text-white border-green-500' },
+  { value: 'late', label: 'สาย', active: 'bg-amber-500 text-white border-amber-500' },
+  { value: 'absent', label: 'ขาด', active: 'bg-red-500 text-white border-red-500' },
+  { value: 'leave', label: 'ลา', active: 'bg-blue-500 text-white border-blue-500' },
+  { value: 'sick', label: 'ป่วย', active: 'bg-purple-500 text-white border-purple-500' },
+];
+import { ChangeTeacherPanel } from './change-teacher-dialog';
+
+const THAI_MONTHS_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+// e.g. "6 มิ.ย. 69"
+function formatThaiShortDate(d: Date): string {
+  const yy = String((d.getFullYear() + 543) % 100).padStart(2, '0');
+  return `${d.getDate()} ${THAI_MONTHS_ABBR[d.getMonth()]} ${yy}`;
+}
 
 interface ClassDetailDialogProps {
   open: boolean;
@@ -53,10 +77,26 @@ export default function ClassDetailDialog({
   onAttendanceSaved,
   onTeacherChanged
 }: ClassDetailDialogProps) {
-  const router = useRouter();
+  const { adminUser } = useAuth();
   const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [showChangeTeacher, setShowChangeTeacher] = useState(false);
+  const [savingAttendance, setSavingAttendance] = useState(false);
+  // Inline attendance (regular class)
+  const [showAttendance, setShowAttendance] = useState(false);
+  const [attLoading, setAttLoading] = useState(false);
+  const [attSaving, setAttSaving] = useState(false);
+  const [attMap, setAttMap] = useState<Record<string, AttendanceStatus>>({});
+  const [attInitial, setAttInitial] = useState<Record<string, string>>({});
+  // Locally reflect a teacher change without closing/reopening the modal
+  const [teacherOverride, setTeacherOverride] = useState<{ name: string; image?: string } | null>(null);
+
+  // Reset transient state whenever a different session is opened
+  useEffect(() => {
+    setShowChangeTeacher(false);
+    setShowAttendance(false);
+    setTeacherOverride(null);
+  }, [scheduleId]);
 
   useEffect(() => {
     if (open && event && event.extendedProps.type === 'class') {
@@ -108,6 +148,90 @@ export default function ClassDetailDialog({
   const isMakeup = event.extendedProps.type === 'makeup';
   const isTrial = event.extendedProps.type === 'trial';
   const isRegularClass = event.extendedProps.type === 'class';
+
+  // Enter inline attendance (regular class) — default everyone present, prefill existing
+  const enterAttendance = async () => {
+    setShowAttendance(true);
+    setAttLoading(true);
+    try {
+      const existing = await getAttendanceBySchedule(scheduleId);
+      const initial: Record<string, string> = {};
+      const map: Record<string, AttendanceStatus> = {};
+      enrolledStudents.forEach((s) => {
+        const rec = existing.find((e) => e.studentId === s.id);
+        initial[s.id] = rec?.status || '';
+        map[s.id] = (rec?.status as AttendanceStatus) || 'present';
+      });
+      setAttInitial(initial);
+      setAttMap(map);
+    } catch {
+      const map: Record<string, AttendanceStatus> = {};
+      enrolledStudents.forEach((s) => { map[s.id] = 'present'; });
+      setAttMap(map);
+      setAttInitial({});
+    } finally {
+      setAttLoading(false);
+    }
+  };
+
+  const handleSaveAttendance = async () => {
+    if (!event) return;
+    setAttSaving(true);
+    try {
+      const records = enrolledStudents.map((s) => ({
+        studentId: s.id,
+        studentName: s.nickname || s.name,
+        status: attMap[s.id] || ('present' as AttendanceStatus),
+      }));
+      const res = await saveAttendanceWithMakeup({
+        classId: event.classId,
+        scheduleId,
+        records,
+        initialStatuses: attInitial,
+        checkedBy: adminUser?.id || 'system',
+        sessionNumber: event.extendedProps.sessionNumber,
+        sessionDate: event.start as Date,
+      });
+      if (res.makeupCreated > 0) toast.success(`สร้าง Makeup ${res.makeupCreated} คน`);
+      if (res.limitExceeded.length > 0) toast.warning(`เกินลิมิต Makeup: ${res.limitExceeded.join(', ')}`);
+      onAttendanceSaved?.();
+    } catch (error) {
+      console.error('Error saving attendance:', error);
+      toast.error('บันทึกการเช็คชื่อไม่สำเร็จ');
+    } finally {
+      setAttSaving(false);
+    }
+  };
+
+  // Quick attendance for trial / makeup (single student)
+  const markAttendance = async (present: boolean) => {
+    if (!event) return;
+    setSavingAttendance(true);
+    try {
+      if (isTrial) {
+        await updateTrialSession(scheduleId, {
+          status: present ? 'attended' : 'absent',
+          attended: present,
+        });
+      } else if (isMakeup) {
+        const payload = {
+          status: (present ? 'present' : 'absent') as 'present' | 'absent',
+          checkedBy: adminUser?.id || 'system',
+        };
+        if (event.extendedProps.status === 'completed') {
+          await updateMakeupAttendance(scheduleId, payload);
+        } else {
+          await recordMakeupAttendance(scheduleId, payload);
+        }
+      }
+      onAttendanceSaved?.();
+    } catch (error) {
+      console.error('Error saving attendance:', error);
+      toast.error('บันทึกการเช็คชื่อไม่สำเร็จ');
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
   const eventDate = event.start as Date;
   const eventEndDate = event.end as Date | null;
 
@@ -208,6 +332,93 @@ export default function ClassDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {showChangeTeacher ? (
+          <ChangeTeacherPanel
+            event={event}
+            scheduleId={scheduleId}
+            onCancel={() => setShowChangeTeacher(false)}
+            onChanged={(t) => {
+              setTeacherOverride(t);
+              setShowChangeTeacher(false);
+              onTeacherChanged?.();
+            }}
+          />
+        ) : showAttendance ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Tooltip label="กลับ">
+                  <button onClick={() => setShowAttendance(false)} className="text-gray-400 hover:text-gray-600" aria-label="กลับ">
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                </Tooltip>
+                <ClipboardCheck className="h-5 w-5 text-emerald-500" />
+                เช็คชื่อ
+              </DialogTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                {getEventTitle()} · {formatThaiShortDate(eventDate)} {formatEventTime()}
+              </p>
+            </DialogHeader>
+
+            <div className="py-2">
+              {attLoading ? (
+                <div className="text-center py-8 text-gray-500">กำลังโหลดรายชื่อ...</div>
+              ) : enrolledStudents.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">ยังไม่มีนักเรียนลงทะเบียน</div>
+              ) : (
+                <div className="space-y-1.5 max-h-[50vh] overflow-y-auto pr-1">
+                  {enrolledStudents.map((student, index) => (
+                    <div key={student.id} className="flex items-center justify-between gap-2 p-2 rounded-lg border border-gray-100">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs text-gray-400 w-5 shrink-0">{index + 1}.</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{student.nickname}</p>
+                          <p className="text-xs text-gray-500 truncate">{student.name}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {ATTENDANCE_STATUSES.map((st) => {
+                          const selected = (attMap[student.id] || 'present') === st.value;
+                          return (
+                            <button
+                              key={st.value}
+                              onClick={() => setAttMap((m) => ({ ...m, [student.id]: st.value }))}
+                              className={`px-2 py-1 rounded-md text-xs border transition-colors ${
+                                selected ? st.active : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                              }`}
+                            >
+                              {st.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-3 border-t mt-2">
+              <button
+                onClick={() => setAttMap(Object.fromEntries(enrolledStudents.map((s) => [s.id, 'present' as AttendanceStatus])))}
+                className="text-xs text-gray-500 hover:text-gray-700"
+                disabled={attSaving || enrolledStudents.length === 0}
+              >
+                ตั้งทั้งหมดเป็น “มาเรียน”
+              </button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowAttendance(false)} disabled={attSaving}>
+                  ยกเลิก
+                </Button>
+                <Button onClick={handleSaveAttendance} disabled={attSaving || attLoading || enrolledStudents.length === 0}>
+                  {attSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  บันทึกการเช็คชื่อ
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+        <>
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -246,9 +457,7 @@ export default function ClassDetailDialog({
               </p>
               <div className="flex items-center gap-2 mt-2 text-sm">
                 <Calendar className="h-4 w-4 text-gray-400" />
-                <span className="font-medium">{formatDate(eventDate, 'full')}</span>
-                <Clock className="h-4 w-4 text-gray-400 ml-3" />
-                <span className="font-medium">{formatEventTime()}</span>
+                <span className="font-medium">{formatThaiShortDate(eventDate)} {formatEventTime()}</span>
               </div>
             </div>
             {getStatusBadge()}
@@ -267,15 +476,21 @@ export default function ClassDetailDialog({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-gray-500" />
+              <Avatar className="h-6 w-6 shrink-0 ring-1 ring-gray-200">
+                {(teacherOverride?.image ?? event.extendedProps.teacherImage) ? (
+                  <AvatarImage src={teacherOverride?.image ?? event.extendedProps.teacherImage} alt={teacherOverride?.name ?? event.extendedProps.teacherName} />
+                ) : null}
+                <AvatarFallback className="bg-gray-200 text-gray-600 text-[10px]">
+                  {((teacherOverride?.name ?? event.extendedProps.teacherName) || '?').trim().slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <span className="text-sm">
                 <span className="text-gray-500">ครูผู้สอน:</span>{' '}
-                <span className="font-medium">{event.extendedProps.teacherName}</span>
+                <span className="font-medium">{teacherOverride?.name ?? event.extendedProps.teacherName}</span>
               </span>
               <button
                 onClick={() => setShowChangeTeacher(true)}
                 className="ml-auto inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
-                title="เปลี่ยนครูผู้สอน"
               >
                 <Pencil className="h-3 w-3" />
                 เปลี่ยนครู
@@ -395,21 +610,41 @@ export default function ClassDetailDialog({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-between gap-2 pt-4 border-t">
-          <div>
-            {/* Check attendance button - for future use */}
+        <div className="flex justify-between items-center gap-2 pt-4 border-t">
+          <div className="flex items-center gap-2">
+            {/* Regular class → inline attendance in this modal */}
             {isRegularClass && (
-              <Button 
-                variant="outline"
-                onClick={() => {
-                  // TODO: Link to attendance module
-                  console.log('Go to attendance module');
-                }}
-                disabled // Disable for now
-              >
+              <Button variant="outline" onClick={enterAttendance}>
                 <ClipboardCheck className="h-4 w-4 mr-2" />
                 เช็คชื่อ
               </Button>
+            )}
+
+            {/* Trial / Makeup (single student) → quick มาเรียน / ขาด */}
+            {(isTrial || isMakeup) && (
+              <>
+                <span className="text-sm text-gray-500 mr-1">เช็คชื่อ:</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingAttendance}
+                  onClick={() => markAttendance(true)}
+                  className="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  มาเรียน
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingAttendance}
+                  onClick={() => markAttendance(false)}
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  ขาด
+                </Button>
+              </>
             )}
           </div>
 
@@ -417,19 +652,9 @@ export default function ClassDetailDialog({
             ปิด
           </Button>
         </div>
+        </>
+        )}
       </DialogContent>
-
-      {/* Change teacher (this session / whole class) */}
-      <ChangeTeacherDialog
-        open={showChangeTeacher}
-        onOpenChange={setShowChangeTeacher}
-        event={event}
-        scheduleId={scheduleId}
-        onChanged={() => {
-          setShowChangeTeacher(false);
-          onTeacherChanged?.();
-        }}
-      />
     </Dialog>
   );
 }

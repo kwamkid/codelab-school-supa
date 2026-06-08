@@ -189,3 +189,28 @@ types/
 - `sendBatchMessage()` sends text blocks + images in 1 API request; DB stores each block/image as separate message
 - Conversation list sorts by `lastMessageAt` only (NOT unread-first) to prevent jumping when marking read
 - Sidebar unread badge polls every 15 seconds via `getTotalUnreadCount()`
+- Conversation search is 2-step: in-memory over loaded rows first, then DB on demand. Name/phone via "ค้นหาเพิ่มเติมในฐานข้อมูล" button (`searchConversations`); tag filter auto-queries DB (`getConversationsByTags`, `.overlaps`). Picking a DB-only result fetches+adds it to the list.
+
+## LINE Display Name & Parent ↔ Chat Linking (Jun 2026)
+- `parents` table has **NO `updated_at` column** — never write it in parents updates (silently broke `linkParentToLine` before). Migration `20260606_add_parent_line_display_name` added `parents.line_display_name`.
+- Parent LINE identity split: `parents.display_name` = entered name; `parents.line_display_name` = real LINE profile name; `parents.picture_url` = avatar. `mapToParent` in `lib/services/parents.ts` maps all three.
+- Real LINE name/avatar live in `chat_contacts.display_name`/`avatar_url` (keyed by `platform_user_id` = LINE userId).
+- Auto-link `chat_contacts` ↔ `parents` by LINE id (both directions): webhook `findOrCreateContact` on new contact, `linkParentToLine` on LIFF register, `linkContactToParent` syncs name/avatar onto parent.
+- `get_daily_timetable` RPC returns `teacher_image` = `COALESCE(teachers.profile_image, Google avatar via admin_users→auth.users)` and `total_sessions`.
+
+## Attendance ("เช็คชื่อ") System
+- Detailed checker is a shared component `components/attendance/attendance-checker.tsx` (`<AttendanceChecker classId scheduleId onSaved onCancel showHeader>`) — used by both the full page `app/(admin)/attendance/[classId]/[sessionId]/page.tsx` and the modal.
+- `components/attendance/attendance-dialog.tsx` — opened from `/attendance` list (row/จัดการ click), starts at the selected date's session; "เลือกคาบอื่น" switches to a session-picker view inside the same modal. Pass `scheduleId` = `cls.todaySchedule.id` (already on the list row).
+- Save logic centralized in `saveAttendanceWithMakeup()` (`lib/services/attendance.ts`): saves attendance + auto creates/cancels makeup per settings (`getMakeupSettings` → `allowMakeupForStatuses` default `['absent','sick','leave']`, `autoCreateMakeup`, `makeupLimitPerCourse`).
+- Status meaning: present/late = attended (NO makeup, shows Teacher Feedback shown to parents); absent/leave/sick = makeup auto-created (differ only by recorded reason). UI status order: มา/สาย/ขาด/ลา/ป่วย.
+- Dashboard modal also checks attendance inline: regular class → full checker; makeup/trial → quick มาเรียน/ขาด (`recordMakeupAttendance` / `updateTrialSession`).
+
+## Dashboard Timetable (Time×Room grid)
+- `components/dashboard/daily-timetable.tsx` — full-width table (`w-full`, room cols `min-w-[150px]`); each cell: subject + `(sessionNumber/totalSessions)` inline, de-emphasised class code, teacher avatar (2-char fallback). makeup/trial show student name in the count slot. Dark-mode variants added.
+- `components/dashboard/class-detail-dialog.tsx` — compact date `formatThaiShortDate` ("6 มิ.ย. 69 HH:MM - HH:MM"); change teacher in-place (`change-teacher-dialog.tsx` exports `ChangeTeacherPanel`): per-session via `actualTeacherId` (`updateClassSchedule`) or whole-class via `changeClassResources` from this session onward; warns (not blocks) on teacher conflict via `checkAvailability`.
+
+## Shared UI conventions
+- `components/ui/tooltip.tsx` — Radix tooltip. Use `<Tooltip label="...">{trigger}</Tooltip>` for ALL hover tooltips (NOT html `title`). `TooltipProvider` is in root `app/layout.tsx`. Pass `label=""` to render children with no tooltip (used for sidebar nav: tooltip only when collapsed). Trigger must forward ref — wrap non-forwarding components (e.g. `MenuLink`) in a `<span>`.
+- `Button` size `sm` is `text-sm` (default size stays `text-base`).
+- `DateRangePicker` (`mode="single"`) supports `withStepper` → `‹ [picker] ›` prev/next-day buttons.
+- Sidebar (`app/(admin)/layout.tsx`): desktop-collapsible to an icon rail (`sidebarCollapsed`, persisted in localStorage); toggle button lives in the top bar.

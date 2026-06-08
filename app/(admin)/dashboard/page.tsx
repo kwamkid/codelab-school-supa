@@ -97,6 +97,7 @@ export default function DashboardPage() {
         roomName: event.room_name,
         roomId: event.room_id,
         teacherName: event.teacher_name,
+        teacherImage: event.teacher_image ?? undefined,
         subjectColor: event.subject_color,
         enrolled: event.enrolled_count ?? undefined,
         maxStudents: event.max_students ?? undefined,
@@ -134,7 +135,7 @@ export default function DashboardPage() {
   };
 
   const handleTeacherChanged = async () => {
-    setDialogOpen(false);
+    // Keep the detail modal open (it reflects the change locally); just refresh the grid behind it
     clearDashboardCache();
     await loadTimetable(selectedDate);
   };
@@ -165,22 +166,23 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10"
+            disabled={isToday(selectedDate)}
+            onClick={() => setSelectedDate(toDateStr(new Date()))}
+          >
+            วันนี้
+          </Button>
           <DateRangePicker
             mode="single"
             value={selectedDate}
             onChange={handleDateChange}
             placeholder="เลือกวันที่"
-            className="w-[200px]"
+            withStepper
+            className="w-[260px]"
           />
-          {!isToday(selectedDate) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedDate(toDateStr(new Date()))}
-            >
-              วันนี้
-            </Button>
-          )}
           <Button
             variant="outline"
             size="icon"

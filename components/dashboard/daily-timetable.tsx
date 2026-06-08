@@ -3,7 +3,15 @@
 import { useMemo } from 'react';
 import { User, Users, GraduationCap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+
+// Up to 2-character initials for the teacher avatar fallback
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.trim().slice(0, 2).toUpperCase();
+}
 
 // Types matching the RPC response
 export interface TimetableEvent {
@@ -19,11 +27,13 @@ export interface TimetableEvent {
   enrolled_count: number | null;
   max_students: number | null;
   session_number: number | null;
+  total_sessions?: number | null;
   schedule_status: string;
   attendance: any;
   room_name: string;
   room_id: string;
   teacher_name: string;
+  teacher_image?: string | null;
   branch_name: string;
   branch_id: string;
   student_info: string | null;
@@ -56,13 +66,13 @@ function getEventBg(event: TimetableEvent): string {
 
   // Completed (past time or status)
   if (endTime < now || event.schedule_status === 'completed') {
-    return 'bg-green-50 border-green-200';
+    return 'bg-green-50 border-green-200 dark:bg-green-950/40 dark:border-green-800';
   }
 
   switch (event.event_type) {
-    case 'makeup': return 'bg-purple-50 border-purple-200';
-    case 'trial': return 'bg-orange-50 border-orange-200';
-    default: return 'bg-white border-gray-200';
+    case 'makeup': return 'bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800';
+    case 'trial': return 'bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800';
+    default: return 'bg-white border-gray-200 dark:bg-slate-800 dark:border-slate-700';
   }
 }
 
@@ -114,16 +124,16 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
   return (
     <div className="overflow-x-auto -mx-4 sm:-mx-6">
       <div className="inline-block min-w-full px-4 sm:px-6">
-        <table className="min-w-full border-collapse">
+        <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-gray-50 border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 text-left w-[110px] min-w-[110px]">
+              <th className="sticky left-0 z-10 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 text-left w-[96px] min-w-[96px]">
                 เวลา
               </th>
               {sortedRooms.map((room) => (
                 <th
                   key={room.room_id}
-                  className="border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 text-center bg-gray-50 min-w-[160px]"
+                  className="border border-gray-200 dark:border-slate-700 px-2 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 text-center bg-gray-50 dark:bg-slate-800 min-w-[150px]"
                 >
                   {room.room_name}
                 </th>
@@ -136,13 +146,13 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
               return (
                 <tr key={timeKey}>
                   {/* Time column */}
-                  <td className="sticky left-0 z-10 bg-gray-50 border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 whitespace-nowrap align-top">
-                    {slot.start.substring(0, 5)}
+                  <td className="sticky left-0 z-10 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2 py-2 font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap align-top">
+                    <span className="text-base font-semibold">{slot.start.substring(0, 5)}</span>
                     <br />
-                    <span className="text-gray-400">{slot.end.substring(0, 5)}</span>
+                    <span className="text-sm text-gray-400">{slot.end.substring(0, 5)}</span>
                     {(() => {
                       const count = events.filter(e => `${e.start_time}-${e.end_time}` === timeKey).length;
-                      return <span className="text-gray-400 ml-0.5"> ({count})</span>;
+                      return <span className="text-xs text-gray-400 ml-0.5">({count})</span>;
                     })()}
                   </td>
 
@@ -154,70 +164,80 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
                     return (
                       <td
                         key={room.room_id}
-                        className="border border-gray-200 p-1 align-top"
+                        className="border border-gray-200 dark:border-slate-700 p-1.5 align-top"
                       >
                         {cellEvents.length === 0 ? (
-                          <div className="h-full min-h-[60px]" />
+                          <div className="h-full min-h-[84px]" />
                         ) : (
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             {cellEvents.map((event) => (
                               <button
                                 key={event.schedule_id}
                                 onClick={() => onEventClick(event)}
                                 className={cn(
-                                  'w-full text-left rounded-md border p-2 transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer',
+                                  'w-full text-left rounded-lg border p-2.5 transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer',
                                   getEventBg(event)
                                 )}
                               >
-                                {/* Subject + type badge */}
+                                {/* Subject + session no. (inline) + type badge */}
                                 <div className="flex items-center gap-1.5 mb-1">
                                   <div
-                                    className="w-2 h-2 rounded-full flex-shrink-0"
+                                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                     style={{ backgroundColor: event.subject_color }}
                                   />
-                                  <span className="font-medium text-gray-900 text-xs truncate flex-1">
+                                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate min-w-0">
                                     {event.subject_name}
                                   </span>
-                                  {getTypeBadge(event.event_type)}
+                                  {event.session_number != null && (
+                                    <span className="text-orange-600 dark:text-orange-400 font-semibold text-[11px] shrink-0 whitespace-nowrap">
+                                      ({event.session_number}{event.total_sessions != null ? `/${event.total_sessions}` : ''})
+                                    </span>
+                                  )}
+                                  <span className="ml-auto shrink-0">{getTypeBadge(event.event_type)}</span>
                                 </div>
 
-                                {/* Class name + session */}
+                                {/* Class code (de-emphasised) */}
                                 {event.class_name && (
-                                  <p className="text-[11px] text-gray-500 truncate">
+                                  <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mb-1.5">
                                     {event.class_name}
-                                    {event.session_number && <span className="text-orange-600 font-medium"> ครั้งที่ {event.session_number}</span>}
                                   </p>
                                 )}
 
-                                {/* Teacher + students */}
-                                <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500">
-                                  {event.teacher_name && (
-                                    <span className="flex items-center gap-0.5 truncate">
-                                      <User className="h-3 w-3" />
-                                      {event.teacher_name}
+                                {/* Teacher (avatar + name) + right info */}
+                                <div className="flex items-center justify-between gap-2 mt-1">
+                                  {event.teacher_name ? (
+                                    <span className="flex items-center gap-1.5 min-w-0 text-xs text-gray-700 dark:text-gray-200">
+                                      <Avatar className="h-6 w-6 shrink-0 ring-1 ring-gray-200 dark:ring-slate-600">
+                                        {event.teacher_image ? (
+                                          <AvatarImage src={event.teacher_image} alt={event.teacher_name} />
+                                        ) : null}
+                                        <AvatarFallback className="bg-gray-200 text-gray-600 dark:bg-slate-600 dark:text-gray-200 text-[10px]">
+                                          {getInitials(event.teacher_name)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="truncate font-medium">{event.teacher_name}</span>
                                     </span>
-                                  )}
-                                  {event.enrolled_count != null && (
-                                    <span className="flex items-center gap-0.5">
-                                      <Users className="h-3 w-3" />
+                                  ) : <span />}
+
+                                  {/* Regular class → enrolled count; makeup/trial → student name */}
+                                  {event.event_type === 'class' && event.enrolled_count != null && (
+                                    <span className="flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                                      <Users className="h-3.5 w-3.5" />
                                       {event.enrolled_count}/{event.max_students}
                                     </span>
                                   )}
+                                  {(event.event_type === 'makeup' || event.event_type === 'trial') && event.student_info && (
+                                    <span
+                                      className={cn(
+                                        'flex items-center gap-0.5 text-xs shrink-0 truncate max-w-[55%]',
+                                        event.event_type === 'makeup' ? 'text-purple-600 dark:text-purple-300' : 'text-orange-600 dark:text-orange-300'
+                                      )}
+                                    >
+                                      <User className="h-3.5 w-3.5 shrink-0" />
+                                      <span className="truncate">{event.student_info}</span>
+                                    </span>
+                                  )}
                                 </div>
-
-                                {/* Makeup/Trial student info */}
-                                {event.event_type === 'makeup' && event.student_info && (
-                                  <p className="text-[11px] text-purple-600 mt-1 truncate">
-                                    {event.student_info}
-                                    {event.extra_info && ` • ${event.extra_info}`}
-                                  </p>
-                                )}
-                                {event.event_type === 'trial' && event.student_info && (
-                                  <p className="text-[11px] text-orange-600 mt-1 truncate">
-                                    {event.student_info}
-                                    {event.extra_info && ` • ${event.extra_info}`}
-                                  </p>
-                                )}
                               </button>
                             ))}
                           </div>
