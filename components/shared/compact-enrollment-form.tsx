@@ -998,9 +998,50 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
         <span className="text-gray-500 dark:text-gray-400">ราคาคลาส ({classInfo.cls.name})</span>
         <span className="dark:text-white">{formatCurrency(classInfo.cls.pricing?.totalPrice || 0)}</span>
       </div>
+      {/* Discount input - enter it here so the total updates inline */}
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="text-gray-500 dark:text-gray-400 shrink-0">ส่วนลด</span>
+        <div className="flex items-center gap-0 w-40">
+          <Input
+            type="number"
+            value={discount || ''}
+            onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+            placeholder="0"
+            min={0}
+            max={discountType === 'percent' ? 100 : undefined}
+            className="h-8 text-right rounded-r-none border-r-0"
+          />
+          <div className="inline-flex h-8 shrink-0 rounded-r-md border border-gray-300 dark:border-slate-600 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => { setDiscountType('fixed'); setDiscount(0); }}
+              className={cn(
+                'px-2.5 h-full text-sm font-medium transition-colors',
+                discountType === 'fixed'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-400'
+              )}
+            >
+              ฿
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDiscountType('percent'); setDiscount(0); }}
+              className={cn(
+                'px-2.5 h-full text-sm font-medium transition-colors border-l border-gray-300 dark:border-slate-600',
+                discountType === 'percent'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-400'
+              )}
+            >
+              %
+            </button>
+          </div>
+        </div>
+      </div>
       {actualDiscountAmount > 0 && (
         <div className="flex justify-between text-sm text-green-600">
-          <span>ส่วนลด{discountType === 'percent' ? ` (${discount}%)` : ''}</span>
+          <span>ส่วนลดที่ได้รับ{discountType === 'percent' ? ` (${discount}%)` : ''}</span>
           <span>-{formatCurrency(actualDiscountAmount)}</span>
         </div>
       )}
@@ -1051,48 +1092,6 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
               {t.label}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Discount - inline input with toggle appended */}
-      <div className="space-y-1.5">
-        <Label className="text-sm">ส่วนลด</Label>
-        <div className="flex items-center gap-0 max-w-xs">
-          <Input
-            type="number"
-            value={discount || ''}
-            onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-            placeholder="0"
-            min={0}
-            max={discountType === 'percent' ? 100 : undefined}
-            className="rounded-r-none border-r-0"
-          />
-          <div className="inline-flex h-9 shrink-0 rounded-r-md border border-gray-300 dark:border-slate-600 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => { setDiscountType('fixed'); setDiscount(0); }}
-              className={cn(
-                'px-3 h-full text-sm font-medium transition-colors',
-                discountType === 'fixed'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-400'
-              )}
-            >
-              ฿
-            </button>
-            <button
-              type="button"
-              onClick={() => { setDiscountType('percent'); setDiscount(0); }}
-              className={cn(
-                'px-3 h-full text-sm font-medium transition-colors border-l border-gray-300 dark:border-slate-600',
-                discountType === 'percent'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-400'
-              )}
-            >
-              %
-            </button>
-          </div>
         </div>
       </div>
 

@@ -29,8 +29,18 @@ export default function LoginPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  // True while we're returning from Google OAuth (URL carries the auth code).
+  // Used to show a loading screen instead of flashing the login form back.
+  const [isOAuthCallback, setIsOAuthCallback] = useState(false);
   const { signIn, signInWithGoogle, user } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('code') || window.location.hash.includes('access_token')) {
+      setIsOAuthCallback(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -145,6 +155,38 @@ export default function LoginPage() {
     { icon: Calendar, title: 'จัดตารางเรียน', desc: 'วางแผนตารางเรียนและจัดการห้องเรียน' },
     { icon: BookOpen, title: 'สื่อการสอน', desc: 'จัดเก็บและแชร์สื่อการสอนได้ง่าย' },
   ];
+
+  // After returning from Google OAuth (or once signed in) we exchange the code
+  // and look up the admin user — show a loading screen instead of the form so
+  // the page doesn't flash back to login before redirecting to the dashboard.
+  if (isOAuthCallback || user) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-red-500 via-red-600 to-orange-500 text-white p-6">
+        {settings?.logoUrl ? (
+          <Image
+            src={settings.logoUrl}
+            alt={settings.schoolName || 'School Logo'}
+            width={180}
+            height={45}
+            className="object-contain brightness-0 invert mb-8"
+            priority
+            unoptimized
+          />
+        ) : (
+          <Image
+            src="/logo.svg"
+            alt="CodeLab Logo"
+            width={180}
+            height={45}
+            className="object-contain brightness-0 invert mb-8"
+            priority
+          />
+        )}
+        <Loader2 className="h-10 w-10 animate-spin mb-4" />
+        <p className="text-lg font-medium">กำลังเข้าสู่ระบบ...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex">
@@ -342,7 +384,7 @@ export default function LoginPage() {
                 variant="outline"
                 onClick={handleGoogleSignIn}
                 disabled={isGoogleLoading || isLoading}
-                className="w-full h-12 border-gray-200 bg-white text-gray-700 font-medium hover:bg-gray-50 hover:text-gray-700"
+                className="w-full h-12 border-gray-200 bg-white text-gray-700 font-medium hover:bg-gray-50 hover:text-gray-700 active:bg-gray-100 active:text-gray-700"
               >
                 {isGoogleLoading ? (
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />

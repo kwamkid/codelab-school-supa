@@ -17,7 +17,8 @@ import {
 } from 'lucide-react'
 import { SectionLoading } from '@/components/ui/loading'
 import { getGeneralSettings } from '@/lib/services/settings'
-import { getParentByLineId } from '@/lib/services/parents'
+import { getParentByLineId, getStudentsByParent } from '@/lib/services/parents'
+import { getMakeupClassesByStudent } from '@/lib/services/makeup'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { useLiff } from '@/components/liff/liff-provider'
 import Image from 'next/image'
@@ -93,6 +94,7 @@ function LiffHome() {
   const { isLoggedIn, profile, isLoading, liff } = useLiff()
   const [settings, setSettings] = useState<any>(null)
   const [hasParent, setHasParent] = useState<boolean | null>(null)
+  const [pendingMakeupCount, setPendingMakeupCount] = useState(0)
   const [checking, setChecking] = useState(true)
   const [navigating, setNavigating] = useState(false)
   const [selectedMenu, setSelectedMenu] = useState<string | null>(null)
@@ -141,6 +143,24 @@ function LiffHome() {
         try {
           const parent = await getParentByLineId(profile.userId)
           setHasParent(!!parent)
+
+          // Count makeup sessions still owed (status 'pending' = not scheduled yet)
+          // across all of the parent's active students, for the home alert/badge.
+          if (parent) {
+            try {
+              const students = await getStudentsByParent(parent.id)
+              const activeStudents = students.filter(s => s.isActive)
+              const counts = await Promise.all(
+                activeStudents.map(async (s) => {
+                  const makeups = await getMakeupClassesByStudent(s.id)
+                  return makeups.filter(m => m.status === 'pending').length
+                })
+              )
+              setPendingMakeupCount(counts.reduce((a, b) => a + b, 0))
+            } catch (e) {
+              console.error('Error counting pending makeups:', e)
+            }
+          }
         } catch (error) {
           console.error('Error checking parent:', error)
           setHasParent(false)
@@ -367,6 +387,35 @@ function LiffHome() {
                 เลือกเมนูที่ต้องการใช้งาน
               </p>
             </div>
+
+            {/* Pending makeup alert — shows how many sessions still need to be made up */}
+            {pendingMakeupCount > 0 && (
+              <Card
+                className="cursor-pointer border-2 border-orange-300 bg-orange-50 transition-all hover:shadow-lg active:scale-[0.98]"
+                onClick={() => handleMenuClick('/liff/makeup', 'ข้อมูลการลา')}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="relative shrink-0">
+                      <div className="p-3 rounded-xl bg-orange-500 text-white shadow-md">
+                        <CalendarOff className="h-7 w-7" />
+                      </div>
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
+                        {pendingMakeupCount}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-base text-orange-900">
+                        ต้องเรียนชดเชย {pendingMakeupCount} ครั้ง
+                      </h3>
+                      <p className="text-sm text-orange-700 mt-0.5">
+                        ยังรอนัดวันเรียนชดเชย แตะเพื่อดูรายละเอียด
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             
             {/* Menu items */}
             <div className="space-y-3">
@@ -383,8 +432,15 @@ function LiffHome() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className={`p-3 rounded-xl ${item.color} text-white shadow-md`}>
-                          <Icon className="h-7 w-7" />
+                        <div className="relative shrink-0">
+                          <div className={`p-3 rounded-xl ${item.color} text-white shadow-md`}>
+                            <Icon className="h-7 w-7" />
+                          </div>
+                          {item.path === '/liff/makeup' && pendingMakeupCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
+                              {pendingMakeupCount}
+                            </span>
+                          )}
                         </div>
                         <div className="flex-1">
                           <h3 className="font-semibold text-lg text-gray-800">
