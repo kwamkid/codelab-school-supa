@@ -660,3 +660,24 @@ export async function getEventsForReminder(): Promise<Array<{
 
   return results
 }
+
+// Send a LINE reminder for a single event registration. Server-side: uses the
+// Supabase LINE notifier. `registration`/`event` are raw DB rows (snake_case).
+export async function sendEventReminder(
+  registration: EventRegistration,
+  event: Event
+): Promise<boolean> {
+  const r = registration as any
+  const e = event as any
+  if (!r.line_user_id) return false
+
+  const { sendLineMessage } = await import('./line-notifications')
+
+  const message = `🔔 เตือนงาน: ${e.name}` +
+    (r.schedule_time ? `\n📅 ${r.schedule_time}` : '') +
+    (r.attendee_count ? `\n👥 ผู้เข้าร่วม: ${r.attendee_count} คน` : '') +
+    `\n\nดูรายละเอียดเพิ่มเติม:\n${process.env.NEXT_PUBLIC_APP_URL || ''}/liff/my-events`
+
+  const result = await sendLineMessage(r.line_user_id, message)
+  return result.success
+}

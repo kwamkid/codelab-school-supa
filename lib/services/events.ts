@@ -1149,33 +1149,6 @@ export async function getEventsForReminder(): Promise<Array<{
   }
 }
 
-// Send event reminder
-export async function sendEventReminder(
-  registration: EventRegistration,
-  event: Event
-): Promise<boolean> {
-  try {
-    if (!registration.lineUserId) {
-      return false;
-    }
-
-    // Import LINE notification service
-    const { sendLineMessage } = await import('./line-notifications');
-
-    // Format message
-    const message = `🔔 เตือนงาน: ${event.name}
-📅 ${registration.scheduleTime}
-📍 สถานที่: ${event.location}
-👥 ผู้เข้าร่วม: ${registration.attendeeCount} คน
-
-ดูรายละเอียดเพิ่มเติม:
-${process.env.NEXT_PUBLIC_APP_URL}/liff/my-events`;
-
-    const result = await sendLineMessage(registration.lineUserId, message);
-
-    return result.success;
-  } catch (error) {
-    console.error('Error sending event reminder:', error);
-    return false;
-  }
-}
+// NOTE: Event reminders are sent server-side by lib/supabase/services/events.ts
+// (used by app/api/cron/reminders). The former duplicate here imported the deleted
+// client Firebase notifier (./line-notifications) and broke the build, so it was removed.
