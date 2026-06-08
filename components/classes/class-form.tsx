@@ -108,7 +108,7 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
       const permission = canEditClassDates(classData);
       setEditPermission(permission);
 
-      const fields = getEditableFields(classData, isSuperAdmin);
+      const fields = getEditableFields(classData, isSuperAdmin());
       setEditableFields(fields);
     }
   }, [isEdit, classData, isSuperAdmin]);
@@ -366,8 +366,11 @@ export default function ClassForm({ classData, isEdit = false }: ClassFormProps)
       if (isEdit && classData?.id) {
         await updateClass(classData.id, classPayload);
 
-        // Regenerate schedules if super admin changed schedule fields
-        if (isSuperAdmin && editableFields.schedule) {
+        // Regenerate schedules whenever schedule fields are editable and changed.
+        // editableFields.schedule already encodes permission (super admin always;
+        // draft / published-with-no-students for everyone), and the schedule inputs
+        // are disabled otherwise, so this auto-regen fires on any legitimate edit.
+        if (editableFields.schedule) {
           const scheduleChanged =
             classData.startTime !== formData.startTime ||
             classData.endTime !== formData.endTime ||

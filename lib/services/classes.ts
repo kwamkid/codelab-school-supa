@@ -1392,8 +1392,14 @@ export async function regenerateClassSchedules(
     return { deleted: deleteSchedules.length, created: 0 };
   }
 
-  const startFrom = new Date();
-  startFrom.setHours(0, 0, 0, 0);
+  // Anchor generation on the (new) class start date — NOT "today" — so that
+  // re-dating a not-yet-started class regenerates sessions on the correct days.
+  // Never create dates in the past (keeps mid-course "push remaining" behaviour).
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const desiredStart = new Date(classData.startDate);
+  desiredStart.setHours(0, 0, 0, 0);
+  const startFrom = desiredStart > todayStart ? desiredStart : todayStart;
 
   const newDates = generateSchedules(
     startFrom,
