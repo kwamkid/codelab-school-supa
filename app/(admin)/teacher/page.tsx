@@ -151,8 +151,9 @@ function ScheduleCard({ item }: { item: TeacherScheduleItem }) {
             </div>
           )}
 
-          {/* Slide button — regular classes only; matched by subject + session number */}
-          {item.type === 'class' && (
+          {/* Slide button — classes + makeup; matched by subject + session number.
+              Makeup resolves the session from the original missed session. */}
+          {(item.type === 'class' || item.type === 'makeup') && (
             <div className="mt-3">
               {item.material_id && item.subject_id ? (
                 <Button
