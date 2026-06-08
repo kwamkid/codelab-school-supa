@@ -364,7 +364,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     // ถ้า adminUser ยังไม่โหลด → return array ว่าง (ไม่แสดงเมนูจนกว่าจะรู้ role)
     if (!adminUser) return [];
 
-    return items.filter(item => {
+    const filtered = items.filter(item => {
       if (item.isDivider) return true;
 
       if (item.requiredRole) {
@@ -398,6 +398,23 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       }
       return item;
     });
+
+    // ลบ divider ที่ไม่จำเป็นออก (อยู่ต้น/ท้ายลิสต์ หรือซ้อนกันหลายอัน)
+    // เช่น teacher ที่ section ระหว่าง divider ถูกซ่อนหมด จะเหลือเส้นค้างเป็นแถบ
+    const cleaned: NavigationItem[] = [];
+    for (const item of filtered) {
+      if (item.isDivider) {
+        // ข้าม divider ถ้ายังไม่มีเมนูจริงก่อนหน้า หรือก่อนหน้าเป็น divider อยู่แล้ว
+        const prev = cleaned[cleaned.length - 1];
+        if (!prev || prev.isDivider) continue;
+      }
+      cleaned.push(item);
+    }
+    // ลบ divider ที่ค้างท้ายลิสต์
+    while (cleaned.length && cleaned[cleaned.length - 1].isDivider) {
+      cleaned.pop();
+    }
+    return cleaned;
   };
 
   // ใช้ useMemo สำหรับ navigation array
@@ -570,7 +587,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       href: '/attendance',
       icon: UserCheck,
       iconColor: 'text-emerald-500',
-      requiredRole: ['super_admin', 'branch_admin', 'teacher']
+      requiredRole: ['super_admin', 'branch_admin']
     },
     {
       name: 'Quiz',
