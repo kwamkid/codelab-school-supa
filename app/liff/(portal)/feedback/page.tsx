@@ -65,7 +65,7 @@ function FeedbackContent() {
       if (cacheKey) setLiffCache(cacheKey, { students: studentsData, feedbacks })
     } catch (error) {
       console.error('Error loading feedback:', error)
-      toast.error('ไม่สามารถโหลดข้อมูลได้')
+      toast.error(error instanceof Error ? `โหลด feedback ไม่ได้: ${error.message}` : 'ไม่สามารถโหลดข้อมูลได้')
     } finally {
       setLoading(false)
     }
