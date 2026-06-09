@@ -91,7 +91,7 @@ function FeedbackContent() {
             variant="ghost"
             size="sm"
             onClick={() => router.push('/liff')}
-            className="text-white hover:text-white/80 -ml-2"
+            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>

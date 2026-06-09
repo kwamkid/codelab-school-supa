@@ -355,7 +355,7 @@ function ProfileContent() {
               variant="ghost"
               size="sm"
               onClick={() => navigateTo('/liff')}
-              className="text-white hover:text-white/80 -ml-2"
+              className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
@@ -365,7 +365,7 @@ function ProfileContent() {
             variant="ghost"
             size="sm"
             onClick={handleLogout}
-            className="text-white hover:text-white/80"
+            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900"
             disabled={navigating}
           >
             <LogOut className="h-4 w-4" />
