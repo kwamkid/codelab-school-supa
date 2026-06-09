@@ -156,26 +156,15 @@ export async function getFeedbackData(lineUserId: string) {
 
 export async function getProfileData(lineUserId: string) {
   const supabase = createServiceClient() as any;
-  const parent = await getParentByLine(supabase, lineUserId);
-  if (!parent) return { parent: null, students: [], preferredBranch: null };
-
-  const { data: students } = await supabase
-    .from('students')
-    .select('*')
-    .eq('parent_id', parent.id)
-    .eq('is_active', true);
-
-  let preferredBranch = null;
-  if (parent.preferred_branch_id) {
-    const { data: branch } = await supabase
-      .from('branches')
-      .select('*')
-      .eq('id', parent.preferred_branch_id)
-      .single();
-    preferredBranch = branch || null;
-  }
-
-  return { parent, students: students || [], preferredBranch };
+  // Single round-trip; returns camelCase parent + students + preferred branch.
+  const { data, error } = await supabase.rpc('get_liff_profile', { p_line_user_id: lineUserId });
+  if (error) throw error;
+  return {
+    hasParent: data?.hasParent ?? false,
+    parent: data?.parent ?? null,
+    students: data?.students ?? [],
+    preferredBranch: data?.preferredBranch ?? null,
+  };
 }
 
 export async function updateParentProfile(

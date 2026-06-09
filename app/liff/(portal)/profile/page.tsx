@@ -27,8 +27,8 @@ import {
   MessageCircle
 } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
-import { getParentByLineId, getStudentsByParent, deleteStudent as deleteStudentService } from '@/lib/services/parents'
-import { getBranch } from '@/lib/services/branches'
+import { deleteStudent as deleteStudentService } from '@/lib/services/parents'
+import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
 import type { Parent, Student, Branch } from '@/types/models'
 import { Loading } from '@/components/ui/loading'
@@ -80,36 +80,21 @@ function ProfileContent() {
   const loadParentData = async (lineUserId: string) => {
     try {
       setIsLoadingData(true)
-      
-      // Get parent data using service function
-      const parent = await getParentByLineId(lineUserId)
-      console.log('Parent data:', parent)
-      
-      if (parent) {
-        setParentData(parent)
-        setParentId(parent.id)
+
+      // Single round-trip via server route (service role + verified token / RPC)
+      const data = await liffFetch('/api/liff/profile', { lineUserId })
+
+      if (data?.hasParent && data.parent) {
+        setParentData(data.parent as Parent)
+        setParentId(data.parent.id)
         setHasParent(true)
-
-        // Load preferred branch
-        if (parent.preferredBranchId) {
-          const branch = await getBranch(parent.preferredBranchId)
-          if (branch) {
-            setPreferredBranch(branch)
-          }
-        }
-
-        // Load students
-        const studentsList = await getStudentsByParent(parent.id)
-        console.log('Students:', studentsList)
-        
-        setStudents(studentsList.filter(student => student.isActive))
+        setPreferredBranch((data.preferredBranch as Branch) || null)
+        setStudents((data.students || []) as Student[])
       } else {
-        console.log('No parent data found for LINE ID:', lineUserId)
         setHasParent(false)
       }
     } catch (error) {
       console.error('Error loading parent data:', error)
-      // ไม่แสดง error toast เพราะอาจจะยังไม่ได้ลงทะเบียน
       setHasParent(false)
     } finally {
       setIsLoadingData(false)
