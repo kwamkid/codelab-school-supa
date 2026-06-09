@@ -7,8 +7,6 @@
 // single import surface.
 
 import { createServiceClient } from '../server';
-import { dbRowToMakeupClass } from '@/lib/services/makeup';
-import { getReferenceMaps } from './liff-ref';
 
 export {
   getParentScheduleEvents,
@@ -75,94 +73,48 @@ export async function getHomeSummary(lineUserId: string) {
 
 export async function getMakeupData(lineUserId: string) {
   const supabase = createServiceClient() as any;
-  const parent = await getParentByLine(supabase, lineUserId);
-  if (!parent) return { students: [], makeupData: {} };
+  // Single round-trip; assemble the per-class makeup view + stats in JS.
+  const { data, error } = await supabase.rpc('get_liff_makeup', { p_line_user_id: lineUserId });
+  if (error) throw error;
 
-  const activeStudents = await getActiveStudents(supabase, parent.id);
-  if (activeStudents.length === 0) return { students: [], makeupData: {} };
+  const studentsRaw: any[] = data?.students ?? [];
+  const makeups: any[] = data?.makeups ?? [];
+  const enrollments: any[] = data?.enrollments ?? [];
+  const absencesArr: any[] = data?.absences ?? [];
+  if (studentsRaw.length === 0) return { students: [], makeupData: {} };
 
-  const { subjectMap, teacherMap, branchMap, roomMap } = await getReferenceMaps(supabase);
+  const absenceMap = new Map<string, number>();
+  for (const a of absencesArr) absenceMap.set(`${a.studentId}-${a.classId}`, a.cnt);
 
   const makeupData: Record<string, any> = {};
 
-  for (const student of activeStudents) {
-    const { data: makeupRows } = await supabase
-      .from('makeup_classes')
-      .select('*')
-      .eq('student_id', student.id)
-      .order('created_at', { ascending: false });
-    const makeups = (makeupRows || []).map(dbRowToMakeupClass);
-
-    const { data: enrollments } = await supabase
-      .from('enrollments')
-      .select('class_id, classes!enrollments_class_id_fkey(*)')
-      .eq('student_id', student.id)
-      .eq('status', 'active');
-
+  for (const student of studentsRaw) {
+    const studentMakeups = makeups.filter((m) => m.studentId === student.id);
+    const studentEnrollments = enrollments.filter((e) => e.studentId === student.id);
     const classMakeupData: Record<string, any> = {};
 
-    for (const enrollment of enrollments || []) {
-      const classData = enrollment.classes;
-      if (!classData) continue;
-
-      const subject = subjectMap.get(classData.subject_id);
-      const classMakeups = makeups.filter((m: any) => m.originalClassId === enrollment.class_id);
-
+    for (const enr of studentEnrollments) {
+      const classMakeups = studentMakeups.filter((m) => m.originalClassId === enr.classId);
       const selfRequested = classMakeups.filter(
-        (m: any) => m.type === 'scheduled' && (m.requestedBy === 'parent-liff' || m.reason?.includes('ลาผ่านระบบ LIFF'))
+        (m) => m.type === 'scheduled' && (m.requestedBy === 'parent-liff' || m.reason?.includes('ลาผ่านระบบ LIFF'))
       ).length;
-      const systemGenerated = classMakeups.filter(
-        (m: any) => m.type === 'ad-hoc' && m.requestedBy !== 'parent-liff'
-      ).length;
-
-      let absences = 0;
-      const { data: schedRows } = await supabase
-        .from('class_schedules')
-        .select('id')
-        .eq('class_id', enrollment.class_id);
-      const scheduleIds = (schedRows || []).map((s: any) => s.id);
-      if (scheduleIds.length > 0) {
-        const { data: absentRows } = await supabase
-          .from('attendance')
-          .select('schedule_id')
-          .eq('student_id', student.id)
-          .eq('status', 'absent')
-          .in('schedule_id', scheduleIds);
-        (absentRows || []).forEach((a: any) => {
-          const hasMakeup = classMakeups.some((m: any) => m.originalScheduleId === a.schedule_id);
-          if (!hasMakeup) absences++;
-        });
-      }
-
+      const systemGenerated = classMakeups.filter((m) => m.type === 'ad-hoc' && m.requestedBy !== 'parent-liff').length;
+      const absences = absenceMap.get(`${student.id}-${enr.classId}`) || 0;
       const makeupsWithDetails = classMakeups
-        .map((makeup: any) => ({
-          ...makeup,
-          className: classData.name,
-          subjectName: subject?.name,
-          subjectColor: subject?.color,
-          originalTeacherName: teacherMap.get(classData.teacher_id)?.nickname || teacherMap.get(classData.teacher_id)?.name,
-          branchName: branchMap.get(classData.branch_id)?.name,
-          roomName: roomMap.get(classData.room_id)?.name,
-          makeupBranchName: makeup.makeupSchedule ? branchMap.get(makeup.makeupSchedule.branchId)?.name : undefined,
-          makeupRoomName: makeup.makeupSchedule
-            ? roomMap.get(makeup.makeupSchedule.roomId)?.name || makeup.makeupSchedule.roomName
-            : undefined,
-          makeupTeacher: makeup.makeupSchedule?.teacherId ? teacherMap.get(makeup.makeupSchedule.teacherId) : null,
-        }))
-        .sort((a: any, b: any) => new Date(a.originalSessionDate).getTime() - new Date(b.originalSessionDate).getTime());
-
+        .map((m) => ({ ...m, className: enr.className, subjectName: enr.subjectName, subjectColor: enr.subjectColor }))
+        .sort((a, b) => new Date(a.originalSessionDate).getTime() - new Date(b.originalSessionDate).getTime());
       const totalUsed = selfRequested + absences;
-      classMakeupData[enrollment.class_id] = {
-        classId: enrollment.class_id,
-        className: classData.name,
-        subjectName: subject?.name || '',
-        subjectColor: subject?.color,
+      classMakeupData[enr.classId] = {
+        classId: enr.classId,
+        className: enr.className,
+        subjectName: enr.subjectName || '',
+        subjectColor: enr.subjectColor,
         makeups: makeupsWithDetails,
         stats: {
           total: classMakeups.length,
-          pending: classMakeups.filter((m: any) => m.status === 'pending').length,
-          scheduled: classMakeups.filter((m: any) => m.status === 'scheduled').length,
-          completed: classMakeups.filter((m: any) => m.status === 'completed').length,
+          pending: classMakeups.filter((m) => m.status === 'pending').length,
+          scheduled: classMakeups.filter((m) => m.status === 'scheduled').length,
+          completed: classMakeups.filter((m) => m.status === 'completed').length,
           selfRequested,
           absences,
           systemGenerated,
@@ -173,10 +125,10 @@ export async function getMakeupData(lineUserId: string) {
     }
 
     const overallStats = {
-      totalMakeups: Object.values(classMakeupData).reduce((sum: number, c: any) => sum + c.stats.total, 0),
-      totalPending: Object.values(classMakeupData).reduce((sum: number, c: any) => sum + c.stats.pending, 0),
-      totalScheduled: Object.values(classMakeupData).reduce((sum: number, c: any) => sum + c.stats.scheduled, 0),
-      totalCompleted: Object.values(classMakeupData).reduce((sum: number, c: any) => sum + c.stats.completed, 0),
+      totalMakeups: Object.values(classMakeupData).reduce((s: number, c: any) => s + c.stats.total, 0),
+      totalPending: Object.values(classMakeupData).reduce((s: number, c: any) => s + c.stats.pending, 0),
+      totalScheduled: Object.values(classMakeupData).reduce((s: number, c: any) => s + c.stats.scheduled, 0),
+      totalCompleted: Object.values(classMakeupData).reduce((s: number, c: any) => s + c.stats.completed, 0),
     };
 
     makeupData[student.id] = {
@@ -186,13 +138,7 @@ export async function getMakeupData(lineUserId: string) {
     };
   }
 
-  const students = activeStudents.map((s: any) => ({
-    id: s.id,
-    name: s.name,
-    nickname: s.nickname,
-    isActive: true,
-  }));
-
+  const students = studentsRaw.map((s) => ({ id: s.id, name: s.name, nickname: s.nickname, isActive: true }));
   return { students, makeupData };
 }
 
@@ -200,73 +146,10 @@ export async function getMakeupData(lineUserId: string) {
 
 export async function getFeedbackData(lineUserId: string) {
   const supabase = createServiceClient() as any;
-  const parent = await getParentByLine(supabase, lineUserId);
-  if (!parent) return { students: [], feedbacks: [] };
-
-  const studentRows = await getActiveStudents(supabase, parent.id);
-  const students = studentRows.map((s: any) => ({ id: s.id, name: s.name, nickname: s.nickname, is_active: true }));
-  const studentIds = students.map((s: any) => s.id);
-  if (studentIds.length === 0) return { students: [], feedbacks: [] };
-  const studentMap = new Map<string, any>(students.map((s: any) => [s.id, s]));
-
-  const { data: attRows } = await supabase
-    .from('attendance')
-    .select('id, student_id, schedule_id, feedback, photos, checked_at')
-    .in('student_id', studentIds);
-  const relevant = (attRows || []).filter(
-    (r: any) => (r.feedback && r.feedback.trim()) || (Array.isArray(r.photos) && r.photos.length > 0)
-  );
-  if (relevant.length === 0) return { students, feedbacks: [] };
-
-  const scheduleIds = [...new Set(relevant.map((r: any) => r.schedule_id))];
-  const { data: schedRows } = await supabase
-    .from('class_schedules')
-    .select('id, class_id, session_number, session_date, actual_teacher_id')
-    .in('id', scheduleIds);
-  const schedMap = new Map<string, any>((schedRows || []).map((s: any) => [s.id, s]));
-
-  const classIds = [...new Set((schedRows || []).map((s: any) => s.class_id))];
-  const { data: classRows } = await supabase.from('classes').select('id, name, subject_id, teacher_id').in('id', classIds);
-  const classMap = new Map<string, any>((classRows || []).map((c: any) => [c.id, c]));
-
-  const subjectIds = [...new Set((classRows || []).map((c: any) => c.subject_id))];
-  const { data: subjectRows } = await supabase.from('subjects').select('id, name').in('id', subjectIds);
-  const subjectMap = new Map<string, any>((subjectRows || []).map((s: any) => [s.id, s]));
-
-  const teacherIds = [...new Set([
-    ...(schedRows || []).map((s: any) => s.actual_teacher_id).filter(Boolean),
-    ...(classRows || []).map((c: any) => c.teacher_id).filter(Boolean),
-  ])];
-  const { data: teacherRows } = await supabase.from('teachers').select('id, name, nickname').in('id', teacherIds);
-  const teacherMap = new Map<string, any>((teacherRows || []).map((t: any) => [t.id, t]));
-
-  const feedbacks = relevant
-    .map((r: any) => {
-      const sched = schedMap.get(r.schedule_id);
-      if (!sched) return null;
-      const cls = classMap.get(sched.class_id);
-      if (!cls) return null;
-      const subject = subjectMap.get(cls.subject_id);
-      const teacherId = sched.actual_teacher_id || cls.teacher_id;
-      const teacher = teacherMap.get(teacherId);
-      const student = studentMap.get(r.student_id);
-      return {
-        id: r.id,
-        studentId: r.student_id,
-        studentName: student?.nickname || student?.name || '',
-        className: cls.name,
-        subjectName: subject?.name || '',
-        sessionNumber: sched.session_number,
-        sessionDate: sched.session_date,
-        feedback: r.feedback || '',
-        photos: Array.isArray(r.photos) ? r.photos : [],
-        teacherName: teacher?.nickname || teacher?.name || '',
-      };
-    })
-    .filter(Boolean)
-    .sort((a: any, b: any) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
-
-  return { students, feedbacks };
+  // Single round-trip via Postgres function.
+  const { data, error } = await supabase.rpc('get_liff_feedback', { p_line_user_id: lineUserId });
+  if (error) throw error;
+  return { students: data?.students ?? [], feedbacks: data?.feedbacks ?? [] };
 }
 
 // ---- profile page data ----------------------------------------------------

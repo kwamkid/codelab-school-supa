@@ -1,6 +1,5 @@
 import { createServiceClient } from '../server'
 import { ScheduleEvent } from '@/components/liff/schedule-calendar'
-import { getReferenceMaps } from './liff-ref'
 
 export interface StudentScheduleData {
   student: {
