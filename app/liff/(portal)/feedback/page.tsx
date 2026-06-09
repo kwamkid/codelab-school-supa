@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, MessageSquare, Calendar, User, BookOpen, School } from 'lucide-react'
+import { Loader2, MessageSquare, Calendar, User, School } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
+import { StudentBadge } from '@/components/ui/student-badge'
 import { PageLoading } from '@/components/ui/loading'
 import { formatDate } from '@/lib/utils'
 import { liffFetch } from '@/lib/line/liff-fetch'
@@ -84,7 +85,7 @@ function FeedbackContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-primary text-white p-4 pt-6">
+      <div className="bg-primary text-white p-4">
         <h1 className="text-xl font-bold">Teacher Feedback</h1>
       </div>
 
@@ -141,19 +142,17 @@ function FeedbackContent() {
             {filteredFeedbacks.map((feedback) => (
               <Card key={feedback.id}>
                 <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start gap-2">
                     <div>
-                      <CardTitle className="text-base">{feedback.className}</CardTitle>
+                      <CardTitle className="text-base">{feedback.subjectName}</CardTitle>
                       <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                        <BookOpen className="h-3 w-3" />
-                        <span>{feedback.subjectName}</span>
-                        <span>•</span>
                         <span>ครั้งที่ {feedback.sessionNumber}</span>
                       </div>
                     </div>
-                    <Badge variant="secondary">
-                      {formatDate(feedback.sessionDate, 'short')}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <StudentBadge name={feedback.studentName} />
+                      <span className="text-xs text-muted-foreground">{formatDate(feedback.sessionDate, 'short')}</span>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
