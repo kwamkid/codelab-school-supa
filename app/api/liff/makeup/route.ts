@@ -1,10 +1,10 @@
-// app/api/liff/feedback/route.ts
-// Teacher-feedback history (text + photos) for the LIFF feedback page.
+// app/api/liff/makeup/route.ts
+// Makeup ("ข้อมูลการลาและเรียนชดเชย") data for the LIFF makeup page.
 // Identity from a verified LINE ID token.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveLiffUser } from '@/lib/line/verify-liff-token';
-import { getFeedbackData } from '@/lib/supabase/services/liff-data';
+import { getMakeupData } from '@/lib/supabase/services/liff-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
     const user = await resolveLiffUser(request, body);
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
-    const { students, feedbacks } = await getFeedbackData(user.lineUserId);
-    return NextResponse.json({ success: true, students, feedbacks });
+    const { students, makeupData } = await getMakeupData(user.lineUserId);
+    return NextResponse.json({ success: true, students, makeupData });
   } catch (error: any) {
-    console.error('[liff/feedback] Error:', error);
+    console.error('[liff/makeup] Error:', error);
     return NextResponse.json({ success: false, error: error?.message || 'failed' }, { status: 500 });
   }
 }

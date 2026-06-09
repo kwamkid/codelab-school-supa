@@ -11,14 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, Loader2, Calendar, CalendarOff, AlertCircle, CheckCircle, Clock, MapPin, User, Info, X } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
-import { getParentByLineId, getStudentsByParent } from '@/lib/services/parents'
-import { getMakeupClassesByStudent } from '@/lib/services/makeup'
-import { getClass, getClassSchedules } from '@/lib/services/classes'
-import { getTeacher } from '@/lib/services/teachers'
-import { getBranch } from '@/lib/services/branches'
-import { getRoom } from '@/lib/services/rooms'
-import { getSubject } from '@/lib/services/subjects'
-import { getEnrollmentsByStudent } from '@/lib/services/enrollments'
+import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { PageLoading } from '@/components/ui/loading'
@@ -88,170 +81,31 @@ function MakeupContent() {
     try {
       setLoading(true)
 
-      const parent = await getParentByLineId(profile.userId)
-      if (!parent) {
-        toast.error('ไม่พบข้อมูลผู้ปกครอง')
-        return
-      }
+      // Fetch via server route (service role + verified LINE ID token) —
+      // makeup_classes/enrollments/class_schedules are RLS-blocked client-side.
+      const data = await liffFetch('/api/liff/makeup', { lineUserId: profile.userId })
 
-      const studentsData = await getStudentsByParent(parent.id)
-      const activeStudents = studentsData.filter(s => s.isActive)
+      const activeStudents = data.students || []
+      const makeupDataMap: Record<string, StudentMakeupData> = data.makeupData || {}
       setStudents(activeStudents)
 
-      const makeupDataMap: Record<string, StudentMakeupData> = {}
+      // Pick sensible defaults for the selectors
       let firstStudentWithData: string | null = null
       let firstClassWithData: string | null = null
-      
       for (const student of activeStudents) {
-        const makeups = await getMakeupClassesByStudent(student.id)
-        const enrollments = await getEnrollmentsByStudent(student.id)
-        const activeEnrollments = enrollments.filter(e => e.status === 'active')
-        
-        const classMakeupData: Record<string, ClassMakeupData> = {}
-        
-        for (const enrollment of activeEnrollments) {
-          const classData = await getClass(enrollment.classId)
-          if (!classData) continue
-          
-          const subject = await getSubject(classData.subjectId)
-          const classMakeups = makeups.filter(m => m.originalClassId === enrollment.classId)
-          
-          const selfRequested = classMakeups.filter(m => 
-            m.type === 'scheduled' && 
-            (m.requestedBy === 'parent-liff' || m.reason?.includes('ลาผ่านระบบ LIFF'))
-          ).length
-          
-          const systemGenerated = classMakeups.filter(m => 
-            m.type === 'ad-hoc' && 
-            m.requestedBy !== 'parent-liff'
-          ).length
-          
-          let absences = 0
-          try {
-            const schedules = await getClassSchedules(enrollment.classId)
-            schedules.forEach(schedule => {
-              if (schedule.attendance) {
-                const studentAttendance = schedule.attendance.find(
-                  att => att.studentId === student.id && att.status === 'absent'
-                )
-                if (studentAttendance) {
-                  const hasMakeup = classMakeups.some(m => 
-                    m.originalScheduleId === schedule.id
-                  )
-                  if (!hasMakeup) {
-                    absences++
-                  }
-                }
-              }
-            })
-          } catch (error) {
-            console.error('Error counting absences:', error)
-          }
-          
-          const makeupsWithDetails = await Promise.all(
-            classMakeups.map(async (makeup) => {
-              try {
-                let originalTeacher = null
-                let branch = null
-                let room = null
-                let makeupBranch = null
-                let makeupRoom = null
-                let makeupTeacher = null
-
-                if (classData) {
-                  [originalTeacher, branch, room] = await Promise.all([
-                    getTeacher(classData.teacherId),
-                    getBranch(classData.branchId),
-                    getRoom(classData.branchId, classData.roomId)
-                  ])
-                }
-
-                if (makeup.makeupSchedule) {
-                  [makeupBranch, makeupRoom, makeupTeacher] = await Promise.all([
-                    getBranch(makeup.makeupSchedule.branchId),
-                    getRoom(makeup.makeupSchedule.branchId, makeup.makeupSchedule.roomId),
-                    makeup.makeupSchedule.teacherId ? getTeacher(makeup.makeupSchedule.teacherId) : null
-                  ])
-                }
-
-                return {
-                  ...makeup,
-                  className: classData?.name,
-                  subjectName: subject?.name,
-                  subjectColor: subject?.color,
-                  originalTeacherName: originalTeacher?.nickname || originalTeacher?.name,
-                  branchName: branch?.name,
-                  roomName: room?.name,
-                  makeupBranchName: makeupBranch?.name,
-                  makeupRoomName: makeupRoom?.name,
-                  makeupTeacher
-                }
-              } catch (error) {
-                console.error('Error loading makeup details:', error)
-                return makeup
-              }
-            })
-          )
-          
-          const sortedMakeups = makeupsWithDetails.sort((a, b) => {
-            const dateA = a.originalSessionDate?.toDate ? 
-              a.originalSessionDate.toDate() : new Date(a.originalSessionDate)
-            const dateB = b.originalSessionDate?.toDate ? 
-              b.originalSessionDate.toDate() : new Date(b.originalSessionDate)
-            return dateA.getTime() - dateB.getTime()
-          })
-          
-          const totalUsed = selfRequested + absences
-          const quotaRemaining = Math.max(0, MAKEUP_QUOTA - totalUsed)
-          
-          classMakeupData[enrollment.classId] = {
-            classId: enrollment.classId,
-            className: classData.name,
-            subjectName: subject?.name || '',
-            subjectColor: subject?.color,
-            makeups: sortedMakeups,
-            stats: {
-              total: classMakeups.length,
-              pending: classMakeups.filter(m => m.status === 'pending').length,
-              scheduled: classMakeups.filter(m => m.status === 'scheduled').length,
-              completed: classMakeups.filter(m => m.status === 'completed').length,
-              selfRequested,
-              absences,
-              systemGenerated,
-              totalUsed,
-              quotaRemaining
-            }
-          }
-          
-          if (!firstClassWithData && classMakeups.length > 0) {
-            firstClassWithData = enrollment.classId
-          }
+        const sd = makeupDataMap[student.id]
+        if (!sd) continue
+        if (!firstClassWithData) {
+          const classWithMakeup = Object.values(sd.classes).find((c: any) => c.stats.total > 0)
+          if (classWithMakeup) firstClassWithData = (classWithMakeup as any).classId
         }
-        
-        const overallStats = {
-          totalMakeups: Object.values(classMakeupData).reduce((sum, c) => sum + c.stats.total, 0),
-          totalPending: Object.values(classMakeupData).reduce((sum, c) => sum + c.stats.pending, 0),
-          totalScheduled: Object.values(classMakeupData).reduce((sum, c) => sum + c.stats.scheduled, 0),
-          totalCompleted: Object.values(classMakeupData).reduce((sum, c) => sum + c.stats.completed, 0)
-        }
-        
-        makeupDataMap[student.id] = {
-          student: {
-            id: student.id,
-            name: student.name,
-            nickname: student.nickname
-          },
-          classes: classMakeupData,
-          overallStats
-        }
-        
-        if (!firstStudentWithData && overallStats.totalMakeups > 0) {
+        if (!firstStudentWithData && sd.overallStats.totalMakeups > 0) {
           firstStudentWithData = student.id
         }
       }
 
       setMakeupData(makeupDataMap)
-      
+
       if (activeStudents.length === 1) {
         setSelectedStudentId(activeStudents[0].id)
         const studentData = makeupDataMap[activeStudents[0].id]
@@ -286,24 +140,12 @@ function MakeupContent() {
     try {
       setCancellingId(selectedMakeup.id)
       
-      const response = await fetch('/api/liff/cancel-leave', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          makeupId: selectedMakeup.id,
-          studentId: selectedMakeup.studentId,
-          classId: selectedMakeup.originalClassId,
-          scheduleId: selectedMakeup.originalScheduleId
-        })
+      await liffFetch('/api/liff/cancel-leave', {
+        makeupId: selectedMakeup.id,
+        studentId: selectedMakeup.studentId,
+        classId: selectedMakeup.originalClassId,
+        scheduleId: selectedMakeup.originalScheduleId,
       })
-
-      const data = await response.json()
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'เกิดข้อผิดพลาด')
-      }
 
       toast.success('ยกเลิกการลาเรียนเรียบร้อยแล้ว')
       setConfirmCancelOpen(false)

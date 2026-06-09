@@ -18,6 +18,7 @@ import {
 import { SectionLoading } from '@/components/ui/loading'
 import { getGeneralSettings } from '@/lib/services/settings'
 import { getParentByLineId } from '@/lib/services/parents'
+import { liffFetch } from '@/lib/line/liff-fetch'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { useLiff } from '@/components/liff/liff-provider'
 import Image from 'next/image'
@@ -148,13 +149,8 @@ function LiffHome() {
           // LIFF browser client since parents aren't Supabase-authenticated.
           if (parent) {
             try {
-              const res = await fetch('/api/liff/pending-makeup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lineUserId: profile.userId }),
-              })
-              const data = await res.json()
-              if (data?.success) setPendingMakeupCount(data.count || 0)
+              const data = await liffFetch('/api/liff/pending-makeup', { lineUserId: profile.userId })
+              setPendingMakeupCount(data.count || 0)
             } catch (e) {
               console.error('Error counting pending makeups:', e)
             }

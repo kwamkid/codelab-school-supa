@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, User, MapPin, School, Loader2 } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
-import { getParent, updateParent } from '@/lib/services/parents'
+import { getParent } from '@/lib/services/parents'
+import { liffFetch } from '@/lib/line/liff-fetch'
 import { getActiveBranches } from '@/lib/services/branches'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -178,8 +179,14 @@ function EditParentProfileContent() {
         }
       }
       
-      await updateParent(parentId, updateData)
-      
+      // Update via server route (service role + verified ID token) — anon
+      // .update() on parents is blocked by RLS for LIFF users.
+      await liffFetch('/api/liff/profile-update', {
+        parentId,
+        data: updateData,
+        lineUserId: profile?.userId,
+      })
+
       toast.success('บันทึกข้อมูลเรียบร้อย')
       navigateBack()
       

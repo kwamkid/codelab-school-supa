@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ChevronLeft, Loader2, Calendar, Users, Clock, MapPin, User, List, CalendarDays, CalendarRange, AlertCircle } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
 import type { StudentStats } from '@/lib/services/liff-schedule'
+import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { PageLoading, SectionLoading } from '@/components/ui/loading'
@@ -66,21 +67,13 @@ function ScheduleContent() {
       
       console.log(`Loading data from ${yearStart.toDateString()} to ${yearEnd.toDateString()} (covering cross-year courses)`)
 
-      // Fetch via server route (service role) — LIFF users aren't Supabase-authed,
-      // so reading enrollments/schedules client-side is blocked by RLS.
-      const res = await fetch('/api/liff/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lineUserId: profile.userId,
-          start: yearStart.toISOString(),
-          end: yearEnd.toISOString(),
-        }),
+      // Fetch via server route (service role + verified LINE ID token) — LIFF
+      // users aren't Supabase-authed, so client-side reads are blocked by RLS.
+      const data = await liffFetch('/api/liff/schedule', {
+        lineUserId: profile.userId,
+        start: yearStart.toISOString(),
+        end: yearEnd.toISOString(),
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to load schedule')
-      }
 
       // JSON turns Date into ISO strings — revive start/end back into Date objects.
       const fetchedEvents: ScheduleEvent[] = (data.events || []).map((e: any) => ({
@@ -152,27 +145,15 @@ function ScheduleContent() {
         studentId: selectedEvent.extendedProps.studentId
       })
       
-      // Call API to create makeup request
-      const response = await fetch('/api/liff/leave-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          studentId: selectedEvent.extendedProps.studentId,
-          classId: classId,
-          scheduleId: scheduleId,
-          reason: 'ลาผ่านระบบ LIFF',
-          type: 'scheduled', // Since parent requests in advance
-        })
+      // Call API to create makeup request (token attached by liffFetch)
+      const data = await liffFetch('/api/liff/leave-request', {
+        studentId: selectedEvent.extendedProps.studentId,
+        classId: classId,
+        scheduleId: scheduleId,
+        reason: 'ลาผ่านระบบ LIFF',
+        type: 'scheduled', // Since parent requests in advance
       })
-
-      const data = await response.json()
       console.log('[LIFF] Leave request response:', data)
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'เกิดข้อผิดพลาด')
-      }
 
       // Show success message with quota info if available
       if (data.quotaDetails) {

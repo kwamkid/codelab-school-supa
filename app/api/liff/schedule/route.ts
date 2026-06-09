@@ -1,27 +1,24 @@
 // app/api/liff/schedule/route.ts
-// Returns a parent's schedule events + students + per-student stats for the LIFF
-// schedule page. Runs server-side with the service role so it bypasses RLS
-// (LIFF users authenticate via LINE, not Supabase Auth, so the browser anon
-// client cannot read enrollments/class_schedules/makeup_classes).
+// Schedule events + students + per-student stats for the LIFF schedule page.
+// Identity is resolved from a verified LINE ID token (Authorization: Bearer).
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getParentScheduleEvents, getStudentOverallStats } from '@/lib/supabase/services/liff-schedule';
+import { resolveLiffUser } from '@/lib/line/verify-liff-token';
+import { getParentScheduleEvents, getStudentOverallStats } from '@/lib/supabase/services/liff-data';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const { lineUserId, start, end } = await request.json();
-    if (!lineUserId) {
-      return NextResponse.json({ success: false, error: 'Missing lineUserId' }, { status: 400 });
-    }
+    const body = await request.json();
+    const user = await resolveLiffUser(request, body);
+    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
-    const startDate = start ? new Date(start) : new Date(new Date().getFullYear(), new Date().getMonth() - 3, 1);
-    const endDate = end ? new Date(end) : new Date(new Date().getFullYear() + 1, 11, 31);
+    const startDate = body.start ? new Date(body.start) : new Date(new Date().getFullYear(), new Date().getMonth() - 3, 1);
+    const endDate = body.end ? new Date(body.end) : new Date(new Date().getFullYear() + 1, 11, 31);
 
-    const { events, students } = await getParentScheduleEvents(lineUserId, startDate, endDate);
+    const { events, students } = await getParentScheduleEvents(user.lineUserId, startDate, endDate);
 
-    // Per-student overall stats (also needs service role)
     const stats: Record<string, any> = {};
     await Promise.all(
       students.map(async (s) => {

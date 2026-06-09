@@ -11,6 +11,7 @@ import { useLiff } from '@/components/liff/liff-provider'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { PageLoading } from '@/components/ui/loading'
 import { formatDate } from '@/lib/utils'
+import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
 
 interface FeedbackData {
@@ -47,14 +48,8 @@ function FeedbackContent() {
     try {
       setLoading(true)
 
-      // Fetch via server route (service role) — reliable regardless of LIFF RLS context
-      const res = await fetch('/api/liff/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lineUserId: profile.userId }),
-      })
-      const json = await res.json()
-      if (!res.ok || !json.success) throw new Error(json.error || 'load failed')
+      // Fetch via server route (service role + verified LINE ID token)
+      const json = await liffFetch('/api/liff/feedback', { lineUserId: profile.userId })
 
       const studentsData = json.students || []
       setStudents(studentsData)

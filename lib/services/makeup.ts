@@ -9,7 +9,7 @@ import { getSubject } from './subjects';
 import { adminMutation } from '@/lib/admin-mutation';
 
 // Helper function to convert database row to MakeupClass
-function dbRowToMakeupClass(row: any): MakeupClass {
+export function dbRowToMakeupClass(row: any): MakeupClass {
   return {
     id: row.id,
     type: row.type,
