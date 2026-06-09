@@ -57,12 +57,12 @@ function FeedbackContent() {
       setStudents(studentsData)
 
       // Server returns ISO date strings → revive to Date for formatting
-      const feedbacks: FeedbackData[] = (json.feedbacks || []).map((f: any) => ({
+      const revived: FeedbackData[] = (json.feedbacks || []).map((f: any) => ({
         ...f,
         sessionDate: new Date(f.sessionDate),
       }))
-      setFeedbacks(feedbacks)
-      if (cacheKey) setLiffCache(cacheKey, { students: studentsData, feedbacks })
+      setFeedbacks(revived)
+      if (cacheKey) setLiffCache(cacheKey, { students: studentsData, feedbacks: revived })
     } catch (error) {
       console.error('Error loading feedback:', error)
       toast.error(error instanceof Error ? `โหลด feedback ไม่ได้: ${error.message}` : 'ไม่สามารถโหลดข้อมูลได้')
