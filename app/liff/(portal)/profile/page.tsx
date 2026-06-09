@@ -195,12 +195,12 @@ function ProfileContent() {
 
   // Show loading while checking auth or loading data
   if (liffLoading || !authChecked || isLoadingData) {
-    return <Loading fullScreen text="กำลังโหลดข้อมูล..." />
+    return <Loading fullScreen size="lg" text="กำลังโหลดข้อมูล..." />
   }
 
   // Show navigating overlay
   if (navigating) {
-    return <Loading fullScreen text="กำลังโหลด..." />
+    return <Loading fullScreen size="lg" text="กำลังโหลด..." />
   }
 
   // Check if not registered - show registration prompt

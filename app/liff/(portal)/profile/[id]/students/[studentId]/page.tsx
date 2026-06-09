@@ -182,7 +182,7 @@ function EditStudentContent() {
   const minDateStr = minDate.toISOString().split('T')[0]
 
   if (liffLoading || !authChecked || loading || navigating) {
-    return <Loading fullScreen text="กำลังโหลด..." />
+    return <Loading fullScreen size="lg" text="กำลังโหลด..." />
   }
 
   return (
