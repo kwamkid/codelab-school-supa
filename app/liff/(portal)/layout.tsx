@@ -26,20 +26,18 @@ function TopBar() {
   const router = useRouter()
   const { title, back } = routeMeta(pathname)
   return (
-    <header className="sticky top-0 z-40 h-12 flex items-center justify-between px-3 bg-white border-b border-gray-100">
-      <div className="flex items-center gap-1 min-w-0">
-        {back && (
-          <button
-            onClick={() => router.back()}
-            className="p-1.5 -ml-1 rounded-md text-gray-700 hover:bg-gray-100 active:bg-gray-100"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-        )}
-        <h1 className="font-bold text-gray-800 truncate">{title}</h1>
-      </div>
+    <header className="sticky top-0 z-40 h-[53px] flex items-center gap-2 px-3 bg-white border-b border-gray-100">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-just-logo.svg" alt="CodeLab" className="h-7 w-7 shrink-0" />
+      {back && (
+        <button
+          onClick={() => router.back()}
+          className="p-1.5 -ml-1 rounded-md text-gray-700 hover:bg-gray-100 active:bg-gray-100"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+      )}
+      <h1 className="font-semibold text-sm text-gray-800 truncate">{title}</h1>
     </header>
   )
 }
