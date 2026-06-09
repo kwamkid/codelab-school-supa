@@ -348,7 +348,7 @@ function ProfileContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header with Back Button */}
-      <div className="bg-primary text-white p-4">
+      <div className="bg-primary text-white p-4 pt-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Button

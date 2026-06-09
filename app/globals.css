@@ -37,6 +37,19 @@
     --cl-line: #00b900;
   }
 
+  /* LIFF parent portal: the base light theme sets secondary/muted/accent to a
+     dark navy (so outline/ghost buttons flash dark on press and secondary badges
+     are dark). Override to proper light grays — scoped to LIFF only so the admin
+     app is untouched. Also soften card borders for a frame-light mobile look. */
+  .liff-theme {
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --border: 220 14% 96%;
+  }
+
   .dark {
     /* Page canvas — near-black */
     --background: 240 4% 5%;

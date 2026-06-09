@@ -184,7 +184,7 @@ function MakeupContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-primary text-white p-4">
+      <div className="bg-primary text-white p-4 pt-6">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -230,7 +230,7 @@ function MakeupContent() {
                         style={{ backgroundColor: classData.subjectColor }}
                       />
                     )}
-                    <span>{classData.className}</span>
+                    <span>{classData.subjectName}</span>
                     {classData.stats.totalUsed > 0 && (
                       <span className="text-xs text-muted-foreground">
                         (ใช้ {classData.stats.totalUsed}/{MAKEUP_QUOTA})
@@ -256,7 +256,7 @@ function MakeupContent() {
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <span className={canRequestMore ? "text-blue-700" : "text-orange-700"}>
-                    สิทธิ์ Makeup คลาส {selectedClassData.className}: ใช้ไป {selectedClassData.stats.totalUsed} จาก {MAKEUP_QUOTA} ครั้ง
+                    สิทธิ์ Makeup คลาส {selectedClassData.subjectName}: ใช้ไป {selectedClassData.stats.totalUsed} จาก {MAKEUP_QUOTA} ครั้ง
                   </span>
                   {!canRequestMore && (
                     <Badge variant="secondary" className="bg-orange-100 text-orange-700">
@@ -354,7 +354,7 @@ function MakeupContent() {
                               />
                             )}
                             <div>
-                              <p className="font-medium">{selectedClassData.className}</p>
+                              <p className="font-medium">{selectedClassData.subjectName}</p>
                               <p className="text-sm text-muted-foreground">
                                 ครั้งที่ {makeup.originalSessionNumber}
                               </p>
@@ -456,7 +456,7 @@ function MakeupContent() {
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-3">
                             <div>
-                              <p className="font-medium">{selectedClassData.className}</p>
+                              <p className="font-medium">{selectedClassData.subjectName}</p>
                               <p className="text-sm text-muted-foreground">
                                 แทนครั้งที่ {makeup.originalSessionNumber}
                               </p>

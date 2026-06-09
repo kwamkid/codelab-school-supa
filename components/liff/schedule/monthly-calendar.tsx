@@ -204,7 +204,7 @@ export default function MonthlyCalendar({
                                   isCompleted && !isMakeup && !isAbsent && "bg-green-100 text-green-700",
                                   !isMakeup && !isAbsent && !isCompleted && "bg-blue-100 text-blue-700"
                                 )}
-                                title={`${event.extendedProps.studentNickname} - ${event.extendedProps.className}`}
+                                title={`${event.extendedProps.studentNickname} - ${event.extendedProps.subjectName || event.extendedProps.className}`}
                               >
                                 <span className="block truncate">
                                   {event.extendedProps.studentNickname}

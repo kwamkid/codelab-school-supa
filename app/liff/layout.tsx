@@ -22,7 +22,7 @@ export default function LiffLayout({
 }) {
   return (
     <LiffErrorBoundary>
-      {children}
+      <div className="liff-theme">{children}</div>
       <Toaster position="top-center" />
     </LiffErrorBoundary>
   );

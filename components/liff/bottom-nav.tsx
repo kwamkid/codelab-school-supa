@@ -29,11 +29,19 @@ export function BottomNav() {
               type="button"
               onClick={() => router.push(tab.path)}
               className={cn(
-                'flex flex-col items-center justify-center gap-0.5 py-2 transition-colors',
+                'relative flex flex-col items-center justify-center gap-0.5 py-2 transition-all duration-150',
+                'hover:bg-gray-50 active:bg-gray-100 active:scale-95',
                 active ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
               )}
             >
-              <Icon className={cn('h-6 w-6', active && 'fill-primary/10')} strokeWidth={active ? 2.4 : 2} />
+              {/* active top indicator bar */}
+              <span
+                className={cn(
+                  'absolute top-0 h-0.5 w-8 rounded-full bg-primary transition-opacity',
+                  active ? 'opacity-100' : 'opacity-0'
+                )}
+              />
+              <Icon className={cn('h-6 w-6 transition-transform', active && 'fill-primary/10 scale-110')} strokeWidth={active ? 2.4 : 2} />
               <span className={cn('text-[11px]', active && 'font-semibold')}>{tab.label}</span>
             </button>
           )

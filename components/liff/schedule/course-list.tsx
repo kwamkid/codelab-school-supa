@@ -36,6 +36,7 @@ export default function CourseList({
         acc[key] = {
           classId: event.classId,
           className: event.extendedProps.className || event.extendedProps.subjectName,
+          subjectName: event.extendedProps.subjectName || event.extendedProps.className,
           studentId: event.extendedProps.studentId,
           studentName: event.extendedProps.studentNickname || event.extendedProps.studentName,
           subjectColor: event.extendedProps.subjectColor,
@@ -119,7 +120,7 @@ export default function CourseList({
                       style={{ backgroundColor: classData.subjectColor }}
                     />
                   )}
-                  <h3 className="font-semibold text-lg">{classData.className}</h3>
+                  <h3 className="font-semibold text-lg">{classData.subjectName}</h3>
                 </div>
                 <Badge variant="secondary" className="text-xs">
                   {classData.studentName}

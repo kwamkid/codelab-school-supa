@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
-  CalendarOff, Calendar, MessageSquare, ChevronRight, Clock, MapPin,
+  CalendarOff, Calendar, MessageSquare, ChevronRight,
   UserPlus, User, Image as ImageIcon,
 } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
@@ -79,7 +79,7 @@ function Dashboard() {
   return (
     <div className="max-w-md mx-auto">
       {/* Header */}
-      <div className="bg-gradient-to-br from-primary to-orange-500 text-white px-5 pt-6 pb-8 rounded-b-3xl">
+      <div className="bg-gradient-to-br from-primary to-orange-500 text-white px-5 pt-9 pb-8 rounded-b-3xl">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-white/80 text-sm">สวัสดีค่ะ 👋</p>
@@ -129,38 +129,30 @@ function Dashboard() {
           <h2 className="text-sm font-semibold text-gray-500 mb-2 px-1">คาบเรียนถัดไป</h2>
           {data?.nextClass ? (
             <Card className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/schedule')}>
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-3 rounded-xl bg-blue-500 text-white shrink-0">
-                    <Calendar className="h-6 w-6" />
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-blue-500 text-white shrink-0">
+                    <Calendar className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{data.nextClass.subjectName || data.nextClass.className}</p>
-                    <p className="text-sm text-gray-500">
-                      {data.nextClass.studentName} · ครั้งที่ {data.nextClass.sessionNumber}
+                    <p className="font-semibold leading-tight">
+                      {data.nextClass.subjectName || data.nextClass.className}
+                      <span className="font-normal text-gray-400"> · ครั้งที่ {data.nextClass.sessionNumber}</span>
                     </p>
-                    <div className="mt-2 space-y-1 text-sm text-gray-600">
-                      <p className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                        {getDayName(new Date(data.nextClass.sessionDate).getDay())} {formatDate(data.nextClass.sessionDate, 'long')}
-                      </p>
-                      <p className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-gray-400" />
-                        {data.nextClass.startTime?.slice(0, 5)} - {data.nextClass.endTime?.slice(0, 5)} น.
-                      </p>
-                      {data.nextClass.branchName && (
-                        <p className="flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                          {data.nextClass.branchName}
-                        </p>
-                      )}
-                    </div>
+                    <p className="text-sm text-gray-600 mt-0.5">
+                      {getDayName(new Date(data.nextClass.sessionDate).getDay())} {formatDate(data.nextClass.sessionDate, 'long')}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {data.nextClass.startTime?.slice(0, 5)}-{data.nextClass.endTime?.slice(0, 5)} น.
+                      {data.nextClass.branchName && <> · {data.nextClass.branchName}</>}
+                      {data.nextClass.studentName && <> · {data.nextClass.studentName}</>}
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <Card><CardContent className="p-5 text-center text-sm text-gray-400">ไม่มีคาบเรียนที่กำลังจะถึง</CardContent></Card>
+            <Card><CardContent className="p-4 text-center text-sm text-gray-400">ไม่มีคาบเรียนที่กำลังจะถึง</CardContent></Card>
           )}
         </div>
 
