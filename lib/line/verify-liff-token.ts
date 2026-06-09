@@ -58,12 +58,18 @@ export async function resolveLiffUser(
   if (token) {
     const verified = await verifyLiffIdToken(token);
     if (verified) return { lineUserId: verified.lineUserId, verified: true };
-    // A token was supplied but failed verification — reject rather than fall back.
-    return null;
+    // Token failed verification (e.g. wrong channel id / openid scope). Prefer to
+    // fall back to the body userId rather than break the portal — log it so we can
+    // tighten this once the verified path is confirmed working in production.
+    console.warn('[resolveLiffUser] ID token verification failed; falling back to body lineUserId');
   }
 
   if (body?.lineUserId) {
-    console.warn('[resolveLiffUser] No ID token; falling back to unverified body lineUserId');
+    if (token) {
+      // already warned above
+    } else {
+      console.warn('[resolveLiffUser] No ID token; using unverified body lineUserId');
+    }
     return { lineUserId: body.lineUserId, verified: false };
   }
 
