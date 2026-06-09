@@ -57,8 +57,10 @@ function ScheduleContent() {
     if (!profile?.userId || !authChecked || dataLoaded) return
 
     try {
-      setLoading(true)
-      
+      // Only show the full-screen loader on the very first load (no cache);
+      // otherwise revalidate silently so tab switches feel instant.
+      if (events.length === 0) setLoading(true)
+
       // Load data for current year and next year to cover cross-year courses
       const now = new Date()
       // Start from 3 months ago to include recent past classes
@@ -199,7 +201,9 @@ function ScheduleContent() {
   }
 
   // Show loading while checking auth or loading initial data
-  if (liffLoading || !authChecked || (loading && !dataLoaded)) {
+  // Show the full-screen loader only when we truly have nothing to display yet.
+  // (Don't gate on authChecked — it resets on every remount and would hide cached data.)
+  if (loading && events.length === 0) {
     return <PageLoading />
   }
 

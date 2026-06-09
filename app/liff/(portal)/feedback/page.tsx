@@ -47,7 +47,8 @@ function FeedbackContent() {
     if (!profile?.userId) return
 
     try {
-      setLoading(true)
+      // Only show the loader on first load (no cache); revalidate silently otherwise.
+      if (feedbacks.length === 0) setLoading(true)
 
       // Fetch via server route (service role + verified LINE ID token)
       const json = await liffFetch('/api/liff/feedback', { lineUserId: profile.userId })
