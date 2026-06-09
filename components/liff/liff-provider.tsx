@@ -138,7 +138,7 @@ export function LiffProvider({ children, requireLogin = false }: LiffProviderPro
   }, [requireLogin])
 
   if (isLoading) {
-    return <Loading fullScreen text="กำลังโหลด..." />
+    return <Loading fullScreen size="lg" text="กำลังโหลด..." />
   }
 
   if (error) {

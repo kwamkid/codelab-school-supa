@@ -93,8 +93,10 @@ export function Loading({
   )
 }
 
-// Full-screen overlay — blocks scroll, covers everything
-export function PageLoading({ text }: { text?: string } = {}) {
+// Full-screen overlay — blocks scroll, covers everything.
+// Defaults to the same text as the LIFF provider loader so there's only ONE
+// full-screen loading look across the app.
+export function PageLoading({ text = 'กำลังโหลด...' }: { text?: string } = {}) {
   return <Loading fullScreen size="lg" text={text} />
 }
 
