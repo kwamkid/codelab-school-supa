@@ -184,20 +184,6 @@ function MakeupContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-primary text-white p-4">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/liff')}
-            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-bold">ข้อมูลการลาและเรียนชดเชย</h1>
-        </div>
-      </div>
-
       <div className="p-3 space-y-3">
         {students.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-2">

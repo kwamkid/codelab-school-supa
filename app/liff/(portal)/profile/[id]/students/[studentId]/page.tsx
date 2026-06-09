@@ -188,19 +188,6 @@ function EditStudentContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-primary text-white p-4">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={navigateBack}
-            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-bold">แก้ไขข้อมูลนักเรียน</h1>
-        </div>
-      </div>
 
       <div className="p-4 space-y-4">
         {/* Basic Information */}

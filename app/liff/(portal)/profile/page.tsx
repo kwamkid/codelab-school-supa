@@ -347,33 +347,19 @@ function ProfileContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with Back Button */}
-      <div className="bg-primary text-white p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigateTo('/liff')}
-              className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-xl font-bold">โปรไฟล์</h1>
-          </div>
+      <div className="p-4 space-y-4">
+        <div className="flex justify-end">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={handleLogout}
-            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900"
             disabled={navigating}
+            className="text-red-600 border-red-200 hover:bg-red-50 active:bg-red-50"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4 mr-1" />
+            ออกจากระบบ
           </Button>
         </div>
-      </div>
-
-      <div className="p-4 space-y-4">
         {/* Parent Profile Card */}
         <Card>
           <CardHeader>
