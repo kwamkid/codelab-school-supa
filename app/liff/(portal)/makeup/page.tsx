@@ -140,6 +140,7 @@ function MakeupContent() {
       setCancellingId(selectedMakeup.id)
       
       await liffFetch('/api/liff/cancel-leave', {
+        lineUserId: profile?.userId,
         makeupId: selectedMakeup.id,
         studentId: selectedMakeup.studentId,
         classId: selectedMakeup.originalClassId,
@@ -256,20 +257,12 @@ function MakeupContent() {
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <span className={canRequestMore ? "text-blue-700" : "text-orange-700"}>
-                    สิทธิ์ Makeup คลาส {selectedClassData.subjectName}: ใช้ไป {selectedClassData.stats.totalUsed} จาก {MAKEUP_QUOTA} ครั้ง
+                    สิทธิ์ลาล่วงหน้า: ใช้ไป {selectedClassData.stats.totalUsed}/{MAKEUP_QUOTA} ครั้ง
                   </span>
                   {!canRequestMore && (
                     <Badge variant="secondary" className="bg-orange-100 text-orange-700">
                       เต็มแล้ว
                     </Badge>
-                  )}
-                </div>
-                <div className="text-xs text-gray-600">
-                  (ลาล่วงหน้า {selectedClassData.stats.selfRequested} + ขาดเรียน {selectedClassData.stats.absences} ครั้ง)
-                  {selectedClassData.stats.systemGenerated > 0 && (
-                    <span className="text-gray-500">
-                      {' '}• Makeup จากระบบ {selectedClassData.stats.systemGenerated} ครั้ง (ไม่นับใน quota)
-                    </span>
                   )}
                 </div>
               </div>
@@ -301,36 +294,30 @@ function MakeupContent() {
         ) : (
           <>
             <div className="grid grid-cols-3 gap-3">
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardContent className="p-3 text-center">
-                  <p className="text-2xl font-bold text-primary">
-                    {selectedClassData.stats.selfRequested + selectedClassData.stats.absences}
-                  </p>
-                  <p className="text-xs text-muted-foreground">ลา/ขาด</p>
+                  <p className="text-2xl font-bold text-orange-600">{selectedClassData.stats.pending}</p>
+                  <p className="text-xs text-muted-foreground">รอนัด</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardContent className="p-3 text-center">
-                  <p className="text-2xl font-bold text-green-600">
-                    {selectedClassData.stats.quotaRemaining}
-                  </p>
-                  <p className="text-xs text-muted-foreground">โควต้าคงเหลือ</p>
+                  <p className="text-2xl font-bold text-blue-600">{selectedClassData.stats.scheduled}</p>
+                  <p className="text-xs text-muted-foreground">นัดแล้ว</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardContent className="p-3 text-center">
-                  <p className="text-2xl font-bold text-orange-600">
-                    {selectedClassData.stats.pending}
-                  </p>
-                  <p className="text-xs text-muted-foreground">รอนัด Makeup</p>
+                  <p className="text-2xl font-bold text-green-600">{selectedClassData.stats.completed}</p>
+                  <p className="text-xs text-muted-foreground">เรียนชดเชยแล้ว</p>
                 </CardContent>
               </Card>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="leave">วันที่ลา</TabsTrigger>
-                <TabsTrigger value="makeup">ตารางเรียนชดเชย</TabsTrigger>
+                <TabsTrigger value="leave">รายการชดเชย</TabsTrigger>
+                <TabsTrigger value="makeup">นัดเรียนแล้ว</TabsTrigger>
               </TabsList>
 
               <TabsContent value="leave" className="space-y-3">
@@ -343,7 +330,7 @@ function MakeupContent() {
                                    makeup.requestedBy === 'parent-liff'
                   
                   return (
-                    <Card key={makeup.id}>
+                    <Card key={makeup.id} className="border-0 shadow-sm">
                       <CardContent className="p-3">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -452,7 +439,7 @@ function MakeupContent() {
                     const isPast = makeupDate < new Date()
                     
                     return (
-                      <Card key={makeup.id} className={isPast ? 'opacity-75' : ''}>
+                      <Card key={makeup.id} className={isPast ? 'opacity-75 border-0 shadow-sm' : 'border-0 shadow-sm'}>
                         <CardContent className="p-3">
                           <div className="flex items-start justify-between mb-3">
                             <div>

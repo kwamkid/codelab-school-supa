@@ -147,8 +147,10 @@ function ScheduleContent() {
         studentId: selectedEvent.extendedProps.studentId
       })
       
-      // Call API to create makeup request (token attached by liffFetch)
+      // Call API to create makeup request (token attached by liffFetch;
+      // lineUserId included as fallback when the ID token can't be verified)
       const data = await liffFetch('/api/liff/leave-request', {
+        lineUserId: profile?.userId,
         studentId: selectedEvent.extendedProps.studentId,
         classId: classId,
         scheduleId: scheduleId,
@@ -403,9 +405,7 @@ function ScheduleContent() {
                       />
                     )}
                     <span>
-                      {selectedEvent.extendedProps.type === 'makeup' 
-                        ? selectedEvent.extendedProps.originalClassName 
-                        : selectedEvent.extendedProps.className || selectedEvent.extendedProps.subjectName}
+                      {selectedEvent.extendedProps.subjectName || selectedEvent.extendedProps.className}
                       {selectedEvent.extendedProps.sessionNumber && selectedEvent.extendedProps.type !== 'makeup' && (
                         <span className="text-muted-foreground ml-2">
                           (ครั้งที่ {selectedEvent.extendedProps.sessionNumber})
@@ -488,7 +488,7 @@ function ScheduleContent() {
 
       {/* Confirm Leave Dialog */}
       <AlertDialog open={confirmLeaveOpen} onOpenChange={setConfirmLeaveOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[320px] rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
@@ -502,7 +502,7 @@ function ScheduleContent() {
                 <div className="bg-gray-50 p-3 rounded-md space-y-1 text-foreground">
                   <p className="font-medium">{selectedEvent.extendedProps.studentNickname || selectedEvent.extendedProps.studentName}</p>
                   <p className="text-sm">
-                    คลาส: {selectedEvent.extendedProps.className || selectedEvent.extendedProps.subjectName}
+                    คลาส: {selectedEvent.extendedProps.subjectName || selectedEvent.extendedProps.className}
                     {selectedEvent.extendedProps.sessionNumber && (
                       <span className="text-muted-foreground"> (ครั้งที่ {selectedEvent.extendedProps.sessionNumber})</span>
                     )}
