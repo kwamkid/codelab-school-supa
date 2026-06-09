@@ -169,7 +169,7 @@ export default function CourseList({
     <div className="space-y-6">
       {Object.values(eventsByClass).map((classData: any) => (
         <Card key={`${classData.classId}-${classData.studentId}`}>
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             {/* Class Header */}
             <div className="mb-4">
               <div className="flex items-start justify-between mb-2">

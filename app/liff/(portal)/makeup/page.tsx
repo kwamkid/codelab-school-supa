@@ -198,7 +198,7 @@ function MakeupContent() {
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-3 space-y-3">
         {students.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-2">
             {students.map((student) => (
@@ -344,7 +344,7 @@ function MakeupContent() {
                   
                   return (
                     <Card key={makeup.id}>
-                      <CardContent className="p-4">
+                      <CardContent className="p-3">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-2">
                             {selectedClassData.subjectColor && (
@@ -453,7 +453,7 @@ function MakeupContent() {
                     
                     return (
                       <Card key={makeup.id} className={isPast ? 'opacity-75' : ''}>
-                        <CardContent className="p-4">
+                        <CardContent className="p-3">
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               <p className="font-medium">{selectedClassData.subjectName}</p>

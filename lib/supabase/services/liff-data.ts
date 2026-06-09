@@ -8,6 +8,7 @@
 
 import { createServiceClient } from '../server';
 import { dbRowToMakeupClass } from '@/lib/services/makeup';
+import { getReferenceMaps } from './liff-ref';
 
 export {
   getParentScheduleEvents,
@@ -186,16 +187,7 @@ export async function getMakeupData(lineUserId: string) {
   const activeStudents = await getActiveStudents(supabase, parent.id);
   if (activeStudents.length === 0) return { students: [], makeupData: {} };
 
-  const [{ data: subjects }, { data: teachers }, { data: branches }, { data: rooms }] = await Promise.all([
-    supabase.from('subjects').select('*'),
-    supabase.from('teachers').select('*'),
-    supabase.from('branches').select('*'),
-    supabase.from('rooms').select('*'),
-  ]);
-  const subjectMap = new Map<string, any>((subjects || []).map((s: any) => [s.id, s]));
-  const teacherMap = new Map<string, any>((teachers || []).map((t: any) => [t.id, t]));
-  const branchMap = new Map<string, any>((branches || []).map((b: any) => [b.id, b]));
-  const roomMap = new Map<string, any>((rooms || []).map((r: any) => [r.id, r]));
+  const { subjectMap, teacherMap, branchMap, roomMap } = await getReferenceMaps(supabase);
 
   const makeupData: Record<string, any> = {};
 

@@ -1,5 +1,6 @@
 import { createServiceClient } from '../server'
 import { ScheduleEvent } from '@/components/liff/schedule-calendar'
+import { getReferenceMaps } from './liff-ref'
 
 export interface StudentScheduleData {
   student: {
@@ -58,24 +59,8 @@ export async function getParentScheduleEvents(
 
     console.log('[getParentScheduleEvents] Found active students:', students.length)
 
-    // Get all reference data
-    const [
-      { data: subjects },
-      { data: teachers },
-      { data: branches },
-      { data: rooms },
-    ] = await Promise.all([
-      supabase.from('subjects').select('*'),
-      supabase.from('teachers').select('*'),
-      supabase.from('branches').select('*'),
-      supabase.from('rooms').select('*'),
-    ])
-
-    // Create lookup maps
-    const subjectMap = new Map<string, any>((subjects || []).map(s => [s.id, s]))
-    const teacherMap = new Map<string, any>((teachers || []).map(t => [t.id, t]))
-    const branchMap = new Map<string, any>((branches || []).map(b => [b.id, b]))
-    const roomMap = new Map<string, any>((rooms || []).map(r => [r.id, r]))
+    // Reference data (cached across requests)
+    const { subjectMap, teacherMap, branchMap, roomMap } = await getReferenceMaps(supabase)
 
     const events: ScheduleEvent[] = []
     const studentsData: StudentScheduleData[] = []
@@ -155,6 +140,16 @@ export async function getParentScheduleEvents(
 
         if (!schedules) continue
 
+        // Batch-load attendance for all sessions of this class at once (was a
+        // per-session query = N+1).
+        const scheduleIds = schedules.map((s: any) => s.id)
+        const { data: attRows } = await supabase
+          .from('attendance')
+          .select('*')
+          .in('schedule_id', scheduleIds)
+          .eq('student_id', student.id)
+        const attBySchedule = new Map<string, any>((attRows || []).map((a: any) => [a.schedule_id, a]))
+
         for (const schedule of schedules) {
           // Skip cancelled schedules
           if (schedule.status === 'cancelled') continue
@@ -186,15 +181,8 @@ export async function getParentScheduleEvents(
 
           const sessionHasPassed = eventEnd < now
 
-          // Check attendance
-          const { data: attendanceRecords } = await supabase
-            .from('attendance')
-            .select('*')
-            .eq('schedule_id', schedule.id)
-            .eq('student_id', student.id)
-            .single()
-
-          const hasAttendance = attendanceRecords
+          // Check attendance (from the batched map above)
+          const hasAttendance = attBySchedule.get(schedule.id)
 
           if (hasMakeupRequest) {
             backgroundColor = '#FEE2E2' // Red-100

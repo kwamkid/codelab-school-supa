@@ -18,8 +18,17 @@ export interface VerifiedLiffUser {
   picture?: string;
 }
 
+// Cache verified tokens briefly so rapid tab switches don't each hit LINE's
+// verify endpoint. Keyed by the token string; ID tokens are stable per session.
+const verifyCache = new Map<string, { at: number; user: VerifiedLiffUser }>();
+const VERIFY_TTL_MS = 10 * 60_000; // 10 minutes
+
 export async function verifyLiffIdToken(idToken: string): Promise<VerifiedLiffUser | null> {
   if (!idToken) return null;
+
+  const cached = verifyCache.get(idToken);
+  if (cached && Date.now() - cached.at < VERIFY_TTL_MS) return cached.user;
+
   try {
     const res = await fetch(LINE_VERIFY_URL, {
       method: 'POST',
@@ -34,7 +43,9 @@ export async function verifyLiffIdToken(idToken: string): Promise<VerifiedLiffUs
     }
     const payload = await res.json();
     if (!payload?.sub) return null;
-    return { lineUserId: payload.sub, name: payload.name, picture: payload.picture };
+    const user = { lineUserId: payload.sub, name: payload.name, picture: payload.picture };
+    verifyCache.set(idToken, { at: Date.now(), user });
+    return user;
   } catch (error) {
     console.error('[verifyLiffIdToken] Error:', error);
     return null;
