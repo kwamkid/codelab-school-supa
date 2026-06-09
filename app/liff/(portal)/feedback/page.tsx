@@ -1,16 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronLeft, Loader2, MessageSquare, Calendar, User, BookOpen, School } from 'lucide-react'
+import { Loader2, MessageSquare, Calendar, User, BookOpen, School } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
 import { PageLoading } from '@/components/ui/loading'
 import { formatDate } from '@/lib/utils'
 import { liffFetch } from '@/lib/line/liff-fetch'
+import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { toast } from 'sonner'
 
 interface FeedbackData {
@@ -27,11 +27,12 @@ interface FeedbackData {
 }
 
 function FeedbackContent() {
-  const router = useRouter()
   const { profile, isLoggedIn, isLoading: liffLoading } = useLiff()
-  const [loading, setLoading] = useState(true)
-  const [feedbacks, setFeedbacks] = useState<FeedbackData[]>([])
-  const [students, setStudents] = useState<any[]>([])
+  const cacheKey = profile?.userId ? `feedback:${profile.userId}` : null
+  const cached = cacheKey ? getLiffCache<{ students: any[]; feedbacks: FeedbackData[] }>(cacheKey) : undefined
+  const [loading, setLoading] = useState(!cached)
+  const [feedbacks, setFeedbacks] = useState<FeedbackData[]>(cached?.feedbacks ?? [])
+  const [students, setStudents] = useState<any[]>(cached?.students ?? [])
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
   const [selectedSubject, setSelectedSubject] = useState<string>('all')
   
@@ -52,9 +53,6 @@ function FeedbackContent() {
 
       const studentsData = json.students || []
       setStudents(studentsData)
-      if (studentsData.length > 0) {
-        setSelectedStudentId(studentsData[0].id)
-      }
 
       // Server returns ISO date strings → revive to Date for formatting
       const feedbacks: FeedbackData[] = (json.feedbacks || []).map((f: any) => ({
@@ -62,6 +60,7 @@ function FeedbackContent() {
         sessionDate: new Date(f.sessionDate),
       }))
       setFeedbacks(feedbacks)
+      if (cacheKey) setLiffCache(cacheKey, { students: studentsData, feedbacks })
     } catch (error) {
       console.error('Error loading feedback:', error)
       toast.error('ไม่สามารถโหลดข้อมูลได้')
@@ -86,23 +85,21 @@ function FeedbackContent() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-primary text-white p-4 pt-6">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/liff')}
-            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-bold">Teacher Feedback</h1>
-        </div>
+        <h1 className="text-xl font-bold">Teacher Feedback</h1>
       </div>
 
       <div className="p-3 space-y-3">
         {/* Student Selector */}
         {students.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-2">
+            <Button
+              variant={!selectedStudentId ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedStudentId('')}
+              className="whitespace-nowrap"
+            >
+              ทุกคน
+            </Button>
             {students.map((student) => (
               <Button
                 key={student.id}

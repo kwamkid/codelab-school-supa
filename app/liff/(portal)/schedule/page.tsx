@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ChevronLeft, Loader2, Calendar, Users, Clock, MapPin, User, List, CalendarRange, AlertCircle } from 'lucide-react'
+import { Loader2, Calendar, Users, Clock, MapPin, User, List, CalendarRange, AlertCircle } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
 import type { StudentStats } from '@/lib/supabase/services/liff-data'
 import { liffFetch } from '@/lib/line/liff-fetch'
+import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { toast } from 'sonner'
 import { PageLoading, SectionLoading } from '@/components/ui/loading'
 import { ScheduleEvent } from '@/components/liff/schedule-calendar'
@@ -23,12 +24,14 @@ import MonthlyCalendar from '@/components/liff/schedule/monthly-calendar'
 function ScheduleContent() {
   const router = useRouter()
   const { profile, isLoggedIn, isLoading: liffLoading, liff } = useLiff()
-  const [loading, setLoading] = useState(true)
-  const [events, setEvents] = useState<ScheduleEvent[]>([])
-  const [students, setStudents] = useState<any[]>([])
+  const cacheKey = profile?.userId ? `schedule:${profile.userId}` : null
+  const cached = cacheKey ? getLiffCache<{ events: ScheduleEvent[]; students: any[]; stats: Record<string, StudentStats> }>(cacheKey) : undefined
+  const [loading, setLoading] = useState(!cached)
+  const [events, setEvents] = useState<ScheduleEvent[]>(cached?.events ?? [])
+  const [students, setStudents] = useState<any[]>(cached?.students ?? [])
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
-  const [overallStats, setOverallStats] = useState<Record<string, StudentStats>>({})
-  const [loadingStats, setLoadingStats] = useState(true)
+  const [overallStats, setOverallStats] = useState<Record<string, StudentStats>>(cached?.stats ?? {})
+  const [loadingStats, setLoadingStats] = useState(!cached)
   const [dataLoaded, setDataLoaded] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null)
@@ -86,6 +89,7 @@ function ScheduleContent() {
       setOverallStats(data.stats || {})
       setLoadingStats(false)
       setDataLoaded(true)
+      if (cacheKey) setLiffCache(cacheKey, { events: fetchedEvents, students: studentsData, stats: data.stats || {} })
       
       // Set default selected student
       if (studentsData.length > 0 && !selectedStudentId) {
@@ -207,17 +211,7 @@ function ScheduleContent() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-primary text-white p-4 pt-6">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/liff')}
-            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-bold">ตารางเรียน</h1>
-        </div>
+        <h1 className="text-xl font-bold">ตารางเรียน</h1>
       </div>
 
       <div className="p-3 space-y-3">

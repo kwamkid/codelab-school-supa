@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
 import { liffFetch } from '@/lib/line/liff-fetch'
+import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { Loading } from '@/components/ui/loading'
 import { formatDate, getDayName } from '@/lib/utils'
 
@@ -32,8 +33,10 @@ interface HomeSummary {
 function Dashboard() {
   const router = useRouter()
   const { profile, isLoading: liffLoading } = useLiff()
-  const [loading, setLoading] = useState(true)
-  const [data, setData] = useState<HomeSummary | null>(null)
+  const cacheKey = profile?.userId ? `home:${profile.userId}` : null
+  const cached = cacheKey ? getLiffCache<HomeSummary>(cacheKey) : undefined
+  const [loading, setLoading] = useState(!cached)
+  const [data, setData] = useState<HomeSummary | null>(cached ?? null)
 
   useEffect(() => {
     if (liffLoading || !profile?.userId) return
@@ -43,7 +46,10 @@ function Dashboard() {
         const res = await liffFetch<HomeSummary & { success: boolean }>('/api/liff/home', {
           lineUserId: profile.userId,
         })
-        if (active) setData(res)
+        if (active) {
+          setData(res)
+          if (cacheKey) setLiffCache(cacheKey, res)
+        }
       } catch (e) {
         console.error('[dashboard] load error', e)
       } finally {
