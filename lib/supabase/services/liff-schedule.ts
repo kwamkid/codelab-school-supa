@@ -100,7 +100,7 @@ export async function getParentScheduleEvents(
       // Get active enrollments
       const { data: enrollments } = await supabase
         .from('enrollments')
-        .select('*, classes(*)')
+        .select('*, classes!enrollments_class_id_fkey(*)')
         .eq('student_id', student.id)
         .eq('status', 'active')
 
@@ -362,7 +362,7 @@ export async function getStudentOverallStats(
     // Get active enrollments
     const { data: enrollments } = await supabase
       .from('enrollments')
-      .select('class_id, classes(end_time, status)')
+      .select('class_id, classes!enrollments_class_id_fkey(end_time, status)')
       .eq('student_id', studentId)
       .eq('status', 'active')
 

@@ -86,7 +86,7 @@ export async function getMakeupData(lineUserId: string) {
 
     const { data: enrollments } = await supabase
       .from('enrollments')
-      .select('class_id, classes(*)')
+      .select('class_id, classes!enrollments_class_id_fkey(*)')
       .eq('student_id', student.id)
       .eq('status', 'active');
 
