@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { ChevronLeft, Loader2, Calendar, Users, Clock, MapPin, User, List, CalendarDays, CalendarRange, AlertCircle } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
-import type { StudentStats } from '@/lib/services/liff-schedule'
+import type { StudentStats } from '@/lib/supabase/services/liff-data'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
 import { LiffProvider } from '@/components/liff/liff-provider'

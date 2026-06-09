@@ -13,6 +13,7 @@ export {
   getParentScheduleEvents,
   getStudentOverallStats,
 } from './liff-schedule';
+export type { StudentStats, StudentScheduleData } from './liff-schedule';
 
 const MAKEUP_QUOTA = 4;
 
