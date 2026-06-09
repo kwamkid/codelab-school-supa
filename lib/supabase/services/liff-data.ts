@@ -59,121 +59,15 @@ export async function getPendingMakeupCount(lineUserId: string): Promise<number>
 
 export async function getHomeSummary(lineUserId: string) {
   const supabase = createServiceClient() as any;
-  const parent = await getParentByLine(supabase, lineUserId);
-  if (!parent) {
-    return { hasParent: false, parentName: '', pendingMakeupCount: 0, nextClass: null, latestFeedback: null };
-  }
-  const students = await getActiveStudents(supabase, parent.id);
-  const studentIds = students.map((s: any) => s.id);
-  const studentMap = new Map<string, any>(students.map((s: any) => [s.id, s]));
-
-  if (studentIds.length === 0) {
-    return {
-      hasParent: true,
-      parentName: parent.display_name || parent.line_display_name || '',
-      pendingMakeupCount: 0,
-      nextClass: null,
-      latestFeedback: null,
-    };
-  }
-
-  // pending makeup count
-  const { count: pendingMakeupCount } = await supabase
-    .from('makeup_classes')
-    .select('id', { count: 'exact', head: true })
-    .in('student_id', studentIds)
-    .eq('status', 'pending');
-
-  // next upcoming class across all students' active enrollments
-  let nextClass: any = null;
-  const { data: enr } = await supabase
-    .from('enrollments')
-    .select('class_id, student_id')
-    .in('student_id', studentIds)
-    .eq('status', 'active');
-  const classIds = [...new Set((enr || []).map((e: any) => e.class_id))];
-  const studentByClass = new Map<string, string>((enr || []).map((e: any) => [e.class_id, e.student_id]));
-
-  if (classIds.length > 0) {
-    const { data: scheds } = await supabase
-      .from('class_schedules')
-      .select('id, class_id, session_number, session_date')
-      .in('class_id', classIds)
-      .gte('session_date', new Date().toISOString().split('T')[0])
-      .neq('status', 'cancelled')
-      .order('session_date', { ascending: true })
-      .limit(1);
-    const next = (scheds || [])[0];
-    if (next) {
-      const { data: cls } = await supabase
-        .from('classes')
-        .select('name, subject_id, branch_id, start_time, end_time')
-        .eq('id', next.class_id)
-        .single();
-      if (cls) {
-        const [{ data: subject }, { data: branch }] = await Promise.all([
-          supabase.from('subjects').select('name').eq('id', cls.subject_id).single(),
-          supabase.from('branches').select('name').eq('id', cls.branch_id).single(),
-        ]);
-        const student = studentMap.get(studentByClass.get(next.class_id) || '');
-        nextClass = {
-          className: cls.name,
-          subjectName: subject?.name || '',
-          sessionNumber: next.session_number,
-          sessionDate: next.session_date,
-          startTime: cls.start_time,
-          endTime: cls.end_time,
-          branchName: branch?.name || '',
-          studentName: student?.nickname || student?.name || '',
-        };
-      }
-    }
-  }
-
-  // latest teacher feedback (text or photos)
-  let latestFeedback: any = null;
-  const { data: attRows } = await supabase
-    .from('attendance')
-    .select('student_id, schedule_id, feedback, photos, checked_at')
-    .in('student_id', studentIds);
-  const relevant = (attRows || []).filter(
-    (r: any) => (r.feedback && r.feedback.trim()) || (Array.isArray(r.photos) && r.photos.length > 0)
-  );
-  if (relevant.length > 0) {
-    const schedIds = [...new Set(relevant.map((r: any) => r.schedule_id))];
-    const { data: schedRows } = await supabase
-      .from('class_schedules')
-      .select('id, class_id, session_number, session_date')
-      .in('id', schedIds);
-    const schedMap = new Map<string, any>((schedRows || []).map((s: any) => [s.id, s]));
-    // newest by session_date
-    relevant.sort((a: any, b: any) => {
-      const da = schedMap.get(a.schedule_id)?.session_date || '';
-      const db = schedMap.get(b.schedule_id)?.session_date || '';
-      return db.localeCompare(da);
-    });
-    const top = relevant[0];
-    const sched = schedMap.get(top.schedule_id);
-    if (sched) {
-      const { data: cls } = await supabase.from('classes').select('name').eq('id', sched.class_id).single();
-      const student = studentMap.get(top.student_id);
-      latestFeedback = {
-        studentName: student?.nickname || student?.name || '',
-        className: cls?.name || '',
-        sessionNumber: sched.session_number,
-        sessionDate: sched.session_date,
-        feedback: top.feedback || '',
-        photoCount: Array.isArray(top.photos) ? top.photos.length : 0,
-      };
-    }
-  }
-
+  // Single round-trip via Postgres function (was ~10 sequential queries).
+  const { data, error } = await supabase.rpc('get_liff_home', { p_line_user_id: lineUserId });
+  if (error) throw error;
   return {
-    hasParent: true,
-    parentName: parent.display_name || parent.line_display_name || '',
-    pendingMakeupCount: pendingMakeupCount || 0,
-    nextClass,
-    latestFeedback,
+    hasParent: data?.has_parent ?? false,
+    parentName: data?.parent_name ?? '',
+    pendingMakeupCount: data?.pending_makeup_count ?? 0,
+    nextClass: data?.next_class ?? null,
+    latestFeedback: data?.latest_feedback ?? null,
   };
 }
 

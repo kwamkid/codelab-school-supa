@@ -28,309 +28,141 @@ export async function getParentScheduleEvents(
 ): Promise<{
   events: ScheduleEvent[]
   students: StudentScheduleData[]
+  stats: Record<string, StudentStats>
 }> {
   const supabase = createServiceClient() as any
-
   try {
-    // Get parent by LINE user ID
-    const { data: parent, error: parentError } = await supabase
-      .from('parents')
-      .select('id')
-      .eq('line_user_id', lineUserId)
-      .single()
-
-    if (parentError || !parent) {
-      console.log('[getParentScheduleEvents] No parent found for lineUserId:', lineUserId)
-      return { events: [], students: [] }
-    }
-
-    console.log('[getParentScheduleEvents] Found parent:', parent.id)
-
-    // Get active students
-    const { data: students, error: studentsError } = await supabase
-      .from('students')
-      .select('*')
-      .eq('parent_id', parent.id)
-      .eq('is_active', true)
-
-    if (studentsError || !students || students.length === 0) {
-      return { events: [], students: [] }
-    }
-
-    console.log('[getParentScheduleEvents] Found active students:', students.length)
-
-    // Reference data (cached across requests)
-    const { subjectMap, teacherMap, branchMap, roomMap } = await getReferenceMaps(supabase)
-
-    const events: ScheduleEvent[] = []
-    const studentsData: StudentScheduleData[] = []
-    const now = new Date()
-
-    // Process each student
-    for (const student of students) {
-      console.log(`[getParentScheduleEvents] Processing student: ${student.name}`)
-
-      const studentData: StudentScheduleData = {
-        student: {
-          id: student.id,
-          name: student.name,
-          nickname: student.nickname || undefined,
-          profileImage: student.profile_image || undefined,
-        },
-        enrollments: [],
-        classes: [],
-        makeupClasses: [],
-      }
-
-      // Get active enrollments
-      const { data: enrollments } = await supabase
-        .from('enrollments')
-        .select('*, classes!enrollments_class_id_fkey(*)')
-        .eq('student_id', student.id)
-        .eq('status', 'active')
-
-      if (!enrollments) continue
-
-      studentData.enrollments = enrollments
-      console.log(`[getParentScheduleEvents] Student ${student.name} has ${enrollments.length} active enrollments`)
-
-      // Get makeup classes for this student
-      const { data: makeupClasses } = await supabase
-        .from('makeup_classes')
-        .select('*')
-        .eq('student_id', student.id)
-        .neq('status', 'cancelled')
-
-      studentData.makeupClasses = makeupClasses || []
-
-      // Create map of makeup requests
-      const makeupRequestMap = new Map<string, any>()
-      ;(makeupClasses || []).forEach((makeup: Record<string, unknown>) => {
-        const key = `${makeup.original_class_id}-${makeup.original_schedule_id}`
-        makeupRequestMap.set(key, makeup)
-      })
-
-      // Process each enrollment
-      for (const enrollment of enrollments) {
-        const classData = enrollment.classes as any
-        if (!classData) continue
-
-        // Skip draft or cancelled classes
-        if (classData.status === 'draft' || classData.status === 'cancelled') {
-          continue
-        }
-
-        const subject = subjectMap.get(classData.subject_id as string)
-        const teacher = teacherMap.get(classData.teacher_id as string)
-        const branch = branchMap.get(classData.branch_id as string)
-        const room = roomMap.get(classData.room_id as string)
-
-        if (!subject || !teacher || !branch) continue
-
-        studentData.classes.push(classData)
-
-        // Get schedules within date range
-        const { data: schedules } = await supabase
-          .from('class_schedules')
-          .select('*')
-          .eq('class_id', classData.id)
-          .gte('session_date', start.toISOString().split('T')[0])
-          .lte('session_date', end.toISOString().split('T')[0])
-          .order('session_date', { ascending: true })
-
-        if (!schedules) continue
-
-        // Batch-load attendance for all sessions of this class at once (was a
-        // per-session query = N+1).
-        const scheduleIds = schedules.map((s: any) => s.id)
-        const { data: attRows } = await supabase
-          .from('attendance')
-          .select('*')
-          .in('schedule_id', scheduleIds)
-          .eq('student_id', student.id)
-        const attBySchedule = new Map<string, any>((attRows || []).map((a: any) => [a.schedule_id, a]))
-
-        for (const schedule of schedules) {
-          // Skip cancelled schedules
-          if (schedule.status === 'cancelled') continue
-
-          const sessionDate = new Date(schedule.session_date)
-
-          // Check if there's a makeup request for this schedule
-          const makeupKey = `${classData.id}-${schedule.id}`
-          const hasMakeupRequest = makeupRequestMap.has(makeupKey)
-          const makeupData = makeupRequestMap.get(makeupKey) as any
-
-          // Parse times
-          const startTime = classData.start_time as string
-          const endTime = classData.end_time as string
-          const [startHour, startMinute] = startTime.split(':').map(Number)
-          const [endHour, endMinute] = endTime.split(':').map(Number)
-
-          const eventStart = new Date(sessionDate)
-          eventStart.setHours(startHour, startMinute, 0, 0)
-
-          const eventEnd = new Date(sessionDate)
-          eventEnd.setHours(endHour, endMinute, 0, 0)
-
-          // Determine status and color
-          let backgroundColor = '#E5E7EB' // Gray
-          let borderColor = '#D1D5DB'
-          let textColor = '#374151'
-          let effectiveStatus = schedule.status
-
-          const sessionHasPassed = eventEnd < now
-
-          // Check attendance (from the batched map above)
-          const hasAttendance = attBySchedule.get(schedule.id)
-
-          if (hasMakeupRequest) {
-            backgroundColor = '#FEE2E2' // Red-100
-            borderColor = '#FCA5A5'
-            textColor = '#991B1B'
-            effectiveStatus = sessionHasPassed ? 'absent' : 'leave-requested'
-          } else if (hasAttendance) {
-            if (hasAttendance.status === 'present') {
-              backgroundColor = '#D1FAE5' // Green
-              borderColor = '#A7F3D0'
-              textColor = '#065F46'
-              effectiveStatus = 'completed'
-            } else if (hasAttendance.status === 'absent') {
-              backgroundColor = '#FEE2E2' // Red
-              borderColor = '#FCA5A5'
-              textColor = '#991B1B'
-              effectiveStatus = 'absent'
-            }
-          } else if (sessionHasPassed) {
-            backgroundColor = '#D1FAE5' // Green
-            borderColor = '#A7F3D0'
-            textColor = '#065F46'
-            effectiveStatus = 'completed'
-          }
-
-          events.push({
-            id: `${classData.id}-${schedule.id}-${student.id}`,
-            classId: classData.id as string,
-            title: `${student.nickname || student.name} - ${classData.name}`,
-            start: eventStart,
-            end: eventEnd,
-            backgroundColor,
-            borderColor,
-            textColor,
-            extendedProps: {
-              type: 'class',
-              studentId: student.id,
-              studentName: student.name,
-              studentNickname: student.nickname,
-              branchName: branch.name,
-              roomName: room?.name || classData.room_id,
-              teacherName: teacher.nickname || teacher.name,
-              subjectName: subject.name,
-              className: classData.name as string,
-              subjectColor: subject.color,
-              sessionNumber: schedule.session_number,
-              status: effectiveStatus,
-              hasMakeupRequest,
-              makeupScheduled: makeupData?.status === 'scheduled' && makeupData?.makeup_date,
-              makeupDate: makeupData?.makeup_date as string | undefined,
-              makeupTime: makeupData?.makeup_start_time && makeupData?.makeup_end_time
-                ? `${makeupData.makeup_start_time} - ${makeupData.makeup_end_time}`
-                : undefined,
-            },
-          })
-        }
-      }
-
-      // Process scheduled makeup classes
-      for (const makeup of studentData.makeupClasses as any[]) {
-        if (makeup.status === 'cancelled' || !makeup.makeup_date) continue
-
-        const makeupDate = new Date(makeup.makeup_date as string)
-        if (makeupDate < start || makeupDate > end) continue
-
-        // Get original class info
-        const { data: originalClass } = await supabase
-          .from('classes')
-          .select('*')
-          .eq('id', makeup.original_class_id)
-          .single()
-
-        if (!originalClass) continue
-
-        const teacher = teacherMap.get(makeup.makeup_teacher_id as string)
-        const branch = branchMap.get(makeup.makeup_branch_id as string)
-        const room = roomMap.get(makeup.makeup_room_id as string)
-        const subject = subjectMap.get(originalClass.subject_id)
-
-        if (!teacher || !branch) continue
-
-        const startTime = makeup.makeup_start_time as string
-        const endTime = makeup.makeup_end_time as string
-        const [startHour, startMinute] = startTime.split(':').map(Number)
-        const [endHour, endMinute] = endTime.split(':').map(Number)
-
-        const eventStart = new Date(makeupDate)
-        eventStart.setHours(startHour, startMinute, 0, 0)
-
-        const eventEnd = new Date(makeupDate)
-        eventEnd.setHours(endHour, endMinute, 0, 0)
-
-        let backgroundColor = '#E9D5FF' // Purple
-        let borderColor = '#D8B4FE'
-        let textColor = '#6B21A8'
-
-        if (eventEnd < now || makeup.status === 'completed') {
-          backgroundColor = '#D1FAE5' // Green
-          borderColor = '#A7F3D0'
-          textColor = '#065F46'
-        }
-
-        events.push({
-          id: `makeup-${makeup.id}-${student.id}`,
-          classId: makeup.original_class_id as string,
-          title: `[Makeup] ${student.nickname || student.name} - ${originalClass.name}`,
-          start: eventStart,
-          end: eventEnd,
-          backgroundColor,
-          borderColor,
-          textColor,
-          extendedProps: {
-            type: 'makeup',
-            studentId: student.id,
-            studentName: student.name,
-            studentNickname: student.nickname,
-            branchName: branch.name,
-            roomName: room?.name || makeup.makeup_room_id,
-            teacherName: teacher.nickname || teacher.name,
-            subjectName: subject?.name || '',
-            className: originalClass.name,
-            subjectColor: subject?.color,
-            originalClassName: originalClass.name,
-            sessionNumber: makeup.original_session_number,
-            makeupStatus: makeup.status,
-          },
-        })
-      }
-
-      studentsData.push(studentData)
-    }
-
-    // Sort events by date
-    events.sort((a, b) => {
-      const dateA = a.start as Date
-      const dateB = b.start as Date
-      return dateA.getTime() - dateB.getTime()
+    const startStr = start.toISOString().split('T')[0]
+    const endStr = end.toISOString().split('T')[0]
+    const { data, error } = await supabase.rpc('get_liff_schedule', {
+      p_line_user_id: lineUserId,
+      p_start: startStr,
+      p_end: endStr,
     })
+    if (error) {
+      console.error('[getParentScheduleEvents] RPC error:', error)
+      return { events: [], students: [], stats: {} }
+    }
 
-    console.log(`[getParentScheduleEvents] Total events: ${events.length}`)
-    return { events, students: studentsData }
+    const now = new Date()
+    const events: ScheduleEvent[] = []
+
+    const toClock = (t: string) => {
+      const [h, m] = (t || '00:00').split(':').map(Number)
+      return [h || 0, m || 0] as const
+    }
+
+    // Regular class sessions
+    for (const s of (data?.sessions || [])) {
+      const sessionDate = new Date(s.sessionDate)
+      const [sh, sm] = toClock(s.startTime)
+      const [eh, em] = toClock(s.endTime)
+      const eventStart = new Date(sessionDate); eventStart.setHours(sh, sm, 0, 0)
+      const eventEnd = new Date(sessionDate); eventEnd.setHours(eh, em, 0, 0)
+      const passed = eventEnd < now
+
+      let backgroundColor = '#E5E7EB', borderColor = '#D1D5DB', textColor = '#374151'
+      let effectiveStatus: string = s.scheduleStatus
+      if (s.hasMakeup) {
+        backgroundColor = '#FEE2E2'; borderColor = '#FCA5A5'; textColor = '#991B1B'
+        effectiveStatus = passed ? 'absent' : 'leave-requested'
+      } else if (s.attendanceStatus === 'present') {
+        backgroundColor = '#D1FAE5'; borderColor = '#A7F3D0'; textColor = '#065F46'; effectiveStatus = 'completed'
+      } else if (s.attendanceStatus === 'absent') {
+        backgroundColor = '#FEE2E2'; borderColor = '#FCA5A5'; textColor = '#991B1B'; effectiveStatus = 'absent'
+      } else if (passed) {
+        backgroundColor = '#D1FAE5'; borderColor = '#A7F3D0'; textColor = '#065F46'; effectiveStatus = 'completed'
+      }
+
+      events.push({
+        id: `${s.classId}-${s.scheduleId}-${s.studentId}`,
+        classId: s.classId,
+        title: `${s.studentNickname || s.studentName} - ${s.className}`,
+        start: eventStart,
+        end: eventEnd,
+        backgroundColor, borderColor, textColor,
+        extendedProps: {
+          type: 'class',
+          studentId: s.studentId,
+          studentName: s.studentName,
+          studentNickname: s.studentNickname,
+          branchName: s.branchName,
+          roomName: s.roomName,
+          teacherName: s.teacherName,
+          subjectName: s.subjectName,
+          className: s.className,
+          subjectColor: s.subjectColor,
+          sessionNumber: s.sessionNumber,
+          status: effectiveStatus,
+          hasMakeupRequest: s.hasMakeup,
+          makeupScheduled: s.makeupStatus === 'scheduled' && !!s.makeupDate,
+          makeupDate: s.makeupDate || undefined,
+          makeupTime: s.makeupStartTime && s.makeupEndTime ? `${s.makeupStartTime} - ${s.makeupEndTime}` : undefined,
+        },
+      })
+    }
+
+    // Scheduled makeup events
+    for (const m of (data?.makeups || [])) {
+      const d = new Date(m.makeupDate)
+      const [sh, sm] = toClock(m.startTime)
+      const [eh, em] = toClock(m.endTime)
+      const eventStart = new Date(d); eventStart.setHours(sh, sm, 0, 0)
+      const eventEnd = new Date(d); eventEnd.setHours(eh, em, 0, 0)
+      let backgroundColor = '#E9D5FF', borderColor = '#D8B4FE', textColor = '#6B21A8'
+      if (eventEnd < now || m.status === 'completed') {
+        backgroundColor = '#D1FAE5'; borderColor = '#A7F3D0'; textColor = '#065F46'
+      }
+      events.push({
+        id: `makeup-${m.id}-${m.studentId}`,
+        classId: m.classId,
+        title: `[Makeup] ${m.studentNickname || m.studentName} - ${m.className}`,
+        start: eventStart,
+        end: eventEnd,
+        backgroundColor, borderColor, textColor,
+        extendedProps: {
+          type: 'makeup',
+          studentId: m.studentId,
+          studentName: m.studentName,
+          studentNickname: m.studentNickname,
+          branchName: m.branchName,
+          roomName: m.roomName,
+          teacherName: m.teacherName,
+          subjectName: m.subjectName,
+          className: m.className,
+          subjectColor: m.subjectColor,
+          originalClassName: m.className,
+          sessionNumber: m.sessionNumber,
+          makeupStatus: m.status,
+        },
+      })
+    }
+
+    events.sort((a, b) => (a.start as Date).getTime() - (b.start as Date).getTime())
+
+    const students: StudentScheduleData[] = (data?.students || []).map((s: any) => ({
+      student: { id: s.id, name: s.name, nickname: s.nickname || undefined, profileImage: s.profileImage || undefined },
+      enrollments: [], classes: [], makeupClasses: [],
+    }))
+
+    const stats: Record<string, StudentStats> = {}
+    for (const st of (data?.stats || [])) {
+      stats[st.studentId] = {
+        totalClasses: st.totalClasses || 0,
+        completedClasses: st.completedClasses || 0,
+        upcomingClasses: st.upcomingClasses || 0,
+        makeupClasses: st.makeupClasses || 0,
+      }
+    }
+
+    return { events, students, stats }
   } catch (error) {
     console.error('[getParentScheduleEvents] Error:', error)
-    return { events: [], students: [] }
+    return { events: [], students: [], stats: {} }
   }
 }
 
-// Get overall statistics for a student
+
 export async function getStudentOverallStats(
   parentId: string,
   studentId: string

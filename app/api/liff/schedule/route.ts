@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveLiffUser } from '@/lib/line/verify-liff-token';
-import { getParentScheduleEvents, getStudentOverallStats } from '@/lib/supabase/services/liff-data';
+import { getParentScheduleEvents } from '@/lib/supabase/services/liff-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,14 +17,8 @@ export async function POST(request: NextRequest) {
     const startDate = body.start ? new Date(body.start) : new Date(new Date().getFullYear(), new Date().getMonth() - 3, 1);
     const endDate = body.end ? new Date(body.end) : new Date(new Date().getFullYear() + 1, 11, 31);
 
-    const { events, students } = await getParentScheduleEvents(user.lineUserId, startDate, endDate);
-
-    const stats: Record<string, any> = {};
-    await Promise.all(
-      students.map(async (s) => {
-        stats[s.student.id] = await getStudentOverallStats('', s.student.id);
-      })
-    );
+    // Single RPC returns events + students + per-student stats.
+    const { events, students, stats } = await getParentScheduleEvents(user.lineUserId, startDate, endDate);
 
     return NextResponse.json({ success: true, events, students, stats });
   } catch (error: any) {
