@@ -361,7 +361,7 @@ function ProfileContent() {
           </Button>
         </div>
         {/* Parent Profile Card */}
-        <Card>
+        <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -381,8 +381,16 @@ function ProfileContent() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div>
-                <h3 className="font-semibold text-lg">{parentData?.displayName || profile?.displayName || 'ไม่ระบุชื่อ'}</h3>
+              <div className="space-y-0.5">
+                <p className="text-xs text-muted-foreground">ชื่อ-นามสกุล</p>
+                <h3 className="font-semibold text-lg">
+                  {parentData?.displayName || <span className="text-red-500 text-base font-normal">ยังไม่ได้ระบุ — แตะแก้ไขเพื่อเพิ่ม</span>}
+                </h3>
+                {(parentData?.lineDisplayName || profile?.displayName) && (
+                  <p className="text-sm text-muted-foreground">
+                    ชื่อ LINE: {parentData?.lineDisplayName || profile?.displayName}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2 text-sm">
@@ -438,7 +446,7 @@ function ProfileContent() {
         </Card>
 
         {/* Students Card */}
-        <Card>
+        <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -476,7 +484,7 @@ function ProfileContent() {
                 {students.map((student) => (
                   <div
                     key={student.id}
-                    className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
+                    className="bg-gray-50 rounded-lg p-3 active:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { StudentBadge } from '@/components/ui/student-badge'
 import {
   CalendarOff, Calendar, MessageSquare, ChevronRight,
-  UserPlus, User, Image as ImageIcon,
+  UserPlus, User, Image as ImageIcon, Loader2,
 } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
 import { liffFetch } from '@/lib/line/liff-fetch'
@@ -37,6 +37,7 @@ function Dashboard() {
   const cached = cacheKey ? getLiffCache<HomeSummary>(cacheKey) : undefined
   const [loading, setLoading] = useState(!cached)
   const [data, setData] = useState<HomeSummary | null>(cached ?? null)
+  const [goingProfile, setGoingProfile] = useState(false)
 
   useEffect(() => {
     if (liffLoading || !profile?.userId) return
@@ -93,10 +94,13 @@ function Dashboard() {
             <h1 className="text-xl font-bold">{firstName || 'ผู้ปกครอง'}</h1>
           </div>
           <button
-            onClick={() => router.push('/liff/profile')}
-            className="w-11 h-11 rounded-full bg-white/20 backdrop-blur flex items-center justify-center overflow-hidden border border-white/30"
+            onClick={() => { setGoingProfile(true); router.push('/liff/profile') }}
+            disabled={goingProfile}
+            className="w-11 h-11 rounded-full bg-white/20 backdrop-blur flex items-center justify-center overflow-hidden border border-white/30 active:scale-95 transition-transform"
           >
-            {profile?.pictureUrl ? (
+            {goingProfile ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : profile?.pictureUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={profile.pictureUrl} alt="" className="w-full h-full object-cover" />
             ) : (
