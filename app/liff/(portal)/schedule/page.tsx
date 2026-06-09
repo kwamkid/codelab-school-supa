@@ -209,6 +209,11 @@ function ScheduleContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-primary text-white p-4 pt-6">
+        <h1 className="text-xl font-bold">ตารางเรียน</h1>
+      </div>
+
       <div className="p-3 space-y-3">
         {/* Student Selector - Simple buttons */}
         {students.length > 1 && (
