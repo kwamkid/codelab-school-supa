@@ -4,8 +4,9 @@
 import React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { StudentBadge } from '@/components/ui/student-badge'
 import { Button } from '@/components/ui/button'
-import { Calendar, Clock, MapPin, User, CalendarOff, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, MapPin, User, CalendarOff, CheckCircle, XCircle, AlertCircle, ChevronRight } from 'lucide-react'
 import { formatDate, formatTime, getDayName } from '@/lib/utils'
 import { ScheduleEvent } from '@/components/liff/schedule-calendar'
 import { cn } from '@/lib/utils'
@@ -96,6 +97,65 @@ export default function CourseList({
     }
   }
 
+  const renderSession = (event: ScheduleEvent) => {
+    const statusDisplay = getStatusDisplay(event)
+    const isPast = event.end < now
+    const canRequestLeave = !isPast &&
+      event.extendedProps.status !== 'absent' &&
+      event.extendedProps.status !== 'leave-requested'
+
+    return (
+      <div key={event.id} className={cn('p-3 rounded-lg border transition-colors', statusDisplay.bgColor)}>
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-3 flex-1">
+            <div className={cn('flex items-center justify-center w-8 h-8 rounded-full mt-0.5', statusDisplay.bgColor)}>
+              <statusDisplay.icon className={cn('h-4 w-4', statusDisplay.color)} />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-medium">ครั้งที่ {event.extendedProps.sessionNumber}</span>
+                <span className="text-sm text-muted-foreground">{getDayName(event.start.getDay())}</span>
+              </div>
+              <div className="text-sm text-muted-foreground">{formatDate(event.start, 'short')}</div>
+              <div className="text-sm text-muted-foreground">
+                {event.start.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                {' - '}
+                {event.end.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+              {event.extendedProps.hasMakeupRequest && event.extendedProps.makeupScheduled && (
+                <div className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  เรียนชดเชย: {formatDate(event.extendedProps.makeupDate, 'short')}
+                  {' '}เวลา {event.extendedProps.makeupTime}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <Badge
+              variant={statusDisplay.color === 'text-green-600' ? 'default' :
+                statusDisplay.color === 'text-red-600' ? 'destructive' : 'secondary'}
+              className="text-xs"
+            >
+              {statusDisplay.label}
+            </Badge>
+            {statusDisplay.subLabel && (
+              <span className={cn('text-xs', statusDisplay.subLabel.includes('นัดแล้ว') ? 'text-green-600' : 'text-orange-600')}>
+                {statusDisplay.subLabel}
+              </span>
+            )}
+            {canRequestLeave && (
+              <Button size="sm" variant="outline" onClick={() => onLeaveRequest(event)} className="text-xs h-7">
+                <CalendarOff className="h-3 w-3 mr-1" />
+                ขอลา
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (Object.keys(eventsByClass).length === 0) {
     return (
       <div className="text-center py-8">
@@ -122,9 +182,7 @@ export default function CourseList({
                   )}
                   <h3 className="font-semibold text-lg">{classData.subjectName}</h3>
                 </div>
-                <Badge variant="secondary" className="text-xs">
-                  {classData.studentName}
-                </Badge>
+                <StudentBadge name={classData.studentName} />
               </div>
               
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
@@ -139,98 +197,25 @@ export default function CourseList({
               </div>
             </div>
 
-            {/* Sessions List */}
-            <div className="space-y-2">
-              {classData.events.map((event: ScheduleEvent, index: number) => {
-                const statusDisplay = getStatusDisplay(event)
-                const isPast = event.end < now
-                const canRequestLeave = !isPast && 
-                  event.extendedProps.status !== 'absent' && 
-                  event.extendedProps.status !== 'leave-requested'
-
-                return (
-                  <div 
-                    key={event.id}
-                    className={cn(
-                      "p-3 rounded-lg border transition-colors",
-                      statusDisplay.bgColor
-                    )}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3 flex-1">
-                        <div className={cn(
-                          "flex items-center justify-center w-8 h-8 rounded-full mt-0.5",
-                          statusDisplay.bgColor
-                        )}>
-                          <statusDisplay.icon className={cn("h-4 w-4", statusDisplay.color)} />
-                        </div>
-                        
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">
-                              ครั้งที่ {event.extendedProps.sessionNumber || index + 1}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {getDayName(event.start.getDay())}
-                            </span>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {formatDate(event.start, 'short')}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {event.start.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                            {' - '}
-                            {event.end.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                          
-                          {/* Show makeup info if scheduled */}
-                          {event.extendedProps.hasMakeupRequest && event.extendedProps.makeupScheduled && (
-                            <div className="text-xs text-purple-600 mt-1 flex items-center gap-1">
-                              <AlertCircle className="h-3 w-3" />
-                              เรียนชดเชย: {formatDate(event.extendedProps.makeupDate, 'short')} 
-                              {' '}เวลา {event.extendedProps.makeupTime}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex flex-col items-end gap-1">
-                          <Badge 
-                            variant={statusDisplay.color === 'text-green-600' ? 'default' : 
-                                    statusDisplay.color === 'text-red-600' ? 'destructive' : 'secondary'}
-                            className="text-xs"
-                          >
-                            {statusDisplay.label}
-                          </Badge>
-                          
-                          {statusDisplay.subLabel && (
-                            <span className={cn(
-                              "text-xs",
-                              statusDisplay.subLabel.includes('นัดแล้ว') ? 'text-green-600' : 'text-orange-600'
-                            )}>
-                              {statusDisplay.subLabel}
-                            </span>
-                          )}
-                        </div>
-                        
-                        {canRequestLeave && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onLeaveRequest(event)}
-                            className="text-xs h-7"
-                          >
-                            <CalendarOff className="h-3 w-3 mr-1" />
-                            ขอลา
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            {/* Sessions: past sessions collapsed, upcoming shown */}
+            {(() => {
+              const past = classData.events.filter((e: ScheduleEvent) => e.end < now)
+              const upcoming = classData.events.filter((e: ScheduleEvent) => e.end >= now)
+              return (
+                <div className="space-y-2">
+                  {past.length > 0 && (
+                    <details className="group">
+                      <summary className="flex items-center gap-1 cursor-pointer select-none text-sm text-gray-500 py-1.5">
+                        <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+                        คาบที่ผ่านมาแล้ว ({past.length})
+                      </summary>
+                      <div className="space-y-2 mt-2">{past.map(renderSession)}</div>
+                    </details>
+                  )}
+                  {upcoming.map(renderSession)}
+                </div>
+              )
+            })()}
 
             {/* Class Summary */}
             <div className="mt-4 pt-4 border-t flex justify-between text-sm">

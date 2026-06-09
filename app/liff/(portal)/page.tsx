@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { StudentBadge } from '@/components/ui/student-badge'
 import {
   CalendarOff, Calendar, MessageSquare, ChevronRight,
   UserPlus, User, Image as ImageIcon,
@@ -99,7 +100,7 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="p-4 space-y-4 -mt-4">
+      <div className="p-4 space-y-4">
         {/* Makeup alert */}
         {data && data.pendingMakeupCount > 0 && (
           <Card
@@ -135,17 +136,19 @@ function Dashboard() {
                     <Calendar className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold leading-tight">
-                      {data.nextClass.subjectName || data.nextClass.className}
-                      <span className="font-normal text-gray-400"> · ครั้งที่ {data.nextClass.sessionNumber}</span>
-                    </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold leading-tight">
+                        {data.nextClass.subjectName || data.nextClass.className}
+                        <span className="font-normal text-gray-400"> · ครั้งที่ {data.nextClass.sessionNumber}</span>
+                      </p>
+                      <StudentBadge name={data.nextClass.studentName} className="shrink-0" />
+                    </div>
                     <p className="text-sm text-gray-600 mt-0.5">
                       {getDayName(new Date(data.nextClass.sessionDate).getDay())} {formatDate(data.nextClass.sessionDate, 'long')}
                     </p>
                     <p className="text-sm text-gray-500">
                       {data.nextClass.startTime?.slice(0, 5)}-{data.nextClass.endTime?.slice(0, 5)} น.
                       {data.nextClass.branchName && <> · {data.nextClass.branchName}</>}
-                      {data.nextClass.studentName && <> · {data.nextClass.studentName}</>}
                     </p>
                   </div>
                 </div>

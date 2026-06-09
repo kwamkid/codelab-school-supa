@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ChevronLeft, Loader2, Calendar, Users, Clock, MapPin, User, List, CalendarDays, CalendarRange, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Loader2, Calendar, Users, Clock, MapPin, User, List, CalendarRange, AlertCircle } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
 import type { StudentStats } from '@/lib/supabase/services/liff-data'
 import { liffFetch } from '@/lib/line/liff-fetch'
@@ -18,7 +18,6 @@ import { ScheduleEvent } from '@/components/liff/schedule-calendar'
 
 // Import new components
 import CourseList from '@/components/liff/schedule/course-list'
-import CourseCalendar from '@/components/liff/schedule/course-calendar'
 import MonthlyCalendar from '@/components/liff/schedule/monthly-calendar'
 
 function ScheduleContent() {
@@ -262,18 +261,14 @@ function ScheduleContent() {
           </Card>
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="list" className="text-xs">
                 <List className="h-4 w-4 mr-1" />
                 รายการ
               </TabsTrigger>
-              <TabsTrigger value="course" className="text-xs">
-                <CalendarDays className="h-4 w-4 mr-1" />
-                ปฏิทินคอร์ส
-              </TabsTrigger>
               <TabsTrigger value="monthly" className="text-xs">
                 <CalendarRange className="h-4 w-4 mr-1" />
-                รายเดือน
+                ปฏิทิน
               </TabsTrigger>
             </TabsList>
 
@@ -283,20 +278,6 @@ function ScheduleContent() {
                 <SectionLoading />
               ) : (
                 <CourseList 
-                  events={events}
-                  selectedStudentId={selectedStudentId}
-                  students={students}
-                  onLeaveRequest={handleLeaveRequest}
-                />
-              )}
-            </TabsContent>
-
-            {/* Course Calendar View */}
-            <TabsContent value="course" className="mt-4">
-              {loading ? (
-                <SectionLoading />
-              ) : (
-                <CourseCalendar 
                   events={events}
                   selectedStudentId={selectedStudentId}
                   students={students}
