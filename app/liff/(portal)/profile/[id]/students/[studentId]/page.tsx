@@ -18,7 +18,6 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Loading } from '@/components/ui/loading'
-import { LiffProvider } from '@/components/liff/liff-provider'
 import { useLiff } from '@/components/liff/liff-provider'
 
 // Form schema
@@ -439,8 +438,6 @@ function EditStudentContent() {
 
 export default function EditStudentPage() {
   return (
-    <LiffProvider requireLogin={true}>
       <EditStudentContent />
-    </LiffProvider>
   );
 }

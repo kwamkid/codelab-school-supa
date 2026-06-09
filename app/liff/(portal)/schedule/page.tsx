@@ -13,7 +13,6 @@ import { useLiff } from '@/components/liff/liff-provider'
 import type { StudentStats } from '@/lib/supabase/services/liff-data'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
-import { LiffProvider } from '@/components/liff/liff-provider'
 import { PageLoading, SectionLoading } from '@/components/ui/loading'
 import { ScheduleEvent } from '@/components/liff/schedule-calendar'
 
@@ -581,8 +580,6 @@ function ScheduleContent() {
 
 export default function SchedulePage() {
   return (
-    <LiffProvider requireLogin={true}>
       <ScheduleContent />
-    </LiffProvider>
   );
 }

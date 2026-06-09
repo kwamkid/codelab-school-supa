@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChevronLeft, Loader2, MessageSquare, Calendar, User, BookOpen, School } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
-import { LiffProvider } from '@/components/liff/liff-provider'
 import { PageLoading } from '@/components/ui/loading'
 import { formatDate } from '@/lib/utils'
 import { liffFetch } from '@/lib/line/liff-fetch'
@@ -198,8 +197,6 @@ function FeedbackContent() {
 
 export default function FeedbackPage() {
   return (
-    <LiffProvider requireLogin={true}>
       <FeedbackContent />
-    </LiffProvider>
   )
 }

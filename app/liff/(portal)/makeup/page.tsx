@@ -13,7 +13,6 @@ import { ChevronLeft, Loader2, Calendar, CalendarOff, AlertCircle, CheckCircle, 
 import { useLiff } from '@/components/liff/liff-provider'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
-import { LiffProvider } from '@/components/liff/liff-provider'
 import { PageLoading } from '@/components/ui/loading'
 import { formatDate, formatTime, getDayName } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -588,8 +587,6 @@ function MakeupContent() {
 
 export default function MakeupPage() {
   return (
-    <LiffProvider requireLogin={true}>
       <MakeupContent />
-    </LiffProvider>
   )
 }

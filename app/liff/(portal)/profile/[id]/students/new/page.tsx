@@ -17,7 +17,6 @@ import { z } from 'zod'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
-import { LiffProvider } from '@/components/liff/liff-provider'
 import { useLiff } from '@/components/liff/liff-provider'
 
 // Form schema
@@ -373,8 +372,6 @@ function AddStudentContent() {
 
 export default function AddStudentPage() {
   return (
-    <LiffProvider requireLogin={true}>
       <AddStudentContent />
-    </LiffProvider>
   );
 }

@@ -17,7 +17,6 @@ import { z } from 'zod'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loading } from '@/components/ui/loading'
-import { LiffProvider } from '@/components/liff/liff-provider'
 import { ProvinceCombobox } from '@/components/ui/province-combobox'
 
 // Thai provinces data - removed (using ProvinceCombobox instead)
@@ -474,8 +473,6 @@ function EditParentProfileContent() {
 
 export default function EditParentProfilePage() {
   return (
-    <LiffProvider requireLogin={true}>
       <EditParentProfileContent />
-    </LiffProvider>
   );
 }

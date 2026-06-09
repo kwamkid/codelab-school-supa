@@ -31,7 +31,6 @@ import { getParentByLineId, getStudentsByParent, deleteStudent as deleteStudentS
 import { getBranch } from '@/lib/services/branches'
 import { toast } from 'sonner'
 import type { Parent, Student, Branch } from '@/types/models'
-import { LiffProvider } from '@/components/liff/liff-provider'
 import { Loading } from '@/components/ui/loading'
 import {
   AlertDialog,
@@ -614,8 +613,6 @@ function ProfileContent() {
 
 export default function ProfilePage() {
   return (
-    <LiffProvider requireLogin={true}>
       <ProfileContent />
-    </LiffProvider>
   );
 }

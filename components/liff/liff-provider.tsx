@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import type { Liff } from '@line/liff'
 import { initializeLiff } from '@/lib/line/liff-client'
-import { LiffLoading } from '@/components/liff/loading'
+import { Loading } from '@/components/ui/loading'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertCircle } from 'lucide-react'
@@ -138,7 +138,7 @@ export function LiffProvider({ children, requireLogin = false }: LiffProviderPro
   }, [requireLogin])
 
   if (isLoading) {
-    return <LiffLoading />
+    return <Loading fullScreen text="กำลังโหลด..." />
   }
 
   if (error) {

@@ -1,0 +1,207 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import {
+  CalendarOff, Calendar, MessageSquare, ChevronRight, Clock, MapPin,
+  UserPlus, User, Image as ImageIcon,
+} from 'lucide-react'
+import { useLiff } from '@/components/liff/liff-provider'
+import { liffFetch } from '@/lib/line/liff-fetch'
+import { Loading } from '@/components/ui/loading'
+import { formatDate, getDayName } from '@/lib/utils'
+
+interface HomeSummary {
+  hasParent: boolean
+  parentName: string
+  pendingMakeupCount: number
+  nextClass: null | {
+    className: string; subjectName: string; sessionNumber: number
+    sessionDate: string; startTime: string; endTime: string
+    branchName: string; studentName: string
+  }
+  latestFeedback: null | {
+    studentName: string; className: string; sessionNumber: number
+    sessionDate: string; feedback: string; photoCount: number
+  }
+}
+
+function Dashboard() {
+  const router = useRouter()
+  const { profile, isLoading: liffLoading } = useLiff()
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<HomeSummary | null>(null)
+
+  useEffect(() => {
+    if (liffLoading || !profile?.userId) return
+    let active = true
+    ;(async () => {
+      try {
+        const res = await liffFetch<HomeSummary & { success: boolean }>('/api/liff/home', {
+          lineUserId: profile.userId,
+        })
+        if (active) setData(res)
+      } catch (e) {
+        console.error('[dashboard] load error', e)
+      } finally {
+        if (active) setLoading(false)
+      }
+    })()
+    return () => { active = false }
+  }, [liffLoading, profile?.userId])
+
+  if (liffLoading || loading) return <Loading fullScreen text="กำลังโหลด..." />
+
+  // Logged in but not registered yet
+  if (data && data.hasParent === false) {
+    return (
+      <div className="p-4 pt-10 max-w-md mx-auto">
+        <Card className="border-2 border-orange-200">
+          <CardContent className="pt-6 space-y-4 text-center">
+            <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
+              <UserPlus className="h-10 w-10 text-orange-600" />
+            </div>
+            <h2 className="text-xl font-bold">ยังไม่ได้ลงทะเบียน</h2>
+            <p className="text-gray-600 text-sm">กรุณาลงทะเบียนเพื่อเริ่มใช้งาน</p>
+            <Button className="w-full" size="lg" onClick={() => router.push('/liff/register')}>
+              <UserPlus className="h-5 w-5 mr-2" /> ลงทะเบียนใหม่
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const firstName = (profile?.displayName || data?.parentName || '').trim()
+
+  return (
+    <div className="max-w-md mx-auto">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-primary to-orange-500 text-white px-5 pt-6 pb-8 rounded-b-3xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-white/80 text-sm">สวัสดีค่ะ 👋</p>
+            <h1 className="text-xl font-bold">{firstName || 'ผู้ปกครอง'}</h1>
+          </div>
+          <button
+            onClick={() => router.push('/liff/profile')}
+            className="w-11 h-11 rounded-full bg-white/20 backdrop-blur flex items-center justify-center overflow-hidden border border-white/30"
+          >
+            {profile?.pictureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.pictureUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <User className="h-6 w-6" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4 -mt-4">
+        {/* Makeup alert */}
+        {data && data.pendingMakeupCount > 0 && (
+          <Card
+            className="cursor-pointer border-2 border-orange-300 bg-orange-50 active:scale-[0.98] transition-transform"
+            onClick={() => router.push('/liff/makeup')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="relative shrink-0">
+                <div className="p-3 rounded-xl bg-orange-500 text-white">
+                  <CalendarOff className="h-6 w-6" />
+                </div>
+                <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
+                  {data.pendingMakeupCount}
+                </span>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-orange-900">ต้องเรียนชดเชย {data.pendingMakeupCount} ครั้ง</h3>
+                <p className="text-sm text-orange-700">ยังรอนัดวันเรียนชดเชย</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-orange-400" />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Next class */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-500 mb-2 px-1">คาบเรียนถัดไป</h2>
+          {data?.nextClass ? (
+            <Card className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/schedule')}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 rounded-xl bg-blue-500 text-white shrink-0">
+                    <Calendar className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{data.nextClass.subjectName || data.nextClass.className}</p>
+                    <p className="text-sm text-gray-500">
+                      {data.nextClass.studentName} · ครั้งที่ {data.nextClass.sessionNumber}
+                    </p>
+                    <div className="mt-2 space-y-1 text-sm text-gray-600">
+                      <p className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                        {getDayName(new Date(data.nextClass.sessionDate).getDay())} {formatDate(data.nextClass.sessionDate, 'long')}
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-gray-400" />
+                        {data.nextClass.startTime?.slice(0, 5)} - {data.nextClass.endTime?.slice(0, 5)} น.
+                      </p>
+                      {data.nextClass.branchName && (
+                        <p className="flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                          {data.nextClass.branchName}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card><CardContent className="p-5 text-center text-sm text-gray-400">ไม่มีคาบเรียนที่กำลังจะถึง</CardContent></Card>
+          )}
+        </div>
+
+        {/* Latest feedback */}
+        <div>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <h2 className="text-sm font-semibold text-gray-500">Feedback ล่าสุดจากครู</h2>
+            <button className="text-xs text-primary font-medium" onClick={() => router.push('/liff/feedback')}>ดูทั้งหมด</button>
+          </div>
+          {data?.latestFeedback ? (
+            <Card className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/feedback')}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 rounded-xl bg-purple-500 text-white shrink-0">
+                    <MessageSquare className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-500">
+                      {data.latestFeedback.studentName} · {data.latestFeedback.className} (ครั้งที่ {data.latestFeedback.sessionNumber})
+                    </p>
+                    {data.latestFeedback.feedback && (
+                      <p className="text-sm mt-1 line-clamp-2">{data.latestFeedback.feedback}</p>
+                    )}
+                    {data.latestFeedback.photoCount > 0 && (
+                      <p className="flex items-center gap-1 text-xs text-purple-600 mt-1">
+                        <ImageIcon className="h-3.5 w-3.5" /> {data.latestFeedback.photoCount} รูป
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card><CardContent className="p-5 text-center text-sm text-gray-400">ยังไม่มี feedback</CardContent></Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function LiffHomePage() {
+  return <Dashboard />
+}
