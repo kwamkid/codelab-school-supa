@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { sendClassReminder, sendMakeupNotification } from '@/lib/supabase/services/line-notifications'
+import { sendClassReminder, sendMakeupNotification, sendTrialConfirmation } from '@/lib/supabase/services/line-notifications'
 import { getEventsForReminder, sendEventReminder } from '@/lib/supabase/services/events'
 
 export const dynamic = 'force-dynamic'
@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
     const results = {
       classReminders: 0,
       makeupReminders: 0,
+      trialReminders: 0,
       eventReminders: 0,
       errors: [] as string[]
     }
@@ -168,9 +169,41 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
-    // 3. Event Reminders
+    // 3. Trial Reminders (ทดลองเรียน)
     // ============================================
-    console.log('\n--- Part 3: Event Reminders ---')
+    console.log('\n--- Part 3: Trial Reminders ---')
+
+    const { data: trials } = await supabase
+      .from('trial_sessions')
+      .select('id, student_name')
+      .eq('status', 'scheduled')
+      .gte('scheduled_date', tomorrow.toISOString().split('T')[0])
+      .lt('scheduled_date', dayAfterTomorrow.toISOString().split('T')[0])
+
+    console.log(`Found ${trials?.length || 0} trial sessions for tomorrow`)
+
+    for (const trial of trials || []) {
+      try {
+        console.log(`\nProcessing trial for ${trial.student_name}`)
+
+        const success = await sendTrialConfirmation(trial.id, 'reminder')
+        if (success) {
+          results.trialReminders++
+          totalSent++
+          console.log('  ✓ Sent trial reminder')
+        } else {
+          console.log('  ✗ Failed to send trial reminder')
+        }
+      } catch (error) {
+        console.error('  ! Trial reminder error:', error)
+        results.errors.push(`Trial reminder error: ${error}`)
+      }
+    }
+
+    // ============================================
+    // 4. Event Reminders
+    // ============================================
+    console.log('\n--- Part 4: Event Reminders ---')
 
     // Get events that need reminders
     const eventsToRemind = await getEventsForReminder()
@@ -208,6 +241,7 @@ export async function GET(request: NextRequest) {
       totalSent,
       classReminders: results.classReminders,
       makeupReminders: results.makeupReminders,
+      trialReminders: results.trialReminders,
       eventReminders: results.eventReminders,
       errors: results.errors.length
     })

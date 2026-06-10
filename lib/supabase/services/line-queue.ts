@@ -207,11 +207,12 @@ async function buildFeedbackMessages(
 
   const studentName = student.nickname || student.name || '';
   const sessionLabel = sched.session_number ? ` (ครั้งที่ ${sched.session_number})` : '';
+  const subjectName = subject?.name || cls.name;
 
   const header =
     `📝 Feedback จากครู\n\n` +
     `นักเรียน: ${studentName}\n` +
-    `คลาส: ${cls.name}${sessionLabel}\n` +
+    `วิชา: ${subjectName}${sessionLabel}\n` +
     `จากครู: ครู${teacherName}` +
     (feedback ? `\n\n"${feedback}"` : '') +
     `\n\nดูทั้งหมดได้ที่เมนู Teacher Feedback`;

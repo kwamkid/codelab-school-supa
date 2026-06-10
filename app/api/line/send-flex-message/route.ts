@@ -10,6 +10,7 @@ const FLEX_TEMPLATES = {
   makeupConfirmation: (data: {
     studentName: string;
     className: string;
+    subjectName?: string;
     sessionNumber?: number;
     date: string;
     startTime: string;
@@ -84,7 +85,7 @@ const FLEX_TEMPLATES = {
               contents: [
                 {
                   type: "text",
-                  text: "📚 คลาสเรียน",
+                  text: "📚 วิชา",
                   size: "sm",
                   color: "#555555",
                   flex: 0,
@@ -92,7 +93,7 @@ const FLEX_TEMPLATES = {
                 },
                 {
                   type: "text",
-                  text: data.className + (data.sessionNumber ? ` (ครั้งที่ ${data.sessionNumber})` : ''),
+                  text: (data.subjectName || data.className) + (data.sessionNumber ? ` (ครั้งที่ ${data.sessionNumber})` : ''),
                   size: "sm",
                   color: "#111111",
                   align: "end",
@@ -224,6 +225,7 @@ const FLEX_TEMPLATES = {
   makeupReminder: (data: {
     studentName: string;
     className: string;
+    subjectName?: string;
     sessionNumber?: number;
     date: string;
     startTime: string;
@@ -298,7 +300,7 @@ const FLEX_TEMPLATES = {
               contents: [
                 {
                   type: "text",
-                  text: "📚 คลาสเรียน",
+                  text: "📚 วิชา",
                   size: "sm",
                   color: "#555555",
                   flex: 0,
@@ -306,7 +308,7 @@ const FLEX_TEMPLATES = {
                 },
                 {
                   type: "text",
-                  text: data.className + (data.sessionNumber ? ` (ครั้งที่ ${data.sessionNumber})` : ''),
+                  text: (data.subjectName || data.className) + (data.sessionNumber ? ` (ครั้งที่ ${data.sessionNumber})` : ''),
                   size: "sm",
                   color: "#111111",
                   align: "end",
@@ -439,6 +441,7 @@ const FLEX_TEMPLATES = {
   classReminder: (data: {
     studentName: string;
     className: string;
+    subjectName?: string;
     sessionNumber?: number;
     date: string;
     startTime: string;
@@ -513,7 +516,7 @@ const FLEX_TEMPLATES = {
               contents: [
                 {
                   type: "text",
-                  text: "📚 คลาสเรียน",
+                  text: "📚 วิชา",
                   size: "sm",
                   color: "#555555",
                   flex: 0,
@@ -521,7 +524,7 @@ const FLEX_TEMPLATES = {
                 },
                 {
                   type: "text",
-                  text: data.className + (data.sessionNumber ? ` (ครั้งที่ ${data.sessionNumber})` : ''),
+                  text: (data.subjectName || data.className) + (data.sessionNumber ? ` (ครั้งที่ ${data.sessionNumber})` : ''),
                   size: "sm",
                   color: "#111111",
                   align: "end",
@@ -1029,6 +1032,131 @@ const FLEX_TEMPLATES = {
                   color: "#111111",
                   align: "end"
                 }
+              ]
+            }
+          ]
+        },
+        {
+          type: "separator",
+          margin: "md"
+        },
+        {
+          type: "text",
+          text: `หากต้องการเปลี่ยนแปลง\nกรุณาติดต่อ ${data.contactPhone}`,
+          size: "xs",
+          color: "#aaaaaa",
+          wrap: true,
+          margin: "md",
+          align: "center"
+        }
+      ],
+      paddingAll: "20px"
+    }
+  }),
+
+  trialReminder: (data: {
+    studentName: string;
+    subjectName: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    location: string;
+    roomName: string;
+    contactPhone: string;
+  }) => ({
+    type: "bubble",
+    size: "kilo",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "box",
+          layout: "horizontal",
+          contents: [
+            {
+              type: "text",
+              text: "⏰ แจ้งเตือนทดลองเรียนพรุ่งนี้",
+              weight: "bold",
+              size: "md",
+              color: "#ffffff",
+              flex: 1
+            }
+          ]
+        }
+      ],
+      backgroundColor: "#FF9800",
+      paddingAll: "15px"
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: "พรุ่งนี้มีทดลองเรียนนะคะ 😊",
+          size: "lg",
+          color: "#FF9800",
+          weight: "bold",
+          align: "center",
+          margin: "md"
+        },
+        {
+          type: "separator",
+          margin: "md"
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          margin: "md",
+          spacing: "sm",
+          contents: [
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                { type: "text", text: "👦 นักเรียน", size: "sm", color: "#555555", flex: 0, weight: "bold" },
+                { type: "text", text: data.studentName, size: "sm", color: "#111111", align: "end" }
+              ]
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                { type: "text", text: "📚 วิชา", size: "sm", color: "#555555", flex: 0, weight: "bold" },
+                { type: "text", text: data.subjectName, size: "sm", color: "#111111", align: "end", weight: "bold" }
+              ]
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                { type: "text", text: "📅 วันที่", size: "sm", color: "#555555", flex: 0 },
+                { type: "text", text: data.date, size: "sm", color: "#111111", align: "end" }
+              ]
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                { type: "text", text: "⏰ เวลา", size: "sm", color: "#555555", flex: 0 },
+                { type: "text", text: `${data.startTime} - ${data.endTime}`, size: "sm", color: "#111111", align: "end" }
+              ]
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                { type: "text", text: "📍 สถานที่", size: "sm", color: "#555555", flex: 0 },
+                { type: "text", text: data.location, size: "sm", color: "#111111", align: "end" }
+              ]
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                { type: "text", text: "🚪 ห้องเรียน", size: "sm", color: "#555555", flex: 0 },
+                { type: "text", text: data.roomName, size: "sm", color: "#111111", align: "end" }
               ]
             }
           ]

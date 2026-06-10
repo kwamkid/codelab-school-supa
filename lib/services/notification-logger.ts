@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 
 export interface NotificationLog {
   id?: string;
-  type: 'class-reminder' | 'makeup-reminder' | 'makeup-scheduled' | 'trial-confirmation' | 'feedback' | 'schedule-change' | 'payment-reminder';
+  type: 'class-reminder' | 'makeup-reminder' | 'makeup-scheduled' | 'trial-confirmation' | 'trial-reminder' | 'feedback' | 'schedule-change' | 'payment-reminder';
   recipientType: 'parent' | 'student' | 'teacher';
   recipientId?: string;
   recipientName?: string;

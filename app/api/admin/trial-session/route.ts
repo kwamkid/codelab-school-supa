@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sendTrialConfirmation } from '@/lib/supabase/services/line-notifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,6 +62,14 @@ export async function POST(request: NextRequest) {
         .from('trial_bookings')
         .update({ status: 'scheduled' })
         .eq('id', data.bookingId)
+    }
+
+    // Send LINE confirmation to parent (best-effort, only for scheduled sessions).
+    // sendTrialConfirmation no-ops if the booking has no parent_line_id.
+    if (sessionData.status === 'scheduled') {
+      sendTrialConfirmation(session.id).catch((err) =>
+        console.error('[trial-session] confirmation send failed:', err)
+      )
     }
 
     return NextResponse.json({ id: session.id })

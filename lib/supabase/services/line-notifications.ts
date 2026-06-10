@@ -197,6 +197,7 @@ export async function sendClassReminder(
       flexData: {
         studentName: student.nickname || student.name,
         className: classData.name,
+        subjectName: subject?.name || classData.name,
         sessionNumber,
         date: formatDate(scheduleDate, 'long'),
         startTime: formatTime(classData.start_time),
@@ -220,7 +221,7 @@ export async function sendClassReminder(
     const messagePreview = [
       `🔔 แจ้งเตือนคลาสเรียนพรุ่งนี้`,
       `👦 นักเรียน: ${studentName}`,
-      `📚 คลาส: ${classData.name}${sessionText}`,
+      `📚 วิชา: ${subject?.name || classData.name}${sessionText}`,
       `📅 วันที่: ${formatDate(scheduleDate, 'long')}`,
       `⏰ เวลา: ${formatTime(classData.start_time)} - ${formatTime(classData.end_time)}`,
       `👩‍🏫 ครูผู้สอน: ครู${teacher?.nickname || teacher?.name || 'ไม่ระบุ'}`,
@@ -301,16 +302,20 @@ export async function sendMakeupNotification(
 
     console.log(`[sendMakeupNotification] Parent LINE ID: ${parent.line_user_id?.substring(0, 10)}...`)
 
-    // Get teacher, branch, room info
-    const [teacherResult, branchResult, roomResult] = await Promise.all([
+    // Get teacher, branch, room, subject info
+    const [teacherResult, branchResult, roomResult, subjectResult] = await Promise.all([
       supabase.from('teachers').select('id, name, nickname').eq('id', makeup.makeup_teacher_id).single(),
       supabase.from('branches').select('id, name').eq('id', makeup.makeup_branch_id).single(),
-      supabase.from('rooms').select('id, name').eq('id', makeup.makeup_room_id).single()
+      supabase.from('rooms').select('id, name').eq('id', makeup.makeup_room_id).single(),
+      classData?.subject_id
+        ? supabase.from('subjects').select('id, name').eq('id', classData.subject_id).single()
+        : Promise.resolve({ data: null })
     ])
 
     const teacher = teacherResult.data
     const branch = branchResult.data
     const room = roomResult.data
+    const subjectName = subjectResult.data?.name || classData?.name || 'Makeup Class'
 
     const makeupDate = new Date(makeup.makeup_date)
 
@@ -323,6 +328,7 @@ export async function sendMakeupNotification(
       flexData: {
         studentName: student?.nickname || student?.name,
         className: classData?.name || 'Makeup Class',
+        subjectName,
         sessionNumber: makeup.original_session_number,
         date: formatDate(makeupDate, 'long'),
         startTime: formatTime(makeup.makeup_start_time),
@@ -350,7 +356,7 @@ export async function sendMakeupNotification(
     const messagePreview = [
       headerText,
       `👦 นักเรียน: ${studentName}`,
-      `📚 คลาส: ${classData?.name || 'Makeup Class'}${sessionText}`,
+      `📚 วิชา: ${subjectName}${sessionText}`,
       `📅 วันที่: ${formatDate(makeupDate, 'long')}`,
       `⏰ เวลา: ${formatTime(makeup.makeup_start_time)} - ${formatTime(makeup.makeup_end_time)}`,
       `👩‍🏫 ครูผู้สอน: ครู${teacher?.nickname || teacher?.name || 'ไม่ระบุ'}`,
@@ -384,11 +390,14 @@ export async function sendMakeupNotification(
 }
 
 // 3. ยืนยันการจองทดลองเรียน
-export async function sendTrialConfirmation(trialSessionId: string): Promise<boolean> {
+export async function sendTrialConfirmation(
+  trialSessionId: string,
+  type: 'confirmation' | 'reminder' = 'confirmation'
+): Promise<boolean> {
   const supabase = createServiceClient()
 
   try {
-    console.log(`\n[sendTrialConfirmation] Starting for trial: ${trialSessionId}`)
+    console.log(`\n[sendTrialConfirmation] Starting for trial: ${trialSessionId}, type: ${type}`)
 
     // Get trial session data
     const { data: trial, error: trialError } = await supabase
@@ -425,7 +434,7 @@ export async function sendTrialConfirmation(trialSessionId: string): Promise<boo
     // ส่งข้อความแบบ Flex Message
     const result = await sendLineMessage(booking.parent_line_id, '', undefined, {
       useFlexMessage: true,
-      flexTemplate: 'trialConfirmation',
+      flexTemplate: type === 'reminder' ? 'trialReminder' : 'trialConfirmation',
       flexData: {
         studentName: trial.student_name,
         subjectName: subject?.name || 'ไม่ระบุ',
@@ -436,7 +445,10 @@ export async function sendTrialConfirmation(trialSessionId: string): Promise<boo
         roomName: room?.name || trial.room_name || 'ไม่ระบุ',
         contactPhone: branch?.phone || '081-234-5678'
       },
-      altText: `ยืนยันการทดลองเรียน - น้อง${trial.student_name}`
+      altText:
+        type === 'reminder'
+          ? `แจ้งเตือนทดลองเรียนพรุ่งนี้ - น้อง${trial.student_name}`
+          : `ยืนยันการทดลองเรียน - น้อง${trial.student_name}`
     })
 
     if (result.success) {
@@ -446,8 +458,9 @@ export async function sendTrialConfirmation(trialSessionId: string): Promise<boo
     }
 
     // Build detailed message preview
+    const headerText = type === 'reminder' ? '⏰ แจ้งเตือนทดลองเรียนพรุ่งนี้' : '✅ ยืนยันการทดลองเรียน'
     const messagePreview = [
-      `✅ ยืนยันการทดลองเรียน`,
+      headerText,
       `👦 นักเรียน: ${trial.student_name}`,
       `📚 วิชา: ${subject?.name || 'ไม่ระบุ'}`,
       `📅 วันที่: ${formatDate(new Date(trial.scheduled_date), 'long')}`,
@@ -459,7 +472,7 @@ export async function sendTrialConfirmation(trialSessionId: string): Promise<boo
 
     // Log notification
     await logNotification({
-      type: 'trial-confirmation',
+      type: type === 'reminder' ? 'trial-reminder' : 'trial-confirmation',
       recipientType: 'parent',
       recipientId: booking.id,
       recipientName: `${trial.student_name}'s parent`,
