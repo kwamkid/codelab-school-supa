@@ -33,6 +33,7 @@ import {
   ChevronRight,
   School,
   UserCheck,
+  Award,
   GraduationCap,
   Building,
   Loader2,
@@ -649,6 +650,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           href: '/reports/notification-logs',
           icon: Bell,
           iconColor: 'text-purple-600'
+        },
+        {
+          name: 'พิมพ์ใบประกาศนียบัตร',
+          href: '/certificates',
+          icon: Award,
+          iconColor: 'text-orange-500'
         },
       ]
     },

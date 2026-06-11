@@ -9,6 +9,7 @@ const TABLE_NAME = 'teachers';
 interface TeacherRow {
   id: string;
   name: string;
+  name_en: string | null;
   nickname: string | null;
   email: string | null;
   phone: string | null;
@@ -29,6 +30,7 @@ function mapToTeacher(row: TeacherRow): Teacher {
   return {
     id: row.id,
     name: row.name,
+    nameEn: row.name_en || undefined,
     nickname: row.nickname || undefined,
     email: row.email || undefined,
     phone: row.phone || undefined,
@@ -203,6 +205,7 @@ export async function createTeacher(
       operation: 'insert',
       data: {
         name: teacherData.name,
+        name_en: teacherData.nameEn || null,
         nickname: teacherData.nickname || null,
         email: teacherData.email || null,
         phone: teacherData.phone || null,
@@ -262,6 +265,7 @@ export async function updateTeacher(id: string, teacherData: Partial<Teacher>): 
     };
 
     if (teacherData.name !== undefined) updateData.name = teacherData.name;
+    if (teacherData.nameEn !== undefined) updateData.name_en = teacherData.nameEn || null;
     if (teacherData.nickname !== undefined) updateData.nickname = teacherData.nickname || null;
     if (teacherData.email !== undefined) updateData.email = teacherData.email || null;
     if (teacherData.phone !== undefined) updateData.phone = teacherData.phone || null;

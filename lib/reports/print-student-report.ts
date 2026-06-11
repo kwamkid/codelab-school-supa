@@ -5,7 +5,7 @@
 
 import type { StudentClassReport } from '@/lib/supabase/services/student-report';
 import { generateStudentReportHTML } from '@/components/reports/report-template';
-import { generateCertificateHTML } from '@/components/reports/certificate-template';
+import { generateCertificateHTML, certDate, type CertificateFields } from '@/components/reports/certificate-template';
 
 // Open a hidden iframe with the document's own styles and trigger print.
 // (Standalone — unlike invoices/openPrintWindow it does not force invoice A4
@@ -73,15 +73,42 @@ export async function printStudentReport(
   openPrint(title, body, css);
 }
 
+/**
+ * Map a report to certificate fields. English name preferred (for the cert),
+ * falling back to the Thai name. Teacher = the class's default teacher.
+ */
+export function certFieldsFromReport(report: StudentClassReport): CertificateFields {
+  return {
+    subjectName: report.subject.name || report.class.name,
+    studentName: report.student.nameEn || report.student.name,
+    teacherName: report.teacher.nameEn || report.teacher.name,
+    date: certDate(report.class.endDate),
+  };
+}
+
+/** Fetch the report and return prefilled certificate fields (no print). */
+export async function loadCertFields(
+  endpoint: string,
+  payload: Record<string, unknown>
+): Promise<CertificateFields> {
+  const report = await fetchReport(endpoint, payload);
+  if (!report.isCompleted) {
+    throw new Error('คลาสนี้ยังไม่จบ ไม่สามารถออกประกาศนียบัตรได้');
+  }
+  return certFieldsFromReport(report);
+}
+
+/** Print a certificate directly from explicit fields (used by manual + auto pages). */
+export function printCertificateFields(fields: CertificateFields): void {
+  const { title, body, css } = generateCertificateHTML(fields);
+  openPrint(title, body, css);
+}
+
 /** Print the certificate (caller should ensure the class is completed). */
 export async function printCertificate(
   endpoint: string,
   payload: Record<string, unknown>
 ): Promise<void> {
-  const [report, logo] = await Promise.all([fetchReport(endpoint, payload), loadLogoSvg()]);
-  if (!report.isCompleted) {
-    throw new Error('คลาสนี้ยังไม่จบ ไม่สามารถออกประกาศนียบัตรได้');
-  }
-  const { title, body, css } = generateCertificateHTML(report, logo);
-  openPrint(title, body, css);
+  const fields = await loadCertFields(endpoint, payload);
+  printCertificateFields(fields);
 }

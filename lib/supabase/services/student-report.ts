@@ -28,6 +28,7 @@ export interface StudentClassReport {
   student: {
     id: string;
     name: string;
+    nameEn: string;
     nickname: string;
     studentCode: string;
     gradeLevel: string;
@@ -43,7 +44,7 @@ export interface StudentClassReport {
     status: string;
   };
   subject: { name: string; code: string };
-  teacher: { name: string; nickname: string };
+  teacher: { name: string; nameEn: string; nickname: string };
   branch: { name: string; address: string; phone: string };
   company: { name: string };
   attendance: AttendanceSummary;
@@ -64,7 +65,7 @@ export async function buildStudentClassReport(
   // Student
   const { data: student } = await supabase
     .from('students')
-    .select('id, name, nickname, student_code, grade_level, school_name')
+    .select('id, name, name_en, nickname, student_code, grade_level, school_name')
     .eq('id', studentId)
     .single();
   if (!student) return null;
@@ -123,7 +124,7 @@ export async function buildStudentClassReport(
   if (teacherIds.length > 0) {
     const { data: teacherRows } = await supabase
       .from('teachers')
-      .select('id, name, nickname')
+      .select('id, name, name_en, nickname')
       .in('id', teacherIds);
     teacherMap = new Map<string, any>((teacherRows || []).map((t: any) => [t.id, t]));
   }
@@ -158,6 +159,7 @@ export async function buildStudentClassReport(
     student: {
       id: student.id,
       name: student.name,
+      nameEn: student.name_en || '',
       nickname: student.nickname || '',
       studentCode: student.student_code || '',
       gradeLevel: student.grade_level || '',
@@ -173,7 +175,7 @@ export async function buildStudentClassReport(
       status: cls.status || 'draft',
     },
     subject: { name: subject?.name || '', code: subject?.code || '' },
-    teacher: { name: defaultTeacher?.name || '', nickname: defaultTeacher?.nickname || '' },
+    teacher: { name: defaultTeacher?.name || '', nameEn: defaultTeacher?.name_en || '', nickname: defaultTeacher?.nickname || '' },
     branch: { name: branch?.name || '', address: branch?.address || '', phone: branch?.phone || '' },
     company: { name: company?.name || '' },
     attendance: summary,

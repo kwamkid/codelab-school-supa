@@ -23,6 +23,7 @@ import { useLiff } from '@/components/liff/liff-provider'
 // Form schema
 const formSchema = z.object({
   name: z.string().min(1, 'กรุณาระบุชื่อ-นามสกุล'),
+  nameEn: z.string().optional(),
   nickname: z.string().min(1, 'กรุณาระบุชื่อเล่น'),
   birthdate: z.string().min(1, 'กรุณาเลือกวันเกิด'),
   gender: z.enum(['M', 'F'], { required_error: 'กรุณาเลือกเพศ' }),
@@ -59,6 +60,7 @@ function EditStudentContent() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
+      nameEn: '',
       nickname: '',
       birthdate: '',
       gender: 'M',
@@ -115,6 +117,7 @@ function EditStudentContent() {
       // Reset form with loaded data
       const formData = {
         name: student.name,
+        nameEn: student.nameEn || '',
         nickname: student.nickname || '',
         birthdate: birthdateStr,
         gender: student.gender,
@@ -150,6 +153,7 @@ function EditStudentContent() {
       
       await updateStudent(parentId, studentId, {
         name: data.name,
+        nameEn: data.nameEn?.trim() || '',
         nickname: data.nickname,
         birthdate,
         gender: data.gender,
@@ -228,6 +232,25 @@ function EditStudentContent() {
               {errors.name && (
                 <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="nameEn">ชื่อ-นามสกุล (ภาษาอังกฤษ)</Label>
+              <Controller
+                name="nameEn"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value || ''}
+                    id="nameEn"
+                    placeholder="เช่น Somchai Jaidee"
+                  />
+                )}
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                ใช้สำหรับออกใบประกาศนียบัตร (ไม่บังคับ)
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

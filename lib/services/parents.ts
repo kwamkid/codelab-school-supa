@@ -294,6 +294,7 @@ export async function getStudentsByParent(parentId: string): Promise<Student[]> 
       studentCode: row.student_code,
       parentId: row.parent_id,
       name: row.name,
+      nameEn: row.name_en,
       nickname: row.nickname,
       birthdate: new Date(row.birthdate),
       gender: row.gender,
@@ -335,6 +336,7 @@ export async function getStudent(parentId: string, studentId: string): Promise<S
       studentCode: data.student_code,
       parentId: data.parent_id,
       name: data.name,
+      nameEn: data.name_en,
       nickname: data.nickname,
       birthdate: new Date(data.birthdate),
       gender: data.gender,
@@ -365,6 +367,7 @@ export async function createStudent(
       data: {
         parent_id: parentId,
         name: studentData.name,
+        name_en: studentData.nameEn || null,
         nickname: studentData.nickname,
         birthdate: studentData.birthdate.toISOString(),
         gender: studentData.gender,
@@ -396,6 +399,7 @@ export async function updateStudent(
     const updateData: any = {};
 
     if (data.name !== undefined) updateData.name = data.name;
+    if (data.nameEn !== undefined) updateData.name_en = data.nameEn || null;
     if (data.nickname !== undefined) updateData.nickname = data.nickname;
     if (data.birthdate !== undefined) updateData.birthdate = data.birthdate.toISOString();
     if (data.gender !== undefined) updateData.gender = data.gender;
@@ -776,6 +780,7 @@ export async function getStudentWithParent(studentId: string): Promise<(Student 
       studentCode: data.student_code,
       parentId: data.parent_id,
       name: data.name,
+      nameEn: data.name_en,
       nickname: data.nickname,
       birthdate: new Date(data.birthdate),
       gender: data.gender,

@@ -86,7 +86,8 @@ import IssueRefundNoteDialog from '@/components/invoices/issue-refund-note-dialo
 import RequestTaxInvoiceDialog from '@/components/invoices/request-tax-invoice-dialog';
 import { useDocumentPrint } from '@/hooks/useDocumentPrint';
 import PrintDialogs from '@/components/shared/print-dialogs';
-import { printStudentReport, printCertificate } from '@/lib/reports/print-student-report';
+import { printStudentReport } from '@/lib/reports/print-student-report';
+import { CertificateDialog } from '@/components/reports/certificate-dialog';
 import { FileText, Award } from 'lucide-react';
 import { getInvoiceCompany } from '@/lib/services/invoice-companies';
 import { InvoiceCompany } from '@/types/models';
@@ -555,16 +556,11 @@ export default function EnrollmentDetailPage() {
     }
   };
 
-  const handlePrintCertificate = async () => {
+  const [certDialogOpen, setCertDialogOpen] = useState(false);
+
+  const handlePrintCertificate = () => {
     if (!enrollment) return;
-    try {
-      await printCertificate('/api/admin/reports/student-report', {
-        studentId: enrollment.studentId,
-        classId: enrollment.classId,
-      });
-    } catch (e: any) {
-      toast.error(e?.message || 'พิมพ์ประกาศนียบัตรไม่สำเร็จ');
-    }
+    setCertDialogOpen(true);
   };
 
   if (loading) {
@@ -1409,6 +1405,17 @@ export default function EnrollmentDetailPage() {
 
       {/* Print Dialogs (shared) */}
       <PrintDialogs print={print} />
+
+      {/* Certificate (prefilled, editable, can save EN names back) */}
+      {enrollment && (
+        <CertificateDialog
+          open={certDialogOpen}
+          onOpenChange={setCertDialogOpen}
+          studentId={enrollment.studentId}
+          classId={enrollment.classId}
+          teacherId={classData?.teacherId}
+        />
+      )}
 
       {/* Issue Credit Note Dialog */}
       <IssueCreditNoteDialog

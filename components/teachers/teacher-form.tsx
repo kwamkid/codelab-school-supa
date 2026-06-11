@@ -28,6 +28,7 @@ export default function TeacherForm({ teacher, isEdit = false }: TeacherFormProp
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [formData, setFormData] = useState({
     name: teacher?.name || '',
+    nameEn: teacher?.nameEn || '',
     nickname: teacher?.nickname || '',
     email: teacher?.email || '',
     phone: teacher?.phone || '',
@@ -190,6 +191,19 @@ export default function TeacherForm({ teacher, isEdit = false }: TeacherFormProp
                   placeholder="ชื่อเล่น"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nameEn">ชื่อ-นามสกุล (ภาษาอังกฤษ)</Label>
+              <Input
+                id="nameEn"
+                value={formData.nameEn}
+                onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+                placeholder="เช่น Somchai Jaidee"
+              />
+              <p className="text-sm text-muted-foreground">
+                ใช้สำหรับออกใบประกาศนียบัตร (ถ้าไม่กรอก จะใช้ชื่อภาษาไทยแทน)
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

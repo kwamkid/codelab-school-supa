@@ -22,6 +22,7 @@ import { useLiff } from '@/components/liff/liff-provider'
 // Form schema
 const formSchema = z.object({
   name: z.string().min(1, 'กรุณาระบุชื่อ-นามสกุล'),
+  nameEn: z.string().optional(),
   nickname: z.string().min(1, 'กรุณาระบุชื่อเล่น'),
   birthdate: z.string().min(1, 'กรุณาเลือกวันเกิด'),
   gender: z.enum(['M', 'F'], { required_error: 'กรุณาเลือกเพศ' }),
@@ -64,6 +65,7 @@ function AddStudentContent() {
       
       await createStudent(parentId, {
         name: data.name,
+        ...(data.nameEn?.trim() && { nameEn: data.nameEn.trim() }),
         nickname: data.nickname,
         birthdate,
         gender: data.gender,
@@ -140,6 +142,26 @@ function AddStudentContent() {
               {errors.name && (
                 <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="nameEn">ชื่อ-นามสกุล (ภาษาอังกฤษ)</Label>
+              <Controller
+                name="nameEn"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="nameEn"
+                    placeholder="เช่น Somchai Jaidee"
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                ใช้สำหรับออกใบประกาศนียบัตร (ไม่บังคับ)
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

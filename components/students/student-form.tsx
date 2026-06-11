@@ -30,6 +30,7 @@ export default function StudentForm({ parentId, student, isEdit = false }: Stude
   
   const [formData, setFormData] = useState({
     name: student?.name || '',
+    nameEn: student?.nameEn || '',
     nickname: student?.nickname || '',
     birthdate: student?.birthdate ? new Date(student.birthdate).toISOString().split('T')[0] : '',
     gender: student?.gender || 'M' as 'M' | 'F',
@@ -77,6 +78,7 @@ export default function StudentForm({ parentId, student, isEdit = false }: Stude
     try {
       const studentData: Omit<Student, 'id' | 'parentId'> = {
         name: formData.name,
+        nameEn: formData.nameEn.trim(),
         nickname: formData.nickname,
         birthdate: new Date(formData.birthdate),
         gender: formData.gender,
@@ -137,6 +139,19 @@ export default function StudentForm({ parentId, student, isEdit = false }: Stude
                   placeholder="ชื่อเล่น"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nameEn">ชื่อ-นามสกุล (ภาษาอังกฤษ)</Label>
+              <Input
+                id="nameEn"
+                value={formData.nameEn}
+                onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+                placeholder="เช่น Somchai Jaidee"
+              />
+              <p className="text-sm text-muted-foreground">
+                ใช้สำหรับออกใบประกาศนียบัตร (ถ้าไม่กรอก จะใช้ชื่อภาษาไทยแทน)
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

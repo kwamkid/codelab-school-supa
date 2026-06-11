@@ -48,6 +48,7 @@ export interface Student {
   studentCode?: string;
   parentId: string;
   name: string;
+  nameEn?: string; // English full name for certificates (optional)
   nickname: string;
   birthdate: Date;
   gender: 'M' | 'F';
@@ -116,6 +117,7 @@ export interface Subject {
 export interface Teacher {
   id: string;
   name: string;
+  nameEn?: string; // English full name for certificates (optional)
   nickname?: string;
   email: string;
   phone: string;
