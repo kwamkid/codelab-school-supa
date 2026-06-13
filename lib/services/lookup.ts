@@ -59,6 +59,7 @@ export async function getClassLookupData(branchId?: string | null): Promise<Clas
       id: t.id,
       name: t.name,
       nickname: t.nickname,
+      profileImage: t.profile_image,
       specialties: t.specialties || [],
       availableBranches: t.available_branches || [],
       isActive: t.is_active,

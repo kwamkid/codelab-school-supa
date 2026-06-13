@@ -16,6 +16,7 @@ import { Loading } from '@/components/ui/loading';
 import { Printer, Award, ChevronLeft, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { StudentBadge } from '@/components/ui/student-badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { CertificateEditor } from '@/components/reports/certificate-editor';
 import { loadCertFields, printCertificatesFields } from '@/lib/reports/print-student-report';
 import type { CertificateFields } from '@/components/reports/certificate-template';
@@ -184,7 +185,7 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
                 >
                   <StudentBadge name={s.nickname ? `${s.name} (${s.nickname})` : s.name} />
                   {s.parentName && (
-                    <span className="text-xs text-muted-foreground truncate">{s.parentName}</span>
+                    <ParentBadge name={s.parentName} size="sm" />
                   )}
                 </button>
               ))}

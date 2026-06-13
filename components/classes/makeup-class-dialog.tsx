@@ -21,6 +21,7 @@ import { createMakeupRequest, getMakeupCount, checkMakeupExists } from '@/lib/se
 import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 
 interface MakeupClassDialogProps {
   open: boolean;
@@ -235,7 +236,7 @@ export default function MakeupClassDialog({
               <p>นักเรียน: {student.name} ({student.nickname})</p>
               <p>คลาส: {classInfo.name}</p>
               <p>ครั้งที่: {sessionNumber} - {formatDate(sessionDate, 'long')}</p>
-              <p>ผู้ปกครอง: {student.parentName} ({student.parentPhone})</p>
+              <span className="flex items-center gap-1">ผู้ปกครอง: <ParentBadge name={student.parentName} size="sm" /> ({student.parentPhone})</span>
             </div>
           </div>
 

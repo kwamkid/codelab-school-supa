@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TeacherBadge } from '@/components/ui/teacher-badge';
 import { Input } from '@/components/ui/input';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
@@ -603,18 +604,22 @@ export default function AttendancePage() {
                               {cls.actualTeacher ? (
                                 <>
                                   {/* Substitute actually taught this session */}
-                                  <span className="text-sm font-medium">
-                                    {cls.actualTeacher.nickname || cls.actualTeacher.name}
-                                  </span>
+                                  <TeacherBadge
+                                    name={cls.actualTeacher.nickname || cls.actualTeacher.name}
+                                    imageUrl={cls.actualTeacher.profileImage}
+                                    size="sm"
+                                  />
                                   <Badge variant="outline" className="text-xs border-amber-300 text-amber-700">แทน</Badge>
                                   <span className="text-xs text-muted-foreground line-through">
                                     {cls.teacher?.nickname || cls.teacher?.name}
                                   </span>
                                 </>
                               ) : (
-                                <span className="text-sm">
-                                  {cls.teacher?.nickname || cls.teacher?.name}
-                                </span>
+                                <TeacherBadge
+                                  name={cls.teacher?.nickname || cls.teacher?.name}
+                                  imageUrl={cls.teacher?.profileImage}
+                                  size="sm"
+                                />
                               )}
                             </div>
                             <div className="flex items-center gap-2">

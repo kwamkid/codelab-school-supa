@@ -41,6 +41,8 @@ export interface AdminUser {
   createdBy: string;
   updatedAt?: Date;
   updatedBy?: string;
+  lastLoginAt?: Date; // last_sign_in_at from auth.users (real last login)
+  avatarUrl?: string; // teacher profile_image or Google avatar (from auth)
 }
 
 export interface Student {

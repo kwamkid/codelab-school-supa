@@ -12,6 +12,7 @@ import { Printer, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { printStudentReport, printClassReports } from '@/lib/reports/print-student-report';
 import { StudentBadge } from '@/components/ui/student-badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 
 export interface PrintStudent {
   id: string;
@@ -75,7 +76,7 @@ export function ReportPrintDialog({ open, onOpenChange, classId, students }: Pro
             >
               <StudentBadge name={s.nickname ? `${s.name} (${s.nickname})` : s.name} />
               {s.parentName && (
-                <span className="text-xs text-muted-foreground truncate">{s.parentName}</span>
+                <ParentBadge name={s.parentName} size="sm" />
               )}
             </button>
           ))}

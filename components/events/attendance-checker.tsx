@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from "@/components/ui/badge";
+import { ParentBadge } from "@/components/ui/parent-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormSelect } from '@/components/ui/form-select';
 import {
@@ -314,7 +315,7 @@ export default function AttendanceChecker({
                     <div className="flex-1 space-y-2">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium">{registration.parentName}</p>
+                          <ParentBadge name={registration.parentName} size="sm" />
                           <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                             <span className="flex items-center gap-1">
                               <Phone className="h-3 w-3" />

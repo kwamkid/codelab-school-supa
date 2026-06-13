@@ -10,6 +10,7 @@ import { DatesSetArg, EventClickArg, EventContentArg } from '@fullcalendar/core'
 import { Clock, Users, MapPin, User, Calendar, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { TeacherBadge } from '@/components/ui/teacher-badge';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
@@ -199,10 +200,7 @@ export default function ScheduleCalendar({
                     <MapPin className="h-3 w-3" />
                     {props.branchName} - {props.roomName}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    ครู{props.teacherName}
-                  </span>
+                  <TeacherBadge name={props.teacherName} size="sm" />
                 </div>
                 
                 {/* Show makeup info if this is rescheduled */}
@@ -643,7 +641,7 @@ export default function ScheduleCalendar({
 
                 <div>
                   <p className="text-sm text-muted-foreground">ครูผู้สอน</p>
-                  <p className="font-medium">ครู{selectedEvent.extendedProps.teacherName}</p>
+                  <TeacherBadge name={selectedEvent.extendedProps.teacherName} size="md" />
                 </div>
               </div>
 

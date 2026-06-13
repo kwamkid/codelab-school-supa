@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, MessageSquare, Calendar, User, School } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
 import { StudentBadge } from '@/components/ui/student-badge'
+import { TeacherBadge } from '@/components/ui/teacher-badge'
 import { PageLoading } from '@/components/ui/loading'
 import { formatDate } from '@/lib/utils'
 import { liffFetch } from '@/lib/line/liff-fetch'
@@ -177,10 +178,7 @@ function FeedbackContent() {
                         ))}
                       </div>
                     )}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <User className="h-3 w-3" />
-                      <span>ครู{feedback.teacherName}</span>
-                    </div>
+                    <TeacherBadge name={feedback.teacherName} size="sm" />
                   </div>
                 </CardContent>
               </Card>

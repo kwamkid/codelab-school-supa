@@ -87,14 +87,24 @@ export async function getAllAdminUsers(): Promise<AdminUser[]> {
   try {
     const supabase = getClient();
 
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // RPC: joins auth.users (real last-login, by email since ids differ) + the
+    // linked teacher's nickname (teachers keep nickname there, not on admin_users).
+    const { data, error } = await (supabase.rpc as any)('get_admin_users_with_last_login');
 
     if (error) throw error;
 
-    return (data || []).map(row => mapToAdminUser(row as AdminUserRow));
+    return (data || []).map((row: any) => {
+      const user = mapToAdminUser(row as AdminUserRow);
+      // Fall back to the teacher's nickname when admin_users.nickname is blank.
+      if (!user.nickname && row.teacher_nickname) {
+        user.nickname = row.teacher_nickname;
+      }
+      // Real last-login from auth (column "เข้าใช้งานล่าสุด"), not updated_at.
+      user.lastLoginAt = row.last_login_at ? new Date(row.last_login_at) : undefined;
+      // Avatar: teacher profile_image → Google avatar (resolved in the RPC).
+      user.avatarUrl = row.avatar_url || undefined;
+      return user;
+    });
   } catch (error) {
     console.error('Error getting all admin users:', error);
     throw error;

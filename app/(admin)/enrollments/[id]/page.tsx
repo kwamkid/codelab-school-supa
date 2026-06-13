@@ -12,6 +12,7 @@ import { getTeacher } from '@/lib/services/teachers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { 
   ChevronLeft, 
   Edit, 
@@ -903,7 +904,7 @@ export default function EnrollmentDetailPage() {
               <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">ชื่อผู้ปกครอง</p>
-                  <p className="font-medium">{parent.displayName}</p>
+                  <ParentBadge name={parent.displayName} imageUrl={parent.pictureUrl} size="sm" />
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">เบอร์โทรหลัก</p>

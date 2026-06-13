@@ -19,6 +19,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Teacher, Subject } from '@/types/models';
+import { TeacherBadge } from '@/components/ui/teacher-badge';
 
 interface TimeSlot {
   startTime: string;
@@ -157,7 +158,7 @@ export function TeacherAvailability({
                     {/* Teacher Info */}
                     <div className="w-36 py-3 pr-4 space-y-1">
                       <div className="font-medium text-sm">
-                        {teacher.nickname || teacher.name}
+                        <TeacherBadge name={teacher.nickname || teacher.name} imageUrl={teacher.profileImage} size="sm" />
                       </div>
                       <div className="text-xs text-gray-500 flex items-center gap-1">
                         <Phone className="h-3 w-3" />

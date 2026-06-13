@@ -28,6 +28,9 @@ function AvatarImage({
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
+      // Google avatars (lh3.googleusercontent.com) 403 when a referrer is sent —
+      // default to no-referrer so they load; callers can still override via props.
+      referrerPolicy="no-referrer"
       className={cn("aspect-square size-full", className)}
       {...props}
     />

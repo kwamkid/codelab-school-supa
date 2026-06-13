@@ -14,6 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead, useSortableTable } from '@/components/ui/sortable-table-head';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -59,7 +61,7 @@ import { toast } from 'sonner';
 import UserFormDialog from '@/components/users/user-form-dialog';
 import AddRightsDialog from '@/components/users/add-rights-dialog';
 import CreateInviteDialog from '@/components/users/create-invite-dialog';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
 import Link from 'next/link';
 import {
   Select,
@@ -86,6 +88,7 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<AdminUser | null>(null);
   const [deleteUserTarget, setDeleteUserTarget] = useState<AdminUser | null>(null);
+  const [toggleUserTarget, setToggleUserTarget] = useState<AdminUser | null>(null);
 
   // Check permission - redirect หลังจาก auth loading เสร็จ และ adminUser โหลดแล้ว
   useEffect(() => {
@@ -191,6 +194,17 @@ export default function UsersPage() {
       (user.nickname || '').toLowerCase().includes(search) ||
       user.email.toLowerCase().includes(search)
     );
+  });
+
+  // Column sorting (shared)
+  const { sort, toggle: toggleSort, sortRows } = useSortableTable();
+  const roleRank: Record<string, number> = { super_admin: 0, branch_admin: 1, teacher: 2 };
+  const sortedUsers = sortRows(filteredUsers, (user, key) => {
+    switch (key) {
+      case 'role': return roleRank[user.role] ?? 99;
+      case 'lastLogin': return user.lastLoginAt ? user.lastLoginAt.getTime() : null; // null → ยังไม่เคยเข้าใช้ ไปท้ายสุด
+      default: return null;
+    }
   });
 
   // Get role display
@@ -319,65 +333,23 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards — full-colour */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">ผู้ใช้ทั้งหมด</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
-            <p className="text-xs text-muted-foreground">
-              ใช้งาน {users.filter(u => u.isActive).length} คน
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-red-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Super Admin</CardTitle>
-            <Shield className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {users.filter(u => u.role === 'super_admin').length}
+        {[
+          { label: 'ผู้ใช้ทั้งหมด', value: users.length, sub: `ใช้งาน ${users.filter(u => u.isActive).length} คน`, Icon: Users, bg: 'bg-gradient-to-br from-gray-700 to-gray-900' },
+          { label: 'Super Admin', value: users.filter(u => u.role === 'super_admin').length, sub: 'มีสิทธิ์สูงสุดในระบบ', Icon: Shield, bg: 'bg-gradient-to-br from-red-500 to-red-600' },
+          { label: 'Branch Admin', value: users.filter(u => u.role === 'branch_admin').length, sub: 'จัดการเฉพาะสาขา', Icon: Building2, bg: 'bg-gradient-to-br from-blue-500 to-blue-600' },
+          { label: 'ครูผู้สอน', value: users.filter(u => u.role === 'teacher').length, sub: 'เข้าถึงเมนูฝั่งครู', Icon: UserCog, bg: 'bg-gradient-to-br from-green-500 to-emerald-600' },
+        ].map((stat) => (
+          <div key={stat.label} className={cn('rounded-xl p-4 text-white shadow-sm', stat.bg)}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-white/90">{stat.label}</span>
+              <stat.Icon className="h-5 w-5 text-white/80" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              มีสิทธิ์สูงสุดในระบบ
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Branch Admin</CardTitle>
-            <Building2 className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {users.filter(u => u.role === 'branch_admin').length}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              จัดการเฉพาะสาขา
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">ครูผู้สอน</CardTitle>
-            <UserCog className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {users.filter(u => u.role === 'teacher').length}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              เข้าถึงเมนูฝั่งครู
-            </p>
-          </CardContent>
-        </Card>
+            <div className="text-3xl font-bold mt-2">{stat.value}</div>
+            <p className="text-xs text-white/80 mt-0.5">{stat.sub}</p>
+          </div>
+        ))}
       </div>
 
       {/* Search and Table */}
@@ -467,25 +439,35 @@ export default function UsersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>ผู้ใช้งาน</TableHead>
-                <TableHead>Role</TableHead>
+                <SortableTableHead sortKey="role" currentSort={sort} onSort={toggleSort}>Role</SortableTableHead>
                 <TableHead>สาขา</TableHead>
                 <TableHead>สถานะ</TableHead>
-                <TableHead>เข้าใช้งานล่าสุด</TableHead>
+                <SortableTableHead sortKey="lastLogin" currentSort={sort} onSort={toggleSort}>เข้าใช้งานล่าสุด</SortableTableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {sortedUsers.map((user) => (
                 <TableRow key={user.id} className={!user.isActive ? 'bg-gray-50' : ''}>
                   <TableCell>
-                    <div>
-                      <div className="font-medium">
-                        {user.displayName}
-                        {user.nickname && (
-                          <span className="text-gray-500 font-normal"> ({user.nickname})</span>
-                        )}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="h-9 w-9 shrink-0 ring-1 ring-gray-200">
+                        {user.avatarUrl ? (
+                          <AvatarImage src={user.avatarUrl} alt={user.displayName} />
+                        ) : null}
+                        <AvatarFallback className="bg-gray-100 text-gray-600 text-xs font-semibold">
+                          {(user.displayName || user.email).trim().slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">
+                          {user.displayName}
+                          {user.nickname && (
+                            <span className="text-gray-500 font-normal"> ({user.nickname})</span>
+                          )}
+                        </div>
+                        <div className="text-gray-500 truncate">{user.email}</div>
                       </div>
-                      <div className="text-gray-500">{user.email}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -518,7 +500,7 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="text-gray-500">
-                      {user.updatedAt ? formatDate(user.updatedAt, 'short') : '-'}
+                      {user.lastLoginAt ? formatDate(user.lastLoginAt, 'short') : 'ยังไม่เคยเข้าใช้'}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -548,8 +530,8 @@ export default function UsersPage() {
                           รีเซ็ตรหัสผ่าน
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => handleToggleActive(user)}
+                        <DropdownMenuItem
+                          onClick={() => setToggleUserTarget(user)}
                           disabled={user.id === adminUser?.id}
                           className={user.isActive ? 'text-orange-600' : ''}
                         >
@@ -640,6 +622,37 @@ export default function UsersPage() {
               }}
             >
               ยืนยัน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Toggle (ระงับ/เปิดใช้งาน) Confirmation Dialog */}
+      <AlertDialog open={!!toggleUserTarget} onOpenChange={(open) => !open && setToggleUserTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleUserTarget?.isActive ? 'ระงับการใช้งาน' : 'เปิดใช้งาน'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleUserTarget?.isActive
+                ? `ต้องการระงับการใช้งานของ ${toggleUserTarget?.displayName} (${toggleUserTarget?.email}) ใช่หรือไม่? ผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`
+                : `ต้องการเปิดใช้งานของ ${toggleUserTarget?.displayName} (${toggleUserTarget?.email}) ใช่หรือไม่?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className={toggleUserTarget?.isActive ? 'bg-orange-600 hover:bg-orange-700' : ''}
+              onClick={() => {
+                if (toggleUserTarget) {
+                  const target = toggleUserTarget;
+                  setToggleUserTarget(null);
+                  handleToggleActive(target);
+                }
+              }}
+            >
+              {toggleUserTarget?.isActive ? 'ระงับ' : 'เปิดใช้งาน'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

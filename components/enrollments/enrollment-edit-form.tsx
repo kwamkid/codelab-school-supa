@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -285,7 +286,7 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
           </div>
           <div>
             <p className="text-sm text-gray-500">ผู้ปกครอง</p>
-            <p className="font-medium">{parent.displayName}</p>
+            <ParentBadge name={parent.displayName} imageUrl={parent.pictureUrl} size="sm" />
             <p className="text-sm text-gray-600">{parent.phone}</p>
           </div>
           <div>

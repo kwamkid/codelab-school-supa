@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ParentBadge } from "@/components/ui/parent-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { 
@@ -225,7 +226,7 @@ export default function MakeupDetailDialog({
               <div className="flex items-center gap-2 text-sm">
                 <User className="h-4 w-4 text-gray-500" />
                 <span className="font-medium">ผู้ปกครอง:</span>
-                <span>{student.parentName}</span>
+                <ParentBadge name={student.parentName} size="sm" />
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="h-4 w-4 text-gray-500" />

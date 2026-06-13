@@ -3,15 +3,8 @@
 import { useMemo } from 'react';
 import { User, Users, GraduationCap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { TeacherBadge } from '@/components/ui/teacher-badge';
 import { cn } from '@/lib/utils';
-
-// Up to 2-character initials for the teacher avatar fallback
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.trim().slice(0, 2).toUpperCase();
-}
 
 // Types matching the RPC response
 export interface TimetableEvent {
@@ -206,17 +199,11 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
                                 {/* Teacher (avatar + name) + right info */}
                                 <div className="flex items-center justify-between gap-2 mt-1">
                                   {event.teacher_name ? (
-                                    <span className="flex items-center gap-1.5 min-w-0 text-xs text-gray-700 dark:text-gray-200">
-                                      <Avatar className="h-6 w-6 shrink-0 ring-1 ring-gray-200 dark:ring-slate-600">
-                                        {event.teacher_image ? (
-                                          <AvatarImage src={event.teacher_image} alt={event.teacher_name} />
-                                        ) : null}
-                                        <AvatarFallback className="bg-gray-200 text-gray-600 dark:bg-slate-600 dark:text-gray-200 text-[10px]">
-                                          {getInitials(event.teacher_name)}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <span className="truncate font-medium">{event.teacher_name}</span>
-                                    </span>
+                                    <TeacherBadge
+                                      name={event.teacher_name}
+                                      imageUrl={event.teacher_image}
+                                      size="sm"
+                                    />
                                   ) : <span />}
 
                                   {/* Regular class → enrolled count; makeup/trial → student name */}

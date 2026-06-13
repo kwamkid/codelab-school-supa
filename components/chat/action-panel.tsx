@@ -5,6 +5,7 @@ import { Phone, Mail, Tag, Link as LinkIcon, BookOpen, GraduationCap, ArrowLeft,
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { Input } from '@/components/ui/input';
 import { ChatConversation, Branch } from '@/types/models';
 import { formatDate } from '@/lib/utils';
@@ -261,7 +262,7 @@ export default function ActionPanel({
         {linkedParent ? (
           <div className="space-y-2">
             <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <p className="text-sm font-semibold text-green-800 dark:text-green-300">{linkedParent.displayName}</p>
+              <ParentBadge name={linkedParent.displayName} size="sm" />
               {linkedParent.phone && (
                 <p className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 mt-0.5">
                   <Phone className="w-3 h-3 shrink-0" />

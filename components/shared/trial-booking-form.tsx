@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FormSelect } from '@/components/ui/form-select';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -601,9 +602,8 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
               </Label>
               {parentMode === 'linked' ? (
                 <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <User className="h-5 w-5 text-green-600 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-base dark:text-white">{parentName}</p>
+                    <ParentBadge name={parentName} size="md" />
                     <p className="text-sm text-gray-500 dark:text-gray-400">{parentPhone}</p>
                   </div>
                   <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 shrink-0">เชื่อมแล้ว</Badge>

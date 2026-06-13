@@ -50,6 +50,7 @@ import { formatDate, calculateAge } from '@/lib/utils';
 import { PermissionGuard, usePermissions } from '@/components/auth/permission-guard';
 import { useAuth } from '@/hooks/useAuth';
 import { ActionButton } from '@/components/ui/action-button';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import {
@@ -513,19 +514,12 @@ export default function ParentsPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              {parent.pictureUrl ? (
-                                <img
-                                  src={parent.pictureUrl}
-                                  alt={parent.displayName}
-                                  className="w-10 h-10 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                  <Users className="h-5 w-5 text-gray-500" />
-                                </div>
-                              )}
+                              <ParentBadge
+                                name={parent.displayName}
+                                imageUrl={parent.pictureUrl}
+                                size="lg"
+                              />
                               <div>
-                                <p className="font-medium">{parent.displayName}</p>
                                 {parent.enrollmentStatus === 'active' ? (
                                   <Badge className="bg-green-100 text-green-700 text-xs">กำลังเรียน</Badge>
                                 ) : parent.enrollmentStatus === 'completed' || parent.enrollmentStatus === 'mixed' ? (

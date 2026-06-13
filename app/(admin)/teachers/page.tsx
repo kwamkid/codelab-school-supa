@@ -13,6 +13,7 @@ import { Plus, Edit, Phone, Mail, MapPin, BookOpen, Users, Key, Trash2 } from 'l
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
+import { TeacherBadge } from "@/components/ui/teacher-badge";
 import {
   Table,
   TableBody,
@@ -295,7 +296,7 @@ export default function TeachersPage() {
                     <TableRow key={teacher.id} className={!teacher.isActive ? 'opacity-60' : ''}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{teacher.name}</p>
+                          <TeacherBadge name={teacher.name} imageUrl={teacher.profileImage} size="md" />
                           {teacher.nickname && (
                             <p className="text-gray-500">({teacher.nickname})</p>
                           )}

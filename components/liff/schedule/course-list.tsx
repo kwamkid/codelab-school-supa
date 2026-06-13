@@ -5,6 +5,7 @@ import React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StudentBadge } from '@/components/ui/student-badge'
+import { TeacherBadge } from '@/components/ui/teacher-badge'
 import { Button } from '@/components/ui/button'
 import { Calendar, Clock, MapPin, User, CalendarOff, CheckCircle, XCircle, AlertCircle, ChevronRight } from 'lucide-react'
 import { formatDate, formatTime, getDayName } from '@/lib/utils'
@@ -190,10 +191,7 @@ export default function CourseList({
                   <MapPin className="h-3 w-3" />
                   {classData.branchName} - {classData.roomName}
                 </div>
-                <div className="flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  ครู{classData.teacherName}
-                </div>
+                <TeacherBadge name={classData.teacherName} size="sm" />
               </div>
             </div>
 

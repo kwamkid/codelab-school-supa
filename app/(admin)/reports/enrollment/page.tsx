@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ParentBadge } from '@/components/ui/parent-badge'
 import { Pagination, usePagination } from '@/components/ui/pagination'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import {
@@ -514,8 +515,8 @@ export default function EnrollmentReportPage() {
                           {enrollment.student_nickname || enrollment.student_name}
                         </div>
                         {enrollment.parent_name && (
-                          <div className="text-xs text-muted-foreground">
-                            ผู้ปกครอง: {enrollment.parent_name}
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            ผู้ปกครอง: <ParentBadge name={enrollment.parent_name} size="sm" />
                           </div>
                         )}
                       </TableCell>

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
@@ -537,7 +538,7 @@ export default function TrialBookingDetailPage({ params }: { params: { id: strin
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
                     <div>
                       <p className="text-xs text-gray-500">ชื่อ-นามสกุล</p>
-                      <p className="font-medium">{booking.parentName}</p>
+                      <ParentBadge name={booking.parentName} size="sm" />
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">เบอร์โทรศัพท์</p>

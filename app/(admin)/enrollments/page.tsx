@@ -20,6 +20,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { cn } from '@/lib/utils';
 import {
   Plus,
@@ -650,7 +651,10 @@ export default function EnrollmentsPage() {
                             ) : student ? (
                               <div className="min-w-0">
                                 <p className="font-medium text-base truncate">{student.nickname || student.name}</p>
-                                <p className="text-sm text-gray-500 truncate">ผปค. {student.parentName}</p>
+                                <div className="flex items-center gap-1 text-sm text-gray-500 min-w-0">
+                                  <span className="shrink-0">ผปค.</span>
+                                  <ParentBadge name={student.parentName} size="sm" />
+                                </div>
                                 {(student.schoolName || student.gradeLevel) && (
                                   <p className="text-xs text-gray-400 line-clamp-2">
                                     {[student.schoolName, student.gradeLevel].filter(Boolean).join(' / ')}

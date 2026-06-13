@@ -33,15 +33,29 @@ BEGIN
     ORDER BY name
   ) s;
 
-  -- Teachers — include inactive (soft-deleted) so class rows can resolve their
-  -- names (superseded by 20260612 migration). Branch filter still applies; client
-  -- filters by is_active for dropdowns.
+  -- Teachers — ALL of them (this is a name-resolution map for class rows, NOT the
+  -- teacher-picker dropdown; that uses getTeachersByBranch separately). No branch /
+  -- is_active filter: a teacher can be assigned to a class in a branch they aren't
+  -- "available" at (e.g. a พระราม 2 teacher covering a เมืองทอง class), and
+  -- soft-deleted teachers must still resolve — filtering either way showed "Unknown"
+  -- in the list while the detail page showed the real name.
+  -- profile_image falls back to the linked account's Google avatar
+  -- (teachers → admin_users.teacher_id → auth.users.email) so badges show a photo
+  -- even when no image was uploaded.
   SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) INTO v_teachers
   FROM (
-    SELECT id, name, nickname, specialties, available_branches, is_active
-    FROM teachers
-    WHERE (p_branch_id IS NULL OR available_branches @> ARRAY[p_branch_id::text])
-    ORDER BY name
+    SELECT
+      t.id, t.name, t.nickname,
+      COALESCE(
+        t.profile_image,
+        u.raw_user_meta_data->>'avatar_url',
+        u.raw_user_meta_data->>'picture'
+      ) AS profile_image,
+      t.specialties, t.available_branches, t.is_active
+    FROM teachers t
+    LEFT JOIN admin_users au ON au.teacher_id = t.id
+    LEFT JOIN auth.users u ON lower(u.email) = lower(au.email)
+    ORDER BY t.name
   ) t;
 
   -- Rooms (filter by branch if provided)

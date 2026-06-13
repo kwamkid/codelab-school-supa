@@ -22,8 +22,8 @@ import {
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatCurrency, getDayName } from '@/lib/utils';
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TeacherBadge } from "@/components/ui/teacher-badge";
+import { formatDate, formatCurrency, getDayName, cn } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +44,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SearchInput } from '@/components/ui/search-input';
-import SubjectSearchSelect from '@/components/ui/subject-search-select';
+import { FormSelect } from '@/components/ui/form-select';
+import { SortableTableHead, useSortableTable } from '@/components/ui/sortable-table-head';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import {
@@ -92,6 +93,12 @@ export default function ClassesPage() {
   // Filters
   const [selectedStatus, setSelectedStatus] = useState<string>('active');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
+  // extra: 'all' | 'notFull' (ยังไม่เต็ม) | 'openingSoon' (ใกล้เปิด)
+  const [selectedAvailability, setSelectedAvailability] = useState<string>('all');
+
+  // Column sorting (shared)
+  const { sort, toggle: toggleSort, sortRows } = useSortableTable();
 
   // ============================================
   // 🎯 Pagination Hook
@@ -121,7 +128,7 @@ export default function ClassesPage() {
   const { data: lookupData, isLoading: loadingLookup } = useQuery({
     queryKey: ['classLookupData', selectedBranchId],
     queryFn: () => getClassLookupData(selectedBranchId),
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000, // 5 min — so teacher avatar/name changes show up without a hard reload
   });
 
   const branches = lookupData?.branches || [];
@@ -149,6 +156,7 @@ export default function ClassesPage() {
   const getBranchName = (branchId: string) => branchesMap.get(branchId)?.name || 'Unknown';
   const getSubjectName = (subjectId: string) => subjectsMap.get(subjectId)?.name || 'Unknown';
   const getSubjectColor = (subjectId: string) => subjectsMap.get(subjectId)?.color || '#gray';
+  const getTeacher = (teacherId: string) => teachersMap.get(teacherId);
   const getTeacherName = (teacherId: string) => {
     const teacher = teachersMap.get(teacherId);
     return teacher?.nickname || teacher?.name || 'Unknown';
@@ -160,13 +168,10 @@ export default function ClassesPage() {
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           cls.name.toLowerCase().includes(search) ||
-          cls.code.toLowerCase().includes(search) ||
-          getSubjectName(cls.subjectId).toLowerCase().includes(search) ||
-          getTeacherName(cls.teacherId).toLowerCase().includes(search) ||
-          getBranchName(cls.branchId).toLowerCase().includes(search);
-        
+          cls.code.toLowerCase().includes(search);
+
         if (!matchesSearch) return false;
       }
 
@@ -175,16 +180,43 @@ export default function ClassesPage() {
         if (cls.status !== 'published' && cls.status !== 'started') return false;
       } else if (selectedStatus !== 'all' && cls.status !== selectedStatus) return false;
       if (selectedSubject !== 'all' && cls.subjectId !== selectedSubject) return false;
+      if (selectedTeacher !== 'all' && cls.teacherId !== selectedTeacher) return false;
+
+      // Availability filter
+      if (selectedAvailability === 'notFull') {
+        if (cls.enrolledCount >= cls.maxStudents) return false;
+      } else if (selectedAvailability === 'openingSoon') {
+        // เปิดรับสมัคร + วันเริ่มเรียนภายใน 30 วันข้างหน้า (และยังไม่เริ่ม)
+        if (cls.status !== 'published') return false;
+        const start = new Date(cls.startDate).getTime();
+        const now = Date.now();
+        const in30Days = now + 30 * 24 * 60 * 60 * 1000;
+        if (!(start >= now && start <= in30Days)) return false;
+      }
       return true;
     });
-  }, [classes, searchTerm, selectedStatus, selectedSubject, getSubjectName, getTeacherName, getBranchName]);
+  }, [classes, searchTerm, selectedStatus, selectedSubject, selectedTeacher, selectedAvailability]);
 
   // ============================================
   // 🎯 Paginated Classes
   // ============================================
+  // Apply column sort, then paginate
+  const sortedClasses = useMemo(() => {
+    return sortRows(filteredClasses, (cls, key) => {
+      switch (key) {
+        case 'subject': return getSubjectName(cls.subjectId);
+        case 'teacher': return getTeacherName(cls.teacherId);
+        case 'seats': return cls.maxStudents > 0 ? cls.enrolledCount / cls.maxStudents : 0;
+        case 'progress': return cls.totalSessions > 0 ? (classStats[cls.id] || 0) / cls.totalSessions : 0;
+        case 'price': return cls.pricing.totalPrice;
+        default: return null;
+      }
+    });
+  }, [filteredClasses, sortRows, getSubjectName, getTeacherName, classStats]);
+
   const paginatedClasses = useMemo(() => {
-    return getPaginatedData(filteredClasses);
-  }, [filteredClasses, getPaginatedData]);
+    return getPaginatedData(sortedClasses);
+  }, [sortedClasses, getPaginatedData]);
 
   // Calculate total pages
   const totalPages = useMemo(() => {
@@ -211,12 +243,21 @@ export default function ClassesPage() {
       .filter(Boolean) as typeof subjects;
   }, [classes, subjects]);
 
+  // Get unique teachers used in current classes (for teacher filter), sorted by name
+  const usedTeachers = useMemo(() => {
+    const teacherIds = [...new Set(classes.map(c => c.teacherId).filter(Boolean))];
+    return teacherIds
+      .map(id => teachersMap.get(id))
+      .filter(Boolean)
+      .sort((a, b) => (a!.nickname || a!.name).localeCompare(b!.nickname || b!.name, 'th')) as NonNullable<ReturnType<typeof teachersMap.get>>[];
+  }, [classes, teachersMap]);
+
   // ============================================
   // 🎯 Reset Pagination on Filter Change
   // ============================================
   useEffect(() => {
     resetPagination();
-  }, [selectedBranchId, selectedStatus, selectedSubject, searchTerm, resetPagination]);
+  }, [selectedBranchId, selectedStatus, selectedSubject, selectedTeacher, selectedAvailability, searchTerm, sort, resetPagination]);
 
   const handleDeleteClass = async (classId: string, className: string) => {
     setDeletingId(classId);
@@ -339,80 +380,83 @@ export default function ClassesPage() {
         </Card>
       )}
 
-      {/* Status Filter Tabs */}
-      <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="mb-4">
-        <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
-          <TabsTrigger
-            value="active"
-            className="data-[state=active]:bg-gray-900 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-          >
-            กำลังดำเนินการ ({stats.published + stats.started})
-          </TabsTrigger>
-          <TabsTrigger
-            value="all"
-            className="data-[state=active]:bg-gray-900 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-          >
-            ทั้งหมด ({stats.total})
-          </TabsTrigger>
-          {stats.started > 0 && (
-            <TabsTrigger
-              value="started"
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-            >
-              กำลังเรียน ({stats.started})
-            </TabsTrigger>
-          )}
-          {stats.published > 0 && (
-            <TabsTrigger
-              value="published"
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-            >
-              เปิดรับสมัคร ({stats.published})
-            </TabsTrigger>
-          )}
-          {stats.completed > 0 && (
-            <TabsTrigger
-              value="completed"
-              className="data-[state=active]:bg-gray-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-            >
-              จบแล้ว ({stats.completed})
-            </TabsTrigger>
-          )}
-          {stats.draft > 0 && (
-            <TabsTrigger
-              value="draft"
-              className="data-[state=active]:bg-gray-500 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-            >
-              ร่าง ({stats.draft})
-            </TabsTrigger>
-          )}
-          {stats.cancelled > 0 && (
-            <TabsTrigger
-              value="cancelled"
-              className="data-[state=active]:bg-red-600 data-[state=active]:text-white rounded-full px-4 py-1.5 text-sm"
-            >
-              ยกเลิก ({stats.cancelled})
-            </TabsTrigger>
-          )}
-        </TabsList>
-      </Tabs>
+      {/* Status Filter Cards */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        {[
+          { value: 'active', label: 'กำลังดำเนินการ', count: stats.published + stats.started, activeBg: 'bg-gray-900', inactiveBg: 'bg-gray-100', inactiveLabel: 'text-gray-600', inactiveCount: 'text-gray-800', always: true },
+          { value: 'all', label: 'ทั้งหมด', count: stats.total, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
+          { value: 'started', label: 'กำลังเรียน', count: stats.started, activeBg: 'bg-green-600', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700' },
+          { value: 'published', label: 'เปิดรับสมัคร', count: stats.published, activeBg: 'bg-blue-600', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700' },
+          { value: 'completed', label: 'จบแล้ว', count: stats.completed, activeBg: 'bg-gray-600', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-700' },
+          { value: 'draft', label: 'ร่าง', count: stats.draft, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-700' },
+          { value: 'cancelled', label: 'ยกเลิก', count: stats.cancelled, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700' },
+        ]
+          .filter((tab) => tab.always || tab.count > 0)
+          .map((tab) => {
+            const isActive = selectedStatus === tab.value;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setSelectedStatus(tab.value)}
+                className={cn(
+                  'flex flex-col items-center justify-center min-w-24 px-3 h-[72px] rounded-xl transition-all',
+                  isActive ? `${tab.activeBg} shadow-md` : `${tab.inactiveBg} hover:shadow-sm`
+                )}
+              >
+                <span className={cn('text-sm font-medium whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
+                  {tab.label}
+                </span>
+                <span className={cn('text-2xl font-bold mt-0.5', isActive ? 'text-white' : tab.inactiveCount)}>
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+      </div>
 
-      {/* Search + Subject Filter */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+      {/* Filters — all on one row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <SearchInput
-          placeholder="ค้นหาชื่อคลาส, รหัส, ครู, สาขา..."
+          placeholder="ค้นหาชื่อคลาส, รหัสคลาส..."
           value={searchTerm}
           onChange={setSearchTerm}
         />
 
-        {usedSubjects.length > 1 && (
-          <SubjectSearchSelect
-            subjects={usedSubjects}
-            value={selectedSubject === 'all' ? '' : selectedSubject}
-            onValueChange={(val) => setSelectedSubject(val || 'all')}
-            placeholder="กรองวิชา..."
-          />
-        )}
+        <FormSelect
+          value={selectedSubject}
+          onValueChange={setSelectedSubject}
+          className="h-11"
+          placeholder="ทุกวิชา"
+          searchPlaceholder="ค้นหาวิชา..."
+          options={[
+            { value: 'all', label: 'ทุกวิชา' },
+            ...usedSubjects.map((s) => ({ value: s.id, label: s.name, color: s.color })),
+          ]}
+        />
+
+        <FormSelect
+          value={selectedTeacher}
+          onValueChange={setSelectedTeacher}
+          className="h-11"
+          placeholder="ครูทั้งหมด"
+          searchPlaceholder="ค้นหาครู..."
+          options={[
+            { value: 'all', label: 'ครูทั้งหมด' },
+            ...usedTeachers.map((t) => ({ value: t.id, label: t.nickname || t.name })),
+          ]}
+        />
+
+        <FormSelect
+          value={selectedAvailability}
+          onValueChange={setSelectedAvailability}
+          className="h-11"
+          placeholder="ทุกคลาส"
+          options={[
+            { value: 'all', label: 'ทุกคลาส' },
+            { value: 'notFull', label: 'คลาสที่ยังไม่เต็ม' },
+            { value: 'openingSoon', label: 'คลาสที่ใกล้เปิด (ภายใน 30 วัน)' },
+          ]}
+        />
       </div>
 
       {/* Classes Table */}
@@ -440,81 +484,126 @@ export default function ClassesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[200px]">คลาส</TableHead>
+                      <SortableTableHead sortKey="subject" currentSort={sort} onSort={toggleSort} className="w-[220px]">คลาส</SortableTableHead>
                       {isAllBranches && <TableHead className="w-[80px]">สาขา</TableHead>}
-                      <TableHead className="w-[90px]">ครู/นักเรียน</TableHead>
-                      <TableHead className="w-[100px]">วัน/เวลา</TableHead>
-                      <TableHead className="text-center w-[110px]">ระยะเวลา</TableHead>
-                      <TableHead className="text-right w-[80px]">ราคา</TableHead>
-                      <TableHead className="text-center w-[80px]">สถานะ</TableHead>
+                      <SortableTableHead sortKey="teacher" currentSort={sort} onSort={toggleSort} className="w-[130px]">ครูผู้สอน</SortableTableHead>
+                      <TableHead className="w-[110px]">วัน/เวลา</TableHead>
+                      <SortableTableHead sortKey="seats" currentSort={sort} onSort={toggleSort} className="w-[120px]">ที่นั่ง</SortableTableHead>
+                      <SortableTableHead sortKey="progress" currentSort={sort} onSort={toggleSort} className="w-[140px]">ความคืบหน้า</SortableTableHead>
+                      <SortableTableHead sortKey="price" currentSort={sort} onSort={toggleSort} className="text-right w-[90px]">ราคา</SortableTableHead>
+                      <TableHead className="text-center w-[100px]">สถานะ</TableHead>
                       <TableHead className="text-center w-[40px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedClasses.map((cls) => {
                       const isDeletable = cls.enrolledCount <= 0 || cls.status === 'cancelled';
-                      
+                      const teacher = getTeacher(cls.teacherId);
+                      const teacherName = getTeacherName(cls.teacherId);
+
+                      // Seat fill: green < 80%, amber 80–99%, red full
+                      const seatRatio = cls.maxStudents > 0 ? cls.enrolledCount / cls.maxStudents : 0;
+                      const seatFull = cls.enrolledCount >= cls.maxStudents;
+                      const seatColor = seatFull
+                        ? 'bg-red-500'
+                        : seatRatio >= 0.8
+                        ? 'bg-amber-500'
+                        : 'bg-green-500';
+                      const seatText = seatFull
+                        ? 'text-red-600'
+                        : seatRatio >= 0.8
+                        ? 'text-amber-600'
+                        : 'text-gray-900';
+
+                      // Progress: completed sessions / total
+                      const done = classStats[cls.id] || 0;
+                      const total = cls.totalSessions || 0;
+                      const progressPct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+
                       return (
                         <TableRow
                           key={cls.id}
                           className="cursor-pointer"
                           onClick={() => router.push(`/classes/${cls.id}`)}
                         >
-                          {/* คลาส: name + subject */}
-                          <TableCell className="align-top">
-                            <div className="flex items-start gap-2">
+                          {/* คลาส: ชื่อวิชา (title) + รหัสคลาส (subtitle) */}
+                          <TableCell className="align-middle">
+                            <div className="flex items-center gap-2">
                               <div
-                                className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5"
+                                className="w-3 h-3 rounded-full flex-shrink-0"
                                 style={{ backgroundColor: getSubjectColor(cls.subjectId) }}
                               />
                               <div className="min-w-0">
-                                <div className="font-medium truncate" title={cls.name}>{cls.name}</div>
-                                <div className="text-xs text-gray-500">{loadingLookup ? '...' : getSubjectName(cls.subjectId)}</div>
+                                <div className="font-medium truncate" title={loadingLookup ? cls.code : getSubjectName(cls.subjectId)}>
+                                  {loadingLookup ? '...' : getSubjectName(cls.subjectId)}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate" title={cls.code}>{cls.code}</div>
                               </div>
                             </div>
                           </TableCell>
                           {isAllBranches && (
-                            <TableCell className="align-top">
+                            <TableCell className="align-middle">
                               {loadingLookup ? <InlineLoading /> : <div className="text-xs">{getBranchName(cls.branchId)}</div>}
                             </TableCell>
                           )}
-                          {/* นักเรียน: ครู + xx/xx */}
-                          <TableCell className="align-top">
-                            <div className="text-xs text-gray-500">{loadingLookup ? '...' : getTeacherName(cls.teacherId)}</div>
-                            <span className={cls.enrolledCount >= cls.maxStudents ? 'text-red-600 font-medium' : ''}>
-                              {cls.enrolledCount}/{cls.maxStudents}
-                            </span>
+                          {/* ครูผู้สอน */}
+                          <TableCell className="align-middle">
+                            {loadingLookup ? (
+                              <InlineLoading />
+                            ) : (
+                              <TeacherBadge name={teacherName} imageUrl={teacher?.profileImage} size="md" />
+                            )}
                           </TableCell>
                           {/* วัน/เวลา */}
-                          <TableCell className="align-top">
+                          <TableCell className="align-middle">
                             <div className="leading-tight">{cls.daysOfWeek.map(d => getDayName(d)).join(', ')}</div>
                             <div className="text-xs text-gray-500">{cls.startTime?.substring(0, 5)}-{cls.endTime?.substring(0, 5)}</div>
                           </TableCell>
-                          {/* ระยะเวลา */}
-                          <TableCell className="text-center align-top">
-                            <div>{formatDate(cls.startDate, 'short')}</div>
-                            <div className="text-xs text-gray-500">-{formatDate(cls.endDate, 'short')}</div>
-                            <div className="text-xs font-medium">
-                              {(classStats[cls.id] || 0) > 0 ? (
-                                <span className="text-blue-600">{classStats[cls.id]}/{cls.totalSessions} ครั้ง</span>
+                          {/* ที่นั่ง: progress bar + เต็ม/ว่าง */}
+                          <TableCell className="align-middle">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className={`font-medium ${seatText}`}>{cls.enrolledCount}/{cls.maxStudents}</span>
+                              {seatFull ? (
+                                <span className="text-red-600 font-medium">เต็ม</span>
                               ) : (
-                                <span>{cls.totalSessions} ครั้ง</span>
+                                <span className="text-gray-400">ว่าง {cls.maxStudents - cls.enrolledCount}</span>
                               )}
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${seatColor}`}
+                                style={{ width: `${Math.min(100, Math.round(seatRatio * 100))}%` }}
+                              />
+                            </div>
+                          </TableCell>
+                          {/* ความคืบหน้า: sessions progress */}
+                          <TableCell className="align-middle">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-gray-700">
+                                {done > 0 ? <span className="text-blue-600 font-medium">{done}/{total}</span> : <span>{total}</span>} ครั้ง
+                              </span>
+                              <span className="text-gray-400">{formatDate(cls.endDate, 'short')}</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-blue-500"
+                                style={{ width: `${progressPct}%` }}
+                              />
                             </div>
                           </TableCell>
                           {/* ราคา */}
-                          <TableCell className="text-right font-medium text-green-600 align-top">
+                          <TableCell className="text-right font-medium text-green-600 align-middle">
                             {formatCurrency(cls.pricing.totalPrice)}
                           </TableCell>
-                          <TableCell className="text-center align-top">
-                            <Badge 
+                          <TableCell className="text-center align-middle">
+                            <Badge
                               className={`${statusColors[cls.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-700'}`}
                               variant={!cls.status ? 'destructive' : 'default'}
                             >
                               {statusLabels[cls.status as keyof typeof statusLabels] || 'ไม่ระบุ'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-center align-top">
+                          <TableCell className="text-center align-middle">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="h-8 w-8 p-0">

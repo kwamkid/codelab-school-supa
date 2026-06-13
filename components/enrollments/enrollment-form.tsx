@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { 
   User, 
   School, 
@@ -490,8 +491,8 @@ export default function EnrollmentForm() {
                         <div>
                           <span className="text-gray-600">เพศ:</span> {selectedStudent.gender === 'M' ? 'ชาย' : 'หญิง'}
                         </div>
-                        <div className="col-span-2 pt-2 border-t">
-                          <span className="text-gray-600">ผู้ปกครอง:</span> {selectedStudent.parentName} 
+                        <div className="col-span-2 pt-2 border-t flex items-center gap-1 flex-wrap">
+                          <span className="text-gray-600">ผู้ปกครอง:</span> <ParentBadge name={selectedStudent.parentName} size="sm" />
                           <span className="text-gray-500 ml-2">({selectedStudent.parentPhone})</span>
                         </div>
                         {selectedStudent.allergies && (
@@ -714,9 +715,9 @@ export default function EnrollmentForm() {
                         <p className="text-sm text-gray-600 mt-1">
                           {selectedStudent.nickname} ({selectedStudent.name})
                         </p>
-                        <p className="text-sm text-gray-600">
-                          ผู้ปกครอง: {selectedStudent.parentName}
-                        </p>
+                        <span className="text-sm text-gray-600 flex items-center gap-1">
+                          ผู้ปกครอง: <ParentBadge name={selectedStudent.parentName} size="sm" />
+                        </span>
                       </div>
                       
                       <div className="border-t pt-4">

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from "@/components/ui/badge";
+import { ParentBadge } from "@/components/ui/parent-badge";
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -753,7 +754,7 @@ export default function RegistrationList({
                     <TableRow key={registration.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{registration.parentName}</p>
+                          <ParentBadge name={registration.parentName} size="sm" />
                           <p className="text-sm text-gray-500">
                             ลงทะเบียน: {formatDate(registration.registeredAt, 'short')}
                           </p>
@@ -958,7 +959,7 @@ export default function RegistrationList({
                       <div className="flex-1 space-y-2">
                         <div className="flex justify-between items-start gap-2">
                           <div>
-                            <p className="font-medium">{registration.parentName}</p>
+                            <ParentBadge name={registration.parentName} size="sm" />
                             <div className="flex items-center gap-3 text-sm text-gray-500 mt-1 flex-wrap">
                               <span className="flex items-center gap-1">
                                 <Phone className="h-3 w-3" />
@@ -1064,7 +1065,7 @@ export default function RegistrationList({
               <div className="space-y-2">
                 <h3 className="font-medium">ข้อมูลผู้ปกครอง</h3>
                 <div className="space-y-2 text-sm">
-                  <p><span className="text-gray-500">ชื่อ:</span> {selectedRegistration.parentName}</p>
+                  <span className="flex items-center gap-1"><span className="text-gray-500">ชื่อ:</span> <ParentBadge name={selectedRegistration.parentName} size="sm" /></span>
                   <p><span className="text-gray-500">เบอร์โทร:</span> {formatPhoneNumber(selectedRegistration.parentPhone)}</p>
                   {selectedRegistration.parentEmail && (
                     <p><span className="text-gray-500">อีเมล:</span> {selectedRegistration.parentEmail}</p>

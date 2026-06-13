@@ -9,6 +9,7 @@ import { generateLinkToken } from '@/lib/services/link-tokens';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import {
@@ -209,7 +210,13 @@ export default function ParentDetailPage() {
             </div>
           )}
           <div className="flex-1">
-            <h1 className="text-xl sm:text-3xl font-bold text-gray-900">{parent.displayName}</h1>
+            <ParentBadge
+              name={parent.displayName}
+              imageUrl={parent.pictureUrl}
+              showAvatar={false}
+              size="lg"
+              className="text-xl sm:text-3xl font-bold text-gray-900"
+            />
             <div className="flex items-center gap-4 mt-2">
               {parent.lineUserId && (
                 <Badge className="bg-green-100 text-green-700">
@@ -449,16 +456,13 @@ export default function ParentDetailPage() {
                   {/* LINE Profile */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
-                      {parent.pictureUrl && (
-                        <img
-                          src={parent.pictureUrl}
-                          alt={parent.lineDisplayName || parent.displayName}
-                          className="w-12 h-12 rounded-full"
-                        />
-                      )}
                       <div>
-                        <p className="font-medium">{parent.lineDisplayName || parent.displayName}</p>
-                        <p className="text-xs text-gray-500">LINE Display Name</p>
+                        <ParentBadge
+                          name={parent.lineDisplayName || parent.displayName}
+                          imageUrl={parent.pictureUrl}
+                          size="lg"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">LINE Display Name</p>
                       </div>
                     </div>
                     

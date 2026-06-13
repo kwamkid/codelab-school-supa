@@ -15,7 +15,9 @@ import { Student } from '@/types/models';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
+import { TeacherBadge } from '@/components/ui/teacher-badge';
+import { ParentBadge } from '@/components/ui/parent-badge';
+import {
   ChevronLeft,
   Edit,
   Trash2,
@@ -482,7 +484,7 @@ export default function ClassDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">ครูผู้สอน</p>
-                  <p className="font-medium">{teacher.nickname || teacher.name}</p>
+                  <TeacherBadge name={teacher.nickname || teacher.name} imageUrl={teacher.profileImage} size="md" />
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">จำนวนนักเรียน</p>
@@ -574,7 +576,7 @@ export default function ClassDetailPage() {
                             <TableCell className="font-medium">{student.name}</TableCell>
                             <TableCell>{student.nickname || '-'}</TableCell>
                             <TableCell>{age} ปี</TableCell>
-                            <TableCell>{student.parentName}</TableCell>
+                            <TableCell><ParentBadge name={student.parentName} size="sm" /></TableCell>
                             <TableCell>
                               {student.parentPhone ? (
                                 <a href={`tel:${student.parentPhone}`} className="text-blue-600 hover:underline">

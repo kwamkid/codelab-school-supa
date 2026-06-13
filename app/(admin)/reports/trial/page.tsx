@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ParentBadge } from '@/components/ui/parent-badge'
 import { Pagination, usePagination } from '@/components/ui/pagination'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import {
@@ -470,8 +471,8 @@ export default function TrialReportPage() {
                       <TableCell>
                         <div className="font-medium">{session.student_name}</div>
                         {session.parent_name && (
-                          <div className="text-xs text-muted-foreground">
-                            ผู้ปกครอง: {session.parent_name}
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            ผู้ปกครอง: <ParentBadge name={session.parent_name} size="sm" />
                           </div>
                         )}
                       </TableCell>

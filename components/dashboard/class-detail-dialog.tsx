@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { TeacherBadge } from "@/components/ui/teacher-badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CalendarEvent } from '@/lib/services/dashboard';
 import {
@@ -361,18 +361,12 @@ export default function ClassDetailDialog({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6 shrink-0 ring-1 ring-gray-200">
-                {(teacherOverride?.image ?? event.extendedProps.teacherImage) ? (
-                  <AvatarImage src={teacherOverride?.image ?? event.extendedProps.teacherImage} alt={teacherOverride?.name ?? event.extendedProps.teacherName} />
-                ) : null}
-                <AvatarFallback className="bg-gray-200 text-gray-600 text-[10px]">
-                  {((teacherOverride?.name ?? event.extendedProps.teacherName) || '?').trim().slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm">
-                <span className="text-gray-500">ครูผู้สอน:</span>{' '}
-                <span className="font-medium">{teacherOverride?.name ?? event.extendedProps.teacherName}</span>
-              </span>
+              <span className="text-gray-500 text-sm">ครูผู้สอน:</span>
+              <TeacherBadge
+                name={teacherOverride?.name ?? event.extendedProps.teacherName}
+                imageUrl={teacherOverride?.image ?? event.extendedProps.teacherImage}
+                size="sm"
+              />
               <button
                 onClick={() => setShowChangeTeacher(true)}
                 className="ml-auto inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
