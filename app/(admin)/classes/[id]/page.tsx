@@ -30,6 +30,7 @@ import {
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { ChangeResourceDialog } from '@/components/classes/change-resource-dialog';
+import { ClassPrintMenu } from '@/components/classes/class-print-menu';
 import { formatDate, formatCurrency, getDayName } from '@/lib/utils';
 import {
   AlertDialog,
@@ -434,9 +435,22 @@ export default function ClassDetailPage() {
             </h1>
             <p className="text-gray-600 mt-1">รหัสคลาส: {classData.code}</p>
           </div>
-          <Badge className={statusColors[classData.status as keyof typeof statusColors]}>
-            {statusLabels[classData.status as keyof typeof statusLabels]}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <ClassPrintMenu
+              classId={classData.id}
+              teacherId={classData.teacherId}
+              isCompleted={classData.status === 'completed'}
+              students={enrolledStudents.map((s) => ({
+                id: s.id,
+                name: s.name,
+                nickname: s.nickname,
+                parentName: s.parentName,
+              }))}
+            />
+            <Badge className={statusColors[classData.status as keyof typeof statusColors]}>
+              {statusLabels[classData.status as keyof typeof statusLabels]}
+            </Badge>
+          </div>
         </div>
       </div>
 
@@ -595,7 +609,7 @@ export default function ClassDetailPage() {
         {/* Side Info */}
         <div className="space-y-6">
           {/* Attendance - Prominent Button */}
-          <Link href={`/classes/${classId}/attendance`} className="block">
+          <Link href={`/attendance/${classId}`} className="block">
             <Button className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 text-white">
               <Calendar className="h-5 w-5 mr-2" />
               เช็คชื่อเข้าเรียน

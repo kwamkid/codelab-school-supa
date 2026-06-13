@@ -73,6 +73,8 @@ export async function getClasses(branchId?: string, teacherId?: string): Promise
     let query = supabase
       .from(TABLE_NAME)
       .select('*')
+      // Most recently-ended classes first; classes without an end date sink last.
+      .order('end_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
     if (branchId) {

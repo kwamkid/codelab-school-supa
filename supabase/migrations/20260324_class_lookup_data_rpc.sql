@@ -33,13 +33,14 @@ BEGIN
     ORDER BY name
   ) s;
 
-  -- Active teachers (filter by branch if provided)
+  -- Teachers — include inactive (soft-deleted) so class rows can resolve their
+  -- names (superseded by 20260612 migration). Branch filter still applies; client
+  -- filters by is_active for dropdowns.
   SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) INTO v_teachers
   FROM (
     SELECT id, name, nickname, specialties, available_branches, is_active
     FROM teachers
-    WHERE is_active = true
-      AND (p_branch_id IS NULL OR available_branches @> ARRAY[p_branch_id::text])
+    WHERE (p_branch_id IS NULL OR available_branches @> ARRAY[p_branch_id::text])
     ORDER BY name
   ) t;
 

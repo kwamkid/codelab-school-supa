@@ -5,7 +5,10 @@
 
 import type { StudentClassReport } from '@/lib/supabase/services/student-report';
 import { generateStudentReportHTML } from '@/components/reports/report-template';
-import { generateCertificateHTML, certDate, type CertificateFields } from '@/components/reports/certificate-template';
+import {
+  generateCertificateHTML, generateCertificatesHTML, certDate,
+  type CertificateFields,
+} from '@/components/reports/certificate-template';
 
 // Open a hidden iframe with the document's own styles and trigger print.
 // (Standalone — unlike invoices/openPrintWindow it does not force invoice A4
@@ -104,6 +107,12 @@ export function printCertificateFields(fields: CertificateFields): void {
   openPrint(title, body, css);
 }
 
+/** Print many certificates (one per fields entry) as a single multi-page file. */
+export function printCertificatesFields(list: CertificateFields[]): void {
+  const { title, body, css } = generateCertificatesHTML(list);
+  openPrint(title, body, css);
+}
+
 /** Print the certificate (caller should ensure the class is completed). */
 export async function printCertificate(
   endpoint: string,
@@ -111,4 +120,37 @@ export async function printCertificate(
 ): Promise<void> {
   const fields = await loadCertFields(endpoint, payload);
   printCertificateFields(fields);
+}
+
+// ── Whole-class batch printing ──────────────────────────────────────────────
+
+const REPORT_ENDPOINT = '/api/admin/reports/student-report';
+
+/** Print one report per student in the class, as a single multi-page document. */
+export async function printClassReports(classId: string, studentIds: string[]): Promise<void> {
+  const [reports, logo] = await Promise.all([
+    Promise.all(studentIds.map((studentId) => fetchReport(REPORT_ENDPOINT, { studentId, classId }))),
+    loadLogoSvg(),
+  ]);
+  // Each report's generated CSS is identical; use the first, concat the bodies.
+  const pages = reports.map((r) => generateStudentReportHTML(r, logo));
+  const css = pages[0]?.css ?? '';
+  const body = pages
+    .map((p) => `<div style="break-after:page">${p.body}</div>`)
+    .join('\n');
+  openPrint(`Reports (${pages.length})`, body, css);
+}
+
+/** Print one certificate per student in the class, as a single multi-page document. */
+export async function printClassCertificates(classId: string, studentIds: string[]): Promise<void> {
+  const reports = await Promise.all(
+    studentIds.map((studentId) => fetchReport(REPORT_ENDPOINT, { studentId, classId }))
+  );
+  const completed = reports.filter((r) => r.isCompleted);
+  if (completed.length === 0) {
+    throw new Error('คลาสนี้ยังไม่จบ ไม่สามารถออกประกาศนียบัตรได้');
+  }
+  const fields = completed.map(certFieldsFromReport);
+  const { title, body, css } = generateCertificatesHTML(fields);
+  openPrint(title, body, css);
 }

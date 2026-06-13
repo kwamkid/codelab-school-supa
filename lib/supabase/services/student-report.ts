@@ -81,16 +81,32 @@ export async function buildStudentClassReport(
   // Subject / branch / default class teacher (parallel)
   const [{ data: subject }, { data: branch }] = await Promise.all([
     supabase.from('subjects').select('name, code').eq('id', cls.subject_id).single(),
-    supabase.from('branches').select('name, address, phone').eq('id', cls.branch_id).single(),
+    supabase.from('branches').select('name, address, phone, invoice_company_id').eq('id', cls.branch_id).single(),
   ]);
 
-  // Active invoice company → letterhead name
-  const { data: company } = await supabase
-    .from('invoice_companies')
-    .select('name')
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
+  // Invoice company for the letterhead = the company assigned to THIS class's
+  // branch (branches.invoice_company_id). Multiple companies can be active, so
+  // picking "any active one" returned the wrong name. Fall back to the first
+  // active company only when the branch has no company assigned.
+  let company: { name: string } | null = null;
+  if (branch?.invoice_company_id) {
+    const { data } = await supabase
+      .from('invoice_companies')
+      .select('name')
+      .eq('id', branch.invoice_company_id)
+      .maybeSingle();
+    company = data;
+  }
+  if (!company) {
+    const { data } = await supabase
+      .from('invoice_companies')
+      .select('name')
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    company = data;
+  }
 
   // All schedules for this class (ordered)
   const { data: schedRows } = await supabase

@@ -107,53 +107,60 @@ export function generateCertificateHTML(
   fields: CertificateFields,
   bgUrl = '/cert-template.png'
 ): { title: string; body: string; css: string } {
-  const f = CERT_FIELDS;
-  const { w: CW, h: CH } = CERT_CANVAS;
+  const body = certBodyHTML(fields);
+  return {
+    title: `Certificate - ${fields.studentName || ''}`.trim(),
+    body,
+    css: certCSS(bgUrl),
+  };
+}
 
-  // Compute the final font px per field NOW (deterministic, via canvas measure),
-  // and bake them in — no JS shrink in the print iframe. Same computation the
-  // preview uses, so they match exactly.
-  // Uppercase everything first, then measure + display the same text.
-  const txt = {
+/**
+ * Build ONE certificate's `.cert-scale` block. Font-size is inline per field
+ * (cqw computed from fitFontPx), so multiple certs can share one stylesheet and
+ * be concatenated into a single multi-page document.
+ */
+function certBodyHTML(fields: CertificateFields): string {
+  const f = CERT_FIELDS;
+  const { w: CW } = CERT_CANVAS;
+  const cqw = (canvasPx: number) => `${((canvasPx / CW) * 100).toFixed(4)}cqw`;
+
+  // Uppercase first, then measure + display the same text (so shrink agrees).
+  const keys = ['subject', 'student', 'teacher', 'date'] as const;
+  const text: Record<typeof keys[number], string> = {
     subject: certText(fields.subjectName),
     student: certText(fields.studentName),
     teacher: certText(fields.teacherName),
     date: certText(fields.date),
   };
-  const px = {
-    subject: fitFontPx(txt.subject, f.subject),
-    student: fitFontPx(txt.student, f.student),
-    teacher: fitFontPx(txt.teacher, f.teacher),
-    date: fitFontPx(txt.date, f.date),
+
+  const span = (key: typeof keys[number]) => {
+    const fd = f[key];
+    const px = fitFontPx(text[key], fd);
+    const style = [
+      `top:${fd.top}%`, `left:${fd.left}%`, `color:${fd.color}`,
+      `font-weight:${fd.weight}`, `font-size:${cqw(px)}`,
+      `letter-spacing:${fd.spacing}px`,
+    ].join(';');
+    return `<div class="cf" style="${style}">${esc(text[key])}</div>`;
   };
 
-  const span = (key: keyof typeof CERT_FIELDS, text: string) =>
-    `<div class="cf cf-${key}">${esc(text)}</div>`;
-
-  const body = `
+  return `
     <div class="cert-scale">
-      <div class="cert">
-        ${span('subject', txt.subject)}
-        ${span('student', txt.student)}
-        ${span('teacher', txt.teacher)}
-        ${span('date', txt.date)}
-      </div>
+      <div class="cert">${keys.map(span).join('')}</div>
     </div>`;
+}
 
-  // The certificate fills the A4 page directly (no transform scaling — that broke
-  // the background in some print engines). Field positions are %, so they're
-  // resolution-independent. Font px were computed on the 2000px canvas, so scale
-  // them to the printed width (297mm). em is relative to the canvas width: 1
-  // canvas-px = (100/CW)% of width; we express font-size in cqw so it tracks the
-  // real printed width regardless of DPI.
-  const cqw = (canvasPx: number) => `${((canvasPx / CW) * 100).toFixed(4)}cqw`;
-
-  const css = `
+/** Shared stylesheet for one or many certificates. */
+function certCSS(bgUrl: string): string {
+  return `
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @page { size: A4 landscape; margin: 0; }
     html, body { margin: 0; padding: 0; }
     body { font-family: 'IBM Plex Sans Thai', sans-serif; }
-    .cert-scale { width: 297mm; height: 209.9mm; }
+    /* page-break between certs when printing a whole class */
+    .cert-scale { width: 297mm; height: 209.9mm; break-after: page; }
+    .cert-scale:last-child { break-after: auto; }
     .cert {
       position: relative;
       width: 297mm; height: 209.9mm;        /* matches 2000x1414 ratio */
@@ -163,16 +170,17 @@ export function generateCertificateHTML(
     .cf {
       position: absolute; transform: translate(-50%, -50%);
       text-align: center; white-space: nowrap; line-height: 1;
-    }
-    .cf-subject { top:${f.subject.top}%; left:${f.subject.left}%; color:${f.subject.color}; font-weight:${f.subject.weight}; font-size:${cqw(px.subject)}; letter-spacing:${f.subject.spacing}px; }
-    .cf-student { top:${f.student.top}%; left:${f.student.left}%; color:${f.student.color}; font-weight:${f.student.weight}; font-size:${cqw(px.student)}; }
-    .cf-teacher { top:${f.teacher.top}%; left:${f.teacher.left}%; color:${f.teacher.color}; font-weight:${f.teacher.weight}; font-size:${cqw(px.teacher)}; letter-spacing:${f.teacher.spacing}px; }
-    .cf-date    { top:${f.date.top}%;    left:${f.date.left}%;    color:${f.date.color};    font-weight:${f.date.weight};    font-size:${cqw(px.date)}; }
-  `;
+    }`;
+}
 
+/** Build a multi-page document: one certificate per fields entry. */
+export function generateCertificatesHTML(
+  list: CertificateFields[],
+  bgUrl = '/cert-template.png'
+): { title: string; body: string; css: string } {
   return {
-    title: `Certificate - ${fields.studentName || ''}`.trim(),
-    body,
-    css,
+    title: `Certificates (${list.length})`,
+    body: list.map(certBodyHTML).join('\n'),
+    css: certCSS(bgUrl),
   };
 }

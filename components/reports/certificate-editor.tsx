@@ -23,6 +23,8 @@ interface Props {
   actions?: React.ReactNode;
   /** Hide the built-in footer print button (caller renders its own, e.g. header). */
   hidePrintButton?: boolean;
+  /** Called right before printing (e.g. to persist edited names). Awaited. */
+  onBeforePrint?: (fields: CertificateFields) => Promise<void> | void;
 }
 
 /** Print the given certificate fields. Exported so a header button can call it. */
@@ -64,7 +66,7 @@ function Field({ k, text }: { k: keyof typeof POS; text: string }) {
   );
 }
 
-export function CertificateEditor({ value, onChange, actions, hidePrintButton }: Props) {
+export function CertificateEditor({ value, onChange, actions, hidePrintButton, onBeforePrint }: Props) {
   const [printing, setPrinting] = useState(false);
   const [fontsReady, setFontsReady] = useState(false); // re-measure once font loads
 
@@ -79,9 +81,13 @@ export function CertificateEditor({ value, onChange, actions, hidePrintButton }:
   const set = (k: keyof CertificateFields) => (e: React.ChangeEvent<HTMLInputElement>) =>
     onChange({ ...value, [k]: e.target.value });
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     setPrinting(true);
     try {
+      await onBeforePrint?.(value); // persist edited names first, if wired
+      printCertificateFields(value);
+    } catch (e: any) {
+      // printing still proceeds even if the save failed — don't block the print
       printCertificateFields(value);
     } finally {
       setTimeout(() => setPrinting(false), 1500);

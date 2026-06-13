@@ -86,9 +86,7 @@ import IssueRefundNoteDialog from '@/components/invoices/issue-refund-note-dialo
 import RequestTaxInvoiceDialog from '@/components/invoices/request-tax-invoice-dialog';
 import { useDocumentPrint } from '@/hooks/useDocumentPrint';
 import PrintDialogs from '@/components/shared/print-dialogs';
-import { printStudentReport } from '@/lib/reports/print-student-report';
-import { CertificateDialog } from '@/components/reports/certificate-dialog';
-import { FileText, Award } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { getInvoiceCompany } from '@/lib/services/invoice-companies';
 import { InvoiceCompany } from '@/types/models';
 
@@ -544,25 +542,6 @@ export default function EnrollmentDetailPage() {
     print.printReceipt(id);
   };
 
-  const handlePrintReport = async () => {
-    if (!enrollment) return;
-    try {
-      await printStudentReport('/api/admin/reports/student-report', {
-        studentId: enrollment.studentId,
-        classId: enrollment.classId,
-      });
-    } catch (e: any) {
-      toast.error(e?.message || 'พิมพ์รายงานไม่สำเร็จ');
-    }
-  };
-
-  const [certDialogOpen, setCertDialogOpen] = useState(false);
-
-  const handlePrintCertificate = () => {
-    if (!enrollment) return;
-    setCertDialogOpen(true);
-  };
-
   if (loading) {
     return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
@@ -593,28 +572,6 @@ export default function EnrollmentDetailPage() {
         </Link>
         
         <div className="flex gap-2">
-          {/* Student Report / Certificate */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <FileText className="h-4 w-4 mr-2" />
-                พิมพ์รายงาน
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handlePrintReport}>
-                <FileText className="h-4 w-4 mr-2" />
-                รายงานความเห็นครู
-              </DropdownMenuItem>
-              {classData?.status === 'completed' && (
-                <DropdownMenuItem onClick={handlePrintCertificate}>
-                  <Award className="h-4 w-4 mr-2" />
-                  ประกาศนียบัตร
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           {/* Print Document Dropdown */}
           {(invoices.length > 0 || creditNotes.length > 0) && (
             <DropdownMenu>
@@ -1405,17 +1362,6 @@ export default function EnrollmentDetailPage() {
 
       {/* Print Dialogs (shared) */}
       <PrintDialogs print={print} />
-
-      {/* Certificate (prefilled, editable, can save EN names back) */}
-      {enrollment && (
-        <CertificateDialog
-          open={certDialogOpen}
-          onOpenChange={setCertDialogOpen}
-          studentId={enrollment.studentId}
-          classId={enrollment.classId}
-          teacherId={classData?.teacherId}
-        />
-      )}
 
       {/* Issue Credit Note Dialog */}
       <IssueCreditNoteDialog

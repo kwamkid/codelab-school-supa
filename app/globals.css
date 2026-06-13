@@ -12,12 +12,14 @@
     --popover-foreground: 216 38.5% 5.1%;
     --primary: 3.3 85% 58.2%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Light grays for secondary/muted/accent (was dark navy, which made hover
+       states + secondary badges flash dark in the admin app). */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
@@ -37,16 +39,9 @@
     --cl-line: #00b900;
   }
 
-  /* LIFF parent portal: the base light theme sets secondary/muted/accent to a
-     dark navy (so outline/ghost buttons flash dark on press and secondary badges
-     are dark). Override to proper light grays — scoped to LIFF only so the admin
-     app is untouched. Also soften card borders for a frame-light mobile look. */
+  /* LIFF parent portal: soften card borders for a frame-light mobile look.
+     (secondary/muted/accent now inherit the corrected light grays from :root.) */
   .liff-theme {
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
     --border: 220 14% 96%;
   }
 
