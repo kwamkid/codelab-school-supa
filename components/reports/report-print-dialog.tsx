@@ -82,8 +82,8 @@ export function ReportPrintDialog({ open, onOpenChange, classId, students }: Pro
         </div>
 
         {students.length > 0 && (
-          <div className="pt-3 border-t">
-            <Button onClick={printAll} disabled={busy} className="w-full">
+          <div className="pt-3 border-t flex justify-end">
+            <Button onClick={printAll} disabled={busy}>
               <Printer className="h-4 w-4 mr-2" />
               พิมพ์ทั้งหมด ({students.length} คน)
             </Button>

@@ -190,8 +190,8 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
               ))}
             </div>
             {students.length > 0 && (
-              <div className="pt-3 border-t">
-                <Button onClick={openBatch} disabled={busy} className="w-full">
+              <div className="pt-3 border-t flex justify-end">
+                <Button onClick={openBatch} disabled={busy}>
                   <Users className="h-4 w-4 mr-2" />
                   พิมพ์ทั้งหมด ({students.length} คน)
                 </Button>
@@ -240,8 +240,8 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
                 </tbody>
               </table>
             </div>
-            <div className="pt-3 border-t">
-              <Button onClick={printBatch} disabled={busy} className="w-full">
+            <div className="pt-3 border-t flex justify-end">
+              <Button onClick={printBatch} disabled={busy}>
                 <Printer className="h-4 w-4 mr-2" />
                 {busy ? 'กำลังพิมพ์...' : `พิมพ์ทั้งหมด (${rows.length} ใบ)`}
               </Button>
