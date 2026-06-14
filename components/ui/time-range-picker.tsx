@@ -48,6 +48,23 @@ interface TimePickerDropdownProps {
   className?: string
 }
 
+// Normalize free-typed input into "HH:MM" (24h). Accepts "9", "930", "9:3",
+// "9.30", "0930" etc. Returns '' if it can't make a valid time.
+function normalizeTimeInput(raw: string): string {
+  const digits = raw.replace(/[^0-9]/g, '')
+  if (!digits) return ''
+  let h: number, m: number
+  if (digits.length <= 2) {
+    h = parseInt(digits, 10); m = 0
+  } else if (digits.length === 3) {
+    h = parseInt(digits.slice(0, 1), 10); m = parseInt(digits.slice(1), 10)
+  } else {
+    h = parseInt(digits.slice(0, 2), 10); m = parseInt(digits.slice(2, 4), 10)
+  }
+  if (isNaN(h) || isNaN(m) || h > 23 || m > 59) return ''
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 function TimePickerDropdown({
   value,
   onChange,
@@ -59,9 +76,25 @@ function TimePickerDropdown({
   className,
 }: TimePickerDropdownProps) {
   const [open, setOpen] = React.useState(false)
+  const [text, setText] = React.useState(value || '')
   const listRef = React.useRef<HTMLDivElement>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
 
   const slots = React.useMemo(() => generateTimeSlots(step, min, max), [step, min, max])
+
+  // Keep the input text in sync when the value changes from outside (e.g. start
+  // time auto-sets end time), but not while the user is actively typing.
+  React.useEffect(() => {
+    if (!open) setText(value || '')
+  }, [value, open])
+
+  // Filter the slot list by what's typed (digits only, prefix match).
+  const filtered = React.useMemo(() => {
+    const q = text.replace(/[^0-9:]/g, '')
+    if (!q) return slots
+    const norm = q.replace(/:/g, '')
+    return slots.filter((s) => s.replace(/:/g, '').startsWith(norm) || s.startsWith(q))
+  }, [slots, text])
 
   // Scroll to selected time when opened
   React.useEffect(() => {
@@ -80,29 +113,65 @@ function TimePickerDropdown({
     setTimeout(tryScroll, 0)
   }, [open, value])
 
+  const commit = (raw: string) => {
+    const normalized = normalizeTimeInput(raw)
+    if (normalized) {
+      onChange(normalized)
+      setText(normalized)
+    } else {
+      setText(value || '') // revert invalid input
+    }
+  }
+
+  const pick = (slot: string) => {
+    onChange(slot)
+    setText(slot)
+    setOpen(false)
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          value={text}
           disabled={disabled}
+          placeholder={placeholder}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onChange={(e) => {
+            setText(e.target.value)
+            if (!open) setOpen(true)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              // Prefer the top filtered suggestion, else parse what's typed.
+              if (filtered.length > 0 && text.replace(/[^0-9:]/g, '')) pick(filtered[0])
+              else commit(text)
+              setOpen(false)
+            } else if (e.key === 'Escape') {
+              setText(value || '')
+              setOpen(false)
+            }
+          }}
+          onBlur={() => commit(text)}
           className={cn(
-            'w-full h-10 justify-between font-normal text-base',
-            !value && 'text-muted-foreground',
+            'w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-base',
+            'ring-offset-background placeholder:text-muted-foreground',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            'disabled:cursor-not-allowed disabled:opacity-50',
             className
           )}
-        >
-          <span className="truncate">
-            {value ? formatTimeDisplay(value) : placeholder}
-          </span>
-        </Button>
+        />
       </PopoverTrigger>
       <PopoverContent
         className="w-[120px] p-0"
         align="start"
         collisionPadding={8}
+        onOpenAutoFocus={(e) => e.preventDefault()}
         onWheel={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
       >
@@ -113,24 +182,26 @@ function TimePickerDropdown({
           onWheel={(e) => e.stopPropagation()}
           onTouchMove={(e) => e.stopPropagation()}
         >
-          {slots.map((slot) => (
-            <button
-              key={slot}
-              type="button"
-              data-value={slot}
-              onClick={() => {
-                onChange(slot)
-                setOpen(false)
-              }}
-              className={cn(
-                'flex w-full items-center justify-center rounded-sm px-2 py-1.5 text-sm outline-none select-none',
-                'hover:bg-accent hover:text-accent-foreground',
-                value === slot && 'bg-accent/10 font-medium'
-              )}
-            >
-              {formatTimeDisplay(slot)}
-            </button>
-          ))}
+          {filtered.length === 0 ? (
+            <div className="py-3 text-center text-sm text-muted-foreground">ไม่พบเวลา</div>
+          ) : (
+            filtered.map((slot) => (
+              <button
+                key={slot}
+                type="button"
+                data-value={slot}
+                onMouseDown={(e) => e.preventDefault()} // keep input from blurring first
+                onClick={() => pick(slot)}
+                className={cn(
+                  'flex w-full items-center justify-center rounded-sm px-2 py-1.5 text-sm outline-none select-none',
+                  'hover:bg-accent hover:text-accent-foreground',
+                  value === slot && 'bg-accent/10 font-medium'
+                )}
+              >
+                {formatTimeDisplay(slot)}
+              </button>
+            ))
+          )}
         </div>
       </PopoverContent>
     </Popover>

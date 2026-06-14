@@ -88,17 +88,30 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    // Transform to expected format
-    const transformedSchedules = (schedules || []).map(schedule => ({
-      id: schedule.id,
-      eventId: schedule.event_id,
-      date: schedule.date,
-      startTime: schedule.start_time,
-      endTime: schedule.end_time,
-      maxAttendees: schedule.max_attendees,
-      attendeesByBranch: schedule.attendees_by_branch || {},
-      status: schedule.status
-    }))
+    // Transform to expected format. Derive status from live seat counts rather
+    // than the stored `status` field, which can go stale (reset to 'available' on
+    // any cancellation, ignores per-branch quotas) — keeps it consistent with the
+    // admin view and prevents booking a full slot. A cancelled slot stays cancelled.
+    const transformedSchedules = (schedules || []).map(schedule => {
+      const attendeesByBranch = schedule.attendees_by_branch || {}
+      const totalAttendees = Object.values(attendeesByBranch).reduce(
+        (sum: number, c: any) => sum + (Number(c) || 0), 0
+      )
+      const remaining = (schedule.max_attendees ?? 0) - totalAttendees
+      const status = schedule.status === 'cancelled'
+        ? 'cancelled'
+        : (remaining > 0 ? 'available' : 'full')
+      return {
+        id: schedule.id,
+        eventId: schedule.event_id,
+        date: schedule.date,
+        startTime: schedule.start_time,
+        endTime: schedule.end_time,
+        maxAttendees: schedule.max_attendees,
+        attendeesByBranch,
+        status
+      }
+    })
 
     return NextResponse.json({ schedules: transformedSchedules })
   } catch (error: any) {

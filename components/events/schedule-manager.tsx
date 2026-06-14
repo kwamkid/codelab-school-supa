@@ -176,6 +176,16 @@ export default function ScheduleManager({ eventId, schedules, onUpdate }: Schedu
     return Object.values(schedule.attendeesByBranch || {}).reduce((sum, count) => sum + count, 0);
   };
 
+  // Derive the display status from live seat counts rather than the stored
+  // `status` field, which can go stale (e.g. it's reset to 'available' on any
+  // cancellation and ignores per-branch quotas) — so it disagreed with คงเหลือ.
+  // A genuinely cancelled slot still shows 'cancelled'.
+  const getDisplayStatus = (schedule: EventSchedule): string => {
+    if (schedule.status === 'cancelled') return 'cancelled';
+    const remaining = schedule.maxAttendees - getTotalAttendees(schedule);
+    return remaining > 0 ? 'available' : 'full';
+  };
+
   return (
     <div className="space-y-6">
       {/* Add Schedule Button */}
@@ -264,9 +274,14 @@ export default function ScheduleManager({ eventId, schedules, onUpdate }: Schedu
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge className={getStatusColor(schedule.status)}>
-                            {getStatusText(schedule.status)}
-                          </Badge>
+                          {(() => {
+                            const displayStatus = getDisplayStatus(schedule);
+                            return (
+                              <Badge className={getStatusColor(displayStatus)}>
+                                {getStatusText(displayStatus)}
+                              </Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">

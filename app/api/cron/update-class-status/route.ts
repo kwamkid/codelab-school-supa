@@ -52,6 +52,8 @@ export async function GET(request: NextRequest) {
       classesChecked: 0,
       classesCompleted: 0,
       classesStarted: 0,
+      eventsChecked: 0,
+      eventsCompleted: 0,
       errors: [] as string[]
     }
 
@@ -147,17 +149,76 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log('\n=== Class status update completed ===')
+    // 3. Mark published events as 'completed' once their LAST schedule day has passed.
+    console.log('\n--- Checking for completed events ---')
+
+    // `events`/`event_schedules` aren't in the generated Database types → cast to any.
+    const { data: publishedEvents, error: eventsError } = await (supabase as any)
+      .from('events')
+      .select('id, name, status')
+      .eq('status', 'published')
+
+    if (eventsError) {
+      console.error('Error fetching events:', eventsError)
+      throw eventsError
+    }
+
+    console.log(`Found ${publishedEvents?.length || 0} published events`)
+
+    for (const ev of (publishedEvents || []) as any[]) {
+      try {
+        results.eventsChecked++
+
+        // The event's last day = max schedule date. If there's no schedule, skip.
+        const { data: schedules } = await (supabase as any)
+          .from('event_schedules')
+          .select('date')
+          .eq('event_id', ev.id)
+          .order('date', { ascending: false })
+          .limit(1)
+
+        const lastDateStr = schedules?.[0]?.date
+        if (!lastDateStr) {
+          console.log(`Event "${ev.name}" (${ev.id}) has no schedules — skip`)
+          continue
+        }
+
+        const lastDay = new Date(lastDateStr)
+        lastDay.setHours(23, 59, 59, 999) // end of the last event day
+
+        if (lastDay < now) {
+          console.log(`  ✓ Event "${ev.name}" past last day (${lastDateStr}) → completed`)
+          const { error: updateError } = await (supabase as any)
+            .from('events')
+            .update({ status: 'completed' })
+            .eq('id', ev.id)
+
+          if (updateError) {
+            console.error(`  ✗ Error updating event:`, updateError)
+            results.errors.push(`Event ${ev.id}: ${updateError.message}`)
+          } else {
+            results.eventsCompleted++
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing event ${ev.id}:`, error)
+        results.errors.push(`Event ${ev.id}: ${error}`)
+      }
+    }
+
+    console.log('\n=== Class & event status update completed ===')
     console.log('Summary:', {
       classesChecked: results.classesChecked,
       classesCompleted: results.classesCompleted,
       classesStarted: results.classesStarted,
+      eventsChecked: results.eventsChecked,
+      eventsCompleted: results.eventsCompleted,
       errors: results.errors.length
     })
 
     return NextResponse.json({
       success: true,
-      message: `Updated ${results.classesCompleted} completed classes, ${results.classesStarted} started classes`,
+      message: `Updated ${results.classesCompleted} completed classes, ${results.classesStarted} started classes, ${results.eventsCompleted} completed events`,
       details: results,
       timestamp: now.toISOString()
     })

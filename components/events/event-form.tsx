@@ -180,10 +180,12 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
   };
 
   const handleUpdateScheduleBranch = (tempId: string, branchId: string, value: string) => {
-    setSchedules(schedules.map(s => {
+    // Functional update: build on the LATEST state so rapid edits to two branch
+    // inputs don't clobber each other via a stale `schedules` closure (which made
+    // the "รวม" total miss a branch — e.g. 4+4 showed 4).
+    setSchedules(prev => prev.map(s => {
       if (s.tempId !== tempId) return s;
       const updated = { ...s.maxAttendeesByBranch, [branchId]: value };
-      // Auto-calculate total
       const total = Object.values(updated).reduce((sum, v) => sum + (parseInt(v) || 0), 0);
       return { ...s, maxAttendeesByBranch: updated, maxAttendees: total.toString() };
     }));
@@ -890,7 +892,12 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                         })}
                         <div className="flex items-center gap-2 text-sm text-gray-500 ml-2">
                           <span>รวม:</span>
-                          <Badge variant="secondary">{schedule.maxAttendees || '0'} คน</Badge>
+                          <Badge variant="secondary">
+                            {formData.branchIds.reduce(
+                              (sum, bid) => sum + (parseInt(schedule.maxAttendeesByBranch[bid] || '0') || 0),
+                              0
+                            )} คน
+                          </Badge>
                         </div>
                       </div>
                     )}
