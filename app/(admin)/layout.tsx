@@ -505,6 +505,13 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       requiredRole: ['super_admin', 'branch_admin']
     },
     {
+      name: 'ผู้ช่วยจัดตาราง',
+      href: '/classes/assistant',
+      icon: CalendarDays,
+      iconColor: 'text-violet-500',
+      requiredRole: ['super_admin', 'branch_admin']
+    },
+    {
       name: 'ข้อมูลพื้นฐาน',
       icon: Building,
       iconColor: 'text-cyan-500',

@@ -78,6 +78,8 @@ function TimePickerDropdown({
   const [open, setOpen] = React.useState(false)
   // Display HH:MM only — value from DB may be "HH:MM:SS", strip the seconds.
   const [text, setText] = React.useState(formatTimeDisplay(value))
+  // Keyboard-navigation highlight (index into `filtered`); -1 = none.
+  const [highlight, setHighlight] = React.useState(-1)
   const listRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -89,30 +91,66 @@ function TimePickerDropdown({
     if (!open) setText(formatTimeDisplay(value))
   }, [value, open])
 
-  // Filter the slot list by what's typed (digits only, prefix match).
+  // Filter the slot list by what's typed. Accepts "8", "8:", "8.00", "8:3",
+  // "0800", "830" etc. Splits on the first ':' or '.' into hour + minute parts;
+  // hour matches with or without a leading zero ("8" → 08), minute is a prefix.
   const filtered = React.useMemo(() => {
-    const q = text.replace(/[^0-9:]/g, '')
-    if (!q) return slots
-    const norm = q.replace(/:/g, '')
-    return slots.filter((s) => s.replace(/:/g, '').startsWith(norm) || s.startsWith(q))
+    const raw = text.trim()
+    if (!raw) return slots
+
+    const sep = raw.search(/[:.]/)
+    let hourPart: string
+    let minPart: string | null
+    if (sep >= 0) {
+      hourPart = raw.slice(0, sep).replace(/[^0-9]/g, '')
+      minPart = raw.slice(sep + 1).replace(/[^0-9]/g, '')
+    } else {
+      const digits = raw.replace(/[^0-9]/g, '')
+      if (digits.length <= 2) { hourPart = digits; minPart = null }
+      else { hourPart = digits.slice(0, digits.length - 2); minPart = digits.slice(-2) }
+    }
+
+    return slots.filter((s) => {
+      const [sh, sm] = s.split(':') // slot is "HH:MM"
+      // hour: match as number (8 === 08) OR as string prefix ("1" → 10,11,...)
+      const hourOk =
+        hourPart === '' ||
+        (Number(hourPart) === Number(sh)) ||
+        sh.startsWith(hourPart)
+      if (!hourOk) return false
+      if (minPart == null || minPart === '') return true
+      return sm.startsWith(minPart)
+    })
   }, [slots, text])
 
-  // Scroll to selected time when opened
+  // On open, highlight the current value (or first item); scroll it into view.
   React.useEffect(() => {
-    if (!open || !value) return
-    let attempts = 0
-    const tryScroll = () => {
-      const container = listRef.current
-      const el = container?.querySelector(`[data-value="${value}"]`) as HTMLElement
-      if (container && el) {
-        container.scrollTop = el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2
-      } else if (attempts < 5) {
-        attempts++
-        setTimeout(tryScroll, 50)
-      }
+    if (!open) { setHighlight(-1); return }
+    const idx = value ? filtered.findIndex((s) => s === formatTimeDisplay(value)) : -1
+    setHighlight(idx >= 0 ? idx : 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Keep highlight in range when the filtered list changes (typing).
+  React.useEffect(() => {
+    if (!open) return
+    setHighlight((h) => (filtered.length === 0 ? -1 : Math.min(Math.max(h, 0), filtered.length - 1)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered.length])
+
+  // Scroll the highlighted item into view.
+  React.useEffect(() => {
+    if (!open || highlight < 0) return
+    const container = listRef.current
+    const el = container?.querySelector(`[data-index="${highlight}"]`) as HTMLElement | null
+    if (container && el) {
+      const top = el.offsetTop
+      const bottom = top + el.clientHeight
+      if (top < container.scrollTop) container.scrollTop = top
+      else if (bottom > container.scrollTop + container.clientHeight)
+        container.scrollTop = bottom - container.clientHeight
     }
-    setTimeout(tryScroll, 0)
-  }, [open, value])
+  }, [highlight, open])
 
   const commit = (raw: string) => {
     const normalized = normalizeTimeInput(raw)
@@ -147,10 +185,19 @@ function TimePickerDropdown({
             if (!open) setOpen(true)
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'ArrowDown') {
               e.preventDefault()
-              // Prefer the top filtered suggestion, else parse what's typed.
-              if (filtered.length > 0 && text.replace(/[^0-9:]/g, '')) pick(filtered[0])
+              if (!open) { setOpen(true); return }
+              setHighlight((h) => (filtered.length === 0 ? -1 : (h + 1) % filtered.length))
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault()
+              if (!open) { setOpen(true); return }
+              setHighlight((h) => (filtered.length === 0 ? -1 : (h - 1 + filtered.length) % filtered.length))
+            } else if (e.key === 'Enter') {
+              e.preventDefault()
+              // Prefer the highlighted item, else the top match, else parse typed text.
+              if (highlight >= 0 && filtered[highlight]) pick(filtered[highlight])
+              else if (filtered.length > 0 && text.replace(/[^0-9:]/g, '')) pick(filtered[0])
               else commit(text)
               setOpen(false)
             } else if (e.key === 'Escape') {
@@ -186,17 +233,19 @@ function TimePickerDropdown({
           {filtered.length === 0 ? (
             <div className="py-3 text-center text-sm text-muted-foreground">ไม่พบเวลา</div>
           ) : (
-            filtered.map((slot) => (
+            filtered.map((slot, i) => (
               <button
                 key={slot}
                 type="button"
                 data-value={slot}
+                data-index={i}
                 onMouseDown={(e) => e.preventDefault()} // keep input from blurring first
+                onMouseEnter={() => setHighlight(i)}
                 onClick={() => pick(slot)}
                 className={cn(
                   'flex w-full items-center justify-center rounded-sm px-2 py-1.5 text-sm outline-none select-none',
-                  'hover:bg-accent hover:text-accent-foreground',
-                  value === slot && 'bg-accent/10 font-medium'
+                  i === highlight && 'bg-accent text-accent-foreground',
+                  value === slot && 'font-medium'
                 )}
               >
                 {formatTimeDisplay(slot)}

@@ -54,7 +54,8 @@ import {
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
+import { StatusFilterTabs } from '@/components/ui/status-filter-tabs';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 
@@ -183,6 +184,7 @@ export default function EventsPage() {
     published: events.filter(e => e.status === 'published').length,
     draft: events.filter(e => e.status === 'draft').length,
     completed: events.filter(e => e.status === 'completed').length,
+    cancelled: events.filter(e => e.status === 'cancelled').length,
   };
 
   const getEventTypeLabel = (type: string) => {
@@ -257,44 +259,19 @@ export default function EventsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">เผยแพร่แล้ว</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.published}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ร่าง</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{stats.draft}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">จบแล้ว</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.completed}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Status filter cards (clickable) */}
+      <StatusFilterTabs
+        value={statusFilter}
+        onChange={setStatusFilter}
+        className="mb-6"
+        tabs={[
+          { value: 'all', label: 'ทั้งหมด', count: stats.total, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
+          { value: 'published', label: 'เผยแพร่แล้ว', count: stats.published, activeBg: 'bg-green-600', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700' },
+          { value: 'draft', label: 'ร่าง', count: stats.draft, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-700' },
+          { value: 'completed', label: 'จบแล้ว', count: stats.completed, activeBg: 'bg-blue-600', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700' },
+          { value: 'cancelled', label: 'ยกเลิก', count: stats.cancelled, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700' },
+        ]}
+      />
 
       {/* Filters */}
       <div className="mb-6 space-y-4">
@@ -305,20 +282,7 @@ export default function EventsPage() {
             onChange={setSearchTerm}
             className="flex-1"
           />
-          
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="สถานะทั้งหมด" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">สถานะทั้งหมด</SelectItem>
-              <SelectItem value="draft">ร่าง</SelectItem>
-              <SelectItem value="published">เผยแพร่แล้ว</SelectItem>
-              <SelectItem value="completed">จบแล้ว</SelectItem>
-              <SelectItem value="cancelled">ยกเลิก</SelectItem>
-            </SelectContent>
-          </Select>
-          
+
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="ประเภททั้งหมด" />

@@ -23,7 +23,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
 import { TeacherBadge } from "@/components/ui/teacher-badge";
-import { formatDate, formatCurrency, getDayName, cn } from '@/lib/utils';
+import { formatDate, formatCurrency, getDayName } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/table";
 import { SearchInput } from '@/components/ui/search-input';
 import { FormSelect } from '@/components/ui/form-select';
+import { StatusFilterTabs } from '@/components/ui/status-filter-tabs';
 import { SortableTableHead, useSortableTable } from '@/components/ui/sortable-table-head';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLoading, InlineLoading } from '@/components/ui/loading';
@@ -165,6 +166,11 @@ export default function ClassesPage() {
   // Filter classes with memoization
   const filteredClasses = useMemo(() => {
     return classes.filter(cls => {
+      // Branch safety filter: never show a class from another branch when a
+      // specific branch is selected (guards against the query returning
+      // cross-branch rows, e.g. before the branch id has hydrated).
+      if (selectedBranchId && cls.branchId !== selectedBranchId) return false;
+
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
@@ -195,7 +201,7 @@ export default function ClassesPage() {
       }
       return true;
     });
-  }, [classes, searchTerm, selectedStatus, selectedSubject, selectedTeacher, selectedAvailability]);
+  }, [classes, selectedBranchId, searchTerm, selectedStatus, selectedSubject, selectedTeacher, selectedAvailability]);
 
   // ============================================
   // 🎯 Paginated Classes
@@ -223,17 +229,24 @@ export default function ClassesPage() {
     return calculateTotalPages(filteredClasses.length);
   }, [filteredClasses.length, calculateTotalPages]);
 
+  // Classes scoped to the selected branch — basis for stats so the status-tab
+  // counts match the rows actually shown (not inflated by other branches).
+  const branchClasses = useMemo(
+    () => (selectedBranchId ? classes.filter(c => c.branchId === selectedBranchId) : classes),
+    [classes, selectedBranchId]
+  );
+
   // Calculate statistics with memoization
   const stats = useMemo(() => ({
-    total: classes.length,
-    draft: classes.filter(c => c.status === 'draft').length,
-    published: classes.filter(c => c.status === 'published').length,
-    started: classes.filter(c => c.status === 'started').length,
-    completed: classes.filter(c => c.status === 'completed').length,
-    cancelled: classes.filter(c => c.status === 'cancelled').length,
-    totalSeats: classes.reduce((sum, c) => sum + c.maxStudents, 0),
-    enrolledSeats: classes.reduce((sum, c) => sum + c.enrolledCount, 0),
-  }), [classes]);
+    total: branchClasses.length,
+    draft: branchClasses.filter(c => c.status === 'draft').length,
+    published: branchClasses.filter(c => c.status === 'published').length,
+    started: branchClasses.filter(c => c.status === 'started').length,
+    completed: branchClasses.filter(c => c.status === 'completed').length,
+    cancelled: branchClasses.filter(c => c.status === 'cancelled').length,
+    totalSeats: branchClasses.reduce((sum, c) => sum + c.maxStudents, 0),
+    enrolledSeats: branchClasses.reduce((sum, c) => sum + c.enrolledCount, 0),
+  }), [branchClasses]);
 
   // Get unique subjects used in current classes (for subject chips)
   const usedSubjects = useMemo(() => {
@@ -381,8 +394,11 @@ export default function ClassesPage() {
       )}
 
       {/* Status Filter Cards */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        {[
+      <StatusFilterTabs
+        value={selectedStatus}
+        onChange={setSelectedStatus}
+        className="mb-6"
+        tabs={[
           { value: 'active', label: 'กำลังดำเนินการ', count: stats.published + stats.started, activeBg: 'bg-gray-900', inactiveBg: 'bg-gray-100', inactiveLabel: 'text-gray-600', inactiveCount: 'text-gray-800', always: true },
           { value: 'all', label: 'ทั้งหมด', count: stats.total, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
           { value: 'started', label: 'กำลังเรียน', count: stats.started, activeBg: 'bg-green-600', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700' },
@@ -390,29 +406,8 @@ export default function ClassesPage() {
           { value: 'completed', label: 'จบแล้ว', count: stats.completed, activeBg: 'bg-gray-600', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-700' },
           { value: 'draft', label: 'ร่าง', count: stats.draft, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-700' },
           { value: 'cancelled', label: 'ยกเลิก', count: stats.cancelled, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700' },
-        ]
-          .filter((tab) => tab.always || tab.count > 0)
-          .map((tab) => {
-            const isActive = selectedStatus === tab.value;
-            return (
-              <button
-                key={tab.value}
-                onClick={() => setSelectedStatus(tab.value)}
-                className={cn(
-                  'flex flex-col items-center justify-center min-w-24 px-3 h-[72px] rounded-xl transition-all',
-                  isActive ? `${tab.activeBg} shadow-md` : `${tab.inactiveBg} hover:shadow-sm`
-                )}
-              >
-                <span className={cn('text-sm font-medium whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
-                  {tab.label}
-                </span>
-                <span className={cn('text-2xl font-bold mt-0.5', isActive ? 'text-white' : tab.inactiveCount)}>
-                  {tab.count}
-                </span>
-              </button>
-            );
-          })}
-      </div>
+        ]}
+      />
 
       {/* Filters — all on one row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

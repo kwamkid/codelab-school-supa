@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ParentBadge } from '@/components/ui/parent-badge';
-import { cn } from '@/lib/utils';
 import {
   Plus,
   Search,
@@ -36,6 +35,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { StatusFilterTabs } from '@/components/ui/status-filter-tabs';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -471,54 +471,28 @@ export default function EnrollmentsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Payment Status Tabs */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        {[
-          { value: 'all', label: 'ทั้งหมด', count: filteredStats?.total ?? stats?.total ?? 0, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700' },
-          { value: 'paid', label: 'ชำระแล้ว', count: filteredStats?.paidCount ?? stats?.paidCount ?? 0, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700' },
-          { value: 'pending', label: 'รอชำระ', count: filteredStats?.pendingCount ?? stats?.pendingCount ?? 0, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700' },
-          { value: 'partial', label: 'ชำระบางส่วน', count: filteredStats?.partialCount ?? stats?.partialCount ?? 0, activeBg: 'bg-orange-500', inactiveBg: 'bg-orange-50', inactiveLabel: 'text-orange-600', inactiveCount: 'text-orange-700' },
-          { value: 'dropped', label: 'ยกเลิก', count: filteredStats?.droppedCount ?? stats?.dropped ?? 0, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700', isStatusFilter: true },
-        ].map((tab) => {
-          const isDroppedTab = (tab as any).isStatusFilter;
-          const isActive = isDroppedTab
-            ? selectedStatus === 'dropped'
-            : selectedPaymentStatus === tab.value && selectedStatus !== 'dropped';
-          return (
-            <button
-              key={tab.value}
-              onClick={() => {
-                if (isDroppedTab) {
-                  setSelectedStatus('dropped');
-                  setSelectedPaymentStatus('all');
-                } else {
-                  setSelectedStatus('all');
-                  setSelectedPaymentStatus(tab.value);
-                }
-              }}
-              className={cn(
-                'flex flex-col items-center justify-center w-24 h-[72px] rounded-xl transition-all',
-                isActive
-                  ? `${tab.activeBg} shadow-md`
-                  : `${tab.inactiveBg} hover:shadow-sm`
-              )}
-            >
-              <span className={cn(
-                'text-sm font-medium',
-                isActive ? 'text-white' : tab.inactiveLabel
-              )}>
-                {tab.label}
-              </span>
-              <span className={cn(
-                'text-2xl font-bold mt-0.5',
-                isActive ? 'text-white' : tab.inactiveCount
-              )}>
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Payment Status Tabs — "ยกเลิก" filters by enrollment status (dropped);
+          the rest filter by payment status. Map both states to one active value. */}
+      <StatusFilterTabs
+        className="mb-6"
+        value={selectedStatus === 'dropped' ? 'dropped' : selectedPaymentStatus}
+        onChange={(value) => {
+          if (value === 'dropped') {
+            setSelectedStatus('dropped');
+            setSelectedPaymentStatus('all');
+          } else {
+            setSelectedStatus('all');
+            setSelectedPaymentStatus(value);
+          }
+        }}
+        tabs={[
+          { value: 'all', label: 'ทั้งหมด', count: filteredStats?.total ?? stats?.total ?? 0, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
+          { value: 'paid', label: 'ชำระแล้ว', count: filteredStats?.paidCount ?? stats?.paidCount ?? 0, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700', always: true },
+          { value: 'pending', label: 'รอชำระ', count: filteredStats?.pendingCount ?? stats?.pendingCount ?? 0, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700', always: true },
+          { value: 'partial', label: 'ชำระบางส่วน', count: filteredStats?.partialCount ?? stats?.partialCount ?? 0, activeBg: 'bg-orange-500', inactiveBg: 'bg-orange-50', inactiveLabel: 'text-orange-600', inactiveCount: 'text-orange-700', always: true },
+          { value: 'dropped', label: 'ยกเลิก', count: filteredStats?.droppedCount ?? stats?.dropped ?? 0, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700', always: true },
+        ]}
+      />
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3 mb-6">

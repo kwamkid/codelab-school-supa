@@ -18,10 +18,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
-import { 
-  Loader2, 
-  Save, 
-  X, 
+import {
+  Loader2,
+  Save,
+  X,
   Calendar,
   MapPin,
   Users,
@@ -31,8 +31,13 @@ import {
   Image,
   Clock,
   Edit,
-  Upload
+  Upload,
+  Info,
+  FileText,
+  CheckCircle2
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate, formatTime } from '@/lib/utils';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -53,6 +58,40 @@ interface ScheduleFormData {
 interface TempSchedule extends ScheduleFormData {
   tempId: string;
   isNew: boolean;
+}
+
+// Reusable section wrapper: rounded card with an orange icon chip header.
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+  className,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card className={cn('overflow-hidden border-gray-200 shadow-sm', className)}>
+      <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Icon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle className="text-base">{title}</CardTitle>
+            {description && (
+              <CardDescription className="text-sm">{description}</CardDescription>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-5">{children}</CardContent>
+    </Card>
+  );
 }
 
 export default function EventForm({ event, isEdit = false }: EventFormProps) {
@@ -466,14 +505,15 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="max-w-4xl mx-auto space-y-6">
+      {/* Wide screens: 2-column grid; wide sections (รอบเวลา, รายละเอียด) span both
+          columns. Single column on small screens. items-start so cards size to their
+          own content height. */}
+      <div className="w-full pb-28 grid grid-cols-1 lg:grid-cols-2 lg:grid-flow-row-dense gap-6 items-start">
         {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>ข้อมูลพื้นฐาน</CardTitle>
-            <CardDescription>ข้อมูลทั่วไปของ Event</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <SectionCard icon={Info} title="ข้อมูลพื้นฐาน" description="ข้อมูลทั่วไปของ Event" className="lg:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+            {/* Left: text fields */}
+            <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">ชื่อ Event *</Label>
@@ -485,7 +525,7 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="eventType">ประเภท Event *</Label>
                 <FormSelect
@@ -525,7 +565,9 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
               />
               <p className="text-xs text-gray-500">รองรับ Markdown สำหรับจัดรูปแบบข้อความ</p>
             </div>
+            </div>
 
+            {/* Right: image upload */}
             <div className="space-y-3">
   <Label>รูปภาพ Event</Label>
 
@@ -616,17 +658,12 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
       />
     </div>
   </details>
-</div>
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+        </SectionCard>
 
         {/* Location & Branches */}
-        <Card>
-          <CardHeader>
-            <CardTitle>สถานที่และสาขา</CardTitle>
-            <CardDescription>เลือกว่าจัดที่สาขาหรือสถานที่ภายนอก</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <SectionCard icon={MapPin} title="สถานที่และสาขา" description="เลือกว่าจัดที่สาขาหรือสถานที่ภายนอก">
             {/* Location type toggle */}
             <RadioGroup
               value={locationType}
@@ -745,16 +782,10 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </SectionCard>
 
         {/* Registration Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>การลงทะเบียน</CardTitle>
-            <CardDescription>กำหนดช่วงเวลาและวิธีนับจำนวนผู้เข้าร่วม</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <SectionCard icon={Users} title="การลงทะเบียน" description="กำหนดช่วงเวลาและวิธีนับจำนวนผู้เข้าร่วม">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="registrationStartDate">วันเปิดรับลงทะเบียน *</Label>
@@ -794,23 +825,18 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                 {formData.countingMethod === 'parents' && 'นับจำนวนผู้ปกครองที่ลงทะเบียน'}
               </p>
             </div>
-          </CardContent>
-        </Card>
+        </SectionCard>
 
         {/* Event Schedules */}
-        <Card>
-          <CardHeader>
-            <CardTitle>รอบเวลา</CardTitle>
-            <CardDescription>กำหนดวันและเวลาที่จัด Event (สามารถเพิ่มได้หลายรอบ)</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <SectionCard icon={Clock} title="รอบเวลา" description="กำหนดวันและเวลาที่จัด Event (สามารถเพิ่มได้หลายรอบ)">
             {/* Schedule Cards */}
             <div className="space-y-4">
               {schedules.map((schedule) => (
-                <div key={schedule.tempId} className="border rounded-lg p-4 space-y-4 bg-gray-50/50">
-                  {/* Row 1: Date, Time, Actions */}
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-[180px]">
+                <div key={schedule.tempId} className="rounded-xl border border-gray-200 p-4 space-y-4 bg-white shadow-sm">
+                  {/* Row 1: Date on top, then time + actions below — fits the
+                      narrower (half-width) column without crowding. */}
+                  <div className="space-y-3">
+                    <div>
                       <Label className="text-xs text-gray-500 mb-1 block">วันที่</Label>
                       <DateRangePicker
                         mode="single"
@@ -820,14 +846,15 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                         placeholder="เลือกวันที่"
                       />
                     </div>
-                    <div className="w-[120px]">
+                    <div className="flex items-end gap-3">
+                    <div className="w-[110px]">
                       <Label className="text-xs text-gray-500 mb-1 block">เวลาเริ่ม</Label>
                       <TimePicker
                         value={schedule.startTime}
                         onChange={(v) => handleUpdateSchedule(schedule.tempId, 'startTime', v)}
                       />
                     </div>
-                    <div className="w-[120px]">
+                    <div className="w-[110px]">
                       <Label className="text-xs text-gray-500 mb-1 block">เวลาจบ</Label>
                       <TimePicker
                         value={schedule.endTime}
@@ -835,7 +862,7 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                         min={schedule.startTime}
                       />
                     </div>
-                    <div className="flex items-end gap-1 pt-5">
+                    <div className="flex items-end gap-1 ml-auto">
                       <Button
                         type="button"
                         variant="ghost"
@@ -865,6 +892,7 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+                    </div>
                   </div>
 
                   {/* Row 2: Per-branch quota */}
@@ -873,24 +901,24 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                     {formData.branchIds.length === 0 ? (
                       <p className="text-sm text-gray-400">กรุณาเลือกสาขาก่อน</p>
                     ) : (
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap items-end gap-3">
                         {formData.branchIds.map(bid => {
                           const branch = branches.find(b => b.id === bid);
                           return (
-                            <div key={bid} className="flex items-center gap-2">
-                              <span className="text-sm font-medium whitespace-nowrap">{branch?.name || 'สาขา'}</span>
+                            <div key={bid} className="flex flex-col gap-1">
+                              <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{branch?.name || 'สาขา'}</span>
                               <Input
                                 type="number"
                                 min="0"
                                 value={schedule.maxAttendeesByBranch[bid] || ''}
                                 onChange={(e) => handleUpdateScheduleBranch(schedule.tempId, bid, e.target.value)}
                                 placeholder="0"
-                                className="h-9 w-20"
+                                className="h-9 w-24"
                               />
                             </div>
                           );
                         })}
-                        <div className="flex items-center gap-2 text-sm text-gray-500 ml-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-500 ml-2 pb-1.5">
                           <span>รวม:</span>
                           <Badge variant="secondary">
                             {formData.branchIds.reduce(
@@ -926,16 +954,10 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
             <p className="text-xs text-gray-500">
               💡 คำแนะนำ: คลิกปุ่ม "คัดลอก" 📋 เพื่อสร้างรอบใหม่ที่มีข้อมูลคล้ายกัน | กรอกข้อมูลให้ครบทุกช่องก่อนบันทึก
             </p>
-          </CardContent>
-        </Card>
+        </SectionCard>
 
         {/* Event Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>รายละเอียด Event</CardTitle>
-            <CardDescription>ข้อมูลเพิ่มเติมสำหรับผู้เข้าร่วม</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <SectionCard icon={FileText} title="รายละเอียด Event" description="ข้อมูลเพิ่มเติมสำหรับผู้เข้าร่วม">
             <div className="space-y-2">
               <Label htmlFor="targetAudience">กลุ่มเป้าหมาย</Label>
               <Input
@@ -1013,16 +1035,10 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </SectionCard>
 
         {/* Reminder Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>การแจ้งเตือน</CardTitle>
-            <CardDescription>ตั้งค่าการแจ้งเตือนผู้ลงทะเบียน</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <SectionCard icon={Bell} title="การแจ้งเตือน" description="ตั้งค่าการแจ้งเตือนผู้ลงทะเบียน">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>เปิดการแจ้งเตือนอัตโนมัติ</Label>
@@ -1059,15 +1075,10 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </SectionCard>
 
         {/* Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle>สถานะ</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <SectionCard icon={CheckCircle2} title="สถานะ" description="ควบคุมการเผยแพร่ Event">
             <div className="space-y-2">
               <Label htmlFor="status">สถานะ Event</Label>
               <FormSelect
@@ -1089,22 +1100,19 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                 {formData.status === 'cancelled' && 'Event ถูกยกเลิก'}
               </p>
             </div>
-          </CardContent>
-        </Card>
+        </SectionCard>
+      </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end gap-4">
+      {/* Sticky save bar */}
+      <div className="sticky bottom-0 z-20 mt-6 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <div className="w-full flex items-center justify-end gap-3 px-4 py-3">
           <Link href="/events">
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" disabled={loading}>
               <X className="h-4 w-4 mr-2" />
               ยกเลิก
             </Button>
           </Link>
-          <Button
-            type="submit"
-            className="bg-red-500 hover:bg-red-600"
-            disabled={loading}
-          >
+          <Button type="submit" disabled={loading} className="min-w-[160px]">
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

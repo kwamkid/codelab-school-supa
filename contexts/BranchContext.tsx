@@ -42,17 +42,21 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const _isSuperAdmin = isSuperAdmin();
 
-    if (selectedBranchId && adminUser && !_isSuperAdmin) {
-      // Check if user still has access to selected branch
-      const hasAccess = canAccessBranch(selectedBranchId);
+    if (adminUser && !_isSuperAdmin) {
+      const hasBranches = adminUser.branchIds && adminUser.branchIds.length > 0;
 
-      if (!hasAccess) {
-        // Reset to first available branch
-        if (adminUser.branchIds && adminUser.branchIds.length > 0) {
-          setSelectedBranchId(adminUser.branchIds[0]);
-        } else {
-          setSelectedBranchId(null);
-        }
+      // A non-super-admin must always have a branch selected; leaving it null
+      // makes branch-scoped queries (e.g. getClasses) load EVERY branch's data,
+      // which leaked other branches' classes into the list. Default to (or reset
+      // to) their first accessible branch.
+      if (!selectedBranchId) {
+        if (hasBranches) setSelectedBranchId(adminUser.branchIds[0]);
+        return;
+      }
+
+      // Selected branch is no longer accessible → reset to first available.
+      if (!canAccessBranch(selectedBranchId)) {
+        setSelectedBranchId(hasBranches ? adminUser.branchIds[0] : null);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

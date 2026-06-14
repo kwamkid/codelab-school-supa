@@ -12,7 +12,8 @@ import {
   createEventSchedule,
   updateEventSchedule,
   deleteEventSchedule,
-  updateEventAttendance
+  updateEventAttendance,
+  updateEvent
 } from '@/lib/services/events';
 import { getActiveBranches } from '@/lib/services/branches';
 import { useAuth } from '@/hooks/useAuth';
@@ -35,11 +36,19 @@ import {
   BarChart3,
   Clock,
   AlertCircle,
-  LinkIcon
+  LinkIcon,
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
-import { formatDate, formatTime } from '@/lib/utils';
+import { formatDate, formatTime, cn } from '@/lib/utils';
 import ScheduleManager from '@/components/events/schedule-manager';
 import RegistrationList from '@/components/events/registration-list';
 import AttendanceChecker from '@/components/events/attendance-checker';
@@ -110,6 +119,25 @@ export default function EventDetailPage() {
     }
   };
 
+  const [statusChanging, setStatusChanging] = useState(false);
+  const handleStatusChange = async (newStatus: Event['status']) => {
+    if (!event || newStatus === event.status) return;
+    setStatusChanging(true);
+    // Optimistic update
+    setEvent({ ...event, status: newStatus });
+    try {
+      await updateEvent(event.id, { status: newStatus }, user!.uid);
+      toast.success('เปลี่ยนสถานะเรียบร้อยแล้ว');
+    } catch (error) {
+      console.error('Error changing status:', error);
+      toast.error('ไม่สามารถเปลี่ยนสถานะได้');
+      setEvent({ ...event }); // revert
+      setRefreshKey(prev => prev + 1);
+    } finally {
+      setStatusChanging(false);
+    }
+  };
+
   if (loading) {
     return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
@@ -167,43 +195,87 @@ export default function EventDetailPage() {
         </Link>
       </div>
 
-      <div className="flex justify-between items-start mb-8">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-xl sm:text-3xl font-bold text-gray-900">{event.name}</h1>
-            <Badge className={getStatusColor(event.status)}>
-              {getStatusText(event.status)}
-            </Badge>
-            <Badge variant="outline">
-              {getEventTypeLabel(event.eventType)}
-            </Badge>
+      {/* Hero: banner + title + actions */}
+      <div className="mb-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        {event.imageUrl && (
+          <div className="relative aspect-[16/5] w-full bg-gray-100">
+            <img
+              src={event.imageUrl}
+              alt={event.name}
+              className="h-full w-full object-cover"
+            />
           </div>
-          <p className="text-gray-600">{event.description}</p>
-        </div>
-        
-        <div className="flex gap-2">
-          {event.status === 'published' && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                const link = `${window.location.origin}/liff/events/register/${event.id}`;
-                navigator.clipboard.writeText(link);
-                toast.success('คัดลอกลิงก์ลงทะเบียนแล้ว');
-              }}
-            >
-              <LinkIcon className="h-4 w-4 mr-2" />
-              คัดลอกลิงก์ลงทะเบียน
-            </Button>
-          )}
-          
-          <PermissionGuard action="update">
-            <Link href={`/events/${event.id}/edit`}>
-              <Button className="bg-red-500 hover:bg-red-600">
-                <Edit className="h-4 w-4 mr-2" />
-                แก้ไข Event
+        )}
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{event.name}</h1>
+              <Badge variant="outline">{getEventTypeLabel(event.eventType)}</Badge>
+            </div>
+            <p className="text-gray-600">{event.description}</p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {/* Status changer */}
+            <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={statusChanging}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60',
+                      getStatusColor(event.status)
+                    )}
+                  >
+                    {statusChanging ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        {getStatusText(event.status)}
+                        <ChevronDown className="h-4 w-4 opacity-70" />
+                      </>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {(['draft', 'published', 'completed', 'cancelled'] as const).map((s) => (
+                    <DropdownMenuItem
+                      key={s}
+                      onClick={() => handleStatusChange(s)}
+                      className={cn('gap-2', s === event.status && 'font-semibold')}
+                    >
+                      <span className={cn('h-2 w-2 rounded-full', getStatusColor(s).split(' ')[0])} />
+                      {getStatusText(s)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </PermissionGuard>
+
+            {event.status === 'published' && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const link = `${window.location.origin}/liff/events/register/${event.id}`;
+                  navigator.clipboard.writeText(link);
+                  toast.success('คัดลอกลิงก์ลงทะเบียนแล้ว');
+                }}
+              >
+                <LinkIcon className="h-4 w-4 mr-2" />
+                คัดลอกลิงก์
               </Button>
-            </Link>
-          </PermissionGuard>
+            )}
+
+            <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+              <Link href={`/events/${event.id}/edit`}>
+                <Button>
+                  <Edit className="h-4 w-4 mr-2" />
+                  แก้ไข Event
+                </Button>
+              </Link>
+            </PermissionGuard>
+          </div>
         </div>
       </div>
 
@@ -211,8 +283,10 @@ export default function EventDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-gray-600">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <MapPin className="h-4 w-4" />
+              </span>
               สถานที่
             </CardTitle>
           </CardHeader>
@@ -233,8 +307,10 @@ export default function EventDetailPage() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-gray-600">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Calendar className="h-4 w-4" />
+              </span>
               รับลงทะเบียน
             </CardTitle>
           </CardHeader>
@@ -246,8 +322,10 @@ export default function EventDetailPage() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-gray-600">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Users className="h-4 w-4" />
+              </span>
               ผู้ลงทะเบียน
             </CardTitle>
           </CardHeader>
@@ -275,7 +353,7 @@ export default function EventDetailPage() {
                   <div className="mt-2 mb-1">
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-red-500 h-2 rounded-full transition-all"
+                        className="bg-primary h-2 rounded-full transition-all"
                         style={{ width: `${Math.min(100, (totalAttendees / (totalCapacity || 1)) * 100)}%` }}
                       />
                     </div>
@@ -309,8 +387,10 @@ export default function EventDetailPage() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-gray-600">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <BarChart3 className="h-4 w-4" />
+              </span>
               เปิดดู / ลงทะเบียน
             </CardTitle>
           </CardHeader>
