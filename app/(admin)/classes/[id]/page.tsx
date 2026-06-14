@@ -628,11 +628,8 @@ export default function ClassDetailPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10">#</TableHead>
-                        <TableHead>ชื่อ-นามสกุล</TableHead>
-                        <TableHead>ชื่อเล่น</TableHead>
-                        <TableHead>อายุ</TableHead>
+                        <TableHead>นักเรียน</TableHead>
                         <TableHead>ผู้ปกครอง</TableHead>
-                        <TableHead>เบอร์โทร</TableHead>
                         <TableHead>การชำระเงิน</TableHead>
                         <TableHead className="w-10"></TableHead>
                       </TableRow>
@@ -645,23 +642,32 @@ export default function ClassDetailPage() {
                         return (
                           <TableRow key={student.id} className={student.enrollmentStatus === 'paused' ? 'bg-amber-50/60' : ''}>
                             <TableCell className="text-center text-gray-500">{index + 1}</TableCell>
-                            <TableCell className="font-medium">
-                              <span className="flex items-center gap-2">
-                                {student.name}
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{student.name}</span>
                                 {student.enrollmentStatus === 'paused' && (
                                   <Badge className="bg-amber-100 text-amber-700">พักเรียน</Badge>
                                 )}
-                              </span>
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {[
+                                  student.nickname && `(${student.nickname})`,
+                                  `${age} ปี`,
+                                ].filter(Boolean).join(' · ')}
+                              </div>
+                              {student.schoolName && (
+                                <div className="text-xs text-gray-400">{student.schoolName}</div>
+                              )}
                             </TableCell>
-                            <TableCell>{student.nickname || '-'}</TableCell>
-                            <TableCell>{age} ปี</TableCell>
-                            <TableCell><ParentBadge name={student.parentName} size="sm" /></TableCell>
                             <TableCell>
-                              {student.parentPhone ? (
-                                <a href={`tel:${student.parentPhone}`} className="text-blue-600 hover:underline">
-                                  {student.parentPhone}
-                                </a>
-                              ) : '-'}
+                              <ParentBadge name={student.parentName} size="sm" className="[&_.font-medium]:font-normal" />
+                              {student.parentPhone && (
+                                <div className="mt-0.5">
+                                  <a href={`tel:${student.parentPhone}`} className="text-xs text-blue-600 hover:underline">
+                                    {student.parentPhone}
+                                  </a>
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell>
                               {student.paymentStatus === 'paid' && (
