@@ -54,8 +54,13 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
 
   // batch state
   const [rows, setRows] = useState<BatchRow[]>([]);
+  // shared fields for the whole class (same on every certificate) — only the
+  // student's EN name differs per row.
+  const [shared, setShared] = useState<{ subjectName: string; teacherName: string; date: string }>(
+    { subjectName: '', teacherName: '', date: '' }
+  );
 
-  const reset = () => { setView('list'); setSingle(null); setRows([]); };
+  const reset = () => { setView('list'); setSingle(null); setRows([]); setShared({ subjectName: '', teacherName: '', date: '' }); };
 
   const close = (o: boolean) => { if (!o) reset(); onOpenChange(o); };
 
@@ -113,6 +118,9 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
         teacherName: fields.teacherName,
         date: fields.date,
       })));
+      // Subject / teacher / date are the same across the class → seed shared from the first.
+      const first = ok[0].fields;
+      setShared({ subjectName: first.subjectName, teacherName: first.teacherName, date: first.date });
       setView('batch');
     } finally {
       setBusy(false);
@@ -132,17 +140,18 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
           data: { name_en: r.studentName.trim() || null }, match: { id: r.studentId },
         }))
       );
-      if (teacherId && rows[0]) {
+      if (teacherId) {
         await adminMutation({
           table: 'teachers', operation: 'update',
-          data: { name_en: rows[0].teacherName.trim() || null }, match: { id: teacherId },
+          data: { name_en: shared.teacherName.trim() || null }, match: { id: teacherId },
         });
       }
+      // Shared subject / teacher / date on every cert; only the EN student name varies.
       const list: CertificateFields[] = rows.map((r) => ({
-        subjectName: r.subjectName,
+        subjectName: shared.subjectName,
         studentName: r.studentName,
-        teacherName: r.teacherName,
-        date: r.date,
+        teacherName: shared.teacherName,
+        date: shared.date,
       }));
       printCertificatesFields(list);
     } catch (e: any) {
@@ -155,7 +164,7 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className={view === 'single' ? 'max-w-4xl max-h-[92vh] overflow-y-auto'
-        : view === 'batch' ? 'max-w-3xl max-h-[88vh] flex flex-col'
+        : view === 'batch' ? 'max-w-4xl max-h-[88vh] flex flex-col'
         : 'max-w-md max-h-[85vh] flex flex-col'}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -214,8 +223,37 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
         {view === 'batch' && (
           <>
             <p className="text-sm text-muted-foreground">
-              กรอก/แก้ชื่อภาษาอังกฤษของนักเรียนแต่ละคน (ระบบจะบันทึกให้อัตโนมัติเมื่อพิมพ์)
+              วิชา / วันที่ / ชื่อครู ใช้ร่วมกันทุกใบ — กรอกชื่อภาษาอังกฤษของนักเรียนแต่ละคนด้านล่าง (ระบบจะบันทึกให้อัตโนมัติเมื่อพิมพ์)
             </p>
+
+            {/* Shared fields — same on every certificate */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-3 border-b">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">วิชา (บนใบ)</label>
+                <Input
+                  value={shared.subjectName}
+                  onChange={(e) => setShared((s) => ({ ...s, subjectName: e.target.value }))}
+                  className="h-9 mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">ชื่อครู (บนใบ)</label>
+                <Input
+                  value={shared.teacherName}
+                  onChange={(e) => setShared((s) => ({ ...s, teacherName: e.target.value }))}
+                  className="h-9 mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">วันที่ (บนใบ)</label>
+                <Input
+                  value={shared.date}
+                  onChange={(e) => setShared((s) => ({ ...s, date: e.target.value }))}
+                  className="h-9 mt-1"
+                />
+              </div>
+            </div>
+
             <div className="flex-1 overflow-y-auto -mx-1 px-1">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-background">

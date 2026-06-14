@@ -73,7 +73,9 @@ export function generateStudentReportHTML(
   ];
 
   const sessionBlocks = sessions
-    .filter((s) => s.feedback || s.photos.length || s.status)
+    // Only sessions the teacher actually filled in (feedback text or photos).
+    // Empty sessions are dropped — teachers don't write feedback every time.
+    .filter((s) => s.feedback || s.photos.length)
     .map((s) => {
       const idx = sessions.indexOf(s);
       const highlight = idx === latestIdx;
@@ -84,7 +86,7 @@ export function generateStudentReportHTML(
         : '';
       const feedback = s.feedback
         ? `<div class="feedback">${esc(s.feedback)}</div>`
-        : '<div class="feedback muted">— ไม่มีความเห็น —</div>';
+        : '';
       return `
         <div class="session ${highlight ? 'session-latest' : ''}">
           <div class="session-head">
