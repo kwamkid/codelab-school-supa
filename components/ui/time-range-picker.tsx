@@ -76,7 +76,8 @@ function TimePickerDropdown({
   className,
 }: TimePickerDropdownProps) {
   const [open, setOpen] = React.useState(false)
-  const [text, setText] = React.useState(value || '')
+  // Display HH:MM only — value from DB may be "HH:MM:SS", strip the seconds.
+  const [text, setText] = React.useState(formatTimeDisplay(value))
   const listRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -85,7 +86,7 @@ function TimePickerDropdown({
   // Keep the input text in sync when the value changes from outside (e.g. start
   // time auto-sets end time), but not while the user is actively typing.
   React.useEffect(() => {
-    if (!open) setText(value || '')
+    if (!open) setText(formatTimeDisplay(value))
   }, [value, open])
 
   // Filter the slot list by what's typed (digits only, prefix match).
@@ -119,7 +120,7 @@ function TimePickerDropdown({
       onChange(normalized)
       setText(normalized)
     } else {
-      setText(value || '') // revert invalid input
+      setText(formatTimeDisplay(value)) // revert invalid input
     }
   }
 
@@ -153,7 +154,7 @@ function TimePickerDropdown({
               else commit(text)
               setOpen(false)
             } else if (e.key === 'Escape') {
-              setText(value || '')
+              setText(formatTimeDisplay(value))
               setOpen(false)
             }
           }}
