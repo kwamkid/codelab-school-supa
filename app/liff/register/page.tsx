@@ -119,6 +119,9 @@ function LiffRegisterContent() {
           phone: parentPhone.replace(/[-\s]/g, ''),
           lineUserId: profile?.userId || null,
           email: null,
+          // Pull the LINE profile pic + real LINE name on registration
+          pictureUrl: profile?.pictureUrl || null,
+          lineDisplayName: profile?.displayName || null,
         });
       }
 

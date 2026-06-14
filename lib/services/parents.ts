@@ -186,6 +186,8 @@ export async function createParent(parentData: Omit<Parent, 'id' | 'createdAt' |
         phone: parentData.phone,
         line_user_id: parentData.lineUserId || null,
         email: parentData.email || null,
+        picture_url: parentData.pictureUrl || null,
+        line_display_name: parentData.lineDisplayName || null,
       },
       options: { select: true, single: true }
     })

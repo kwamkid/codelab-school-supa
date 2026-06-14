@@ -9,8 +9,11 @@ import { getClasses } from '@/lib/services/classes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
+import { FormSelect } from '@/components/ui/form-select';
+import { SortableTableHead, useSortableTable } from '@/components/ui/sortable-table-head';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination, usePagination } from '@/components/ui/pagination';
+import { cn } from '@/lib/utils';
 import {
   Plus,
   Users,
@@ -18,7 +21,6 @@ import {
   Mail,
   Eye,
   Edit,
-  Building2,
   ChevronDown,
   ChevronUp,
   User,
@@ -27,17 +29,12 @@ import {
   GraduationCap,
   Globe,
   Trash2,
-  Loader2
+  Loader2,
+  CornerDownRight
 } from 'lucide-react';
+import { LineIcon } from '@/components/ui/line-icon';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -92,6 +89,7 @@ export default function ParentsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterBranch, setFilterBranch] = useState<string>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const { sort, toggle: toggleSort, sortRows } = useSortableTable();
   const [deletingParentId, setDeletingParentId] = useState<string | null>(null);
   const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -197,7 +195,7 @@ export default function ParentsPage() {
   // Reset page when filters change
   useEffect(() => {
     resetPagination();
-  }, [searchTerm, filterBranch, filterStatus, resetPagination]);
+  }, [searchTerm, filterBranch, filterStatus, sort, resetPagination]);
 
   // Filter parents
   const filteredParents = useMemo(() => {
@@ -254,8 +252,20 @@ export default function ParentsPage() {
     };
   }, [filteredParents]);
 
+  // Apply column sort, then paginate
+  const sortedParents = useMemo(() => {
+    return sortRows(filteredParents, (parent, key) => {
+      switch (key) {
+        case 'name': return parent.displayName;
+        case 'children': return parent.activeStudentCount || 0;
+        case 'created': return parent.createdAt ? new Date(parent.createdAt).getTime() : null;
+        default: return null;
+      }
+    });
+  }, [filteredParents, sortRows]);
+
   // Paginated data
-  const paginatedParents = getPaginatedData(filteredParents);
+  const paginatedParents = getPaginatedData(sortedParents);
   const calculatedTotalPages = totalPages(filteredParents.length);
 
   // Toggle row expansion
@@ -270,7 +280,7 @@ export default function ParentsPage() {
   };
 
   // Delete parent handler
-  const handleDeleteParent = async (parent: ParentWithStudents) => {
+  const handleDeleteParent = async (parent: ParentWithInfo) => {
     setDeletingParentId(parent.id);
     try {
       await deleteParent(parent.id);
@@ -336,118 +346,58 @@ export default function ParentsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards — full-colour */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-        <Card key="card-total">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              {filterBranch !== 'all' ? 'ผู้ปกครองในสาขา' : 'ผู้ปกครองทั้งหมด'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalParents}</div>
-          </CardContent>
-        </Card>
-        
-        <Card key="card-students">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">นักเรียนทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.totalStudents}</div>
-          </CardContent>
-        </Card>
-        
-        <Card key="card-line">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">เชื่อมต่อ LINE</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.withLineId}</div>
-          </CardContent>
-        </Card>
-        
-        <Card key="card-active">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">มีลูกกำลังเรียน</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {stats.activeEnrollment}
+        {[
+          { label: filterBranch !== 'all' ? 'ผู้ปกครองในสาขา' : 'ผู้ปกครองทั้งหมด', value: stats.totalParents, Icon: Users, bg: 'bg-gradient-to-br from-gray-700 to-gray-900' },
+          { label: 'นักเรียนทั้งหมด', value: stats.totalStudents, Icon: GraduationCap, bg: 'bg-gradient-to-br from-blue-500 to-blue-600' },
+          { label: 'เชื่อมต่อ LINE', value: stats.withLineId, Icon: Globe, bg: 'bg-gradient-to-br from-emerald-500 to-green-600' },
+          { label: 'มีลูกกำลังเรียน', value: stats.activeEnrollment, Icon: GraduationCap, bg: 'bg-gradient-to-br from-teal-500 to-teal-600' },
+          { label: 'จบคอร์สแล้ว', value: stats.completedEnrollment, Icon: School, bg: 'bg-gradient-to-br from-orange-500 to-orange-600' },
+          { label: 'ยังไม่ลงคอร์ส', value: stats.neverEnrolled, Icon: User, bg: 'bg-gradient-to-br from-slate-400 to-slate-500' },
+        ].map((stat) => (
+          <div key={stat.label} className={cn('rounded-xl p-4 text-white shadow-sm', stat.bg)}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-white/90 leading-tight">{stat.label}</span>
+              <stat.Icon className="h-4 w-4 text-white/80 shrink-0" />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card key="card-completed">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">จบคอร์สแล้ว</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {stats.completedEnrollment}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card key="card-never">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">ยังไม่ลงคอร์ส</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">
-              {stats.neverEnrolled}
-            </div>
-          </CardContent>
-        </Card>
+            <div className="text-2xl font-bold mt-2">{stat.value}</div>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
         <SearchInput
           placeholder="ค้นหาชื่อผู้ปกครอง, นักเรียน, เบอร์โทร, อีเมล..."
           value={searchTerm}
           onChange={setSearchTerm}
-          className="flex-1"
         />
 
-        <Select value={filterBranch} onValueChange={setFilterBranch}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                ทุกสาขา
-              </div>
-            </SelectItem>
-            {loadingBranches ? (
-              <SelectItem value="loading" disabled>กำลังโหลด...</SelectItem>
-            ) : (
-              branches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    {branch.name}
-                    <span className="text-xs text-gray-500 ml-1">(เรียน+สนใจ)</span>
-                  </div>
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
+        <FormSelect
+          value={filterBranch}
+          onValueChange={setFilterBranch}
+          className="h-11"
+          placeholder="ทุกสาขา"
+          searchPlaceholder="ค้นหาสาขา..."
+          options={[
+            { value: 'all', label: 'ทุกสาขา' },
+            ...branches.map((b) => ({ value: b.id, label: `${b.name} (เรียน+สนใจ)` })),
+          ]}
+        />
 
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">สถานะเรียนทั้งหมด</SelectItem>
-            <SelectItem value="active">มีลูกกำลังเรียน</SelectItem>
-            <SelectItem value="completed">จบคอร์สแล้ว</SelectItem>
-            <SelectItem value="never">ยังไม่ลงคอร์ส</SelectItem>
-          </SelectContent>
-        </Select>
+        <FormSelect
+          value={filterStatus}
+          onValueChange={setFilterStatus}
+          className="h-11"
+          placeholder="สถานะเรียนทั้งหมด"
+          options={[
+            { value: 'all', label: 'สถานะเรียนทั้งหมด' },
+            { value: 'active', label: 'มีลูกกำลังเรียน' },
+            { value: 'completed', label: 'จบคอร์สแล้ว' },
+            { value: 'never', label: 'ยังไม่ลงคอร์ส' },
+          ]}
+        />
       </div>
 
       {/* Parents Table */}
@@ -490,13 +440,13 @@ export default function ParentsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[40px]"></TableHead>
-                      <TableHead>ชื่อผู้ปกครอง</TableHead>
+                      <SortableTableHead sortKey="name" currentSort={sort} onSort={toggleSort}>ชื่อผู้ปกครอง</SortableTableHead>
                       <TableHead>ติดต่อ</TableHead>
-                      <TableHead className="text-center">จำนวนลูก</TableHead>
+                      <SortableTableHead sortKey="children" currentSort={sort} onSort={toggleSort} className="text-center">จำนวนลูก</SortableTableHead>
                       <TableHead className="text-center">LINE</TableHead>
                       <TableHead>สาขาที่สะดวก</TableHead>
                       <TableHead>สาขาที่เรียน</TableHead>
-                      <TableHead>วันที่ลงทะเบียน</TableHead>
+                      <SortableTableHead sortKey="created" currentSort={sort} onSort={toggleSort}>วันที่ลงทะเบียน</SortableTableHead>
                       <TableHead className="text-right">จัดการ</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -561,24 +511,19 @@ export default function ParentsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            {parent.lineUserId ? (
-                              <Badge className="bg-green-100 text-green-700">
-                                เชื่อมต่อแล้ว
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">ยังไม่เชื่อมต่อ</Badge>
-                            )}
+                            <LineIcon
+                              connected={!!parent.lineUserId}
+                              className="h-5 w-5 mx-auto"
+                              aria-label={parent.lineUserId ? 'เชื่อมต่อ LINE แล้ว' : 'ยังไม่เชื่อมต่อ LINE'}
+                            />
                           </TableCell>
                           <TableCell>
                             {loadingBranches ? (
                               <InlineLoading />
                             ) : parent.preferredBranchId ? (
-                              <div className="flex items-center gap-1">
-                                <Badge variant="outline">
-                                  {getBranchName(parent.preferredBranchId)}
-                                </Badge>
-                                <span className="text-blue-600">สนใจ</span>
-                              </div>
+                              <Badge variant="outline">
+                                {getBranchName(parent.preferredBranchId)}
+                              </Badge>
                             ) : (
                               <span className="text-gray-400">-</span>
                             )}
@@ -677,23 +622,23 @@ export default function ParentsPage() {
                         {expandedRows.has(parent.id) && parent.students && parent.students.length > 0 && (
                           <TableRow>
                             <TableCell colSpan={9} className="bg-gray-50 p-0">
-                              <div className="p-4">
-                                <h4 className="font-medium text-sm mb-3">ข้อมูลนักเรียน</h4>
+                              <div className="pl-12 pr-4 py-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h4 className="font-medium text-sm text-gray-700 flex items-center gap-1.5">
+                                    <CornerDownRight className="h-4 w-4 text-gray-400" />
+                                    ลูกของ {parent.displayName} ({parent.students.length} คน)
+                                  </h4>
+                                  <Link href={`/parents/${parent.id}/students/new?returnTo=/parents`}>
+                                    <Button size="sm" variant="outline">
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      เพิ่มนักเรียน
+                                    </Button>
+                                  </Link>
+                                </div>
                                 <div className="space-y-2">
                                   {parent.students.map((student) => (
                                     <div key={student.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
                                       <div className="flex items-center gap-3">
-                                        {student.profileImage ? (
-                                          <img
-                                            src={student.profileImage}
-                                            alt={student.name}
-                                            className="w-10 h-10 rounded-full object-cover"
-                                          />
-                                        ) : (
-                                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                            <User className="h-5 w-5 text-gray-500" />
-                                          </div>
-                                        )}
                                         <div>
                                           <p className="font-medium">{student.name}</p>
                                           <div className="flex items-center gap-4 text-gray-600">
@@ -722,7 +667,7 @@ export default function ParentsPage() {
                                       <div className="flex items-center gap-3">
                                         <div className="flex flex-wrap gap-1">
                                           {loadingBranches ? (
-                                            <BadgeSkeleton />
+                                            <InlineLoading />
                                           ) : (() => {
                                             const studentBranches = new Set<string>();
                                             student.enrollments?.forEach(enrollment => {
@@ -820,14 +765,6 @@ export default function ParentsPage() {
                                       </div>
                                     </div>
                                   ))}
-                                  <div className="text-right mt-2">
-                                    <Link href={`/parents/${parent.id}/students/new`}>
-                                      <Button size="sm" variant="outline">
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        เพิ่มนักเรียน
-                                      </Button>
-                                    </Link>
-                                  </div>
                                 </div>
                               </div>
                             </TableCell>

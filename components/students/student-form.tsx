@@ -22,10 +22,13 @@ interface StudentFormProps {
   parentId: string;
   student?: Student;
   isEdit?: boolean;
+  /** Where to go after save/cancel. Falls back to the parent detail page. */
+  returnTo?: string;
 }
 
-export default function StudentForm({ parentId, student, isEdit = false }: StudentFormProps) {
+export default function StudentForm({ parentId, student, isEdit = false, returnTo }: StudentFormProps) {
   const router = useRouter();
+  const backTo = returnTo || `/parents/${parentId}`;
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -100,7 +103,7 @@ export default function StudentForm({ parentId, student, isEdit = false }: Stude
         toast.success('เพิ่มนักเรียนใหม่เรียบร้อยแล้ว');
       }
       
-      router.push(`/parents/${parentId}`);
+      router.push(backTo);
     } catch (error) {
       console.error('Error saving student:', error);
       toast.error(isEdit ? 'ไม่สามารถอัปเดตข้อมูลได้' : 'ไม่สามารถเพิ่มนักเรียนได้');
@@ -313,7 +316,7 @@ export default function StudentForm({ parentId, student, isEdit = false }: Stude
 
         {/* Action Buttons */}
         <div className="flex justify-end gap-4">
-          <Link href={`/parents/${parentId}`}>
+          <Link href={backTo}>
             <Button type="button" variant="outline">
               <X className="h-4 w-4 mr-2" />
               ยกเลิก
