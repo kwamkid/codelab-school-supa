@@ -240,7 +240,7 @@ export async function getEnrollmentsByClass(classId: string): Promise<Enrollment
       .from(TABLE_NAME)
       .select('*')
       .eq('class_id', classId)
-      .in('status', ['active', 'completed'])
+      .in('status', ['active', 'completed', 'paused'])
       .order('enrolled_at', { ascending: true });
 
     if (error) throw error;
@@ -681,6 +681,92 @@ export async function cancelEnrollment(
     console.error('Error canceling enrollment:', error);
     throw error;
   }
+}
+
+// ============================================
+// Pause / Resume an enrollment (temporary freeze)
+// ============================================
+//
+// "Pause" = student temporarily stops attending (travel, camp, etc.) and the
+// sessions they will miss from `pauseFrom` onward become makeup credits. The
+// enrollment goes to status 'paused' so it's distinct from 'dropped' (permanent).
+// "Resume" just flips status back to 'active' — the makeup credits stay (pending).
+
+export async function pauseEnrollment(
+  id: string,
+  pauseFrom: Date,
+  reason: string,
+  requestedBy: string
+): Promise<{ makeupsCreated: number }> {
+  const enrollment = await getEnrollment(id);
+  if (!enrollment) throw new Error('Enrollment not found');
+
+  // 1. Mark the enrollment paused (reason carries the note + pause date).
+  await adminMutation({
+    table: 'enrollments',
+    operation: 'update',
+    data: { status: 'paused', dropped_reason: reason },
+    match: { id },
+  });
+
+  // 2. For every session from pauseFrom onward (sessions the student will miss),
+  //    create a makeup credit + mark that session's attendance as 'leave'.
+  const classData = await getClass(enrollment.classId);
+  let makeupsCreated = 0;
+  if (classData) {
+    const schedules = await getClassSchedules(enrollment.classId);
+    const from = new Date(pauseFrom);
+    from.setHours(0, 0, 0, 0);
+
+    const missed = schedules.filter((s) => {
+      const d = new Date(s.sessionDate);
+      d.setHours(0, 0, 0, 0);
+      return d >= from && s.status !== 'cancelled' && s.status !== 'rescheduled';
+    });
+
+    for (const schedule of missed) {
+      try {
+        await createMakeupRequest({
+          type: 'ad-hoc',
+          originalClassId: enrollment.classId,
+          originalScheduleId: schedule.id,
+          studentId: enrollment.studentId,
+          parentId: enrollment.parentId,
+          requestDate: new Date(),
+          requestedBy,
+          reason,
+          status: 'pending',
+          originalSessionNumber: schedule.sessionNumber,
+          originalSessionDate: schedule.sessionDate,
+        });
+        makeupsCreated++;
+      } catch (error) {
+        // Skip sessions that already have a makeup (createMakeupRequest throws on dup).
+        console.error(`Pause: skip session ${schedule.sessionNumber}:`, error);
+      }
+    }
+  }
+
+  // 3. Enrolled count reflects only active students.
+  const currentCount = await getEnrollmentCountByClass(enrollment.classId);
+  await fixEnrolledCount(enrollment.classId, currentCount);
+
+  return { makeupsCreated };
+}
+
+export async function resumeEnrollment(id: string): Promise<void> {
+  const enrollment = await getEnrollment(id);
+  if (!enrollment) throw new Error('Enrollment not found');
+
+  await adminMutation({
+    table: 'enrollments',
+    operation: 'update',
+    data: { status: 'active', dropped_reason: null },
+    match: { id },
+  });
+
+  const currentCount = await getEnrollmentCountByClass(enrollment.classId);
+  await fixEnrolledCount(enrollment.classId, currentCount);
 }
 
 // ============================================

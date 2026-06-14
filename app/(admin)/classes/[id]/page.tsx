@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Class, Branch, Subject, Teacher, Room, ClassSchedule } from '@/types/models';
 import { getClass, getClassSchedules, updateClass, deleteClass, fixEnrolledCount, getEndClassPreview, endClassNow } from '@/lib/services/classes';
-import { getEnrollmentsByClass } from '@/lib/services/enrollments';
+import { getEnrollmentsByClass, pauseEnrollment, resumeEnrollment } from '@/lib/services/enrollments';
 import { getStudentWithParent } from '@/lib/services/parents';
 import { useAuth } from '@/hooks/useAuth';
 import { getBranch } from '@/lib/services/branches';
@@ -27,7 +27,10 @@ import {
   History,
   CheckCircle,
   Loader2,
-  ArrowLeftRight
+  ArrowLeftRight,
+  MoreHorizontal,
+  PauseCircle,
+  PlayCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -55,6 +58,21 @@ import {
 } from "@/components/ui/table";
 import RescheduleHistoryDialog from '@/components/classes/reschedule-history-dialog';
 import { SectionLoading } from '@/components/ui/loading';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 const statusColors = {
   'draft': 'bg-gray-100 text-gray-700',
@@ -75,7 +93,7 @@ const statusLabels = {
 export default function ClassDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, adminUser } = useAuth();
   const classId = params.id as string;
 
   const [classData, setClassData] = useState<Class | null>(null);
@@ -97,6 +115,8 @@ export default function ClassDetailPage() {
   } | null>(null);
   const [endingClass, setEndingClass] = useState(false);
   const [enrolledStudents, setEnrolledStudents] = useState<(Student & {
+    enrollmentId: string;
+    enrollmentStatus: 'active' | 'completed' | 'dropped' | 'transferred' | 'paused';
     parentName: string;
     parentPhone: string;
     paymentStatus: 'pending' | 'partial' | 'paid';
@@ -104,6 +124,13 @@ export default function ClassDetailPage() {
     finalPrice: number;
   })[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+
+  // Pause/resume a student's enrollment (temporary freeze → makeup credits)
+  const [pauseTarget, setPauseTarget] = useState<{ enrollmentId: string; studentName: string } | null>(null);
+  const [pauseFrom, setPauseFrom] = useState<string>('');
+  const [pauseReason, setPauseReason] = useState<string>('');
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const [resumingId, setResumingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (classId) {
@@ -158,13 +185,15 @@ export default function ClassDetailPage() {
           if (!student) return null;
           return {
             ...student,
+            enrollmentId: enrollment.id,
+            enrollmentStatus: enrollment.status,
             paymentStatus: enrollment.payment.status,
             paidAmount: enrollment.payment.paidAmount,
             finalPrice: enrollment.pricing.finalPrice,
           };
         })
       );
-      const filtered = studentsWithPayment.filter(Boolean) as (Student & { parentName: string; parentPhone: string; paymentStatus: 'pending' | 'partial' | 'paid'; paidAmount: number; finalPrice: number })[];
+      const filtered = studentsWithPayment.filter(Boolean) as (Student & { enrollmentId: string; enrollmentStatus: 'active' | 'completed' | 'dropped' | 'transferred' | 'paused'; parentName: string; parentPhone: string; paymentStatus: 'pending' | 'partial' | 'paid'; paidAmount: number; finalPrice: number })[];
       setEnrolledStudents(filtered);
 
       // Auto-fix enrolled_count if it drifted from actual enrollment count
@@ -177,6 +206,48 @@ export default function ClassDetailPage() {
       console.error('Error loading enrolled students:', error);
     } finally {
       setLoadingStudents(false);
+    }
+  };
+
+  // Open the pause dialog for a student (default pause-from = today).
+  const openPauseDialog = (enrollmentId: string, studentName: string) => {
+    setPauseTarget({ enrollmentId, studentName });
+    setPauseFrom(new Date().toISOString().split('T')[0]);
+    setPauseReason('พักเรียนชั่วคราว');
+  };
+
+  const handlePause = async () => {
+    if (!pauseTarget || !pauseFrom) return;
+    setPauseBusy(true);
+    try {
+      const { makeupsCreated } = await pauseEnrollment(
+        pauseTarget.enrollmentId,
+        new Date(pauseFrom),
+        pauseReason.trim() || 'พักเรียนชั่วคราว',
+        adminUser?.id || 'system'
+      );
+      toast.success(`พักเรียน ${pauseTarget.studentName} แล้ว — สร้างคาบชดเชย ${makeupsCreated} ครั้ง`);
+      setPauseTarget(null);
+      loadEnrolledStudents();
+    } catch (error: any) {
+      console.error('Error pausing enrollment:', error);
+      toast.error(error?.message || 'พักเรียนไม่สำเร็จ');
+    } finally {
+      setPauseBusy(false);
+    }
+  };
+
+  const handleResume = async (enrollmentId: string, studentName: string) => {
+    setResumingId(enrollmentId);
+    try {
+      await resumeEnrollment(enrollmentId);
+      toast.success(`${studentName} กลับมาเรียนแล้ว`);
+      loadEnrolledStudents();
+    } catch (error: any) {
+      console.error('Error resuming enrollment:', error);
+      toast.error(error?.message || 'กลับมาเรียนไม่สำเร็จ');
+    } finally {
+      setResumingId(null);
     }
   };
 
@@ -563,6 +634,7 @@ export default function ClassDetailPage() {
                         <TableHead>ผู้ปกครอง</TableHead>
                         <TableHead>เบอร์โทร</TableHead>
                         <TableHead>การชำระเงิน</TableHead>
+                        <TableHead className="w-10"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -571,9 +643,16 @@ export default function ClassDetailPage() {
                           (Date.now() - student.birthdate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
                         );
                         return (
-                          <TableRow key={student.id}>
+                          <TableRow key={student.id} className={student.enrollmentStatus === 'paused' ? 'bg-amber-50/60' : ''}>
                             <TableCell className="text-center text-gray-500">{index + 1}</TableCell>
-                            <TableCell className="font-medium">{student.name}</TableCell>
+                            <TableCell className="font-medium">
+                              <span className="flex items-center gap-2">
+                                {student.name}
+                                {student.enrollmentStatus === 'paused' && (
+                                  <Badge className="bg-amber-100 text-amber-700">พักเรียน</Badge>
+                                )}
+                              </span>
+                            </TableCell>
                             <TableCell>{student.nickname || '-'}</TableCell>
                             <TableCell>{age} ปี</TableCell>
                             <TableCell><ParentBadge name={student.parentName} size="sm" /></TableCell>
@@ -597,6 +676,36 @@ export default function ClassDetailPage() {
                                 <Badge className="bg-red-100 text-red-700">ยังไม่ชำระ</Badge>
                               )}
                             </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0" disabled={resumingId === student.enrollmentId}>
+                                    {resumingId === student.enrollmentId
+                                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                                      : <MoreHorizontal className="h-4 w-4" />}
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {student.enrollmentStatus === 'paused' ? (
+                                    <DropdownMenuItem
+                                      onClick={() => handleResume(student.enrollmentId, student.nickname || student.name)}
+                                      className="text-green-700 focus:text-green-700"
+                                    >
+                                      <PlayCircle className="h-4 w-4 mr-2" />
+                                      กลับมาเรียน
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      onClick={() => openPauseDialog(student.enrollmentId, student.nickname || student.name)}
+                                      className="text-amber-700 focus:text-amber-700"
+                                    >
+                                      <PauseCircle className="h-4 w-4 mr-2" />
+                                      พักเรียนชั่วคราว
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -607,6 +716,34 @@ export default function ClassDetailPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Pause student dialog */}
+        <Dialog open={!!pauseTarget} onOpenChange={(o) => { if (!o) setPauseTarget(null); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>พักเรียนชั่วคราว</DialogTitle>
+              <DialogDescription>
+                พักเรียนของ {pauseTarget?.studentName} ชั่วคราว — คาบตั้งแต่วันที่เลือกเป็นต้นไปจะกลายเป็นคาบชดเชย (makeup) ให้อัตโนมัติ และกลับมาเรียนได้ภายหลัง
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div>
+                <label className="text-sm font-medium">พักตั้งแต่วันที่</label>
+                <Input type="date" value={pauseFrom} onChange={(e) => setPauseFrom(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">เหตุผล</label>
+                <Input value={pauseReason} onChange={(e) => setPauseReason(e.target.value)} placeholder="เช่น ไปต่างประเทศ 1 เดือน" className="mt-1" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPauseTarget(null)} disabled={pauseBusy}>ยกเลิก</Button>
+              <Button onClick={handlePause} disabled={pauseBusy || !pauseFrom} className="bg-amber-600 hover:bg-amber-700">
+                {pauseBusy ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />กำลังพัก...</> : 'ยืนยันพักเรียน'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Side Info */}
         <div className="space-y-6">

@@ -407,7 +407,7 @@ export interface Enrollment {
   parentId: string;
   branchId: string;
   enrolledAt: Date;
-  status: 'active' | 'completed' | 'dropped' | 'transferred';
+  status: 'active' | 'completed' | 'dropped' | 'transferred' | 'paused';
   pricing: {
     originalPrice: number;
     discount: number;
