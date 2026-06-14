@@ -152,23 +152,21 @@ export default function MakeupScheduleFields({
       <div className="grid gap-4" style={{ gridTemplateColumns: '5fr 7fr' }}>
         <div className="space-y-2 min-w-0">
           <Label>ครูผู้สอน *</Label>
-          <Select
+          <FormSelect
             value={value.teacherId}
             onValueChange={(v) => update({ teacherId: v })}
             disabled={disabled || loadingData || teachers.length === 0}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={loadingData ? 'กำลังโหลด...' : 'เลือกครู'} />
-            </SelectTrigger>
-            <SelectContent>
-              {teachers.map((teacher) => (
-                <SelectItem key={teacher.id} value={teacher.id}>
-                  {teacher.nickname || teacher.name}
-                  {originalTeacherId && teacher.id === originalTeacherId && ' (ครูประจำคลาส)'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder={loadingData ? 'กำลังโหลด...' : 'เลือกครู'}
+            searchPlaceholder="ค้นหาครู..."
+            options={teachers.map((teacher) => ({
+              value: teacher.id,
+              label:
+                (teacher.nickname || teacher.name) +
+                (originalTeacherId && teacher.id === originalTeacherId
+                  ? ' (ครูประจำคลาส)'
+                  : ''),
+            }))}
+          />
         </div>
         <div className="space-y-2 min-w-0">
           <Label>ห้องเรียน *</Label>
