@@ -21,6 +21,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AttendanceDialog } from '@/components/attendance/attendance-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { recordMakeupAttendance, updateMakeupAttendance } from '@/lib/services/makeup';
+import { Check, X } from 'lucide-react';
 
 // --- Types ---
 
@@ -159,11 +168,11 @@ function ScheduleCard({
             </div>
           )}
 
-          {/* Actions: check-in (regular classes) + open slide (classes + makeup).
+          {/* Actions: check-in (regular classes + makeup) + open slide (classes + makeup).
               Slide is matched by subject + session number; makeup uses the original session. */}
           {(item.type === 'class' || item.type === 'makeup') && (
             <div className="mt-3 flex flex-wrap gap-2">
-              {item.type === 'class' && (
+              {(item.type === 'class' || item.type === 'makeup') && (
                 <Button
                   variant="outline"
                   onClick={() => onCheckAttendance(item)}
@@ -354,6 +363,89 @@ export default function TeacherHomePage() {
           onSaved={() => { setAttItem(null); loadSchedule(); }}
         />
       )}
+
+      {/* Quick attendance for makeup (single student → มาเรียน/ขาด) */}
+      {attItem && attItem.type === 'makeup' && (
+        <MakeupQuickAttendanceDialog
+          item={attItem}
+          checkedBy={adminUser?.id || 'system'}
+          onClose={() => setAttItem(null)}
+          onSaved={() => { setAttItem(null); loadSchedule(); }}
+        />
+      )}
     </div>
+  );
+}
+
+// --- Makeup quick attendance dialog (มาเรียน / ขาด) ---
+
+function MakeupQuickAttendanceDialog({
+  item,
+  checkedBy,
+  onClose,
+  onSaved,
+}: {
+  item: TeacherScheduleItem;
+  checkedBy: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const student = item.students[0];
+
+  const mark = async (present: boolean) => {
+    setSaving(true);
+    try {
+      const payload = {
+        status: (present ? 'present' : 'absent') as 'present' | 'absent',
+        checkedBy,
+      };
+      // Re-checking an already-completed makeup updates it; first time records it.
+      if (item.schedule_status === 'completed') {
+        await updateMakeupAttendance(item.schedule_id, payload);
+      } else {
+        await recordMakeupAttendance(item.schedule_id, payload);
+      }
+      toast.success(present ? 'บันทึก: มาเรียน' : 'บันทึก: ขาดเรียน');
+      onSaved();
+    } catch (error) {
+      console.error('Error saving makeup attendance:', error);
+      toast.error('บันทึกการเช็คชื่อไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>เช็คชื่อเรียนชดเชย</DialogTitle>
+          <DialogDescription>
+            {item.subject_name}
+            {student ? ` · ${student.nickname || student.name}` : ''}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-3 pt-2">
+          <Button
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+            disabled={saving}
+            onClick={() => mark(true)}
+          >
+            <Check className="h-4 w-4 mr-2" />
+            มาเรียน
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 border-red-300 text-red-700 hover:bg-red-50 hover:text-red-700"
+            disabled={saving}
+            onClick={() => mark(false)}
+          >
+            <X className="h-4 w-4 mr-2" />
+            ขาดเรียน
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

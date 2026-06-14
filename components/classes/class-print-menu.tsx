@@ -3,7 +3,7 @@
 // Print buttons for the class detail header. Two documents, each opening its own
 // dialog (pick a student or print the whole class):
 //   - Teacher-feedback report → ReportPrintDialog
-//   - Certificate (only when the class is completed) → CertificatePrintDialog
+//   - Certificate → CertificatePrintDialog (no completion gate — printable anytime)
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -28,12 +28,10 @@ export function ClassPrintMenu({ classId, teacherId, isCompleted, students }: Pr
         <FileText className="h-4 w-4 mr-2" />
         รายงาน
       </Button>
-      {isCompleted && (
-        <Button variant="outline" onClick={() => setCertOpen(true)}>
-          <Award className="h-4 w-4 mr-2" />
-          ประกาศนียบัตร
-        </Button>
-      )}
+      <Button variant="outline" onClick={() => setCertOpen(true)}>
+        <Award className="h-4 w-4 mr-2" />
+        ประกาศนียบัตร
+      </Button>
 
       <ReportPrintDialog
         open={reportOpen}

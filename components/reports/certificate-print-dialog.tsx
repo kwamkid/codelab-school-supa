@@ -102,7 +102,7 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
       );
       const ok = reports.filter(Boolean) as { s: PrintStudent; fields: CertificateFields }[];
       if (ok.length === 0) {
-        toast.error('คลาสนี้ยังไม่จบ ไม่สามารถออกประกาศนียบัตรได้');
+        toast.error('ไม่สามารถโหลดข้อมูลประกาศนียบัตรได้');
         return;
       }
       setRows(ok.map(({ s, fields }) => ({

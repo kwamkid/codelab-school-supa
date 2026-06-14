@@ -95,9 +95,7 @@ export async function loadCertFields(
   payload: Record<string, unknown>
 ): Promise<CertificateFields> {
   const report = await fetchReport(endpoint, payload);
-  if (!report.isCompleted) {
-    throw new Error('คลาสนี้ยังไม่จบ ไม่สามารถออกประกาศนียบัตรได้');
-  }
+  // No completion gate — allow printing the certificate regardless of class progress.
   return certFieldsFromReport(report);
 }
 
@@ -146,11 +144,8 @@ export async function printClassCertificates(classId: string, studentIds: string
   const reports = await Promise.all(
     studentIds.map((studentId) => fetchReport(REPORT_ENDPOINT, { studentId, classId }))
   );
-  const completed = reports.filter((r) => r.isCompleted);
-  if (completed.length === 0) {
-    throw new Error('คลาสนี้ยังไม่จบ ไม่สามารถออกประกาศนียบัตรได้');
-  }
-  const fields = completed.map(certFieldsFromReport);
+  // No completion gate — print a certificate for every selected student.
+  const fields = reports.map(certFieldsFromReport);
   const { title, body, css } = generateCertificatesHTML(fields);
   openPrint(title, body, css);
 }
