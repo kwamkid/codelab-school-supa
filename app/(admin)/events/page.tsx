@@ -156,12 +156,26 @@ export default function EventsPage() {
     }
   };
 
-  const copyRegistrationLink = (eventId: string) => {
-    const link = `${window.location.origin}/liff/events/register/${eventId}`;
-    navigator.clipboard.writeText(link);
+  const copyRegistrationLink = async (eventId: string) => {
+    let link = `${window.location.origin}/liff/events/register/${eventId}`;
+    try {
+      const res = await fetch('/api/admin/short-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.code) {
+        link = `${window.location.origin}/e/${data.code}`;
+      }
+    } catch {
+      // Fall back to the long link.
+    }
+
+    await navigator.clipboard.writeText(link);
     setCopiedEventId(eventId);
     toast.success('คัดลอกลิงก์แล้ว');
-    
+
     // Reset copied state after 2 seconds
     setTimeout(() => {
       setCopiedEventId(null);

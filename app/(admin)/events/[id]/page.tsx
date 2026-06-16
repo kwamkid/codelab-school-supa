@@ -69,6 +69,7 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [copyingLink, setCopyingLink] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -256,10 +257,28 @@ export default function EventDetailPage() {
             {event.status === 'published' && (
               <Button
                 variant="outline"
-                onClick={() => {
-                  const link = `${window.location.origin}/liff/events/register/${event.id}`;
-                  navigator.clipboard.writeText(link);
-                  toast.success('คัดลอกลิงก์ลงทะเบียนแล้ว');
+                disabled={copyingLink}
+                onClick={async () => {
+                  setCopyingLink(true);
+                  try {
+                    const res = await fetch('/api/admin/short-links', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ eventId: event.id }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok || !data.code) throw new Error(data.error || 'failed');
+                    const link = `${window.location.origin}/e/${data.code}`;
+                    await navigator.clipboard.writeText(link);
+                    toast.success('คัดลอกลิงก์ลงทะเบียนแล้ว');
+                  } catch {
+                    // Fallback to the long link so copy still works.
+                    const link = `${window.location.origin}/liff/events/register/${event.id}`;
+                    await navigator.clipboard.writeText(link);
+                    toast.success('คัดลอกลิงก์ลงทะเบียนแล้ว');
+                  } finally {
+                    setCopyingLink(false);
+                  }
                 }}
               >
                 <LinkIcon className="h-4 w-4 mr-2" />
