@@ -168,6 +168,17 @@ export default function EventDetailPage() {
     return colors[status] || 'bg-gray-100 text-gray-700';
   };
 
+  // Solid dot colors — the soft badge backgrounds are too faint for a small dot.
+  const getStatusDotColor = (status: string) => {
+    const colors: Record<string, string> = {
+      'draft': 'bg-gray-400',
+      'published': 'bg-green-500',
+      'completed': 'bg-blue-500',
+      'cancelled': 'bg-red-500'
+    };
+    return colors[status] || 'bg-gray-400';
+  };
+
   const getStatusText = (status: string) => {
     const texts: Record<string, string> = {
       'draft': 'ร่าง',
@@ -183,6 +194,50 @@ export default function EventDetailPage() {
     return branch?.name || branchId;
   };
 
+  const activeRegs = registrations.filter(r => r.status !== 'cancelled');
+  const totalRegistered = activeRegs.reduce((sum, r) => sum + r.attendeeCount, 0);
+  const totalAttended = registrations.filter(r => r.status === 'attended').length;
+  const totalCapacity = statistics?.totalCapacity || 0;
+  const countUnit = event.countingMethod === 'registrations' ? 'รายการ' : 'คน';
+
+  // Event date range from schedules (real "วันที่จัด")
+  const scheduleDates = schedules
+    .map(s => new Date(s.date).getTime())
+    .filter(t => !isNaN(t))
+    .sort((a, b) => a - b);
+  const firstDate = scheduleDates.length ? new Date(scheduleDates[0]) : null;
+  const lastDate = scheduleDates.length ? new Date(scheduleDates[scheduleDates.length - 1]) : null;
+  const eventDateLabel = firstDate
+    ? (lastDate && lastDate.getTime() !== firstDate.getTime()
+        ? `${formatDate(firstDate, 'short')} - ${formatDate(lastDate, 'short')}`
+        : formatDate(firstDate, 'short'))
+    : null;
+
+  // Per-branch breakdown: registered + capacity (summed over schedules) + per-schedule rows.
+  const branchBreakdown = event.branchIds.map((branchId) => {
+    const capacity = schedules.reduce((sum, s) => {
+      const mabb = (s as any).maxAttendeesByBranch || {};
+      return sum + (mabb[branchId] || 0);
+    }, 0);
+    const registered = activeRegs
+      .filter(r => r.branchId === branchId)
+      .reduce((sum, r) => sum + r.attendeeCount, 0);
+    const attended = registrations
+      .filter(r => r.branchId === branchId && r.status === 'attended')
+      .reduce((sum, r) => sum + r.attendeeCount, 0);
+    const perSchedule = schedules.map((s) => {
+      const mabb = (s as any).maxAttendeesByBranch || {};
+      const cap = mabb[branchId] || 0;
+      const reg = activeRegs
+        .filter(r => r.scheduleId === s.id && r.branchId === branchId)
+        .reduce((sum, r) => sum + r.attendeeCount, 0);
+      return { schedule: s, cap, reg };
+    }).filter(x => x.cap > 0 || x.reg > 0);
+    const isFull = capacity > 0 && registered >= capacity;
+    const pct = capacity > 0 ? Math.min(100, Math.round((registered / capacity) * 100)) : 0;
+    return { branchId, name: getBranchName(branchId), capacity, registered, attended, isFull, pct, perSchedule };
+  });
+
   return (
     <div>
       {/* Header */}
@@ -196,64 +251,68 @@ export default function EventDetailPage() {
         </Link>
       </div>
 
-      {/* Hero: banner + title + actions */}
-      <div className="mb-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      {/* Hero: cover (left) + title + actions (right) */}
+      <div className={cn(
+        'mb-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm',
+        event.imageUrl && 'md:grid md:grid-cols-2'
+      )}>
         {event.imageUrl && (
-          <div className="relative aspect-[16/5] w-full bg-gray-100">
+          <div className="flex items-center justify-center bg-gray-50 md:border-r md:border-gray-100">
             <img
               src={event.imageUrl}
               alt={event.name}
-              className="h-full w-full object-cover"
+              className="max-h-[320px] w-full object-contain"
             />
           </div>
         )}
-        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-4 p-5">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{event.name}</h1>
-              <Badge variant="outline">{getEventTypeLabel(event.eventType)}</Badge>
+            <div className="flex items-start gap-2 mb-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{event.name}</h1>
+                <Badge variant="outline">{getEventTypeLabel(event.eventType)}</Badge>
+              </div>
+              {/* Status changer — pinned top-right */}
+              <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={statusChanging}
+                      className={cn(
+                        'ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60',
+                        getStatusColor(event.status)
+                      )}
+                    >
+                      {statusChanging ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          {getStatusText(event.status)}
+                          <ChevronDown className="h-4 w-4 opacity-70" />
+                        </>
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {(['draft', 'published', 'completed', 'cancelled'] as const).map((s) => (
+                      <DropdownMenuItem
+                        key={s}
+                        onClick={() => handleStatusChange(s)}
+                        className={cn('gap-2', s === event.status && 'font-semibold')}
+                      >
+                        <span className={cn('h-2 w-2 rounded-full', getStatusDotColor(s))} />
+                        {getStatusText(s)}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </PermissionGuard>
             </div>
             <p className="text-gray-600">{event.description}</p>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {/* Status changer */}
-            <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={statusChanging}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60',
-                      getStatusColor(event.status)
-                    )}
-                  >
-                    {statusChanging ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        {getStatusText(event.status)}
-                        <ChevronDown className="h-4 w-4 opacity-70" />
-                      </>
-                    )}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {(['draft', 'published', 'completed', 'cancelled'] as const).map((s) => (
-                    <DropdownMenuItem
-                      key={s}
-                      onClick={() => handleStatusChange(s)}
-                      className={cn('gap-2', s === event.status && 'font-semibold')}
-                    >
-                      <span className={cn('h-2 w-2 rounded-full', getStatusColor(s).split(' ')[0])} />
-                      {getStatusText(s)}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </PermissionGuard>
-
+          <div className="flex flex-wrap items-center gap-2">
             {event.status === 'published' && (
               <Button
                 variant="outline"
@@ -298,154 +357,150 @@ export default function EventDetailPage() {
         </div>
       </div>
 
-      {/* Quick Info Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2 text-gray-600">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <MapPin className="h-4 w-4" />
-              </span>
-              สถานที่
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="font-medium">{event.location}</p>
-            {event.locationUrl && (
-              <a 
-                href={event.locationUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:underline"
-              >
-                ดูแผนที่
-              </a>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2 text-gray-600">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Calendar className="h-4 w-4" />
-              </span>
-              รับลงทะเบียน
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">{formatDate(event.registrationStartDate, 'short')}</p>
-            <p className="text-sm text-gray-500">ถึง {formatDate(event.registrationEndDate, 'short')}</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2 text-gray-600">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Users className="h-4 w-4" />
-              </span>
-              ผู้ลงทะเบียน
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const activeRegs = registrations.filter(r => r.status !== 'cancelled');
-              const totalAttendees = event.countingMethod === 'registrations'
-                ? activeRegs.length
-                : activeRegs.reduce((sum, r) => sum + r.attendeeCount, 0);
-              const totalCapacity = statistics?.totalCapacity || 0;
-              const countLabel = event.countingMethod === 'students' ? 'คน' : event.countingMethod === 'parents' ? 'คน' : 'รายการ';
-
-              // Group by branch
-              const byBranch: Record<string, number> = {};
-              for (const r of activeRegs) {
-                byBranch[r.branchId] = (byBranch[r.branchId] || 0) + r.attendeeCount;
-              }
-
-              return (
-                <>
-                  <p className="text-2xl font-bold">
-                    {totalAttendees}
-                    <span className="text-lg font-normal text-gray-500">/{totalCapacity}</span>
-                  </p>
-                  <div className="mt-2 mb-1">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-primary h-2 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, (totalAttendees / (totalCapacity || 1)) * 100)}%` }}
+      {/* Per-branch breakdown (primary) */}
+      <Card className="mb-4">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>ยอดลงทะเบียนแยกตามสาขา</CardTitle>
+          <span className="text-sm font-normal text-gray-500">
+            รวม {totalRegistered}{totalCapacity ? `/${totalCapacity}` : ''} {countUnit}
+          </span>
+        </CardHeader>
+        <CardContent>
+          {branchBreakdown.length === 0 ? (
+            <p className="text-sm text-gray-500">ยังไม่ได้กำหนดสาขา</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {branchBreakdown.map((b) => (
+                <div
+                  key={b.branchId}
+                  className={cn(
+                    'rounded-xl border p-4',
+                    b.isFull ? 'border-red-200 bg-red-50/40' : 'border-gray-200'
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={cn(
+                          'h-2.5 w-2.5 shrink-0 rounded-full',
+                          b.capacity === 0 ? 'bg-gray-300' : b.isFull ? 'bg-red-500' : 'bg-green-500'
+                        )}
                       />
+                      <span className="truncate font-medium">{b.name}</span>
                     </div>
+                    {b.capacity > 0 && (
+                      <Badge
+                        className={cn(
+                          'shrink-0',
+                          b.isFull ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                        )}
+                      >
+                        {b.isFull ? 'เต็ม' : `ว่าง ${b.capacity - b.registered}`}
+                      </Badge>
+                    )}
                   </div>
-                  {/* Per branch breakdown */}
-                  {Object.keys(byBranch).length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {Object.entries(byBranch).map(([branchId, count]) => {
-                        const branch = branches.find(b => b.id === branchId);
-                        // Get branch max from schedules
-                        const branchMax = schedules.reduce((max, s) => {
-                          const mabb = (s as any).maxAttendeesByBranch || {};
-                          return max + (mabb[branchId] || 0);
-                        }, 0);
+
+                  <div className="mt-3 flex items-baseline gap-1">
+                    <span className={cn('text-2xl font-bold tabular-nums', b.isFull && 'text-red-600')}>
+                      {b.registered}
+                    </span>
+                    <span className="text-base text-gray-400">
+                      /{b.capacity || '∞'} {countUnit}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200">
+                    <div
+                      className={cn('h-1.5 rounded-full transition-all', b.isFull ? 'bg-red-500' : 'bg-green-500')}
+                      style={{ width: `${b.pct}%` }}
+                    />
+                  </div>
+
+                  {/* Per-schedule rows (only when there are multiple rounds) */}
+                  {schedules.length > 1 && b.perSchedule.length > 0 && (
+                    <div className="mt-3 space-y-1 border-t border-gray-100 pt-2">
+                      {b.perSchedule.map(({ schedule, cap, reg }) => {
+                        const full = cap > 0 && reg >= cap;
                         return (
-                          <div key={branchId} className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600">{branch?.name || 'ไม่ระบุ'}</span>
-                            <span className="font-medium">
-                              {count}{branchMax > 0 ? `/${branchMax}` : ''} คน
+                          <div key={schedule.id} className="flex items-center justify-between text-xs">
+                            <span className="truncate text-gray-500">
+                              {formatDate(schedule.date, 'short')} {formatTime(schedule.startTime)}
+                            </span>
+                            <span className={cn('font-medium tabular-nums', full && 'text-red-600')}>
+                              {reg}{cap > 0 ? `/${cap}` : ''}
                             </span>
                           </div>
                         );
                       })}
                     </div>
                   )}
-                </>
-              );
-            })()}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2 text-gray-600">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <BarChart3 className="h-4 w-4" />
-              </span>
-              เปิดดู / ลงทะเบียน
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const views = event.viewCount || 0;
-              const activeRegsForView = registrations.filter(r => r.status !== 'cancelled');
-              const regs = event.countingMethod === 'registrations'
-                ? activeRegsForView.length
-                : activeRegsForView.reduce((sum, r) => sum + r.attendeeCount, 0);
-              const rate = views > 0 ? Math.round((regs / views) * 100) : 0;
-              return (
-                <div className="space-y-2">
-                  <div className="flex items-end gap-3">
-                    <div>
-                      <p className="text-xs text-gray-500">เปิดดู</p>
-                      <p className="text-2xl font-bold">{views}</p>
-                    </div>
-                    <div className="text-gray-300 text-lg pb-1">→</div>
-                    <div>
-                      <p className="text-xs text-gray-500">ลงทะเบียน</p>
-                      <p className="text-2xl font-bold text-blue-600">{regs}</p>
-                    </div>
-                  </div>
-                  {views > 0 && (
-                    <p className="text-xs text-gray-500">
-                      Conversion rate: <span className="font-medium text-green-600">{rate}%</span>
+
+                  {event.status === 'completed' && b.attended > 0 && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      มาเข้าร่วม {b.attended} {countUnit}
                     </p>
                   )}
                 </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Compact stat strip */}
+      <Card className="mb-6">
+        <CardContent className="grid grid-cols-1 divide-y divide-gray-100 p-0 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {/* วันที่จัด */}
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              วันที่จัด
+            </div>
+            <p className="mt-1 text-base font-semibold leading-snug">
+              {eventDateLabel || <span className="text-gray-400">ยังไม่มีรอบ</span>}
+            </p>
+            <p className="mt-0.5 text-xs text-gray-500">{schedules.length} รอบเวลา</p>
+          </div>
+
+          {/* รับลงทะเบียน */}
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <Calendar className="h-4 w-4 text-primary" />
+              รับลงทะเบียน
+            </div>
+            <p className="mt-1 text-sm font-medium leading-snug">
+              {formatDate(event.registrationStartDate, 'short')}
+            </p>
+            <p className="text-xs text-gray-500">
+              ถึง {formatDate(event.registrationEndDate, 'short')}
+            </p>
+          </div>
+
+          {/* เปิดดู → ลงทะเบียน */}
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              เปิดดู → ลงทะเบียน
+            </div>
+            {(() => {
+              const views = event.viewCount || 0;
+              const rate = views > 0 ? Math.round((totalRegistered / views) * 100) : 0;
+              return (
+                <>
+                  <p className="mt-1 text-2xl font-bold">
+                    {views}
+                    <span className="px-1 text-base font-normal text-gray-300">→</span>
+                    <span className="text-blue-600">{totalRegistered}</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {views > 0 ? <>Conversion <span className="font-medium text-green-600">{rate}%</span></> : 'ยังไม่มีการเปิดดู'}
+                  </p>
+                </>
               );
             })()}
-          </CardContent>
-        </Card>
-
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -518,18 +573,27 @@ export default function EventDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Branches */}
+          {/* Location */}
           <Card>
             <CardHeader>
-              <CardTitle>สาขาที่จัด Event</CardTitle>
+              <CardTitle>สถานที่จัดงาน</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {event.branchIds.map(branchId => (
-                  <Badge key={branchId} variant="outline">
-                    {getBranchName(branchId)}
-                  </Badge>
-                ))}
+              <div className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                <div>
+                  <p className="font-medium">{event.location}</p>
+                  {event.locationUrl && (
+                    <a
+                      href={event.locationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      ดูแผนที่
+                    </a>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -600,9 +664,10 @@ export default function EventDetailPage() {
 
         {/* Schedules Tab */}
         <TabsContent value="schedules">
-          <ScheduleManager 
+          <ScheduleManager
             eventId={eventId}
             schedules={schedules}
+            branches={branches}
             onUpdate={handleScheduleUpdate}
           />
         </TabsContent>

@@ -30,6 +30,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -50,7 +57,8 @@ import {
   CalendarX,
   Link as LinkIcon,
   CheckCircle2,
-  Copy
+  Copy,
+  MoreHorizontal
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
@@ -59,11 +67,20 @@ import { StatusFilterTabs } from '@/components/ui/status-filter-tabs';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 
+type EventWithStats = Event & {
+  totalRegistrations?: number;
+  totalAttendees?: number;
+  registrationsByBranch?: Record<string, number>;
+  capacityByBranch?: Record<string, number>;
+  firstEventDate?: Date | null;
+  lastEventDate?: Date | null;
+};
+
 export default function EventsPage() {
   const router = useRouter();
   const { user, isSuperAdmin } = useAuth();
   const { selectedBranchId, isAllBranches } = useBranch();
-  const [events, setEvents] = useState<(Event & { totalRegistrations?: number; totalAttendees?: number })[]>([]);
+  const [events, setEvents] = useState<EventWithStats[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -115,6 +132,10 @@ export default function EventsPage() {
         createdBy: row.created_by || '',
         totalRegistrations: row.total_registrations || 0,
         totalAttendees: row.total_attendees || 0,
+        registrationsByBranch: row.registrations_by_branch || {},
+        capacityByBranch: row.capacity_by_branch || {},
+        firstEventDate: row.first_event_date ? new Date(row.first_event_date) : null,
+        lastEventDate: row.last_event_date ? new Date(row.last_event_date) : null,
       }));
 
       setEvents(eventsData);
@@ -248,6 +269,34 @@ export default function EventsPage() {
     return branch?.name || branchId;
   };
 
+  // Per-branch seat status: registered / capacity for each branch the event runs at.
+  const getBranchSeats = (event: EventWithStats) => {
+    const reg = event.registrationsByBranch || {};
+    const cap = event.capacityByBranch || {};
+    return event.branchIds.map((branchId) => {
+      const registered = reg[branchId] || 0;
+      const capacity = cap[branchId] || 0;
+      const isFull = capacity > 0 && registered >= capacity;
+      return {
+        branchId,
+        name: getBranchName(branchId),
+        registered,
+        capacity,
+        isFull,
+        hasCapacity: capacity > 0,
+      };
+    });
+  };
+
+  const formatEventDate = (event: EventWithStats) => {
+    if (!event.firstEventDate) return null;
+    const first = formatDate(event.firstEventDate, 'short');
+    if (event.lastEventDate && event.lastEventDate.getTime() !== event.firstEventDate.getTime()) {
+      return `${first} - ${formatDate(event.lastEventDate, 'short')}`;
+    }
+    return first;
+  };
+
   if (loading) {
     return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
@@ -350,8 +399,8 @@ export default function EventsPage() {
                     <TableHead>Event</TableHead>
                     <TableHead>ประเภท</TableHead>
                     <TableHead>วันที่จัด</TableHead>
+                    <TableHead>ที่นั่ง (แยกสาขา)</TableHead>
                     <TableHead>รับลงทะเบียน</TableHead>
-                    <TableHead>สาขา</TableHead>
                     <TableHead>สถานะ</TableHead>
                     <TableHead className="text-right">จัดการ</TableHead>
                   </TableRow>
@@ -361,21 +410,25 @@ export default function EventsPage() {
                     <TableRow key={event.id}>
                       <TableCell>
                         <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{event.name}</p>
-                            {(event as any).totalAttendees > 0 ? (
-                              <Badge className="text-xs bg-blue-100 text-blue-700">
-                                {(event as any).totalAttendees} คนลงทะเบียน
-                              </Badge>
+                          <Link
+                            href={`/events/${event.id}`}
+                            className="font-medium text-gray-900 hover:text-primary hover:underline"
+                          >
+                            {event.name}
+                          </Link>
+                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                            {event.branchIds.length > 0 ? (
+                              event.branchIds.map((branchId) => (
+                                <Badge key={branchId} variant="outline" className="text-xs font-normal">
+                                  {getBranchName(branchId)}
+                                </Badge>
+                              ))
                             ) : (
-                              <Badge variant="secondary" className="text-xs">
-                                ยังไม่มีคนลงทะเบียน
-                              </Badge>
+                              <div className="flex items-center gap-1 text-gray-500 text-sm">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate max-w-[260px]">{event.location}</span>
+                              </div>
                             )}
-                          </div>
-                          <div className="flex items-center gap-1 text-gray-500 mt-1">
-                            <MapPin className="h-3 w-3" />
-                            {event.location}
                           </div>
                         </div>
                       </TableCell>
@@ -385,28 +438,55 @@ export default function EventsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div>
+                        {formatEventDate(event) ? (
+                          <div className="flex items-center gap-1 whitespace-nowrap">
+                            <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                            <span>{formatEventDate(event)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {getBranchSeats(event).map((b) => (
+                            <div key={b.branchId} className="flex items-center gap-1.5 text-sm whitespace-nowrap">
+                              <span
+                                className={cn(
+                                  'h-2 w-2 rounded-full shrink-0',
+                                  !b.hasCapacity
+                                    ? 'bg-gray-300'
+                                    : b.isFull
+                                    ? 'bg-red-500'
+                                    : 'bg-green-500'
+                                )}
+                              />
+                              <span className="text-gray-600">{b.name}</span>
+                              <span
+                                className={cn(
+                                  'font-medium tabular-nums',
+                                  b.isFull ? 'text-red-600' : 'text-gray-900'
+                                )}
+                              >
+                                {b.registered}
+                                {b.hasCapacity ? `/${b.capacity}` : ''}
+                              </span>
+                              {b.isFull && (
+                                <span className="text-xs text-red-500">เต็ม</span>
+                              )}
+                            </div>
+                          ))}
+                          {getBranchSeats(event).length === 0 && (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm whitespace-nowrap">
                           <p>{formatDate(event.registrationStartDate, 'short')}</p>
                           <p className="text-gray-500">
                             ถึง {formatDate(event.registrationEndDate, 'short')}
                           </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p>เปิด: {formatDate(event.registrationStartDate, 'short')}</p>
-                          <p className="text-gray-500">
-                            ปิด: {formatDate(event.registrationEndDate, 'short')}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {event.branchIds.map((branchId) => (
-                            <Badge key={branchId} variant="outline" className="text-xs">
-                              {getBranchName(branchId)}
-                            </Badge>
-                          ))}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -415,62 +495,60 @@ export default function EventsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Link href={`/events/${event.id}`}>
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
                             </Button>
-                          </Link>
-                          
-                          <PermissionGuard action="update">
-                            <Link href={`/events/${event.id}/edit`}>
-                              <Button variant="ghost" size="sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                          </PermissionGuard>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => router.push(`/events/${event.id}`)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              ดูรายละเอียด
+                            </DropdownMenuItem>
 
-                          <PermissionGuard action="create">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDuplicate(event.id)}
-                              disabled={duplicatingEventId === event.id}
-                              className="text-purple-600 hover:text-purple-700 hover:bg-purple-100"
-                              title="คัดลอก Event (สถานะร่าง)"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </PermissionGuard>
+                            <PermissionGuard action="update">
+                              <DropdownMenuItem onClick={() => router.push(`/events/${event.id}/edit`)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                แก้ไข
+                              </DropdownMenuItem>
+                            </PermissionGuard>
 
-                          {/* Copy Registration Link Button */}
-                          {event.status === 'published' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => copyRegistrationLink(event.id)}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
-                              title="คัดลอกลิงก์ลงทะเบียน"
-                            >
-                              {copiedEventId === event.id ? (
-                                <CheckCircle2 className="h-4 w-4" />
-                              ) : (
-                                <LinkIcon className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
-                          
-                          {isSuperAdmin() && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteEventId(event.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-100"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
+                            {event.status === 'published' && (
+                              <DropdownMenuItem onClick={() => copyRegistrationLink(event.id)}>
+                                {copiedEventId === event.id ? (
+                                  <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                                ) : (
+                                  <LinkIcon className="h-4 w-4 mr-2" />
+                                )}
+                                คัดลอกลิงก์ลงทะเบียน
+                              </DropdownMenuItem>
+                            )}
+
+                            <PermissionGuard action="create">
+                              <DropdownMenuItem
+                                onClick={() => handleDuplicate(event.id)}
+                                disabled={duplicatingEventId === event.id}
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                คัดลอก Event
+                              </DropdownMenuItem>
+                            </PermissionGuard>
+
+                            {isSuperAdmin() && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteEventId(event.id)}
+                                  className="text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  ลบ
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}

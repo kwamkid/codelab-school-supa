@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { EventSchedule } from '@/types/models';
+import { EventSchedule, Branch } from '@/types/models';
 import { 
   createEventSchedule, 
   updateEventSchedule, 
@@ -49,16 +49,17 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDate, formatTime } from '@/lib/utils';
+import { formatDate, formatTime, cn } from '@/lib/utils';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 interface ScheduleManagerProps {
   eventId: string;
   schedules: EventSchedule[];
+  branches?: Branch[];
   onUpdate: () => void;
 }
 
-export default function ScheduleManager({ eventId, schedules, onUpdate }: ScheduleManagerProps) {
+export default function ScheduleManager({ eventId, schedules, branches = [], onUpdate }: ScheduleManagerProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<EventSchedule | null>(null);
   const [deleteScheduleId, setDeleteScheduleId] = useState<string | null>(null);
@@ -176,6 +177,24 @@ export default function ScheduleManager({ eventId, schedules, onUpdate }: Schedu
     return Object.values(schedule.attendeesByBranch || {}).reduce((sum, count) => sum + count, 0);
   };
 
+  const getBranchName = (branchId: string) => {
+    const branch = branches.find(b => b.id === branchId);
+    return branch?.name || branchId;
+  };
+
+  // Per-branch seat breakdown for one schedule round (registered / quota).
+  const getBranchSeats = (schedule: EventSchedule) => {
+    const cap = (schedule as any).maxAttendeesByBranch || {};
+    const reg = schedule.attendeesByBranch || {};
+    const branchIds = Array.from(new Set([...Object.keys(cap), ...Object.keys(reg)]));
+    return branchIds.map((branchId) => {
+      const capacity = cap[branchId] || 0;
+      const registered = reg[branchId] || 0;
+      const isFull = capacity > 0 && registered >= capacity;
+      return { branchId, name: getBranchName(branchId), capacity, registered, isFull, hasCap: capacity > 0 };
+    });
+  };
+
   // Derive the display status from live seat counts rather than the stored
   // `status` field, which can go stale (e.g. it's reset to 'available' on any
   // cancellation and ignores per-branch quotas) — so it disagreed with คงเหลือ.
@@ -259,11 +278,54 @@ export default function ScheduleManager({ eventId, schedules, onUpdate }: Schedu
                         <TableCell className="text-center">
                           {schedule.maxAttendees}
                         </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Users className="h-4 w-4 text-gray-400" />
-                            {totalAttendees}
-                          </div>
+                        <TableCell>
+                          {(() => {
+                            const seats = getBranchSeats(schedule);
+                            if (seats.length === 0) {
+                              return (
+                                <div className="flex items-center justify-center gap-1 text-gray-400">
+                                  <Users className="h-4 w-4" />
+                                  <span>{totalAttendees}</span>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="flex flex-col items-stretch gap-1">
+                                {seats.map((b) => {
+                                  // gray = ยังไม่มีคนลง, green = เต็ม, yellow = มีคนลงแต่ยังไม่เต็ม
+                                  const state = b.registered === 0
+                                    ? 'empty'
+                                    : b.isFull
+                                    ? 'full'
+                                    : 'partial';
+                                  return (
+                                    <span
+                                      key={b.branchId}
+                                      className={cn(
+                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap',
+                                        state === 'empty' && 'border-gray-200 bg-gray-50 text-gray-500',
+                                        state === 'partial' && 'border-amber-200 bg-amber-50 text-amber-700',
+                                        state === 'full' && 'border-green-200 bg-green-50 text-green-700'
+                                      )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          'h-1.5 w-1.5 shrink-0 rounded-full',
+                                          state === 'empty' && 'bg-gray-400',
+                                          state === 'partial' && 'bg-amber-500',
+                                          state === 'full' && 'bg-green-500'
+                                        )}
+                                      />
+                                      <span className="truncate">{b.name}</span>
+                                      <span className="ml-auto font-medium tabular-nums">
+                                        {b.registered}{b.hasCap ? `/${b.capacity}` : ''}
+                                      </span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge 
