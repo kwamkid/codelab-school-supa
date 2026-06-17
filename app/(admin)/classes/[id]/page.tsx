@@ -35,6 +35,8 @@ import {
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { ChangeResourceDialog } from '@/components/classes/change-resource-dialog';
+import { PauseClassDialog } from '@/components/classes/pause-class-dialog';
+import { ResumeClassDialog } from '@/components/classes/resume-class-dialog';
 import { ClassPrintMenu } from '@/components/classes/class-print-menu';
 import { formatDate, formatCurrency, getDayName } from '@/lib/utils';
 import {
@@ -105,6 +107,8 @@ export default function ClassDetailPage() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [changeResourceOpen, setChangeResourceOpen] = useState(false);
+  const [pauseClassOpen, setPauseClassOpen] = useState(false);
+  const [resumeClassOpen, setResumeClassOpen] = useState(false);
   const [showRescheduleHistory, setShowRescheduleHistory] = useState(false);
   const [endClassDialogOpen, setEndClassDialogOpen] = useState(false);
   const [endClassPreview, setEndClassPreview] = useState<{
@@ -352,6 +356,29 @@ export default function ClassDetailPage() {
             </Button>
           )}
 
+          {/* Pause / resume whole class */}
+          {(classData.status === 'published' || classData.status === 'started') && (
+            classData.pauseTo ? (
+              <Button
+                variant="outline"
+                className="text-green-700 border-green-300 hover:bg-green-50"
+                onClick={() => setResumeClassOpen(true)}
+              >
+                <PlayCircle className="h-4 w-4 mr-2" />
+                กลับมาเรียน
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                onClick={() => setPauseClassOpen(true)}
+              >
+                <PauseCircle className="h-4 w-4 mr-2" />
+                พักทั้งคลาส
+              </Button>
+            )
+          )}
+
           {isEditable && (
             <Link href={`/classes/${classId}/edit`}>
               <Button variant="outline">
@@ -430,6 +457,20 @@ export default function ClassDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Paused banner */}
+      {classData.pauseTo && (
+        <div className="mb-4 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <PauseCircle className="h-4 w-4 shrink-0" />
+          <span>
+            คลาสนี้กำลังพักอยู่
+            {classData.pauseFrom && (
+              <> ตั้งแต่ {formatDate(classData.pauseFrom)}</>
+            )}
+            {' '}ถึง {formatDate(classData.pauseTo)} — กด “กลับมาเรียน” เพื่อจัดคาบที่เหลือใหม่
+          </span>
+        </div>
+      )}
 
       {/* End Class Dialog */}
       <AlertDialog open={endClassDialogOpen} onOpenChange={setEndClassDialogOpen}>
@@ -948,6 +989,27 @@ export default function ClassDetailPage() {
           currentRoom={room}
           onSuccess={() => loadClassDetails()}
         />
+      )}
+
+      {classData && (
+        <>
+          <PauseClassDialog
+            open={pauseClassOpen}
+            onOpenChange={setPauseClassOpen}
+            classData={classData}
+            onSuccess={async () => {
+              // mode-A auto-rebooks and finishes; mode-B leaves the class paused
+              // (the "กลับมาเรียน" button opens the editor later). Just refresh.
+              await loadClassDetails();
+            }}
+          />
+          <ResumeClassDialog
+            open={resumeClassOpen}
+            onOpenChange={setResumeClassOpen}
+            classData={classData}
+            onSuccess={() => loadClassDetails()}
+          />
+        </>
       )}
     </div>
   );

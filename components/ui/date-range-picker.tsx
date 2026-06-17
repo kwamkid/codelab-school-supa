@@ -148,40 +148,6 @@ export function DateRangePicker(props: DateRangePickerProps) {
   }
 
   const configs = {
-    shortcuts: {
-      today: "วันนี้",
-      yesterday: "เมื่อวาน",
-      past: (days: number) =>
-        days === 7 ? "7 วันย้อนหลัง" : days === 30 ? "30 วันย้อนหลัง" : `${days} วันย้อนหลัง`,
-      thisMonth: {
-        text: "เดือนนี้",
-        period: {
-          start: new Date(now.getFullYear(), now.getMonth(), 1),
-          end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
-        },
-      },
-      prevMonth: {
-        text: "เดือนที่แล้ว",
-        period: {
-          start: new Date(now.getFullYear(), now.getMonth() - 1, 1),
-          end: new Date(now.getFullYear(), now.getMonth(), 0),
-        },
-      },
-      thisYear: {
-        text: "ปีนี้",
-        period: {
-          start: new Date(now.getFullYear(), 0, 1),
-          end: new Date(now.getFullYear(), 11, 31),
-        },
-      },
-      lastYear: {
-        text: "ปีที่แล้ว",
-        period: {
-          start: new Date(now.getFullYear() - 1, 0, 1),
-          end: new Date(now.getFullYear() - 1, 11, 31),
-        },
-      },
-    },
     footer: {
       cancel: "ยกเลิก",
       apply: "ตกลง",
@@ -195,7 +161,7 @@ export function DateRangePicker(props: DateRangePickerProps) {
         configs={configs}
         value={pickerValue}
         onChange={handleChange}
-        showShortcuts={true}
+        showShortcuts={false}
         showFooter={true}
         separator="—"
         displayFormat="D MMM YYYY"

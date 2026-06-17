@@ -5,8 +5,41 @@ import { getClient } from '@/lib/supabase/client';
 import { getRoomsByBranch } from './rooms';
 import { getHolidaysForBranch } from './holidays';
 import { adminMutation } from '@/lib/admin-mutation';
+import { checkAvailability, type AvailabilityIssue, type AvailabilityWarning } from '@/lib/utils/availability';
 
 const TABLE_NAME = 'classes';
+
+// Coerce a value to a uuid string, or null if it isn't a valid uuid.
+// Guards uuid FK columns (e.g. rescheduled_by) against placeholder strings.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function asUuidOrNull(v: string | null | undefined): string | null {
+  return v && UUID_RE.test(v) ? v : null;
+}
+
+// Lightweight schedule rows (id/date/number/status only) — one query, no
+// per-row attendance fetch. Used by pause/resume where attendance isn't needed.
+// (getClassSchedules loads attendance per row → 30+ requests on long courses.)
+interface LiteSchedule {
+  id: string;
+  sessionDate: Date;
+  sessionNumber: number;
+  status: string;
+}
+async function getScheduleRowsLite(classId: string): Promise<LiteSchedule[]> {
+  const supabase = getClient();
+  const { data, error } = await supabase
+    .from('class_schedules')
+    .select('id, session_date, session_number, status')
+    .eq('class_id', classId)
+    .order('session_date', { ascending: true });
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    sessionDate: new Date(r.session_date),
+    sessionNumber: r.session_number,
+    status: r.status || 'scheduled',
+  }));
+}
 
 // Helper function to get local date string (YYYY-MM-DD) without timezone issues
 function getLocalDateString(date: Date): string {
@@ -62,6 +95,8 @@ function mapToClass(row: any): Class {
     },
     completedSessions: row.completed_sessions ?? undefined,
     status: row.status || 'draft',
+    pauseFrom: row.pause_from ? new Date(row.pause_from) : null,
+    pauseTo: row.pause_to ? new Date(row.pause_to) : null,
     createdAt: new Date(row.created_at),
   };
 }
@@ -367,6 +402,8 @@ export async function getClassSchedules(classId: string): Promise<ClassSchedule[
         status: row.status || 'scheduled',
         actualTeacherId: row.actual_teacher_id,
         actualRoomId: row.actual_room_id,
+        actualStartTime: row.actual_start_time || undefined,
+        actualEndTime: row.actual_end_time || undefined,
         note: row.note,
         attendance: attendance.map(att => ({
           studentId: att.studentId,
@@ -410,21 +447,24 @@ export async function getClassSchedule(
     }
 
     if (!data) return null;
+    const row: any = data;
 
     // Load attendance from separate table
     const { getAttendanceBySchedule } = await import('./attendance');
-    const attendance = await getAttendanceBySchedule(data.id);
+    const attendance = await getAttendanceBySchedule(row.id);
 
     return {
-      id: data.id,
-      classId: data.class_id,
-      sessionDate: new Date(data.session_date),
-      sessionNumber: data.session_number,
-      topic: data.topic,
-      status: data.status || 'scheduled',
-      actualTeacherId: data.actual_teacher_id,
-      actualRoomId: data.actual_room_id,
-      note: data.note,
+      id: row.id,
+      classId: row.class_id,
+      sessionDate: new Date(row.session_date),
+      sessionNumber: row.session_number,
+      topic: row.topic,
+      status: row.status || 'scheduled',
+      actualTeacherId: row.actual_teacher_id,
+      actualRoomId: row.actual_room_id,
+      actualStartTime: row.actual_start_time || undefined,
+      actualEndTime: row.actual_end_time || undefined,
+      note: row.note,
       attendance: attendance.map(att => ({
         studentId: att.studentId,
         status: att.status,
@@ -434,9 +474,9 @@ export async function getClassSchedule(
         feedback: att.feedback,
         photos: att.photos
       })),
-      originalDate: data.original_date ? new Date(data.original_date) : undefined,
-      rescheduledAt: data.rescheduled_at ? new Date(data.rescheduled_at) : undefined,
-      rescheduledBy: data.rescheduled_by,
+      originalDate: row.original_date ? new Date(row.original_date) : undefined,
+      rescheduledAt: row.rescheduled_at ? new Date(row.rescheduled_at) : undefined,
+      rescheduledBy: row.rescheduled_by,
     };
   } catch (error) {
     console.error('Error getting class schedule:', error);
@@ -693,6 +733,8 @@ export async function getUpcomingSessions(
         status: row.status || 'scheduled',
         actualTeacherId: row.actual_teacher_id,
         actualRoomId: row.actual_room_id,
+        actualStartTime: row.actual_start_time || undefined,
+        actualEndTime: row.actual_end_time || undefined,
         note: row.note,
         attendance: attendance.map(att => ({
           studentId: att.studentId,
@@ -1513,6 +1555,284 @@ export async function endClassNow(classId: string): Promise<{ newEndDate: string
     console.error('Error ending class:', error);
     throw error;
   }
+}
+
+// ============================================================================
+// Whole-class pause / resume (พักทั้งคลาส)
+// Separate from per-student pauseEnrollment: NO makeup is created — sessions in
+// the pause window are simply cancelled (hidden from timetables) and the
+// remaining sessions are re-booked on resume via a manual editor.
+// ============================================================================
+
+export interface ResumeDraftSession {
+  sessionNumber: number;
+  date: string;       // YYYY-MM-DD
+  startTime: string;  // HH:MM
+  endTime: string;    // HH:MM
+  roomId: string;
+  teacherId: string;
+}
+
+// The default date to (re)book from = the day AFTER the last kept session
+// (completed or past/future non-cancelled), or today if there are none.
+// Used so a pause re-books the course continuing from where it left off.
+function nextDateAfterLastSession(schedules: ClassSchedule[]): string {
+  const today = getLocalDateString(new Date());
+  const kept = schedules
+    .filter((s) => s.status !== 'cancelled')
+    .map((s) => getLocalDateString(s.sessionDate))
+    .sort();
+  const lastDate = kept.length ? kept[kept.length - 1] : null;
+  if (!lastDate) return today;
+  const d = new Date(lastDate);
+  d.setDate(d.getDate() + 1);
+  const next = getLocalDateString(d);
+  return next > today ? next : today;
+}
+
+// Compute default booking rows for the sessions still to be scheduled.
+//   keptBeforeDate – sessions before this date stay put and count as "kept"
+//   genFrom        – first date to start generating new sessions from
+// (the two differ on a known-range pause: kept = before pauseFrom, but we
+//  generate from after pauseTo so the paused weeks are skipped, not reused.)
+async function computeDefaultRows(
+  cls: Class,
+  schedules: { status: string; sessionDate: Date }[],
+  keptBeforeDate: string,
+  genFrom: string
+): Promise<ResumeDraftSession[]> {
+  const keptCount = schedules.filter(
+    (s) =>
+      s.status === 'completed' ||
+      (s.status !== 'cancelled' && getLocalDateString(s.sessionDate) < keptBeforeDate)
+  ).length;
+  const remaining = Math.max(0, cls.totalSessions - keptCount);
+
+  const start = new Date(genFrom);
+  const horizon = new Date(genFrom);
+  horizon.setMonth(horizon.getMonth() + 12);
+  const holidays = await getHolidaysForBranch(cls.branchId, start, horizon);
+  const dates = generateSchedules(start, horizon, cls.daysOfWeek, remaining, holidays.map((h) => h.date));
+
+  return dates.map((d, i) => ({
+    sessionNumber: keptCount + 1 + i,
+    date: getLocalDateString(d),
+    startTime: normalizeTime(cls.startTime),
+    endTime: normalizeTime(cls.endTime),
+    roomId: cls.roomId,
+    teacherId: cls.teacherId,
+  }));
+}
+
+// Replace all cancelled + future-scheduled (from `fromDate`) rows with the given
+// rows. Shared by mode-A pause (auto-rebook) and resume (mode-B). Returns counts
+// + new end date + how many booked rows currently conflict (room/teacher).
+// Replace rows from `deleteFrom` onward (plus any cancelled rows) with `rows`.
+// Exactly TWO DB round-trips: one batch delete + one batch insert. No per-row
+// loops, no availability calls here (the editor checks conflicts live).
+async function rebookSessions(
+  cls: Class,
+  deleteFrom: string,
+  rows: ResumeDraftSession[]
+): Promise<{ created: number; deleted: number; newEndDate: string }> {
+  const all = await getScheduleRowsLite(cls.id);
+  const toDelete = all.filter(
+    (s) =>
+      s.status === 'cancelled' ||
+      (s.status === 'scheduled' && getLocalDateString(s.sessionDate) >= deleteFrom)
+  );
+  console.log(
+    `[rebookSessions] class=${cls.id} deleteFrom=${deleteFrom} → deleting ${toDelete.length} rows, inserting ${rows.length} rows`
+  );
+
+  // 1 request: batch delete
+  if (toDelete.length > 0) {
+    await adminMutation({
+      table: 'class_schedules',
+      operation: 'delete',
+      filters: [{ op: 'in', column: 'id', value: toDelete.map((s) => s.id) }],
+    });
+  }
+
+  const defaultStart = normalizeTime(cls.startTime);
+  const defaultEnd = normalizeTime(cls.endTime);
+  const inserts = rows.map((r) => {
+    const rowStart = normalizeTime(r.startTime);
+    const rowEnd = normalizeTime(r.endTime);
+    return {
+      class_id: cls.id,
+      session_date: r.date,
+      session_number: r.sessionNumber,
+      status: 'scheduled',
+      actual_room_id: r.roomId && r.roomId !== cls.roomId ? r.roomId : null,
+      actual_teacher_id: r.teacherId && r.teacherId !== cls.teacherId ? r.teacherId : null,
+      actual_start_time: rowStart !== defaultStart ? rowStart : null,
+      actual_end_time: rowEnd !== defaultEnd ? rowEnd : null,
+    };
+  });
+
+  // 1 request: batch insert (adminMutation accepts an array)
+  if (inserts.length > 0) {
+    await adminMutation({ table: 'class_schedules', operation: 'insert', data: inserts });
+  }
+
+  const newEndDate = rows.length
+    ? rows.reduce((max, r) => (r.date > max ? r.date : max), rows[0].date)
+    : getLocalDateString(cls.endDate);
+
+  console.log(`[rebookSessions] done. newEndDate=${newEndDate}`);
+  return { created: inserts.length, deleted: toDelete.length, newEndDate };
+}
+
+// Pause a whole class.
+//   mode 'known'  → cancel sessions in [pauseFrom, pauseTo] AND immediately
+//                   re-book the remaining sessions continuing after the last
+//                   kept session (no makeup, no lingering paused state).
+//   mode 'open'   → cancel all scheduled sessions from pauseFrom onward and
+//                   leave the class flagged paused (pause_to set) until the
+//                   admin resumes and books new dates.
+export async function pauseClass(
+  classId: string,
+  pauseFrom: string,
+  pauseTo: string | null,
+  reason: string,
+  by: string,
+  mode: 'known' | 'open' = 'known'
+): Promise<{ cancelled: number; created?: number; newEndDate?: string }> {
+  const cls = await getClass(classId);
+  if (!cls) throw new Error('ไม่พบข้อมูลคลาส');
+
+  console.log(`[pauseClass] class=${classId} mode=${mode} from=${pauseFrom} to=${pauseTo}`);
+
+  const schedules = await getScheduleRowsLite(classId);
+  const targets = schedules.filter((s) => {
+    if (s.status !== 'scheduled') return false;
+    const d = getLocalDateString(s.sessionDate);
+    if (mode === 'open') return d >= pauseFrom; // open-ended: from start onward
+    return pauseTo ? d >= pauseFrom && d <= pauseTo : d >= pauseFrom;
+  });
+  console.log(`[pauseClass] ${targets.length} session(s) in window`);
+
+  if (mode === 'open') {
+    // Open-ended: cancel the windowed sessions (batch) + leave the class paused.
+    if (targets.length > 0) {
+      await adminMutation({
+        table: 'class_schedules',
+        operation: 'update',
+        data: {
+          status: 'cancelled',
+          note: `[พักทั้งคลาส] ${reason || ''}`.trim(),
+          rescheduled_by: asUuidOrNull(by),
+          rescheduled_at: new Date().toISOString(),
+        },
+        filters: [{ op: 'in', column: 'id', value: targets.map((s) => s.id) }],
+      });
+    }
+    await adminMutation({
+      table: 'classes',
+      operation: 'update',
+      data: { pause_from: pauseFrom, pause_to: pauseTo ?? pauseFrom },
+      match: { id: classId },
+    });
+    return { cancelled: targets.length };
+  }
+
+  // mode 'known': skip the paused weeks and shift the remaining sessions to
+  // start AFTER pauseTo. Sessions before pauseFrom stay put; sessions from
+  // pauseFrom onward are deleted and re-generated starting the day after pauseTo.
+  const after = schedules; // current rows (nothing cancelled yet in this mode)
+  const windowEnd = pauseTo || pauseFrom;
+  const genFrom = (() => {
+    const d = new Date(windowEnd);
+    d.setDate(d.getDate() + 1);
+    return getLocalDateString(d);
+  })();
+
+  // kept = before pauseFrom; generate from the day after pauseTo; delete from pauseFrom.
+  const rows = await computeDefaultRows(cls, after, pauseFrom, genFrom);
+  const result = await rebookSessions(cls, pauseFrom, rows);
+
+  await adminMutation({
+    table: 'classes',
+    operation: 'update',
+    data: { end_date: result.newEndDate, pause_from: null, pause_to: null },
+    match: { id: classId },
+  });
+
+  console.log(
+    `[pauseClass] done. cancelled ${targets.length}, rebooked ${result.created}, newEndDate ${result.newEndDate}`
+  );
+  return {
+    cancelled: targets.length,
+    created: result.created,
+    newEndDate: result.newEndDate,
+  };
+}
+
+// Read-only: auto-fill default resume rows starting from the day after the last
+// kept session (or an explicit fromDate). The editor lets the admin tweak rows.
+export async function buildResumeDraft(
+  classId: string,
+  fromDate?: string
+): Promise<{ rows: ResumeDraftSession[]; fromDate: string }> {
+  const cls = await getClass(classId);
+  if (!cls) throw new Error('ไม่พบข้อมูลคลาส');
+
+  const schedules = await getClassSchedules(classId);
+  const start = fromDate || nextDateAfterLastSession(schedules);
+  // resume: kept = before start, generate from start (same date for both).
+  const rows = await computeDefaultRows(cls, schedules, start, start);
+  return { rows, fromDate: start };
+}
+
+// Thin wrapper for per-row availability checks in the resume editor
+// (warns, never blocks).
+export async function checkSessionAvailability(params: {
+  classId: string;
+  branchId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  roomId: string;
+  teacherId: string;
+}): Promise<{ reasons: AvailabilityIssue[]; warnings: AvailabilityWarning[] }> {
+  const res = await checkAvailability({
+    date: new Date(params.date),
+    startTime: params.startTime,
+    endTime: params.endTime,
+    branchId: params.branchId,
+    roomId: params.roomId,
+    teacherId: params.teacherId,
+    excludeId: params.classId,
+    excludeType: 'class',
+    allowConflicts: true,
+  });
+  return { reasons: res.reasons || [], warnings: res.warnings || [] };
+}
+
+// Commit the resume: replace all future scheduled rows (and any leftover
+// cancelled rows) with the admin-confirmed rows from the editor. NO makeup.
+// Used by both mode-B (open-ended) resume and re-editing after a mode-A pause.
+export async function resumeClass(
+  classId: string,
+  resumeDate: string,
+  rows: ResumeDraftSession[],
+  _by: string
+): Promise<{ created: number; deleted: number; newEndDate: string }> {
+  const cls = await getClass(classId);
+  if (!cls) throw new Error('ไม่พบข้อมูลคลาส');
+
+  console.log(`[resumeClass] class=${classId} resumeDate=${resumeDate} rows=${rows.length}`);
+  const result = await rebookSessions(cls, resumeDate, rows);
+
+  await adminMutation({
+    table: 'classes',
+    operation: 'update',
+    data: { end_date: result.newEndDate, pause_from: null, pause_to: null },
+    match: { id: classId },
+  });
+
+  return result;
 }
 
 // Export functions

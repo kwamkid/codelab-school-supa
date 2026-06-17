@@ -164,6 +164,9 @@ export interface Class {
   };
   completedSessions?: number; // จำนวนครั้งที่เรียนไปแล้ว
   status: 'draft' | 'published' | 'started' | 'completed' | 'cancelled';
+  // พักทั้งคลาส (whole-class pause window). paused ⇔ pauseTo != null
+  pauseFrom?: Date | null;
+  pauseTo?: Date | null;
   createdAt: Date;
 }
 
@@ -177,6 +180,8 @@ export interface ClassSchedule {
   status: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
   actualTeacherId?: string;
   actualRoomId?: string;
+  actualStartTime?: string; // per-session time override (HH:MM[:SS]); falls back to class time
+  actualEndTime?: string;
   note?: string;
   attendance?: {
     studentId: string;
