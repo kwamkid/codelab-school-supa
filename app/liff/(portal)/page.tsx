@@ -60,7 +60,7 @@ function Dashboard() {
     return () => { active = false }
   }, [liffLoading, profile?.userId])
 
-  if (liffLoading || loading) return <Loading fullScreen size="lg" text="กำลังโหลด..." />
+  if (liffLoading || loading) return <Loading fullScreen size="lg" />
 
   // Logged in but not registered yet
   if (data && data.hasParent === false) {

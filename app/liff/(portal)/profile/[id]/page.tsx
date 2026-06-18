@@ -198,7 +198,7 @@ function EditParentProfileContent() {
   }
 
   if (liffLoading || !authChecked || loading || navigating) {
-    return <Loading fullScreen size="lg" text="กำลังโหลด..." />
+    return <Loading fullScreen size="lg" />
   }
 
   return (

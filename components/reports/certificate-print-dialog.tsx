@@ -290,7 +290,7 @@ export function CertificatePrintDialog({ open, onOpenChange, classId, teacherId,
 
         {busy && view === 'list' && (
           <div className="absolute inset-0 bg-background/60 flex items-center justify-center rounded-lg">
-            <Loading text="กำลังโหลด..." />
+            <Loading />
           </div>
         )}
       </DialogContent>

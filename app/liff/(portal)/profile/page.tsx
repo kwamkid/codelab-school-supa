@@ -185,7 +185,7 @@ function ProfileContent() {
 
   // Show navigating overlay
   if (navigating) {
-    return <Loading fullScreen size="lg" text="กำลังโหลด..." />
+    return <Loading fullScreen size="lg" />
   }
 
   // Check if not registered - show registration prompt
