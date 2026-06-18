@@ -1308,7 +1308,14 @@ export function generateClassCode(params: {
   return `${base}-${String(max + 1).padStart(2, '0')}`;
 }
 
-export function getEditableFields(classData: Class, canEditAll = false): {
+// Edit permissions are driven by ENROLLMENT, not role or status:
+//   - no students yet  → everything editable (e.g. push the start date out)
+//   - has students      → lock schedule/resources/pricing; only the name,
+//                          description, max-capacity and status stay editable.
+// `_legacyCanEditAll` is kept for call-site compatibility but intentionally
+// ignored — a super admin must NOT be able to rewrite the schedule of a class
+// that students have already enrolled in.
+export function getEditableFields(classData: Class, _legacyCanEditAll = false): {
   basicInfo: boolean;
   schedule: boolean;
   resources: boolean;
@@ -1316,69 +1323,27 @@ export function getEditableFields(classData: Class, canEditAll = false): {
   capacity: boolean;
   status: boolean;
 } {
-  // Super admin / branch admin can always edit everything (incl. schedule → regen)
-  if (canEditAll) {
+  const hasStudents = classData.enrolledCount > 0;
+
+  if (!hasStudents) {
     return {
       basicInfo: true,
       schedule: true,
       resources: true,
       pricing: true,
       capacity: true,
-      status: true
+      status: true,
     };
   }
 
-  if (classData.status === 'draft' || classData.status === 'cancelled') {
-    return {
-      basicInfo: true,
-      schedule: true,
-      resources: true,
-      pricing: true,
-      capacity: true,
-      status: true
-    };
-  }
-
-  if (classData.status === 'published' && classData.enrolledCount === 0) {
-    return {
-      basicInfo: true,
-      schedule: true,
-      resources: true,
-      pricing: true,
-      capacity: true,
-      status: true
-    };
-  }
-
-  if (classData.status === 'published' && classData.enrolledCount > 0) {
-    return {
-      basicInfo: true,
-      schedule: false,
-      resources: false,
-      pricing: false,
-      capacity: true,
-      status: true
-    };
-  }
-
-  if (classData.status === 'started') {
-    return {
-      basicInfo: true,
-      schedule: false,
-      resources: false,
-      pricing: false,
-      capacity: false,
-      status: true
-    };
-  }
-
+  // Has students → schedule/resources/pricing are frozen.
   return {
-    basicInfo: false,
+    basicInfo: true,   // name, description
     schedule: false,
     resources: false,
     pricing: false,
-    capacity: false,
-    status: false
+    capacity: true,    // max students (can raise; UI blocks lowering below enrolled)
+    status: true,
   };
 }
 

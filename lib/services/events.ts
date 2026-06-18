@@ -1083,6 +1083,30 @@ export async function getEventStatistics(eventId: string) {
   }
 }
 
+export interface EventConversion {
+  totalRegistrants: number;
+  converted: number;
+  conversionRate: number;
+  convertedList: {
+    registrationId: string;
+    parentName: string;
+    parentPhone: string;
+    studentName: string | null;
+    className: string | null;
+    registeredAt: string;
+    enrolledAt: string;
+  }[];
+}
+
+// Conversion = event registrants whose parent (matched by phone) enrolled a
+// student in a class within 7 days of registering. Computed by RPC.
+export async function getEventConversion(eventId: string): Promise<EventConversion> {
+  const supabase = getClient();
+  const { data, error } = await (supabase.rpc as any)('get_event_conversion', { p_event_id: eventId });
+  if (error) throw error;
+  return (data as EventConversion) || { totalRegistrants: 0, converted: 0, conversionRate: 0, convertedList: [] };
+}
+
 // ==================== Event Reminder Functions ====================
 
 // Get events for reminder

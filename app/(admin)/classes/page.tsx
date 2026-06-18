@@ -521,7 +521,7 @@ export default function ClassesPage() {
                           className="cursor-pointer"
                           onClick={() => router.push(`/classes/${cls.id}`)}
                         >
-                          {/* คลาส: ชื่อวิชา (title) + รหัสคลาส (subtitle) */}
+                          {/* คลาส: ชื่อคลาส (title) + รหัสคลาส (subtitle) */}
                           <TableCell className="align-middle">
                             <div className="flex items-center gap-2">
                               <div
@@ -529,8 +529,8 @@ export default function ClassesPage() {
                                 style={{ backgroundColor: getSubjectColor(cls.subjectId) }}
                               />
                               <div className="min-w-0">
-                                <div className="font-medium truncate" title={loadingLookup ? cls.code : getSubjectName(cls.subjectId)}>
-                                  {loadingLookup ? '...' : getSubjectName(cls.subjectId)}
+                                <div className="font-medium truncate" title={cls.name}>
+                                  {cls.name}
                                 </div>
                                 <div className="text-xs text-gray-500 truncate" title={cls.code}>{cls.code}</div>
                               </div>
@@ -598,7 +598,10 @@ export default function ClassesPage() {
                               {statusLabels[cls.status as keyof typeof statusLabels] || 'ไม่ระบุ'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-center align-middle">
+                          <TableCell
+                            className="text-center align-middle"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -606,7 +609,7 @@ export default function ClassesPage() {
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenuItem asChild>
                                   <Link href={`/classes/${cls.id}`}>
                                     <Eye className="mr-2 h-4 w-4" />

@@ -31,12 +31,16 @@ import {
   MoreHorizontal,
   PauseCircle,
   PlayCircle,
+  TrendingUp,
+  CreditCard,
+  CalendarClock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { ChangeResourceDialog } from '@/components/classes/change-resource-dialog';
 import { PauseClassDialog } from '@/components/classes/pause-class-dialog';
 import { ResumeClassDialog } from '@/components/classes/resume-class-dialog';
+import { AttendanceDialog } from '@/components/attendance/attendance-dialog';
 import { ClassPrintMenu } from '@/components/classes/class-print-menu';
 import { formatDate, formatCurrency, getDayName } from '@/lib/utils';
 import {
@@ -48,7 +52,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Table,
@@ -95,7 +98,7 @@ const statusLabels = {
 export default function ClassDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { isSuperAdmin, adminUser } = useAuth();
+  const { isSuperAdmin, isBranchAdmin, adminUser } = useAuth();
   const classId = params.id as string;
 
   const [classData, setClassData] = useState<Class | null>(null);
@@ -109,6 +112,9 @@ export default function ClassDetailPage() {
   const [changeResourceOpen, setChangeResourceOpen] = useState(false);
   const [pauseClassOpen, setPauseClassOpen] = useState(false);
   const [resumeClassOpen, setResumeClassOpen] = useState(false);
+  const [deleteClassOpen, setDeleteClassOpen] = useState(false);
+  const [cancelClassOpen, setCancelClassOpen] = useState(false);
+  const [attendanceScheduleId, setAttendanceScheduleId] = useState<string | null>(null);
   const [showRescheduleHistory, setShowRescheduleHistory] = useState(false);
   const [endClassDialogOpen, setEndClassDialogOpen] = useState(false);
   const [endClassPreview, setEndClassPreview] = useState<{
@@ -332,9 +338,46 @@ export default function ClassDetailPage() {
     );
   }
 
-  const isEditable = classData.status === 'draft' || classData.status === 'published';
+  // Admins can always reach the edit form — it controls field-level permissions
+  // itself (getEditableFields), so a 'started' class still lets them edit the
+  // allowed fields. For others, only draft/published are editable.
+  const canEditAll = isSuperAdmin() || isBranchAdmin();
+  const isEditable = canEditAll || classData.status === 'draft' || classData.status === 'published';
   // Allow deletion for cancelled classes and classes with 0 or negative enrolled count
   const isDeletable = classData.enrolledCount <= 0 || classData.status === 'cancelled';
+  const isActive = classData.status === 'published' || classData.status === 'started';
+  const canCancel = !isDeletable && classData.status !== 'cancelled' && classData.status !== 'completed' && classData.enrolledCount > 0;
+  const canEndNow = isSuperAdmin() && (classData.status === 'started' || classData.status === 'published');
+  // Any action that lives in the ⋯ menu (so we can hide an empty menu).
+  const hasMenuActions = isActive || isDeletable || canCancel || canEndNow;
+
+  // ---- Useful stats ----
+  const sortedSchedules = [...schedules].sort(
+    (a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime()
+  );
+  const countableSchedules = sortedSchedules.filter(s => s.status !== 'cancelled');
+  const completedCount = sortedSchedules.filter(s => s.status === 'completed').length;
+  const totalForProgress = countableSchedules.length || classData.totalSessions || 0;
+  const progressPct = totalForProgress > 0 ? Math.round((completedCount / totalForProgress) * 100) : 0;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todaySession = sortedSchedules.find(s => {
+    const d = new Date(s.sessionDate); d.setHours(0, 0, 0, 0);
+    return d.getTime() === todayStart.getTime() && s.status !== 'cancelled';
+  });
+  const nextSession = sortedSchedules.find(s => {
+    const d = new Date(s.sessionDate); d.setHours(0, 0, 0, 0);
+    return d.getTime() > todayStart.getTime() && (s.status === 'scheduled' || s.status === 'rescheduled');
+  });
+
+  const seatsLeft = classData.maxStudents - classData.enrolledCount;
+  const isFull = classData.enrolledCount >= classData.maxStudents;
+
+  const activeStudents = enrolledStudents.filter(s => s.enrollmentStatus !== 'dropped' && s.enrollmentStatus !== 'transferred');
+  const paidCount = activeStudents.filter(s => s.paymentStatus === 'paid').length;
+  const unpaidCount = activeStudents.filter(s => s.paymentStatus !== 'paid').length;
+  const collected = activeStudents.reduce((sum, s) => sum + (s.paidAmount || 0), 0);
 
   return (
     <div>
@@ -348,37 +391,6 @@ export default function ClassDetailPage() {
         </Link>
         
         <div className="flex gap-2">
-          {/* Change teacher/room — available for active classes */}
-          {(classData.status === 'published' || classData.status === 'started') && (
-            <Button variant="outline" onClick={() => setChangeResourceOpen(true)}>
-              <ArrowLeftRight className="h-4 w-4 mr-2" />
-              เปลี่ยนครู/ห้อง
-            </Button>
-          )}
-
-          {/* Pause / resume whole class */}
-          {(classData.status === 'published' || classData.status === 'started') && (
-            classData.pauseTo ? (
-              <Button
-                variant="outline"
-                className="text-green-700 border-green-300 hover:bg-green-50"
-                onClick={() => setResumeClassOpen(true)}
-              >
-                <PlayCircle className="h-4 w-4 mr-2" />
-                กลับมาเรียน
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className="text-amber-700 border-amber-300 hover:bg-amber-50"
-                onClick={() => setPauseClassOpen(true)}
-              >
-                <PauseCircle className="h-4 w-4 mr-2" />
-                พักทั้งคลาส
-              </Button>
-            )
-          )}
-
           {isEditable && (
             <Link href={`/classes/${classId}/edit`}>
               <Button variant="outline">
@@ -387,76 +399,110 @@ export default function ClassDetailPage() {
               </Button>
             </Link>
           )}
-          
-          {isDeletable && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={deleting}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  ลบคลาส
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>ยืนยันการลบคลาส</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    คุณแน่ใจหรือไม่ที่จะลบคลาส &quot;{classData.name}&quot;? 
-                    การกระทำนี้ไม่สามารถยกเลิกได้
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
-                    ลบคลาส
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          
-          {!isDeletable && classData.status !== 'cancelled' && classData.status !== 'completed' && classData.enrolledCount > 0 && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-red-600">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  ยกเลิกคลาส
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>ยืนยันการยกเลิกคลาส</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    คุณแน่ใจหรือไม่ที่จะยกเลิกคลาส &quot;{classData.name}&quot;?
-                    {classData.enrolledCount > 0 && (
-                      <span className="block mt-2 text-red-600">
-                        คลาสนี้มีนักเรียน {classData.enrolledCount} คน
-                      </span>
-                    )}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>ไม่ยกเลิก</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleCancel} className="bg-red-500 hover:bg-red-600">
-                    ยืนยันยกเลิกคลาส
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
 
-          {/* End Class Now - Super Admin only */}
-          {isSuperAdmin && (classData.status === 'started' || classData.status === 'published') && (
-            <Button
-              variant="outline"
-              className="text-orange-600 border-orange-300 hover:bg-orange-50"
-              onClick={handleOpenEndClassDialog}
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              จบคลาสเลย
-            </Button>
+          {/* All the infrequent actions live in one ⋯ menu */}
+          {hasMenuActions && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-10 w-10 p-0" disabled={deleting}>
+                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {isActive && (
+                  <DropdownMenuItem onClick={() => setChangeResourceOpen(true)}>
+                    <ArrowLeftRight className="h-4 w-4 mr-2" />
+                    เปลี่ยนครู/ห้อง
+                  </DropdownMenuItem>
+                )}
+
+                {isActive && (
+                  classData.pauseTo ? (
+                    <DropdownMenuItem onClick={() => setResumeClassOpen(true)} className="text-green-700 focus:text-green-700">
+                      <PlayCircle className="h-4 w-4 mr-2" />
+                      กลับมาเรียน
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={() => setPauseClassOpen(true)} className="text-amber-700 focus:text-amber-700">
+                      <PauseCircle className="h-4 w-4 mr-2" />
+                      พักทั้งคลาส
+                    </DropdownMenuItem>
+                  )
+                )}
+
+                {canEndNow && (
+                  <DropdownMenuItem onClick={handleOpenEndClassDialog} className="text-orange-600 focus:text-orange-600">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    จบคลาสเลย
+                  </DropdownMenuItem>
+                )}
+
+                {canCancel && (
+                  <DropdownMenuItem
+                    onClick={() => setCancelClassOpen(true)}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    ยกเลิกคลาส
+                  </DropdownMenuItem>
+                )}
+
+                {isDeletable && (
+                  <DropdownMenuItem
+                    onClick={() => setDeleteClassOpen(true)}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    ลบคลาส
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteClassOpen} onOpenChange={setDeleteClassOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบคลาส</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณแน่ใจหรือไม่ที่จะลบคลาส &quot;{classData.name}&quot;?
+              การกระทำนี้ไม่สามารถยกเลิกได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
+              ลบคลาส
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel confirmation */}
+      <AlertDialog open={cancelClassOpen} onOpenChange={setCancelClassOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการยกเลิกคลาส</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณแน่ใจหรือไม่ที่จะยกเลิกคลาส &quot;{classData.name}&quot;?
+              {classData.enrolledCount > 0 && (
+                <span className="block mt-2 text-red-600">
+                  คลาสนี้มีนักเรียน {classData.enrolledCount} คน
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ไม่ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancel} className="bg-red-500 hover:bg-red-600">
+              ยืนยันยกเลิกคลาส
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Paused banner */}
       {classData.pauseTo && (
@@ -538,18 +584,21 @@ export default function ClassDetailPage() {
 
       {/* Class Header */}
       <div className="mb-8">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <div 
-                className="w-4 h-4 rounded-full" 
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 max-w-md">
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 flex items-start gap-3">
+              <div
+                className="mt-1.5 h-4 w-4 shrink-0 rounded-full"
                 style={{ backgroundColor: subject.color }}
               />
-              {classData.name}
+              <span className="line-clamp-2">{classData.name}</span>
             </h1>
-            <p className="text-gray-600 mt-1">รหัสคลาส: {classData.code}</p>
+            <p className="text-gray-600 mt-1 truncate">รหัสคลาส: {classData.code}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Badge className={statusColors[classData.status as keyof typeof statusColors]}>
+              {statusLabels[classData.status as keyof typeof statusLabels]}
+            </Badge>
             <ClassPrintMenu
               classId={classData.id}
               teacherId={classData.teacherId}
@@ -561,12 +610,98 @@ export default function ClassDetailPage() {
                 parentName: s.parentName,
               }))}
             />
-            <Badge className={statusColors[classData.status as keyof typeof statusColors]}>
-              {statusLabels[classData.status as keyof typeof statusLabels]}
-            </Badge>
+            <Link href={`/attendance/${classId}`}>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Calendar className="h-4 w-4 mr-2" />
+                เช็คชื่อ
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
+
+      {/* Stat strip — at-a-glance class health */}
+      <Card className="mb-6">
+        <CardContent className="grid grid-cols-2 divide-y divide-gray-100 p-0 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+          {/* Learning progress */}
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              ความคืบหน้า
+            </div>
+            <p className="mt-1 text-2xl font-bold">
+              {completedCount}
+              <span className="text-base font-normal text-gray-400">/{totalForProgress} ครั้ง</span>
+            </p>
+            <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200">
+              <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
+            </div>
+          </div>
+
+          {/* Seats */}
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <Users className="h-4 w-4 text-primary" />
+              ที่นั่ง
+            </div>
+            <p className="mt-1 text-2xl font-bold">
+              {classData.enrolledCount}
+              <span className="text-base font-normal text-gray-400">/{classData.maxStudents} คน</span>
+            </p>
+            <p className="mt-0.5 text-xs">
+              {isFull ? (
+                <span className="font-medium text-red-600">เต็มแล้ว</span>
+              ) : (
+                <span className="text-green-600">ว่างอีก {seatsLeft} ที่</span>
+              )}
+            </p>
+          </div>
+
+          {/* Payment */}
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <CreditCard className="h-4 w-4 text-primary" />
+              การชำระเงิน
+            </div>
+            <p className="mt-1 text-2xl font-bold text-green-600">
+              {paidCount}
+              <span className="text-base font-normal text-gray-400">/{activeStudents.length} ชำระแล้ว</span>
+            </p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {unpaidCount > 0
+                ? <span className="text-red-600">ค้างชำระ {unpaidCount} คน</span>
+                : <>เก็บแล้ว {formatCurrency(collected)}</>}
+            </p>
+          </div>
+
+          {/* Today / next session */}
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <CalendarClock className="h-4 w-4 text-primary" />
+              {todaySession ? 'คาบวันนี้' : 'คาบถัดไป'}
+            </div>
+            {todaySession ? (
+              <>
+                <p className="mt-1 text-base font-semibold text-blue-600">วันนี้</p>
+                <p className="text-xs text-gray-500">
+                  {classData.startTime.slice(0, 5)} - {classData.endTime.slice(0, 5)} น.
+                </p>
+              </>
+            ) : nextSession ? (
+              <>
+                <p className="mt-1 text-base font-semibold leading-snug">
+                  {formatDate(nextSession.sessionDate, 'short')}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {classData.startTime.slice(0, 5)} - {classData.endTime.slice(0, 5)} น.
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-base font-semibold text-gray-400">— ไม่มี —</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
@@ -627,6 +762,27 @@ export default function ClassDetailPage() {
                       รีเซ็ตจำนวนนักเรียนเป็น 0
                     </Button>
                   )}
+                </div>
+              </div>
+
+              {/* Schedule summary (moved in from sidebar) */}
+              <div className="grid grid-cols-2 gap-4 border-t pt-4 md:grid-cols-4">
+                <div>
+                  <p className="text-sm text-gray-500">วัน/เวลาเรียน</p>
+                  <p className="font-medium">{classData.daysOfWeek.map(d => getDayName(d)).join(', ')}</p>
+                  <p className="text-sm text-gray-600">{classData.startTime.slice(0, 5)} - {classData.endTime.slice(0, 5)} น.</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">วันเริ่ม</p>
+                  <p className="font-medium">{formatDate(classData.startDate, 'short')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">วันจบ</p>
+                  <p className="font-medium">{formatDate(classData.endDate, 'short')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">จำนวนครั้ง</p>
+                  <p className="font-medium">{classData.totalSessions} ครั้ง</p>
                 </div>
               </div>
 
@@ -762,6 +918,60 @@ export default function ClassDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Pricing + Requirements side by side */}
+          <div className="grid gap-6 sm:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>ข้อมูลราคา</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="text-sm text-gray-500">ราคาคลาส</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {formatCurrency(classData.pricing.totalPrice)}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    ({formatCurrency(classData.pricing.pricePerSession)}/ครั้ง)
+                  </p>
+                </div>
+
+                {classData.pricing.materialFee != null && classData.pricing.materialFee > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-500">ค่าอุปกรณ์</p>
+                    <p className="font-medium">{formatCurrency(classData.pricing.materialFee)}</p>
+                  </div>
+                )}
+
+                {classData.pricing.registrationFee != null && classData.pricing.registrationFee > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-500">ค่าลงทะเบียน</p>
+                    <p className="font-medium">{formatCurrency(classData.pricing.registrationFee)}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>ข้อกำหนด</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">นักเรียนขั้นต่ำ</span>
+                  <span className="font-medium">{classData.minStudents} คน</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">นักเรียนสูงสุด</span>
+                  <span className="font-medium">{classData.maxStudents} คน</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">ช่วงอายุ</span>
+                  <span className="font-medium">{subject.ageRange.min}-{subject.ageRange.max} ปี</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Pause student dialog */}
@@ -792,65 +1002,28 @@ export default function ClassDetailPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Side Info */}
-        <div className="space-y-6">
-          {/* Attendance - Prominent Button */}
-          <Link href={`/attendance/${classId}`} className="block">
-            <Button className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 text-white">
-              <Calendar className="h-5 w-5 mr-2" />
-              เช็คชื่อเข้าเรียน
-            </Button>
-          </Link>
-
-          {/* Schedule Information - moved to sidebar */}
+        {/* Side Info — session-by-session list (tallest content) */}
+        <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          {/* Sessions List */}
           <Card>
             <CardHeader>
-              <CardTitle>ตารางเรียน</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-500">วันที่เรียน</p>
-                  <p className="font-medium">
-                    {classData.daysOfWeek.map(d => getDayName(d)).join(', ')}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">เวลาเรียน</p>
-                  <p className="font-medium">{classData.startTime.slice(0, 5)} - {classData.endTime.slice(0, 5)} น.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-sm text-gray-500">วันเริ่ม</p>
-                    <p className="font-medium text-sm">{formatDate(classData.startDate, 'short')}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">วันจบ</p>
-                    <p className="font-medium text-sm">{formatDate(classData.endDate, 'short')}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">จำนวนครั้ง</p>
-                  <p className="font-medium">{classData.totalSessions} ครั้ง</p>
-                </div>
+              <div className="flex items-center justify-between">
+                <CardTitle>รายละเอียดแต่ละครั้ง</CardTitle>
+                {schedules.some(s => s.status === 'rescheduled') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRescheduleHistory(true)}
+                  >
+                    <History className="h-3 w-3 mr-1" />
+                    ประวัติเลื่อน
+                  </Button>
+                )}
               </div>
-
-              {/* Sessions List */}
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-sm">รายละเอียดแต่ละครั้ง</h4>
-                  {schedules.some(s => s.status === 'rescheduled') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowRescheduleHistory(true)}
-                    >
-                      <History className="h-3 w-3 mr-1" />
-                      ประวัติเลื่อน
-                    </Button>
-                  )}
-                </div>
-                <div className="max-h-80 overflow-y-auto">
+            </CardHeader>
+            <CardContent>
+              <div>
+                <div className="max-h-[640px] overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -860,21 +1033,33 @@ export default function ClassDetailPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {schedules
-                        .sort((a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime())
-                        .map((schedule, index) => {
-                          const isPast = new Date(schedule.sessionDate) < new Date();
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
+                      {sortedSchedules.map((schedule, index) => {
                           const scheduleDate = new Date(schedule.sessionDate);
                           scheduleDate.setHours(0, 0, 0, 0);
-                          const isToday = scheduleDate.getTime() === today.getTime();
+                          const isPast = scheduleDate.getTime() < todayStart.getTime();
+                          const isToday = scheduleDate.getTime() === todayStart.getTime();
+                          const isNextUp = nextSession?.id === schedule.id;
+                          // Past-or-today scheduled sessions that still need attendance recorded.
+                          const needsCheck = schedule.status === 'scheduled' && (isToday || isPast);
 
                           return (
-                            <TableRow key={schedule.id}>
+                            <TableRow
+                              key={schedule.id}
+                              className={
+                                isToday
+                                  ? 'bg-blue-50/70'
+                                  : needsCheck
+                                  ? 'bg-amber-50/60'
+                                  : isNextUp
+                                  ? 'bg-primary/5'
+                                  : ''
+                              }
+                            >
                               <TableCell className="text-center text-xs">{index + 1}</TableCell>
                               <TableCell className="text-xs">
-                                {formatDate(schedule.sessionDate, 'short')}
+                                <span className={isToday || isNextUp ? 'font-semibold' : ''}>
+                                  {formatDate(schedule.sessionDate, 'short')}
+                                </span>
                                 {schedule.originalDate && (
                                   <span className="block text-xs text-gray-400">
                                     (จาก {formatDate(schedule.originalDate, 'short')})
@@ -882,25 +1067,34 @@ export default function ClassDetailPage() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                {schedule.status === 'completed' && (
-                                  <Badge className="bg-green-100 text-green-700 text-xs">เรียนแล้ว</Badge>
-                                )}
-                                {schedule.status === 'cancelled' && (
-                                  <Badge variant="destructive" className="text-xs">ยกเลิก</Badge>
-                                )}
-                                {schedule.status === 'rescheduled' && (
-                                  <Badge className="bg-orange-100 text-orange-700 text-xs">เลื่อน</Badge>
-                                )}
-                                {schedule.status === 'scheduled' && (
+                                {/* Past/today unchecked → open the เช็คชื่อ modal in place of a status badge */}
+                                {needsCheck ? (
+                                  <Button
+                                    size="sm"
+                                    className="h-7 bg-blue-600 px-2 text-xs hover:bg-blue-700"
+                                    onClick={() => setAttendanceScheduleId(schedule.id)}
+                                  >
+                                    <Calendar className="mr-1 h-3 w-3" />
+                                    เช็คชื่อ
+                                  </Button>
+                                ) : (
                                   <>
-                                    {isToday && (
-                                      <Badge className="bg-blue-100 text-blue-700 text-xs">วันนี้</Badge>
+                                    {schedule.status === 'completed' && (
+                                      <Badge className="bg-green-100 text-green-700 text-xs">เรียนแล้ว</Badge>
                                     )}
-                                    {!isToday && isPast && (
-                                      <Badge className="bg-gray-100 text-gray-700 text-xs">รอบันทึก</Badge>
+                                    {schedule.status === 'cancelled' && (
+                                      <Badge variant="destructive" className="text-xs">ยกเลิก</Badge>
                                     )}
-                                    {!isToday && !isPast && (
-                                      <Badge variant="outline" className="text-xs">รอเรียน</Badge>
+                                    {schedule.status === 'rescheduled' && (
+                                      <Badge className="bg-orange-100 text-orange-700 text-xs">เลื่อน</Badge>
+                                    )}
+                                    {schedule.status === 'scheduled' && (
+                                      <Badge
+                                        variant="outline"
+                                        className={isNextUp ? 'border-primary text-primary text-xs' : 'text-xs'}
+                                      >
+                                        {isNextUp ? 'คาบถัดไป' : 'รอเรียน'}
+                                      </Badge>
                                     )}
                                   </>
                                 )}
@@ -911,59 +1105,6 @@ export default function ClassDetailPage() {
                     </TableBody>
                   </Table>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Pricing */}
-          <Card>
-            <CardHeader>
-              <CardTitle>ข้อมูลราคา</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-500">ราคาคลาส</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(classData.pricing.totalPrice)}
-                </p>
-                <p className="text-sm text-gray-500">
-                  ({formatCurrency(classData.pricing.pricePerSession)}/ครั้ง)
-                </p>
-              </div>
-
-              {classData.pricing.materialFee != null && classData.pricing.materialFee > 0 && (
-                <div>
-                  <p className="text-sm text-gray-500">ค่าอุปกรณ์</p>
-                  <p className="font-medium">{formatCurrency(classData.pricing.materialFee)}</p>
-                </div>
-              )}
-
-              {classData.pricing.registrationFee != null && classData.pricing.registrationFee > 0 && (
-                <div>
-                  <p className="text-sm text-gray-500">ค่าลงทะเบียน</p>
-                  <p className="font-medium">{formatCurrency(classData.pricing.registrationFee)}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Requirements */}
-          <Card>
-            <CardHeader>
-              <CardTitle>ข้อกำหนด</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">นักเรียนขั้นต่ำ</span>
-                <span className="font-medium">{classData.minStudents} คน</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">นักเรียนสูงสุด</span>
-                <span className="font-medium">{classData.maxStudents} คน</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">ช่วงอายุ</span>
-                <span className="font-medium">{subject.ageRange.min}-{subject.ageRange.max} ปี</span>
               </div>
             </CardContent>
           </Card>
@@ -1010,6 +1151,19 @@ export default function ClassDetailPage() {
             onSuccess={() => loadClassDetails()}
           />
         </>
+      )}
+
+      {/* Attendance check modal — opened from a session row */}
+      {classData && attendanceScheduleId && (
+        <AttendanceDialog
+          open={!!attendanceScheduleId}
+          onOpenChange={(o) => { if (!o) setAttendanceScheduleId(null); }}
+          classId={classId}
+          className={classData.name}
+          classCode={classData.code}
+          scheduleId={attendanceScheduleId}
+          onSaved={() => { setAttendanceScheduleId(null); loadClassDetails(); }}
+        />
       )}
     </div>
   );

@@ -5,10 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Event, EventSchedule, EventRegistration, Branch } from '@/types/models';
 import { 
-  getEvent, 
-  getEventSchedules, 
+  getEvent,
+  getEventSchedules,
   getEventRegistrations,
   getEventStatistics,
+  getEventConversion,
+  type EventConversion,
   createEventSchedule,
   updateEventSchedule,
   deleteEventSchedule,
@@ -22,6 +24,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   ChevronLeft,
   Edit,
   Calendar,
@@ -33,6 +43,8 @@ import {
   XCircle,
   Plus,
   UserCheck,
+  UserPlus,
+  TrendingUp,
   BarChart3,
   Clock,
   AlertCircle,
@@ -65,6 +77,7 @@ export default function EventDetailPage() {
   const [schedules, setSchedules] = useState<EventSchedule[]>([]);
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
   const [statistics, setStatistics] = useState<any>(null);
+  const [conversion, setConversion] = useState<EventConversion | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -78,25 +91,27 @@ export default function EventDetailPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [eventData, schedulesData, registrationsData, statsData, branchesData] = await Promise.all([
+      const [eventData, schedulesData, registrationsData, statsData, branchesData, conversionData] = await Promise.all([
         getEvent(eventId),
         getEventSchedules(eventId),
         getEventRegistrations(eventId),
         getEventStatistics(eventId),
-        getActiveBranches()
+        getActiveBranches(),
+        getEventConversion(eventId).catch(() => null)
       ]);
-      
+
       if (!eventData) {
         toast.error('ไม่พบข้อมูล Event');
         router.push('/events');
         return;
       }
-      
+
       setEvent(eventData);
       setSchedules(schedulesData);
       setRegistrations(registrationsData);
       setStatistics(statsData);
       setBranches(branchesData);
+      setConversion(conversionData);
     } catch (error) {
       console.error('Error loading event data:', error);
       toast.error('ไม่สามารถโหลดข้อมูลได้');
@@ -527,6 +542,75 @@ export default function EventDetailPage() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Conversion: registrants → enrolled students */}
+          {conversion && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <CardTitle>Conversion → สมัครเรียน</CardTitle>
+                </div>
+                <span className="text-sm font-normal text-gray-500">ภายใน 7 วันหลังลงทะเบียน</span>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-end gap-6">
+                  <div>
+                    <p className="text-3xl font-bold text-green-600">
+                      {conversion.conversionRate}
+                      <span className="text-lg font-normal text-gray-400">%</span>
+                    </p>
+                    <p className="text-sm text-gray-500">อัตรา conversion</p>
+                  </div>
+                  <div className="flex items-center gap-2 pb-1 text-gray-600">
+                    <UserCheck className="h-4 w-4 text-gray-400" />
+                    <span className="text-lg font-semibold text-gray-900">{conversion.totalRegistrants}</span>
+                    <span className="text-sm">ลงทะเบียน</span>
+                    <span className="px-1 text-gray-300">→</span>
+                    <UserPlus className="h-4 w-4 text-green-500" />
+                    <span className="text-lg font-semibold text-green-600">{conversion.converted}</span>
+                    <span className="text-sm">สมัครเรียน</span>
+                  </div>
+                </div>
+
+                {conversion.convertedList.length > 0 ? (
+                  <div className="mt-4 overflow-hidden rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ผู้ปกครอง</TableHead>
+                          <TableHead>นักเรียน</TableHead>
+                          <TableHead>คลาสที่สมัคร</TableHead>
+                          <TableHead className="text-right">วันที่สมัคร</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {conversion.convertedList.map((c) => (
+                          <TableRow key={c.registrationId}>
+                            <TableCell>
+                              <p className="font-medium">{c.parentName}</p>
+                              <a href={`tel:${c.parentPhone}`} className="text-xs text-blue-600 hover:underline">
+                                {c.parentPhone}
+                              </a>
+                            </TableCell>
+                            <TableCell>{c.studentName || '-'}</TableCell>
+                            <TableCell className="text-sm">{c.className || '-'}</TableCell>
+                            <TableCell className="text-right text-sm text-gray-500">
+                              {formatDate(new Date(c.enrolledAt), 'short')}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-500">
+                    ยังไม่มีคนจาก event นี้สมัครเรียน (นับเฉพาะที่จับคู่เบอร์โทรกับผู้ปกครองในระบบได้)
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Event Details */}
           <Card>
             <CardHeader>
