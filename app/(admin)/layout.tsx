@@ -713,7 +713,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         { name: 'Facebook Ads', href: '/settings/facebook' },
         { name: 'จัดการโรงเรียน', href: '/settings/schools' },
         { name: 'Backup', href: '/settings/backup' },
-        { name: 'Data Cleaning', href: '/data-cleaning' },
+        // Data Cleaning — hidden (dev/testing tool, no longer used). Route still exists at /data-cleaning.
+        // { name: 'Data Cleaning', href: '/data-cleaning' },
       ]
     },
   ], [pendingMakeupCount, newTrialCount, chatUnreadCount]); // dependencies สำหรับ badges

@@ -28,7 +28,7 @@ import {
   factoryReset, 
   getDataStatistics,
   ResetProgress 
-} from '@/lib/services/factory-reset';
+} from '@/lib/services/factory-reset-client';
 import { toast } from 'sonner';
 
 interface FactoryResetDialogProps {
@@ -260,16 +260,20 @@ export default function FactoryResetDialog({
             
             <div className="space-y-4">
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>กำลังล้าง: {getCollectionDisplayName(resetProgress.currentCollection)}</span>
-                  <span>{resetProgress.current} / {resetProgress.total}</span>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>
+                    {resetProgress.status === 'preparing'
+                      ? 'กำลังเตรียมล้างข้อมูล...'
+                      : 'กำลังล้างข้อมูลทั้งหมด...'}
+                  </span>
                 </div>
-                <Progress 
-                  value={(resetProgress.current / resetProgress.total) * 100} 
+                <Progress
+                  value={resetProgress.status === 'completed' ? 100 : undefined}
                   className="h-2"
                 />
               </div>
-              
+
               {resetProgress.status === 'error' && (
                 <Alert variant="destructive">
                   <XCircle className="h-4 w-4" />

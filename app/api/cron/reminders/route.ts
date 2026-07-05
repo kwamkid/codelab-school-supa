@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { sendClassReminder, sendMakeupNotification, sendTrialConfirmation } from '@/lib/supabase/services/line-notifications'
+import { sendClassReminderFromRow, sendMakeupNotification, sendTrialConfirmation, type ClassReminderRow } from '@/lib/supabase/services/line-notifications'
 import { getEventsForReminder, sendEventReminder } from '@/lib/supabase/services/events'
 
 export const dynamic = 'force-dynamic'
@@ -72,67 +72,36 @@ export async function GET(request: NextRequest) {
     // ============================================
     console.log('\n--- Part 1: Class Reminders ---')
 
-    // Get active classes
-    const { data: classes, error: classesError } = await supabase
-      .from('classes')
-      .select('id, name')
-      .eq('status', 'started')
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]
 
-    if (classesError) {
-      console.error('Error fetching classes:', classesError)
+    // One RPC call resolves everything: which (student × session) should be reminded
+    // tomorrow, with all message data joined in. It filters out paused classes, students
+    // on leave, and students with a makeup/absent for that exact session — in SQL.
+    // get_class_reminders is not in the generated Database types → cast (see CLAUDE.md).
+    const { data: reminderRows, error: reminderError } = await (supabase as any)
+      .rpc('get_class_reminders', { p_date: tomorrowStr })
+
+    if (reminderError) {
+      console.error('Error fetching class reminders:', reminderError)
+      results.errors.push(`Class reminder RPC error: ${reminderError.message}`)
     }
 
-    console.log(`Found ${classes?.length || 0} active classes`)
+    const rows = (reminderRows as ClassReminderRow[] | null) || []
+    console.log(`Found ${rows.length} class reminders to send for tomorrow`)
 
-    for (const cls of classes || []) {
-      // Get schedules for tomorrow
-      const { data: schedules } = await supabase
-        .from('class_schedules')
-        .select('id, session_date, session_number')
-        .eq('class_id', cls.id)
-        .eq('status', 'scheduled')
-        .gte('session_date', tomorrow.toISOString().split('T')[0])
-        .lt('session_date', dayAfterTomorrow.toISOString().split('T')[0])
-
-      if (schedules && schedules.length > 0) {
-        console.log(`\nClass "${cls.name}": Found ${schedules.length} sessions tomorrow`)
-
-        // Get active enrollments
-        const { data: enrollments } = await supabase
-          .from('enrollments')
-          .select('student_id')
-          .eq('class_id', cls.id)
-          .eq('status', 'active')
-
-        console.log(`  - ${enrollments?.length || 0} active students`)
-
-        // Process each schedule
-        for (const schedule of schedules) {
-          console.log(`\n  Processing schedule ${schedule.id} (Session #${schedule.session_number})`)
-
-          // Send reminder to each student
-          for (const enrollment of enrollments || []) {
-            try {
-              const success = await sendClassReminder(
-                enrollment.student_id,
-                cls.id,
-                new Date(schedule.session_date),
-                schedule.id
-              )
-
-              if (success) {
-                results.classReminders++
-                totalSent++
-                console.log(`    ✓ Sent reminder for student ${enrollment.student_id}`)
-              } else {
-                console.log(`    ✗ Failed to send for student ${enrollment.student_id}`)
-              }
-            } catch (error) {
-              console.error(`    ! Error for student ${enrollment.student_id}:`, error)
-              results.errors.push(`Class reminder error: ${error}`)
-            }
-          }
+    for (const row of rows) {
+      try {
+        const success = await sendClassReminderFromRow(row)
+        if (success) {
+          results.classReminders++
+          totalSent++
+          console.log(`  ✓ Sent reminder for student ${row.student_id} (${row.class_name})`)
+        } else {
+          console.log(`  ✗ Failed to send for student ${row.student_id}`)
         }
+      } catch (error) {
+        console.error(`  ! Error for student ${row.student_id}:`, error)
+        results.errors.push(`Class reminder error: ${error}`)
       }
     }
 

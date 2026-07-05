@@ -8,7 +8,7 @@ import {
   getDataCleaningStats,
   deleteOrphanedStudent,
   type OrphanedStudent
-} from '@/lib/services/data-cleaning';
+} from '@/lib/services/data-cleaning-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

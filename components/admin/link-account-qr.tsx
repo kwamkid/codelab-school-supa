@@ -14,7 +14,6 @@ import {
   ExternalLink,
   AlertCircle
 } from 'lucide-react';
-import { generateLinkToken } from '@/lib/services/link-tokens';
 import { toast } from 'sonner';
 
 interface LinkAccountQRProps {
@@ -33,8 +32,16 @@ export function LinkAccountQR({ parentId, parentName, parentPhone }: LinkAccount
     try {
       setLoading(true);
       setError('');
-      const newToken = await generateLinkToken(parentId);
-      setToken(newToken);
+      const res = await fetch('/api/admin/link-tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'เกิดข้อผิดพลาด');
+      }
+      setToken(data.token);
     } catch (err) {
       console.error('Error generating token:', err);
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');

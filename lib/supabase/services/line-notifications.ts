@@ -254,6 +254,91 @@ export async function sendClassReminder(
   }
 }
 
+// Row shape returned by the get_class_reminders(p_date) RPC.
+export interface ClassReminderRow {
+  schedule_id: string
+  session_date: string
+  session_number: number | null
+  class_id: string
+  class_name: string
+  start_time: string | null
+  end_time: string | null
+  subject_name: string | null
+  teacher_name: string | null
+  teacher_nickname: string | null
+  branch_name: string | null
+  room_name: string | null
+  student_id: string
+  student_name: string
+  student_nickname: string | null
+  parent_id: string
+  line_user_id: string
+}
+
+// 1b. แจ้งเตือนก่อนเรียน — fed by the get_class_reminders RPC.
+// The RPC has already done all the joins + filtering (pause / leave / makeup), so this
+// does NO extra queries: it just formats the LINE message, sends it, and logs.
+export async function sendClassReminderFromRow(row: ClassReminderRow): Promise<boolean> {
+  try {
+    const studentName = row.student_nickname || row.student_name
+    const teacherLabel = `ครู${row.teacher_nickname || row.teacher_name || 'ไม่ระบุ'}`
+    const scheduleDate = new Date(row.session_date)
+    const sessionNumber = row.session_number ?? undefined
+
+    const result = await sendLineMessage(row.line_user_id, '', undefined, {
+      useFlexMessage: true,
+      flexTemplate: 'classReminder',
+      flexData: {
+        studentName,
+        className: row.class_name,
+        subjectName: row.subject_name || row.class_name,
+        sessionNumber,
+        date: formatDate(scheduleDate, 'long'),
+        startTime: formatTime(row.start_time || ''),
+        endTime: formatTime(row.end_time || ''),
+        teacherName: teacherLabel,
+        location: row.branch_name || '',
+        roomName: row.room_name || ''
+      },
+      altText: `แจ้งเตือนคลาสเรียนพรุ่งนี้ - น้อง${studentName}`
+    })
+
+    const sessionText = sessionNumber ? ` (ครั้งที่ ${sessionNumber})` : ''
+    const messagePreview = [
+      `🔔 แจ้งเตือนคลาสเรียนพรุ่งนี้`,
+      `👦 นักเรียน: ${studentName}`,
+      `📚 วิชา: ${row.subject_name || row.class_name}${sessionText}`,
+      `📅 วันที่: ${formatDate(scheduleDate, 'long')}`,
+      `⏰ เวลา: ${formatTime(row.start_time || '')} - ${formatTime(row.end_time || '')}`,
+      `👩‍🏫 ครูผู้สอน: ${teacherLabel}`,
+      `📍 สถานที่: ${row.branch_name || '-'}`,
+      `🚪 ห้อง: ${row.room_name || '-'}`
+    ].join('\n')
+
+    await logNotification({
+      type: 'class-reminder',
+      recipientType: 'parent',
+      recipientId: row.parent_id,
+      recipientName: `${studentName}'s parent`,
+      lineUserId: row.line_user_id,
+      studentId: row.student_id,
+      studentName,
+      classId: row.class_id,
+      className: row.class_name,
+      scheduleId: row.schedule_id,
+      messagePreview,
+      status: result.success ? 'success' : 'failed',
+      errorMessage: result.error,
+      sentAt: new Date()
+    })
+
+    return result.success
+  } catch (error) {
+    console.error('[sendClassReminderFromRow] Error:', error)
+    return false
+  }
+}
+
 // 2. แจ้งเตือน Makeup Class
 export async function sendMakeupNotification(
   makeupId: string,

@@ -439,6 +439,7 @@ export default function GeneralSettingsComponent() {
               </Button>
             </div>
 
+            {/* ล้างข้อมูลทั้งหมด (Factory Reset) — hidden: dev/testing tool, no longer used.
             <div className="p-4 bg-red-50 rounded-lg border border-red-200">
               <h4 className="font-medium mb-2">ล้างข้อมูลทั้งหมด</h4>
               <p className="text-sm text-gray-600 mb-4">
@@ -457,6 +458,7 @@ export default function GeneralSettingsComponent() {
                 ล้างข้อมูลทั้งหมด
               </Button>
             </div>
+            */}
           </div>
         </CardContent>
       </Card>
@@ -482,11 +484,12 @@ export default function GeneralSettingsComponent() {
         </Button>
       </div>
       
-      {/* Factory Reset Dialog */}
+      {/* Factory Reset Dialog — hidden (dev/testing tool, no longer used).
       <FactoryResetDialog
         open={showResetDialog}
         onOpenChange={setShowResetDialog}
       />
+      */}
     </div>
   );
 }

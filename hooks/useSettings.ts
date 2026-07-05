@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getGeneralSettings, GeneralSettings } from '@/lib/services/settings';
+import { getClient } from '@/lib/supabase/client';
 
 export function useSettings() {
   const [settings, setSettings] = useState<GeneralSettings | null>(null);
@@ -9,39 +10,39 @@ export function useSettings() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Initial load
+    let active = true;
+
     const loadSettings = async () => {
       try {
         const data = await getGeneralSettings();
-        setSettings(data);
+        if (active) setSettings(data);
       } catch (err) {
-        setError(err as Error);
+        if (active) setError(err as Error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     loadSettings();
 
-    // Subscribe to real-time updates
-    const unsubscribe = onSnapshot(
-      doc(db, 'settings', 'general'),
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          setSettings({
-            ...data,
-            updatedAt: data.updatedAt?.toDate() || new Date()
-          } as GeneralSettings);
+    // Real-time updates: re-fetch whenever the settings table changes.
+    // (Replaces the old Firestore onSnapshot subscription.)
+    const supabase = getClient();
+    const channel = supabase
+      .channel('settings-general')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'settings' },
+        () => {
+          loadSettings();
         }
-      },
-      (err) => {
-        console.error('Error listening to settings:', err);
-        setError(err as Error);
-      }
-    );
+      )
+      .subscribe();
 
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return { settings, loading, error };

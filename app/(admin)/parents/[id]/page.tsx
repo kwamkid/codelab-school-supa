@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { Parent, Student, Branch } from '@/types/models';
 import { getParentWithStudents, updateParent } from '@/lib/services/parents';
 import { getBranch } from '@/lib/services/branches';
-import { generateLinkToken } from '@/lib/services/link-tokens';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -101,8 +100,17 @@ export default function ParentDetailPage() {
     
     setGeneratingQR(true);
     try {
-      const token = await generateLinkToken(parent.id);
-      
+      const res = await fetch('/api/admin/link-tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId: parent.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'ไม่สามารถสร้าง QR Code ได้');
+      }
+      const token = data.token;
+
       // Get LIFF ID from environment or settings
       const liffId = process.env.NEXT_PUBLIC_LIFF_ID || '2007575627-GmKBZJdo';
       
