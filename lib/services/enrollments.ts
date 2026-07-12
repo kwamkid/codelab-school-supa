@@ -419,6 +419,11 @@ export async function createEnrollment(
   enrollmentData: Omit<Enrollment, 'id' | 'enrolledAt'>
 ): Promise<string> {
   try {
+    // A ฿0 enrollment (free/summer-camp/trial) has nothing to pay → it's paid by
+    // definition. Otherwise it lingers as "รอชำระ" forever and inflates the stats.
+    const isFree = (enrollmentData.pricing.finalPrice ?? 0) === 0;
+    const paymentStatus = isFree ? 'paid' : enrollmentData.payment.status;
+
     // Prepare enrollment data
     const insertData: any = {
       student_id: enrollmentData.studentId,
@@ -432,7 +437,7 @@ export async function createEnrollment(
       final_price: enrollmentData.pricing.finalPrice,
       payment_method: enrollmentData.payment.method,
       payment_type: enrollmentData.payment.type || 'full',
-      payment_status: enrollmentData.payment.status,
+      payment_status: paymentStatus,
       paid_amount: enrollmentData.payment.paidAmount,
     };
 

@@ -503,11 +503,11 @@ export default function EnrollmentsPage() {
           { value: 'partial', label: 'ชำระบางส่วน', count: filteredStats?.partialCount ?? stats?.partialCount ?? 0, activeBg: 'bg-orange-500', inactiveBg: 'bg-orange-50', inactiveLabel: 'text-orange-600', inactiveCount: 'text-orange-700', always: true,
             subtitle: ((stats?.partialPaidAmount ?? 0) > 0 || (stats?.partialRemainingAmount ?? 0) > 0) ? (
               <span className="flex flex-col gap-0.5 leading-tight">
-                <span>จ่าย <span className="font-semibold tabular-nums">{formatCurrency(stats?.partialPaidAmount ?? 0)}</span></span>
-                <span>ค้าง <span className="font-semibold tabular-nums">{formatCurrency(stats?.partialRemainingAmount ?? 0)}</span></span>
+                <span className="flex justify-between gap-3"><span>จ่าย</span><span className="font-semibold tabular-nums">{formatCurrency(stats?.partialPaidAmount ?? 0)}</span></span>
+                <span className="flex justify-between gap-3"><span>ค้าง</span><span className="font-semibold tabular-nums">{formatCurrency(stats?.partialRemainingAmount ?? 0)}</span></span>
               </span>
             ) : undefined },
-          { value: 'dropped', label: 'ยกเลิก', count: filteredStats?.droppedCount ?? stats?.dropped ?? 0, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700', always: true },
+          { value: 'dropped', label: 'ยกเลิก', count: filteredStats?.droppedCount ?? stats?.dropped ?? 0, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700', always: true, separatorBefore: true },
         ]}
       />
 

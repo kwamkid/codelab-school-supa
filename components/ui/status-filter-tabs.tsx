@@ -18,6 +18,8 @@ export interface StatusFilterTab {
   always?: boolean
   /** optional small line(s) under the count, e.g. an amount summary */
   subtitle?: React.ReactNode
+  /** render a vertical divider before this tab (visually splits groups) */
+  separatorBefore?: boolean
 }
 
 interface StatusFilterTabsProps {
@@ -31,55 +33,64 @@ interface StatusFilterTabsProps {
  * Clickable "filter cards" row used as a status filter on list pages
  * (classes, events, …). Each card shows a label + count and highlights when
  * active. Tabs with count 0 are hidden unless `always` is set.
+ *
+ * A tab with `subtitle` uses a horizontal layout (big count left, label +
+ * subtitle stacked right). A tab with `separatorBefore` gets a thin divider on
+ * its left so distinct groups (e.g. payment states vs. "cancelled") read apart.
  */
 export function StatusFilterTabs({ tabs, value, onChange, className }: StatusFilterTabsProps) {
   const visibleTabs = tabs.filter((tab) => tab.always || tab.count > 0)
-  // Cards with an amount subtitle get a wider, horizontal layout (big count on the
-  // left, label + amount stacked on the right). Plain cards stay compact/centered.
-  // Fixed row height keeps everything aligned.
+
   return (
-    <div className={cn('flex flex-wrap gap-3', className)}>
+    <div className={cn('flex flex-wrap items-stretch gap-2.5', className)}>
       {visibleTabs.map((tab) => {
         const isActive = value === tab.value
         const hasSubtitle = !!tab.subtitle
         return (
-          <button
-            key={tab.value}
-            type="button"
-            onClick={() => onChange(tab.value)}
-            className={cn(
-              'h-[76px] rounded-xl px-4 transition-all',
-              hasSubtitle
-                ? 'flex items-center gap-3 text-left'
-                : 'flex flex-col items-center justify-center min-w-24',
-              isActive ? `${tab.activeBg} shadow-md` : `${tab.inactiveBg} hover:shadow-sm`
+          <div key={tab.value} className="flex items-stretch gap-2.5">
+            {tab.separatorBefore && (
+              <div className="w-px self-stretch my-1.5 bg-gray-200" aria-hidden />
             )}
-          >
-            {hasSubtitle ? (
-              <>
-                <span className={cn('text-3xl font-bold leading-none tabular-nums', isActive ? 'text-white' : tab.inactiveCount)}>
-                  {tab.count}
-                </span>
-                <span className="flex flex-col justify-center">
-                  <span className={cn('text-sm font-medium whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
+            <button
+              type="button"
+              onClick={() => onChange(tab.value)}
+              className={cn(
+                'group h-[78px] rounded-2xl transition-all',
+                'ring-1 ring-inset',
+                hasSubtitle
+                  ? 'flex items-center gap-3 pl-4 pr-5 text-left'
+                  : 'flex flex-col items-center justify-center px-5 min-w-[104px]',
+                isActive
+                  ? `${tab.activeBg} shadow-md ring-transparent`
+                  : `${tab.inactiveBg} ring-black/[0.04] hover:shadow-sm hover:ring-black/[0.08]`
+              )}
+            >
+              {hasSubtitle ? (
+                <>
+                  <span className={cn('text-[34px] font-bold leading-none tabular-nums', isActive ? 'text-white' : tab.inactiveCount)}>
+                    {tab.count}
+                  </span>
+                  <span className="flex flex-col justify-center gap-0.5">
+                    <span className={cn('text-sm font-semibold whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
+                      {tab.label}
+                    </span>
+                    <span className={cn('text-[11px] leading-tight whitespace-nowrap', isActive ? 'text-white/85' : 'text-gray-500')}>
+                      {tab.subtitle}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className={cn('text-xs font-semibold whitespace-nowrap', isActive ? 'text-white/90' : tab.inactiveLabel)}>
                     {tab.label}
                   </span>
-                  <span className={cn('text-[11px] leading-tight whitespace-nowrap mt-0.5', isActive ? 'text-white/90' : 'text-gray-500')}>
-                    {tab.subtitle}
+                  <span className={cn('text-[28px] font-bold leading-none mt-1 tabular-nums', isActive ? 'text-white' : tab.inactiveCount)}>
+                    {tab.count}
                   </span>
-                </span>
-              </>
-            ) : (
-              <>
-                <span className={cn('text-sm font-medium whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
-                  {tab.label}
-                </span>
-                <span className={cn('text-2xl font-bold mt-0.5 leading-none', isActive ? 'text-white' : tab.inactiveCount)}>
-                  {tab.count}
-                </span>
-              </>
-            )}
-          </button>
+                </>
+              )}
+            </button>
+          </div>
         )
       })}
     </div>
