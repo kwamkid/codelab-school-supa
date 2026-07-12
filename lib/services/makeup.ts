@@ -187,7 +187,9 @@ export async function getMakeupClass(id: string): Promise<MakeupClass | null> {
   }
 }
 
-// Count makeup classes for student in a class
+// Count makeup classes that count toward the leave quota for a student in a class.
+// Excludes makeups flagged counts_toward_quota=false (enrollment catch-up, class
+// pause, sickness, teacher-caused). Matches the LIFF-side quota count.
 export async function getMakeupCount(studentId: string, classId: string): Promise<number> {
   try {
     const supabase = getClient();
@@ -196,6 +198,7 @@ export async function getMakeupCount(studentId: string, classId: string): Promis
       .select('*', { count: 'exact', head: true })
       .eq('student_id', studentId)
       .eq('original_class_id', classId)
+      .eq('counts_toward_quota', true)
       .neq('status', 'cancelled');
 
     if (error) throw error;
@@ -390,6 +393,9 @@ export async function createMakeupRequest(
         requested_by: data.requestedBy,
         reason: data.reason,
         status: 'pending',
+        // Real leaves/absences count toward quota; callers pass false for
+        // sickness, enrollment catch-up, class pause, teacher-caused makeups.
+        counts_toward_quota: data.countsTowardQuota ?? true,
         notes: data.notes || null,
         created_at: new Date().toISOString(),
       },

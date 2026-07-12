@@ -616,6 +616,9 @@ export interface MakeupClass {
   requestedBy: string;
   reason: string;
   status: 'pending' | 'scheduled' | 'completed' | 'cancelled';
+  // Whether this makeup consumes the student's leave quota. Defaults to true;
+  // set false for sickness, enrollment catch-up, class pause, teacher-caused.
+  countsTowardQuota?: boolean;
   
   // Makeup Schedule
   makeupSchedule?: {

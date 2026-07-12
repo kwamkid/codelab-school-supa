@@ -350,11 +350,14 @@ export async function saveAttendanceWithMakeup(params: {
       try {
         const existing = await getMakeupByOriginalSchedule(s.studentId, classId, scheduleId);
         if (existing) continue;
+        // Attendance is checked by staff (admin/teacher), so makeup creation
+        // here bypasses makeupLimitPerCourse — admin recording a leave must always
+        // create the makeup even if the student already hit the limit. We still
+        // report over-limit students so the UI can surface a heads-up.
         if (makeupSettings.makeupLimitPerCourse > 0) {
           const cnt = await getMakeupCount(s.studentId, classId);
           if (cnt >= makeupSettings.makeupLimitPerCourse) {
             limitExceeded.push(s.studentName || s.studentId);
-            continue;
           }
         }
         const sd = await getStudentWithParent(s.studentId);
@@ -369,6 +372,8 @@ export async function saveAttendanceWithMakeup(params: {
             requestedBy: checkedBy,
             reason: s.status === 'sick' ? 'ป่วย' : s.status === 'leave' ? 'ลา' : 'ขาดเรียน',
             status: 'pending',
+            // Sickness does NOT consume the leave quota; ลา/ขาด do.
+            countsTowardQuota: s.status !== 'sick',
             originalSessionNumber: sessionNumber,
             originalSessionDate: sessionDate,
           } as any);

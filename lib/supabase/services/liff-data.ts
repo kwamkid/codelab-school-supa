@@ -14,9 +14,30 @@ export {
 } from './liff-schedule';
 export type { StudentStats, StudentScheduleData } from './liff-schedule';
 
-const MAKEUP_QUOTA = 4;
+const DEFAULT_MAKEUP_QUOTA = 4;
 
 // ---- shared helpers -------------------------------------------------------
+
+// Parent-facing makeup quota per course. Reads the admin setting
+// (settings.makeup → makeupLimitPerCourse) so LIFF stays in sync with the
+// admin side; falls back to the default if the setting is missing/misconfigured.
+// A limit of 0 in settings means "unlimited".
+async function getMakeupQuota(supabase: any): Promise<number> {
+  try {
+    const { data } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'makeup')
+      .single();
+    const limit = data?.value?.makeupLimitPerCourse;
+    if (typeof limit === 'number' && limit >= 0) {
+      return limit === 0 ? Infinity : limit;
+    }
+  } catch (e) {
+    console.error('[liff-data] getMakeupQuota failed, using default:', e);
+  }
+  return DEFAULT_MAKEUP_QUOTA;
+}
 
 async function getParentByLine(supabase: any, lineUserId: string) {
   const { data } = await supabase
@@ -73,6 +94,7 @@ export async function getHomeSummary(lineUserId: string) {
 
 export async function getMakeupData(lineUserId: string) {
   const supabase = createServiceClient() as any;
+  const MAKEUP_QUOTA = await getMakeupQuota(supabase);
   // Single round-trip; assemble the per-class makeup view + stats in JS.
   const { data, error } = await supabase.rpc('get_liff_makeup', { p_line_user_id: lineUserId });
   if (error) throw error;
@@ -95,15 +117,22 @@ export async function getMakeupData(lineUserId: string) {
 
     for (const enr of studentEnrollments) {
       const classMakeups = studentMakeups.filter((m) => m.originalClassId === enr.classId);
-      const selfRequested = classMakeups.filter(
-        (m) => m.type === 'scheduled' && (m.requestedBy === 'parent-liff' || m.reason?.includes('ลาผ่านระบบ LIFF'))
+      const nonCancelled = classMakeups.filter((m) => m.status !== 'cancelled');
+      // Quota-counting makeups only (real leaves/absences). Excludes enrollment
+      // catch-up, class pause, sickness, teacher-caused — flagged countsTowardQuota=false.
+      const quotaCounting = nonCancelled.filter((m) => m.countsTowardQuota !== false);
+      // Informational breakdown (not used for quota):
+      const selfRequested = nonCancelled.filter(
+        (m) => m.requestedBy === 'parent-liff' || m.reason?.includes('ลาผ่านระบบ LIFF')
       ).length;
-      const systemGenerated = classMakeups.filter((m) => m.type === 'ad-hoc' && m.requestedBy !== 'parent-liff').length;
+      const systemGenerated = nonCancelled.filter((m) => m.requestedBy !== 'parent-liff' && !m.reason?.includes('ลาผ่านระบบ LIFF')).length;
       const absences = absenceMap.get(`${student.id}-${enr.classId}`) || 0;
       const makeupsWithDetails = classMakeups
         .map((m) => ({ ...m, className: enr.className, subjectName: enr.subjectName, subjectColor: enr.subjectColor }))
         .sort((a, b) => new Date(a.originalSessionDate).getTime() - new Date(b.originalSessionDate).getTime());
-      const totalUsed = selfRequested + absences;
+      // Quota = non-cancelled makeups that count toward quota, matching
+      // requestLeave() enforcement and the admin-side getMakeupCount().
+      const totalUsed = quotaCounting.length;
       classMakeupData[enr.classId] = {
         classId: enr.classId,
         className: enr.className,
@@ -119,7 +148,9 @@ export async function getMakeupData(lineUserId: string) {
           absences,
           systemGenerated,
           totalUsed,
-          quotaRemaining: Math.max(0, MAKEUP_QUOTA - totalUsed),
+          quotaLimit: Number.isFinite(MAKEUP_QUOTA) ? MAKEUP_QUOTA : null,
+          // null quotaRemaining = unlimited (admin set makeupLimitPerCourse to 0)
+          quotaRemaining: Number.isFinite(MAKEUP_QUOTA) ? Math.max(0, MAKEUP_QUOTA - totalUsed) : null,
         },
       };
     }
@@ -255,30 +286,27 @@ export async function requestLeave(
     return { ok: false, status: 400, message: 'มีการขอลาในคาบนี้แล้ว' };
   }
 
-  // Quota: self-requested makeups + absences
-  const { data: quotaMakeups } = await supabase
+  // Quota: count non-cancelled makeups that count toward quota (counts_toward_quota),
+  // regardless of who created them (parent via LIFF, admin form, or attendance
+  // check-in). Real leaves/absences count; enrollment catch-up, class pause,
+  // sickness, and teacher-caused makeups are flagged counts_toward_quota=false and
+  // are excluded. Matches the admin side (getMakeupCount) so both count identically.
+  const MAKEUP_QUOTA = await getMakeupQuota(supabase);
+  const { count: makeupCount } = await supabase
     .from('makeup_classes')
-    .select('id')
+    .select('id', { count: 'exact', head: true })
     .eq('student_id', studentId)
     .eq('original_class_id', classId)
-    .eq('type', 'scheduled')
-    .in('requested_by', ['parent-liff', 'parent']);
-  const { data: absences } = await supabase
-    .from('attendance')
-    .select('id, class_schedules!inner(class_id)')
-    .eq('student_id', studentId)
-    .eq('status', 'absent')
-    .eq('class_schedules.class_id', classId);
+    .eq('counts_toward_quota', true)
+    .neq('status', 'cancelled');
 
-  const scheduledMakeups = quotaMakeups?.length || 0;
-  const totalAbsences = absences?.length || 0;
-  const totalUsed = scheduledMakeups + totalAbsences;
+  const totalUsed = makeupCount || 0;
   if (totalUsed >= MAKEUP_QUOTA) {
     return {
       ok: false,
       status: 400,
-      message: `ใช้สิทธิ์ครบ ${MAKEUP_QUOTA} ครั้งแล้ว (ลา ${scheduledMakeups} + ขาด ${totalAbsences})`,
-      quotaDetails: { scheduled: scheduledMakeups, absences: totalAbsences, total: totalUsed, limit: MAKEUP_QUOTA },
+      message: `ใช้สิทธิ์ลาครบ ${MAKEUP_QUOTA} ครั้งแล้ว`,
+      quotaDetails: { scheduled: totalUsed, absences: 0, total: totalUsed, limit: MAKEUP_QUOTA },
     };
   }
 
@@ -293,6 +321,7 @@ export async function requestLeave(
       requested_by: 'parent-liff',
       reason: reason || 'ลาผ่านระบบ LIFF',
       status: 'pending',
+      counts_toward_quota: true, // a LIFF leave is a real leave → consumes quota
       original_session_number: schedule.session_number || 0,
       original_session_date: schedule.session_date,
     })
@@ -300,7 +329,10 @@ export async function requestLeave(
     .single();
   if (makeupError) throw makeupError;
 
-  // Mark attendance absent (best effort)
+  // Mark attendance as 'leave' (best effort). NOTE: attendance.checked_by is a
+  // uuid FK — it cannot hold the string 'parent-liff' (that silently errored
+  // before, so LIFF leaves never got an attendance row). Leave it null and rely
+  // on the note to identify the source; the paired makeup row is the source of truth.
   try {
     const { data: existingAtt } = await supabase
       .from('attendance')
@@ -311,16 +343,16 @@ export async function requestLeave(
     if (existingAtt) {
       await supabase
         .from('attendance')
-        .update({ status: 'absent', note: 'ลาผ่านระบบ LIFF', checked_at: new Date().toISOString(), checked_by: 'parent-liff' })
+        .update({ status: 'leave', note: 'ลาผ่านระบบ LIFF', checked_at: new Date().toISOString(), checked_by: null })
         .eq('id', existingAtt.id);
     } else {
       await supabase.from('attendance').insert({
         schedule_id: scheduleId,
         student_id: studentId,
-        status: 'absent',
+        status: 'leave',
         note: 'ลาผ่านระบบ LIFF',
         checked_at: new Date().toISOString(),
-        checked_by: 'parent-liff',
+        checked_by: null,
       });
     }
   } catch (e) {
@@ -331,8 +363,8 @@ export async function requestLeave(
     ok: true,
     makeupId: makeupResult.id,
     quotaUsed: totalUsed + 1,
-    quotaLimit: MAKEUP_QUOTA,
-    quotaDetails: { scheduled: scheduledMakeups + 1, absences: totalAbsences, total: totalUsed + 1 },
+    quotaLimit: Number.isFinite(MAKEUP_QUOTA) ? MAKEUP_QUOTA : null,
+    quotaDetails: { scheduled: totalUsed + 1, absences: 0, total: totalUsed + 1, limit: MAKEUP_QUOTA },
   };
 }
 

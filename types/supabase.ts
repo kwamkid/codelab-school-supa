@@ -1774,6 +1774,7 @@ export type Database = {
           branch_name: string
           class_code: string
           class_name: string
+          counts_toward_quota: boolean
           created_at: string
           id: string
           makeup_branch_id: string | null
@@ -1818,6 +1819,7 @@ export type Database = {
           branch_name: string
           class_code: string
           class_name: string
+          counts_toward_quota?: boolean
           created_at?: string
           id?: string
           makeup_branch_id?: string | null
@@ -1862,6 +1864,7 @@ export type Database = {
           branch_name?: string
           class_code?: string
           class_name?: string
+          counts_toward_quota?: boolean
           created_at?: string
           id?: string
           makeup_branch_id?: string | null

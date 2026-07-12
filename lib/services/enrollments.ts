@@ -512,6 +512,7 @@ async function createMakeupForMissedSessions(
           requestedBy: parentId,
           reason: 'สมัครเรียนหลังจากคลาสเริ่มแล้ว',
           status: 'pending',
+          countsTowardQuota: false, // enrollment catch-up, not a leave
           originalSessionNumber: schedule.sessionNumber,
           originalSessionDate: schedule.sessionDate
         });
@@ -736,6 +737,7 @@ export async function pauseEnrollment(
           requestedBy,
           reason,
           status: 'pending',
+          countsTowardQuota: false, // class/enrollment pause, not a leave
           originalSessionNumber: schedule.sessionNumber,
           originalSessionDate: schedule.sessionDate,
         });

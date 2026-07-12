@@ -16,9 +16,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { getClass, getClassSchedule } from '@/lib/services/classes';
+import { getClass, getClassSchedule, shiftClassFromSession } from '@/lib/services/classes';
 import { getEnrollmentsByClass } from '@/lib/services/enrollments';
 import { getTeachersByBranch } from '@/lib/services/teachers';
 import { getStudentWithParent } from '@/lib/services/parents';
@@ -40,6 +50,7 @@ import {
   Loader2,
   ImagePlus,
   X,
+  CalendarClock,
 } from 'lucide-react';
 
 // A photo staged locally (resized, not yet uploaded). Uploaded only on save.
@@ -96,6 +107,8 @@ export function AttendanceChecker({
   const [hasChanges, setHasChanges] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [shiftOpen, setShiftOpen] = useState(false);
+  const [shifting, setShifting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,6 +200,38 @@ export function AttendanceChecker({
   const handleMarkAllPresent = () => {
     setAttendance(prev => prev.map(att => ({ ...att, status: 'present' })));
     setHasChanges(true);
+  };
+
+  // Cancel this whole session and shift the remaining sessions ~1 week later
+  // (no makeup — the class is bumped, not made up). Conflicts are reported for an
+  // admin to resolve. Reuses the same rebooking as admin's "พักทั้งคลาส".
+  const handleShiftClass = async () => {
+    if (!schedule || !classData) return;
+    setShifting(true);
+    try {
+      const res = await shiftClassFromSession(
+        classId,
+        (schedule.sessionDate instanceof Date
+          ? schedule.sessionDate
+          : new Date(schedule.sessionDate)
+        ).toLocaleDateString('en-CA'), // local YYYY-MM-DD
+        'ลายกคลาสจากหน้าเช็คชื่อ',
+        user?.uid || ''
+      );
+      setShiftOpen(false);
+      const msg = `ลายกคลาสเรียบร้อย — เลื่อนคาบที่เหลือออกไป (${res.created} คาบ)`;
+      if (res.conflicts > 0) {
+        toast.warning(`${msg} · มี ${res.conflicts} คาบที่ชนห้อง/ครู กรุณาแจ้งแอดมินจัดตาราง`);
+      } else {
+        toast.success(msg);
+      }
+      onSaved?.({ makeupCreated: 0, makeupCancelled: 0, limitExceeded: [] });
+    } catch (error: any) {
+      console.error('Error shifting class:', error);
+      toast.error(error?.message || 'ไม่สามารถลายกคลาสได้');
+    } finally {
+      setShifting(false);
+    }
   };
 
   // Track every object URL we create so we can revoke them on unmount
@@ -287,7 +332,7 @@ export function AttendanceChecker({
       const parts: string[] = [];
       if (res.makeupCancelled > 0) parts.push(`ยกเลิก Makeup ${res.makeupCancelled} คน`);
       if (res.makeupCreated > 0) parts.push(`สร้าง Makeup ${res.makeupCreated} คน`);
-      if (res.limitExceeded.length > 0) parts.push(`เกินลิมิต: ${res.limitExceeded.join(', ')}`);
+      if (res.limitExceeded.length > 0) parts.push(`เกินสิทธิ์ปกติ (สร้างให้แล้ว): ${res.limitExceeded.join(', ')}`);
       toast.success(parts.length ? `บันทึกการเช็คชื่อเรียบร้อยแล้ว (${parts.join(' / ')})` : 'บันทึกการเช็คชื่อเรียบร้อยแล้ว');
       onSaved?.(res);
     } catch (error: any) {
@@ -384,6 +429,14 @@ export function AttendanceChecker({
               <span className="text-orange-600">สาย: {stats.late}</span>
               <Button variant="outline" size="sm" onClick={handleMarkAllPresent}>
                 <CheckCheck className="h-4 w-4 mr-1" /> มาทั้งหมด
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShiftOpen(true)}
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40"
+              >
+                <CalendarClock className="h-4 w-4 mr-1" /> ลายกคลาส (ยกคลาส)
               </Button>
             </div>
           </div>
@@ -530,6 +583,40 @@ export function AttendanceChecker({
           )}
         </Button>
       </div>
+
+      <AlertDialog open={shiftOpen} onOpenChange={setShiftOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลายกคลาส (ยกคลาสทั้งคาบ)</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  ยกเลิกคาบเรียนวันนี้ แล้วเลื่อนคาบที่เหลือทั้งหมดออกไป (ประมาณ 1 สัปดาห์)
+                  วันสิ้นสุดคอร์สจะขยับตาม
+                </p>
+                <p className="text-muted-foreground">
+                  • ไม่มีการสร้าง Makeup (ทั้งคลาสเลื่อน ไม่ใช่ลารายคน)<br />
+                  • ถ้าคาบที่เลื่อนไปชนห้อง/ครูที่มีคลาสอื่นอยู่ ระบบจะเตือน — ให้แอดมินเข้าไปจัดตาราง/ย้ายห้อง-ครูภายหลัง
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={shifting}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleShiftClass(); }}
+              disabled={shifting}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {shifting ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />กำลังเลื่อน...</>
+              ) : (
+                <><CalendarClock className="h-4 w-4 mr-2" />ยืนยันลายกคลาส</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

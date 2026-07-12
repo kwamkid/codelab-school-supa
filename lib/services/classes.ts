@@ -1601,16 +1601,46 @@ async function rebookSessions(
   rows: ResumeDraftSession[]
 ): Promise<{ created: number; deleted: number; newEndDate: string }> {
   const all = await getScheduleRowsLite(cls.id);
-  const toDelete = all.filter(
+  const toRemove = all.filter(
     (s) =>
       s.status === 'cancelled' ||
       (s.status === 'scheduled' && getLocalDateString(s.sessionDate) >= deleteFrom)
   );
+
+  // A makeup_classes.original_schedule_id FK (NO ACTION) points at some of these
+  // rows — hard-deleting them would raise a FK violation and abort the whole
+  // shift/pause. So split: rows referenced by a live makeup are CANCELLED (row
+  // kept, FK intact, makeup history preserved); the rest are deleted as before.
+  const removeIds = toRemove.map((s) => s.id);
+  let referencedIds = new Set<string>();
+  if (removeIds.length > 0) {
+    const supabase = getClient();
+    const { data: refMakeups } = await (supabase as any)
+      .from('makeup_classes')
+      .select('original_schedule_id')
+      .in('original_schedule_id', removeIds)
+      .neq('status', 'cancelled');
+    referencedIds = new Set((refMakeups || []).map((m: any) => m.original_schedule_id));
+  }
+  const toCancel = toRemove.filter((s) => referencedIds.has(s.id) && s.status !== 'cancelled');
+  const toDelete = toRemove.filter((s) => !referencedIds.has(s.id));
+
   console.log(
-    `[rebookSessions] class=${cls.id} deleteFrom=${deleteFrom} → deleting ${toDelete.length} rows, inserting ${rows.length} rows`
+    `[rebookSessions] class=${cls.id} deleteFrom=${deleteFrom} → deleting ${toDelete.length}, cancelling ${toCancel.length} (has makeup), inserting ${rows.length}`
   );
 
-  // 1 request: batch delete
+  // Cancel sessions that a makeup references (can't delete — FK). Keeps the
+  // original session on record so the linked makeup/leave still resolves.
+  if (toCancel.length > 0) {
+    await adminMutation({
+      table: 'class_schedules',
+      operation: 'update',
+      data: { status: 'cancelled', note: '[เลื่อน/พักคลาส] มีการลา/ชดเชยผูกกับคาบนี้' },
+      filters: [{ op: 'in', column: 'id', value: toCancel.map((s) => s.id) }],
+    });
+  }
+
+  // 1 request: batch delete (only rows with no makeup reference)
   if (toDelete.length > 0) {
     await adminMutation({
       table: 'class_schedules',
@@ -1646,7 +1676,7 @@ async function rebookSessions(
     : getLocalDateString(cls.endDate);
 
   console.log(`[rebookSessions] done. newEndDate=${newEndDate}`);
-  return { created: inserts.length, deleted: toDelete.length, newEndDate };
+  return { created: inserts.length, deleted: toDelete.length + toCancel.length, newEndDate };
 }
 
 // Pause a whole class.
@@ -1732,6 +1762,74 @@ export async function pauseClass(
     created: result.created,
     newEndDate: result.newEndDate,
   };
+}
+
+// Cancel a single session and shift every remaining session one slot later
+// (i.e. skip this week → everything moves ~1 week forward), WITHOUT creating any
+// makeup. Used by the attendance checker's "เลื่อนคลาส (ยกคาบ)" action so a
+// teacher/admin can bump a whole class at check-in time.
+//
+// Mechanically this is pauseClass('known') with a single-day window: the target
+// session is dropped and the remaining sessions are re-generated from the class's
+// weekly pattern starting after that day, extending end_date. After rebooking we
+// check the new future rows for room/teacher conflicts and report the count so
+// the UI can warn (an admin then resolves them) — we do NOT auto-resolve here.
+export async function shiftClassFromSession(
+  classId: string,
+  sessionDate: string, // the session being cancelled (local YYYY-MM-DD)
+  reason: string,
+  by: string
+): Promise<{ cancelled: number; created: number; newEndDate: string; conflicts: number }> {
+  const cls = await getClass(classId);
+  if (!cls) throw new Error('ไม่พบข้อมูลคลาส');
+
+  const schedules = await getScheduleRowsLite(classId);
+  const target = schedules.find(
+    (s) => s.status === 'scheduled' && getLocalDateString(s.sessionDate) === sessionDate
+  );
+  if (!target) throw new Error('ไม่พบคาบเรียนที่จะเลื่อน (อาจถูกเช็คชื่อหรือยกเลิกไปแล้ว)');
+
+  // Regenerate remaining sessions from the day after this one (reuses pause logic).
+  const genFrom = (() => {
+    const d = new Date(sessionDate);
+    d.setDate(d.getDate() + 1);
+    return getLocalDateString(d);
+  })();
+  const rows = await computeDefaultRows(cls, schedules, sessionDate, genFrom);
+  const result = await rebookSessions(cls, sessionDate, rows);
+
+  await adminMutation({
+    table: 'classes',
+    operation: 'update',
+    data: { end_date: result.newEndDate },
+    match: { id: classId },
+  });
+
+  // Count room/teacher conflicts across the newly-booked dates (one RPC call).
+  let conflicts = 0;
+  try {
+    const supabase = getClient();
+    const { data, error } = await (supabase as any).rpc('check_range_availability', {
+      p_dates: rows.map((r) => r.date),
+      p_start_time: normalizeTime(cls.startTime),
+      p_end_time: normalizeTime(cls.endTime),
+      p_branch_id: cls.branchId,
+      p_room_id: cls.roomId,
+      p_teacher_id: cls.teacherId,
+      p_exclude_class_id: classId,
+    });
+    if (!error) {
+      conflicts = ((data || []) as any[]).filter((row) => (row.conflicts || []).length > 0).length;
+    }
+  } catch (e) {
+    console.warn('[shiftClassFromSession] conflict check failed (non-fatal):', e);
+  }
+
+  console.log(
+    `[shiftClassFromSession] class=${classId} cancelled ${target ? 1 : 0}, rebooked ${result.created}, conflicts ${conflicts}`
+  );
+  void reason; void by; // reason/by reserved for future audit note
+  return { cancelled: 1, created: result.created, newEndDate: result.newEndDate, conflicts };
 }
 
 // Read-only: auto-fill default resume rows starting from the day after the last

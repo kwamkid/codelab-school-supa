@@ -32,7 +32,8 @@ interface ClassMakeupData {
     absences: number
     systemGenerated: number
     totalUsed: number
-    quotaRemaining: number
+    quotaRemaining: number | null
+    quotaLimit?: number | null
   }
 }
 
@@ -64,7 +65,8 @@ function MakeupContent() {
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
   const [selectedMakeup, setSelectedMakeup] = useState<any>(null)
 
-  const MAKEUP_QUOTA = 4
+  // Fallback only — the real per-class limit comes from the server (admin setting).
+  const DEFAULT_MAKEUP_QUOTA = 4
 
   useEffect(() => {
     if (!liffLoading && isLoggedIn && profile?.userId) {
@@ -176,8 +178,10 @@ function MakeupContent() {
   const selectedClassData = selectedStudentData && selectedClassId ? 
     selectedStudentData.classes[selectedClassId] : null
   
-  const canRequestMore = selectedClassData ? 
-    selectedClassData.stats.totalUsed < MAKEUP_QUOTA : true
+  // quotaRemaining === null means unlimited (admin set the limit to 0).
+  const canRequestMore = selectedClassData
+    ? selectedClassData.stats.quotaRemaining === null || selectedClassData.stats.quotaRemaining > 0
+    : true
 
   if (liffLoading || loading) {
     return <PageLoading />
@@ -234,7 +238,7 @@ function MakeupContent() {
                     <span>{classData.subjectName}</span>
                     {classData.stats.totalUsed > 0 && (
                       <span className="text-xs text-muted-foreground">
-                        (ใช้ {classData.stats.totalUsed}/{MAKEUP_QUOTA})
+                        (ใช้ {classData.stats.totalUsed}/{classData.stats.quotaLimit ?? DEFAULT_MAKEUP_QUOTA})
                       </span>
                     )}
                   </div>
@@ -257,7 +261,7 @@ function MakeupContent() {
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <span className={canRequestMore ? "text-blue-700" : "text-orange-700"}>
-                    สิทธิ์ลาล่วงหน้า: ใช้ไป {selectedClassData.stats.totalUsed}/{MAKEUP_QUOTA} ครั้ง
+                    สิทธิ์ลาล่วงหน้า: ใช้ไป {selectedClassData.stats.totalUsed}/{selectedClassData.stats.quotaLimit ?? DEFAULT_MAKEUP_QUOTA} ครั้ง
                   </span>
                   {!canRequestMore && (
                     <Badge variant="secondary" className="bg-orange-100 text-orange-700">
