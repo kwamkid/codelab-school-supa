@@ -92,18 +92,47 @@ export default function InvitePage() {
       setPhase('profile');
     };
 
-    // Poll getSession() for a few seconds to catch the async PKCE exchange.
-    let tries = 0;
-    const poll = async () => {
-      if (cancelled) return;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        toProfile(session.user);
-        return;
+    const run = async () => {
+      // If Google returned a ?code=, exchange it for a session explicitly.
+      // detectSessionInUrl can miss it (timing / verifier races) and leave the
+      // code stranded in the URL, which reads as "signed out" → the page loops
+      // back to the button. Exchanging here is deterministic.
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+      let exchangeFailed = false;
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        // Clean the ?code= out of the URL regardless, so a re-render / retry
+        // doesn't try to exchange a now-consumed code.
+        url.searchParams.delete('code');
+        window.history.replaceState({}, '', url.pathname + url.search);
+        // An error here doesn't always mean failure: the client's
+        // detectSessionInUrl may have already consumed the code and created the
+        // session. So don't show an error yet — fall through to the poll and let
+        // the presence/absence of a session decide.
+        if (error) exchangeFailed = true;
       }
-      if (tries++ < 20) setTimeout(poll, 300); // ~6s max
+
+      // Poll getSession() briefly to cover any async settle after exchange.
+      let tries = 0;
+      const poll = async () => {
+        if (cancelled) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          toProfile(session.user);
+          return;
+        }
+        if (tries++ < 20) {
+          setTimeout(poll, 300); // ~6s max
+        } else if (exchangeFailed && !cancelled) {
+          // Exhausted the window with no session AND the exchange errored →
+          // genuinely need a fresh sign-in.
+          setError('เซสชันหมดอายุ กรุณากด "เข้าสู่ระบบด้วย Google" อีกครั้ง');
+        }
+      };
+      poll();
     };
-    poll();
+    run();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) toProfile(session.user);
