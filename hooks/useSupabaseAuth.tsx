@@ -423,10 +423,13 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     // PKCE flow: Google redirects to Supabase callback, then back here.
     // The browser client (detectSessionInUrl) exchanges the code on return,
     // onAuthStateChange fires → loadAdminUser runs → login page redirects.
+    // Force https so the PKCE verifier + returned session share this page's origin
+    // (an http→https flip mid-flow strands the session on the wrong origin).
+    const origin = window.location.origin.replace(/^http:\/\//, 'https://');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `${origin}/login`,
         queryParams: { prompt: 'select_account' },
       },
     });

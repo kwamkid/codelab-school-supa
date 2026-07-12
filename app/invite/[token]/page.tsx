@@ -119,10 +119,15 @@ export default function InvitePage() {
     setError('');
     try {
       const supabase = getClient();
+      // Force https so the PKCE code verifier (stored in localStorage) and the
+      // returned session land on the SAME origin as this page. If the app is ever
+      // reached over http (proxy/CDN terminating TLS upstream), an http→https flip
+      // mid-OAuth puts the session on a different origin → page polls forever.
+      const origin = window.location.origin.replace(/^http:\/\//, 'https://');
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/invite/${token}`,
+          redirectTo: `${origin}/invite/${token}`,
           queryParams: { prompt: 'select_account' },
         },
       });
