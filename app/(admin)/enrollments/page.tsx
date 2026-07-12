@@ -582,9 +582,15 @@ export default function EnrollmentsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <Badge className={`text-[11px] ${paymentStatusColors[enrollment.payment.status]}`}>
-                          {paymentStatusLabels[enrollment.payment.status]}
-                        </Badge>
+                        {/* Cancelled enrollments carry a stale payment_status (kept
+                            for audit) but must not read as รอชำระ/ชำระบางส่วน — show "-". */}
+                        {enrollment.status === 'dropped' ? (
+                          <Badge className="text-[11px] bg-gray-100 text-gray-400">-</Badge>
+                        ) : (
+                          <Badge className={`text-[11px] ${paymentStatusColors[enrollment.payment.status]}`}>
+                            {paymentStatusLabels[enrollment.payment.status]}
+                          </Badge>
+                        )}
                         <Badge className={`text-[11px] ${isUpcoming ? 'bg-yellow-100 text-yellow-700' : statusColors[enrollment.status]}`}>
                           {isUpcoming ? 'รอเริ่มเรียน' : statusLabels[enrollment.status]}
                         </Badge>
@@ -630,7 +636,7 @@ export default function EnrollmentsPage() {
                                 <p className="font-medium text-base truncate">{student.nickname || student.name}</p>
                                 <div className="flex items-center gap-1 text-sm text-gray-500 min-w-0">
                                   <span className="shrink-0">ผปค.</span>
-                                  <ParentBadge name={student.parentName} size="sm" />
+                                  <ParentBadge name={student.parentName} imageUrl={(student as any).parentPictureUrl} size="sm" />
                                 </div>
                                 {(student.schoolName || student.gradeLevel) && (
                                   <p className="text-xs text-gray-400 line-clamp-2">

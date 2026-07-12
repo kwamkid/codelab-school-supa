@@ -649,6 +649,7 @@ export async function getAllStudentsWithParents(): Promise<(Student & {
   parentName: string;
   parentPhone: string;
   lineDisplayName?: string;
+  parentPictureUrl?: string;
 })[]> {
   try {
     const supabase = getClient();
@@ -661,7 +662,8 @@ export async function getAllStudentsWithParents(): Promise<(Student & {
         parents:parent_id (
           id,
           display_name,
-          phone
+          phone,
+          picture_url
         )
       `)
       .order('birthdate', { ascending: true });
@@ -687,6 +689,7 @@ export async function getAllStudentsWithParents(): Promise<(Student & {
       parentName: row.parents?.display_name || 'Unknown',
       parentPhone: row.parents?.phone || '',
       lineDisplayName: row.parents?.display_name,
+      parentPictureUrl: row.parents?.picture_url || undefined,
     }));
   } catch (error) {
     console.error('Error getting students with parents:', error);
