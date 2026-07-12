@@ -10,8 +10,8 @@ async function queryTable(table: string, params: Record<string, string>) {
   }
   const res = await fetch(url.toString(), {
     headers: {
-      'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+      'apikey': process.env.SUPABASE_SECRET_KEY!,
+      'Authorization': `Bearer ${process.env.SUPABASE_SECRET_KEY!}`,
     },
     cache: 'no-store',
   })

@@ -20,7 +20,7 @@ export async function requireSuperAdmin(token: string | null): Promise<SuperAdmi
 
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
   if (error || !user) return { ok: false, error: 'Unauthorized', status: 401 }
@@ -55,7 +55,7 @@ export async function requireStaff(token: string | null): Promise<StaffResult> {
 
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
   if (error || !user) return { ok: false, error: 'Unauthorized', status: 401 }

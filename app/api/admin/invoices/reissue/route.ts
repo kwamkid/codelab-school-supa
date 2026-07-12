@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY!;
 
 async function postgrestFetch(table: string, query: string) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {

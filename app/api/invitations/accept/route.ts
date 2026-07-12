@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     // 1. Verify the authenticated Google user from their access token
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SECRET_KEY!
     )
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(accessToken)
     if (authError || !user || !user.email) {

@@ -5,7 +5,7 @@
 const BASE = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1`
 
 function serviceHeaders(extra?: Record<string, string>) {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const key = process.env.SUPABASE_SECRET_KEY!
   return {
     apikey: key,
     Authorization: `Bearer ${key}`,
