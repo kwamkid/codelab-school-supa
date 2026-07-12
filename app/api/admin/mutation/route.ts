@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,13 @@ const ALLOWED_TABLES = [
 ]
 
 export async function POST(request: NextRequest) {
+  // Require an authenticated, active staff member — this endpoint mutates the DB
+  // with the service role (bypassing RLS), so it must never be callable anonymously.
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+
   const supabase = createServiceClient()
 
   try {

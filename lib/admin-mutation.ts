@@ -1,7 +1,11 @@
 /**
  * Generic admin mutation helper
- * Uses API route with service role client to bypass RLS
+ * Uses API route with service role client to bypass RLS.
+ * The caller's Supabase access token is attached so the API can verify the
+ * request comes from an authenticated, active staff member before mutating.
  */
+
+import { getClient } from '@/lib/supabase/client'
 
 interface MutationFilter {
   column: string
@@ -26,9 +30,14 @@ interface MutationParams {
 }
 
 export async function adminMutation<T = any>(params: MutationParams): Promise<T> {
+  // Attach the logged-in user's access token so the API can authorize the call.
+  const { data: { session } } = await getClient().auth.getSession()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`
+
   const response = await fetch('/api/admin/mutation', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(params),
   })
 
