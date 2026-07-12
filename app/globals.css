@@ -418,4 +418,3 @@ button[aria-busy="true"]::after,
   animation: ripple 0.6s;
   pointer-events: none;
 }
-
