@@ -75,6 +75,10 @@ export async function POST(request: NextRequest) {
       // sent, so an insert would collide with teachers_email_key. Reuse the
       // existing row (matched by email) and just activate/link it; only insert
       // when there's truly no teacher for this email.
+      // Subjects the admin picked when creating the invite (teachers.specialties).
+      const inviteSpecialties: string[] = Array.isArray(inv.teacher_data?.specialties)
+        ? inv.teacher_data.specialties
+        : []
       let teacherId: string | null = null
       if (inv.role === 'teacher') {
         const existingTeacher = await restSelect<{ id: string }>('teachers', {
@@ -88,6 +92,9 @@ export async function POST(request: NextRequest) {
             is_active: true,
             has_login: true,
             available_branches: inv.branch_ids || [],
+            // Only overwrite specialties when the invite actually carried some,
+            // so we don't wipe a pre-created teacher's existing subjects.
+            ...(inviteSpecialties.length > 0 ? { specialties: inviteSpecialties } : {}),
           })
         } else {
           const [teacher] = await restInsert<{ id: string }>('teachers', {
@@ -95,7 +102,7 @@ export async function POST(request: NextRequest) {
             nickname: finalNickname || finalName,
             email: emailLower,
             phone: finalPhone,
-            specialties: [],
+            specialties: inviteSpecialties,
             available_branches: inv.branch_ids || [],
             is_active: true,
             has_login: true,

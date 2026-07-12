@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       role,
       branchIds = [],
       permissions = {},
+      subjectIds = [],
       expiresInDays = 1,
     } = body
 
@@ -49,6 +50,13 @@ export async function POST(request: NextRequest) {
     // super_admin gets all permissions; others use the provided flags
     const isSuper = role === 'super_admin'
 
+    // Teacher's subjects (specialties) are carried on the invite so the profile
+    // is fully set up the moment they accept — no separate admin step needed.
+    const teacherData =
+      role === 'teacher' && Array.isArray(subjectIds) && subjectIds.length > 0
+        ? { specialties: subjectIds }
+        : null
+
     const [created] = await restInsert('admin_invitations', {
       token,
       role,
@@ -57,6 +65,7 @@ export async function POST(request: NextRequest) {
       can_manage_settings: isSuper ? true : !!permissions.canManageSettings,
       can_view_reports: isSuper ? true : !!permissions.canViewReports,
       can_manage_all_branches: isSuper ? true : !!permissions.canManageAllBranches,
+      teacher_data: teacherData,
       created_by: auth.adminId,
       expires_at: expiresAt,
     })

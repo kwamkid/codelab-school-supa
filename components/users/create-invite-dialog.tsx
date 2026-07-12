@@ -16,8 +16,9 @@ import { FormSelect } from '@/components/ui/form-select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Copy, Check, LinkIcon } from 'lucide-react';
-import { Branch } from '@/types/models';
+import { Branch, Subject } from '@/types/models';
 import { createInvitation } from '@/lib/services/invitations';
+import { getActiveSubjects } from '@/lib/services/subjects';
 import { toast } from 'sonner';
 
 type Role = 'super_admin' | 'branch_admin' | 'teacher';
@@ -59,11 +60,15 @@ export default function CreateInviteDialog({
     canManageSettings: false,
     canViewReports: false,
   });
+  // Subjects the teacher will teach (teacher role only) → teachers.specialties.
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjectIds, setSubjectIds] = useState<string[]>([]);
 
   const resetForm = () => {
     setRole(initialRole || 'branch_admin');
     setBranchIds([]);
     setPermissions({ canManageAllBranches: false, canManageSettings: false, canViewReports: false });
+    setSubjectIds([]);
     setCreatedUrl(null);
     setCopied(false);
   };
@@ -74,16 +79,38 @@ export default function CreateInviteDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialRole]);
 
+  // Load subjects once (used only when inviting a teacher)
+  useEffect(() => {
+    if (!open) return;
+    getActiveSubjects()
+      .then(setSubjects)
+      .catch(() => setSubjects([]));
+  }, [open]);
+
+  const subjectsByCategory = subjects.reduce((acc, s) => {
+    (acc[s.category] ||= []).push(s);
+    return acc;
+  }, {} as Record<string, Subject[]>);
+
+  const toggleSubject = (id: string, checked: boolean) => {
+    setSubjectIds((prev) => (checked ? [...prev, id] : prev.filter((s) => s !== id)));
+  };
+
   const allBranches = branchIds.length === 0;
   const showBranchPicker = role !== 'super_admin' && !permissions.canManageAllBranches;
 
   const handleSubmit = async () => {
+    if (role === 'teacher' && subjectIds.length === 0) {
+      toast.error('กรุณาเลือกวิชาที่สอนอย่างน้อย 1 วิชา');
+      return;
+    }
     try {
       setLoading(true);
       const { invitation } = await createInvitation({
         role,
         branchIds: role === 'super_admin' ? [] : branchIds,
         permissions: role === 'branch_admin' ? permissions : undefined,
+        subjectIds: role === 'teacher' ? subjectIds : undefined,
         expiresInDays: EXPIRES_IN_DAYS,
       });
       // Build the link from the current origin so it works in both local and prod
@@ -227,6 +254,33 @@ export default function CreateInviteDialog({
                       <span className="text-sm">{branch.name}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Subjects the teacher will teach → teachers.specialties */}
+            {role === 'teacher' && (
+              <div className="space-y-2">
+                <Label>วิชาที่สอน *</Label>
+                <div className="space-y-3 max-h-[220px] overflow-y-auto border rounded-md p-3">
+                  {subjects.length === 0 ? (
+                    <p className="text-sm text-gray-400">กำลังโหลดวิชา...</p>
+                  ) : (
+                    Object.entries(subjectsByCategory).map(([category, categorySubjects]) => (
+                      <div key={category} className="space-y-1.5">
+                        <p className="text-xs font-medium text-gray-500">{category}</p>
+                        {categorySubjects.map((subject) => (
+                          <div key={subject.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={subjectIds.includes(subject.id)}
+                              onCheckedChange={(checked) => toggleSubject(subject.id, !!checked)}
+                            />
+                            <span className="text-sm">{subject.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}

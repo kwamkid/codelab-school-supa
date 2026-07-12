@@ -31,6 +31,8 @@ export interface CreateInvitationInput {
     canViewReports?: boolean
     canManageAllBranches?: boolean
   }
+  /** Subjects this teacher will teach (teachers.specialties). teacher role only. */
+  subjectIds?: string[]
   expiresInDays?: number
 }
 
