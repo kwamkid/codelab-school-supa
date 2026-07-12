@@ -49,19 +49,17 @@ function mapToTeacher(row: TeacherRow): Teacher {
   };
 }
 
-// Get all teachers (only active ones - excluding soft deleted)
+// Get all teachers (only active ones - excluding soft deleted).
+// Uses the avatar-resolving RPC so profileImage falls back to the linked
+// admin_user's Google avatar (teachers.profile_image is currently empty for all).
 export async function getTeachers(branchId?: string): Promise<Teacher[]> {
   try {
     const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .select('*')
-      .eq('is_active', true) // Only get active teachers (exclude soft deleted)
-      .order('name', { ascending: true });
+    const { data, error } = await (supabase.rpc as any)('get_active_teachers_with_avatar');
 
     if (error) throw error;
 
-    let teachers = (data || []).map(row => mapToTeacher(row as TeacherRow));
+    let teachers = (data || []).map((row: TeacherRow) => mapToTeacher(row));
 
     // Filter by branch if specified
     if (branchId) {
@@ -77,19 +75,19 @@ export async function getTeachers(branchId?: string): Promise<Teacher[]> {
   }
 }
 
-// Get active teachers only
+// Get active teachers only.
+// Uses the RPC so profileImage resolves to teachers.profile_image → the linked
+// admin_user's Google avatar (same COALESCE as the users page). A plain
+// .from('teachers') read only sees profile_image, which is currently empty for
+// everyone, so avatars would never show (e.g. attendance list, dashboard filters).
 export async function getActiveTeachers(branchId?: string): Promise<Teacher[]> {
   try {
     const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .select('*')
-      .eq('is_active', true)
-      .order('name', { ascending: true });
+    const { data, error } = await (supabase.rpc as any)('get_active_teachers_with_avatar');
 
     if (error) throw error;
 
-    let teachers = (data || []).map(row => mapToTeacher(row as TeacherRow));
+    let teachers = (data || []).map((row: TeacherRow) => mapToTeacher(row));
 
     // Filter by branch if specified
     if (branchId) {

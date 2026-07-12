@@ -70,15 +70,20 @@ export default function InvitePage() {
 
   // 2. When a Google session appears (returned from OAuth or already signed in),
   //    move to the profile step and prefill the name from the Google account.
+  //    On OAuth return the PKCE code exchange is async, so getSession() can be
+  //    null for a moment AND the SIGNED_IN event may fire before this effect's
+  //    listener is attached. We therefore both listen AND poll for a short window
+  //    so the page never gets stuck showing the sign-in button (or a spinner)
+  //    after the teacher has actually signed in.
   useEffect(() => {
     if (phase !== 'preview' && phase !== 'profile') return;
     if (!preview?.valid) return;
 
     const supabase = getClient();
+    let cancelled = false;
 
-    const toProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    const toProfile = (user: { user_metadata?: Record<string, any> }) => {
+      if (cancelled) return;
       if (!prefilledRef.current) {
         prefilledRef.current = true;
         const googleName = user.user_metadata?.full_name || user.user_metadata?.name || '';
@@ -87,11 +92,26 @@ export default function InvitePage() {
       setPhase('profile');
     };
 
-    toProfile();
+    // Poll getSession() for a few seconds to catch the async PKCE exchange.
+    let tries = 0;
+    const poll = async () => {
+      if (cancelled) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        toProfile(session.user);
+        return;
+      }
+      if (tries++ < 20) setTimeout(poll, 300); // ~6s max
+    };
+    poll();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) toProfile();
+      if (session?.user) toProfile(session.user);
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [phase, preview]);
 
   const handleGoogleSignIn = async () => {

@@ -70,20 +70,38 @@ export async function POST(request: NextRequest) {
         updated_by: inv.created_by,
       })
     } else {
-      // 4. Create teacher record first when role = teacher
+      // 4. Resolve the teacher record when role = teacher.
+      // A teacher profile is often pre-created by an admin before the invite is
+      // sent, so an insert would collide with teachers_email_key. Reuse the
+      // existing row (matched by email) and just activate/link it; only insert
+      // when there's truly no teacher for this email.
       let teacherId: string | null = null
       if (inv.role === 'teacher') {
-        const [teacher] = await restInsert<{ id: string }>('teachers', {
-          name: finalName,
-          nickname: finalNickname || finalName,
-          email: emailLower,
-          phone: finalPhone,
-          specialties: [],
-          available_branches: inv.branch_ids || [],
-          is_active: true,
-          has_login: true,
+        const existingTeacher = await restSelect<{ id: string }>('teachers', {
+          email: `ilike.${emailLower}`,
+          select: 'id',
+          limit: '1',
         })
-        teacherId = teacher.id
+        if (existingTeacher?.[0]) {
+          teacherId = existingTeacher[0].id
+          await restPatch('teachers', { id: `eq.${teacherId}` }, {
+            is_active: true,
+            has_login: true,
+            available_branches: inv.branch_ids || [],
+          })
+        } else {
+          const [teacher] = await restInsert<{ id: string }>('teachers', {
+            name: finalName,
+            nickname: finalNickname || finalName,
+            email: emailLower,
+            phone: finalPhone,
+            specialties: [],
+            available_branches: inv.branch_ids || [],
+            is_active: true,
+            has_login: true,
+          })
+          teacherId = teacher.id
+        }
       }
 
       // 5. Create the admin_users record
