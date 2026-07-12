@@ -615,6 +615,11 @@ export default function EnrollmentsPage() {
                             {paymentStatusLabels[enrollment.payment.status]}
                           </Badge>
                         )}
+                        {enrollment.status !== 'dropped' && enrollment.payment.status === 'partial' && (
+                          <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                            จ่าย <span className="tabular-nums">{formatCurrency(enrollment.payment.paidAmount)}</span> · ค้าง <span className="tabular-nums text-orange-600">{formatCurrency(Math.max(0, enrollment.pricing.finalPrice - enrollment.payment.paidAmount))}</span>
+                          </span>
+                        )}
                         <Badge className={`text-[11px] ${isUpcoming ? 'bg-yellow-100 text-yellow-700' : statusColors[enrollment.status]}`}>
                           {isUpcoming ? 'รอเริ่มเรียน' : statusLabels[enrollment.status]}
                         </Badge>
@@ -731,9 +736,16 @@ export default function EnrollmentsPage() {
                             {enrollment.status === 'dropped' ? (
                               <Badge className="text-[11px] whitespace-nowrap bg-gray-100 text-gray-400">-</Badge>
                             ) : (
-                              <Badge className={`text-[11px] whitespace-nowrap ${paymentStatusColors[enrollment.payment.status]}`}>
-                                {paymentStatusLabels[enrollment.payment.status]}
-                              </Badge>
+                              <div className="inline-flex flex-col items-center gap-0.5">
+                                <Badge className={`text-[11px] whitespace-nowrap ${paymentStatusColors[enrollment.payment.status]}`}>
+                                  {paymentStatusLabels[enrollment.payment.status]}
+                                </Badge>
+                                {enrollment.payment.status === 'partial' && (
+                                  <span className="text-[10px] leading-tight text-gray-500 whitespace-nowrap">
+                                    จ่าย <span className="tabular-nums">{formatCurrency(enrollment.payment.paidAmount)}</span> · ค้าง <span className="tabular-nums text-orange-600">{formatCurrency(Math.max(0, enrollment.pricing.finalPrice - enrollment.payment.paidAmount))}</span>
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </TableCell>
                           <TableCell className="text-center py-2">
