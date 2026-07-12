@@ -354,11 +354,14 @@ export default function EnrollmentsPage() {
       }
       return true;
     });
+    // Payment-status counts exclude dropped enrollments — a cancelled row keeps
+    // its old payment.status ('pending' etc.) but should only be counted under
+    // "ยกเลิก", never under รอชำระ/ชำระบางส่วน/ชำระแล้ว.
     return {
       total: baseFiltered.length,
-      paidCount: baseFiltered.filter(e => e.payment.status === 'paid').length,
-      pendingCount: baseFiltered.filter(e => e.payment.status === 'pending').length,
-      partialCount: baseFiltered.filter(e => e.payment.status === 'partial').length,
+      paidCount: baseFiltered.filter(e => e.status !== 'dropped' && e.payment.status === 'paid').length,
+      pendingCount: baseFiltered.filter(e => e.status !== 'dropped' && e.payment.status === 'pending').length,
+      partialCount: baseFiltered.filter(e => e.status !== 'dropped' && e.payment.status === 'partial').length,
       droppedCount: baseFiltered.filter(e => e.status === 'dropped').length,
     };
   }, [hasActiveFilters, allEnrollments, selectedStatus, dateRange, isSearchMode, debouncedSearchTerm, getStudentInfo, getClassInfo]);

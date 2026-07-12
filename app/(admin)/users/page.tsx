@@ -170,10 +170,14 @@ export default function UsersPage() {
   };
 
   // Filter users
-  const filteredUsers = users.filter(user => {
-    // ไม่แสดง user ที่ถูกลบ
-    if ((user as any).isDeleted) return false;
-    
+  // Only count/show users who have actually completed Google sign-in at least
+  // once. An invited-but-not-yet-registered account has a row but no login, and
+  // shouldn't appear in the list or the stat cards.
+  const registeredUsers = users.filter(
+    (user) => !(user as any).isDeleted && !!user.lastLoginAt
+  );
+
+  const filteredUsers = registeredUsers.filter(user => {
     // Filter by status
     if (statusFilter === 'active' && !user.isActive) return false;
     if (statusFilter === 'inactive' && user.isActive) return false;
@@ -336,10 +340,10 @@ export default function UsersPage() {
       {/* Stats Cards — full-colour */}
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { label: 'ผู้ใช้ทั้งหมด', value: users.length, sub: `ใช้งาน ${users.filter(u => u.isActive).length} คน`, Icon: Users, bg: 'bg-gradient-to-br from-gray-700 to-gray-900' },
-          { label: 'Super Admin', value: users.filter(u => u.role === 'super_admin').length, sub: 'มีสิทธิ์สูงสุดในระบบ', Icon: Shield, bg: 'bg-gradient-to-br from-red-500 to-red-600' },
-          { label: 'Branch Admin', value: users.filter(u => u.role === 'branch_admin').length, sub: 'จัดการเฉพาะสาขา', Icon: Building2, bg: 'bg-gradient-to-br from-blue-500 to-blue-600' },
-          { label: 'ครูผู้สอน', value: users.filter(u => u.role === 'teacher').length, sub: 'เข้าถึงเมนูฝั่งครู', Icon: UserCog, bg: 'bg-gradient-to-br from-green-500 to-emerald-600' },
+          { label: 'ผู้ใช้ทั้งหมด', value: registeredUsers.length, sub: `ใช้งาน ${registeredUsers.filter(u => u.isActive).length} คน`, Icon: Users, bg: 'bg-gradient-to-br from-gray-700 to-gray-900' },
+          { label: 'Super Admin', value: registeredUsers.filter(u => u.role === 'super_admin').length, sub: 'มีสิทธิ์สูงสุดในระบบ', Icon: Shield, bg: 'bg-gradient-to-br from-red-500 to-red-600' },
+          { label: 'Branch Admin', value: registeredUsers.filter(u => u.role === 'branch_admin').length, sub: 'จัดการเฉพาะสาขา', Icon: Building2, bg: 'bg-gradient-to-br from-blue-500 to-blue-600' },
+          { label: 'ครูผู้สอน', value: registeredUsers.filter(u => u.role === 'teacher').length, sub: 'เข้าถึงเมนูฝั่งครู', Icon: UserCog, bg: 'bg-gradient-to-br from-green-500 to-emerald-600' },
         ].map((stat) => (
           <div key={stat.label} className={cn('rounded-xl p-4 text-white shadow-sm', stat.bg)}>
             <div className="flex items-center justify-between">
@@ -430,7 +434,7 @@ export default function UsersPage() {
             
             {/* Show count */}
             <div className="text-sm text-gray-500">
-              แสดง {filteredUsers.length} จาก {users.length} คน
+              แสดง {filteredUsers.length} จาก {registeredUsers.length} คน
             </div>
           </div>
         </CardHeader>
