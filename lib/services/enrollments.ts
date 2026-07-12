@@ -160,6 +160,7 @@ export interface EnrollmentStats {
   pendingPayments: number;
   pendingAmount: number;
   partialRemainingAmount: number;
+  partialPaidAmount: number;
   pendingCount: number;
   partialCount: number;
   paidCount: number;
@@ -169,7 +170,8 @@ export async function getEnrollmentStats(branchId?: string | null): Promise<Enro
   const emptyStats: EnrollmentStats = {
     total: 0, active: 0, completed: 0, dropped: 0,
     totalRevenue: 0, pendingPayments: 0, pendingAmount: 0,
-    partialRemainingAmount: 0, pendingCount: 0, partialCount: 0, paidCount: 0
+    partialRemainingAmount: 0, partialPaidAmount: 0,
+    pendingCount: 0, partialCount: 0, paidCount: 0
   };
 
   try {
@@ -192,6 +194,7 @@ export async function getEnrollmentStats(branchId?: string | null): Promise<Enro
       pendingPayments: data.pendingPayments || 0,
       pendingAmount: data.pendingAmount || 0,
       partialRemainingAmount: data.partialRemainingAmount || 0,
+      partialPaidAmount: data.partialPaidAmount || 0,
       pendingCount: data.pendingCount || 0,
       partialCount: data.partialCount || 0,
       paidCount: data.paidCount || 0,

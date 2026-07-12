@@ -16,6 +16,8 @@ export interface StatusFilterTab {
   inactiveCount: string
   /** always show even when count is 0 (e.g. the "ทั้งหมด" tab) */
   always?: boolean
+  /** optional small line(s) under the count, e.g. an amount summary */
+  subtitle?: React.ReactNode
 }
 
 interface StatusFilterTabsProps {
@@ -43,16 +45,21 @@ export function StatusFilterTabs({ tabs, value, onChange, className }: StatusFil
               type="button"
               onClick={() => onChange(tab.value)}
               className={cn(
-                'flex flex-col items-center justify-center min-w-24 px-3 h-[72px] rounded-xl transition-all',
+                'flex flex-col items-center justify-center min-w-24 px-3 py-2 min-h-[72px] rounded-xl transition-all',
                 isActive ? `${tab.activeBg} shadow-md` : `${tab.inactiveBg} hover:shadow-sm`
               )}
             >
               <span className={cn('text-sm font-medium whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
                 {tab.label}
               </span>
-              <span className={cn('text-2xl font-bold mt-0.5', isActive ? 'text-white' : tab.inactiveCount)}>
+              <span className={cn('text-2xl font-bold mt-0.5 leading-none', isActive ? 'text-white' : tab.inactiveCount)}>
                 {tab.count}
               </span>
+              {tab.subtitle && (
+                <span className={cn('text-[11px] mt-1 whitespace-nowrap leading-tight text-center', isActive ? 'text-white/90' : 'text-gray-500')}>
+                  {tab.subtitle}
+                </span>
+              )}
             </button>
           )
         })}
