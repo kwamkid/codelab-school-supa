@@ -703,9 +703,14 @@ export default function EnrollmentsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-center py-2">
-                            <Badge className={`text-[11px] whitespace-nowrap ${paymentStatusColors[enrollment.payment.status]}`}>
-                              {paymentStatusLabels[enrollment.payment.status]}
-                            </Badge>
+                            {/* Cancelled rows keep a stale payment_status (audit) → show "-". */}
+                            {enrollment.status === 'dropped' ? (
+                              <Badge className="text-[11px] whitespace-nowrap bg-gray-100 text-gray-400">-</Badge>
+                            ) : (
+                              <Badge className={`text-[11px] whitespace-nowrap ${paymentStatusColors[enrollment.payment.status]}`}>
+                                {paymentStatusLabels[enrollment.payment.status]}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-center py-2">
                             {(() => {

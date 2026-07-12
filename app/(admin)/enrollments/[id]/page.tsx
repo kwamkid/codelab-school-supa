@@ -1033,9 +1033,14 @@ export default function EnrollmentDetailPage() {
                   <DollarSign className="h-5 w-5" />
                   การชำระเงิน
                 </span>
-                <Badge className={paymentStatusColors[enrollment.payment.status as keyof typeof paymentStatusColors] || ''}>
-                  {paymentStatusLabels[enrollment.payment.status as keyof typeof paymentStatusLabels] || enrollment.payment.status}
-                </Badge>
+                {/* Cancelled enrollment keeps a stale payment_status (audit) → show "-". */}
+                {enrollment.status === 'dropped' ? (
+                  <Badge className="bg-gray-100 text-gray-400">-</Badge>
+                ) : (
+                  <Badge className={paymentStatusColors[enrollment.payment.status as keyof typeof paymentStatusColors] || ''}>
+                    {paymentStatusLabels[enrollment.payment.status as keyof typeof paymentStatusLabels] || enrollment.payment.status}
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
