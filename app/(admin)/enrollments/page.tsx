@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ParentBadge } from '@/components/ui/parent-badge';
+import SubjectSearchSelect from '@/components/ui/subject-search-select';
 import {
   Plus,
   Search,
@@ -152,6 +153,7 @@ export default function EnrollmentsPage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>('all');
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
 
   // Date range filter
   const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>(undefined);
@@ -168,7 +170,7 @@ export default function EnrollmentsPage() {
   } = usePagination(20);
 
   const isSearchMode = debouncedSearchTerm.length > 0;
-  const hasActiveFilters = isSearchMode || !!dateRange;
+  const hasActiveFilters = isSearchMode || !!dateRange || !!selectedSubject;
   
   // Other states
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -301,6 +303,7 @@ export default function EnrollmentsPage() {
         if (selectedStatus !== 'all' && enrollment.status !== selectedStatus) return false;
         if (selectedPaymentStatus !== 'all' && enrollment.payment.status !== selectedPaymentStatus) return false;
         if (!isInDateRange(enrollment.enrolledAt)) return false;
+        if (selectedSubject && getClassInfo(enrollment.classId)?.subjectId !== selectedSubject) return false;
 
         if (isSearchMode) {
           const student = getStudentInfo(enrollment.studentId);
@@ -327,6 +330,7 @@ export default function EnrollmentsPage() {
     paginatedData,
     selectedStatus,
     selectedPaymentStatus,
+    selectedSubject,
     debouncedSearchTerm,
     dateRange,
     getStudentInfo,
@@ -340,6 +344,7 @@ export default function EnrollmentsPage() {
     const baseFiltered = allEnrollments.filter(enrollment => {
       if (selectedStatus !== 'all' && enrollment.status !== selectedStatus) return false;
       if (!isInDateRange(enrollment.enrolledAt)) return false;
+      if (selectedSubject && getClassInfo(enrollment.classId)?.subjectId !== selectedSubject) return false;
       if (isSearchMode) {
         const student = getStudentInfo(enrollment.studentId);
         const classInfo = getClassInfo(enrollment.classId);
@@ -364,7 +369,7 @@ export default function EnrollmentsPage() {
       partialCount: baseFiltered.filter(e => e.status !== 'dropped' && e.payment.status === 'partial').length,
       droppedCount: baseFiltered.filter(e => e.status === 'dropped').length,
     };
-  }, [hasActiveFilters, allEnrollments, selectedStatus, dateRange, isSearchMode, debouncedSearchTerm, getStudentInfo, getClassInfo]);
+  }, [hasActiveFilters, allEnrollments, selectedStatus, selectedSubject, dateRange, isSearchMode, debouncedSearchTerm, getStudentInfo, getClassInfo]);
 
   const paginatedSearchResults = useMemo(() => {
     if (!hasActiveFilters) return enrollmentsToDisplay;
@@ -390,7 +395,7 @@ export default function EnrollmentsPage() {
   // ============================================
   useEffect(() => {
     resetPagination();
-  }, [selectedBranchId, selectedStatus, selectedPaymentStatus, debouncedSearchTerm, dateRange, resetPagination]);
+  }, [selectedBranchId, selectedStatus, selectedPaymentStatus, selectedSubject, debouncedSearchTerm, dateRange, resetPagination]);
 
   // ============================================
   // 🎯 Action Handlers
@@ -492,11 +497,16 @@ export default function EnrollmentsPage() {
           { value: 'all', label: 'ทั้งหมด', count: filteredStats?.total ?? stats?.total ?? 0, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
           { value: 'paid', label: 'ชำระแล้ว', count: filteredStats?.paidCount ?? stats?.paidCount ?? 0, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700', always: true },
           { value: 'pending', label: 'รอชำระ', count: filteredStats?.pendingCount ?? stats?.pendingCount ?? 0, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700', always: true,
-            subtitle: (stats?.pendingAmount ?? 0) > 0 ? `ค้าง ${formatCurrency(stats!.pendingAmount)}` : undefined },
-          { value: 'partial', label: 'ชำระบางส่วน', count: filteredStats?.partialCount ?? stats?.partialCount ?? 0, activeBg: 'bg-orange-500', inactiveBg: 'bg-orange-50', inactiveLabel: 'text-orange-600', inactiveCount: 'text-orange-700', always: true,
-            subtitle: ((stats?.partialPaidAmount ?? 0) > 0 || (stats?.partialRemainingAmount ?? 0) > 0)
-              ? (<>จ่าย {formatCurrency(stats?.partialPaidAmount ?? 0)}<br />ค้าง {formatCurrency(stats?.partialRemainingAmount ?? 0)}</>)
+            subtitle: (stats?.pendingAmount ?? 0) > 0
+              ? <>ค้าง <span className="font-semibold tabular-nums">{formatCurrency(stats!.pendingAmount)}</span></>
               : undefined },
+          { value: 'partial', label: 'ชำระบางส่วน', count: filteredStats?.partialCount ?? stats?.partialCount ?? 0, activeBg: 'bg-orange-500', inactiveBg: 'bg-orange-50', inactiveLabel: 'text-orange-600', inactiveCount: 'text-orange-700', always: true,
+            subtitle: ((stats?.partialPaidAmount ?? 0) > 0 || (stats?.partialRemainingAmount ?? 0) > 0) ? (
+              <span className="flex flex-col gap-0.5 leading-tight">
+                <span>จ่าย <span className="font-semibold tabular-nums">{formatCurrency(stats?.partialPaidAmount ?? 0)}</span></span>
+                <span>ค้าง <span className="font-semibold tabular-nums">{formatCurrency(stats?.partialRemainingAmount ?? 0)}</span></span>
+              </span>
+            ) : undefined },
           { value: 'dropped', label: 'ยกเลิก', count: filteredStats?.droppedCount ?? stats?.dropped ?? 0, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700', always: true },
         ]}
       />
@@ -518,6 +528,16 @@ export default function EnrollmentsPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
+          />
+        </div>
+
+        {/* Subject filter (shared auto-search) */}
+        <div className="w-full md:w-[220px]">
+          <SubjectSearchSelect
+            subjects={subjects}
+            value={selectedSubject}
+            onValueChange={setSelectedSubject}
+            placeholder="ทุกวิชา"
           />
         </div>
 
@@ -549,7 +569,7 @@ export default function EnrollmentsPage() {
                 ไม่พบข้อมูลการลงทะเบียน
               </h3>
               <p className="text-gray-600 mb-4">
-                {searchTerm || selectedStatus !== 'all' || selectedPaymentStatus !== 'all'
+                {searchTerm || selectedStatus !== 'all' || selectedPaymentStatus !== 'all' || selectedSubject
                   ? 'ลองปรับเงื่อนไขการค้นหา'
                   : 'เริ่มต้นด้วยการลงทะเบียนนักเรียนคนแรก'}
               </p>

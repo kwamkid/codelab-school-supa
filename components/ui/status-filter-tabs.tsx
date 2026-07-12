@@ -33,36 +33,55 @@ interface StatusFilterTabsProps {
  * active. Tabs with count 0 are hidden unless `always` is set.
  */
 export function StatusFilterTabs({ tabs, value, onChange, className }: StatusFilterTabsProps) {
+  const visibleTabs = tabs.filter((tab) => tab.always || tab.count > 0)
+  // Cards with an amount subtitle get a wider, horizontal layout (big count on the
+  // left, label + amount stacked on the right). Plain cards stay compact/centered.
+  // Fixed row height keeps everything aligned.
   return (
     <div className={cn('flex flex-wrap gap-3', className)}>
-      {tabs
-        .filter((tab) => tab.always || tab.count > 0)
-        .map((tab) => {
-          const isActive = value === tab.value
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => onChange(tab.value)}
-              className={cn(
-                'flex flex-col items-center justify-center min-w-24 px-3 py-2 min-h-[72px] rounded-xl transition-all',
-                isActive ? `${tab.activeBg} shadow-md` : `${tab.inactiveBg} hover:shadow-sm`
-              )}
-            >
-              <span className={cn('text-sm font-medium whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
-                {tab.label}
-              </span>
-              <span className={cn('text-2xl font-bold mt-0.5 leading-none', isActive ? 'text-white' : tab.inactiveCount)}>
-                {tab.count}
-              </span>
-              {tab.subtitle && (
-                <span className={cn('text-[11px] mt-1 whitespace-nowrap leading-tight text-center', isActive ? 'text-white/90' : 'text-gray-500')}>
-                  {tab.subtitle}
+      {visibleTabs.map((tab) => {
+        const isActive = value === tab.value
+        const hasSubtitle = !!tab.subtitle
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => onChange(tab.value)}
+            className={cn(
+              'h-[76px] rounded-xl px-4 transition-all',
+              hasSubtitle
+                ? 'flex items-center gap-3 text-left'
+                : 'flex flex-col items-center justify-center min-w-24',
+              isActive ? `${tab.activeBg} shadow-md` : `${tab.inactiveBg} hover:shadow-sm`
+            )}
+          >
+            {hasSubtitle ? (
+              <>
+                <span className={cn('text-3xl font-bold leading-none tabular-nums', isActive ? 'text-white' : tab.inactiveCount)}>
+                  {tab.count}
                 </span>
-              )}
-            </button>
-          )
-        })}
+                <span className="flex flex-col justify-center">
+                  <span className={cn('text-sm font-medium whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
+                    {tab.label}
+                  </span>
+                  <span className={cn('text-[11px] leading-tight whitespace-nowrap mt-0.5', isActive ? 'text-white/90' : 'text-gray-500')}>
+                    {tab.subtitle}
+                  </span>
+                </span>
+              </>
+            ) : (
+              <>
+                <span className={cn('text-sm font-medium whitespace-nowrap', isActive ? 'text-white' : tab.inactiveLabel)}>
+                  {tab.label}
+                </span>
+                <span className={cn('text-2xl font-bold mt-0.5 leading-none', isActive ? 'text-white' : tab.inactiveCount)}>
+                  {tab.count}
+                </span>
+              </>
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
