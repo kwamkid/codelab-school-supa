@@ -49,6 +49,7 @@ import {
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Trophy,
   LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -716,6 +717,14 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         // Data Cleaning — hidden (dev/testing tool, no longer used). Route still exists at /data-cleaning.
         // { name: 'Data Cleaning', href: '/data-cleaning' },
       ]
+    },
+    // --- VEX Team (bottom-most, below settings) ---
+    {
+      name: 'VEX Team',
+      href: '/vexteam',
+      icon: Trophy,
+      iconColor: 'text-red-600',
+      requiredRole: ['super_admin', 'branch_admin']
     },
   ], [pendingMakeupCount, newTrialCount, chatUnreadCount]); // dependencies สำหรับ badges
 
