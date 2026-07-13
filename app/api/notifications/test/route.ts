@@ -1,12 +1,16 @@
 // app/api/notifications/test/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth'
 import { sendClassReminder } from '@/lib/supabase/services/line-notifications'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
   try {
     const body = await request.json()
     const { type, studentId, classId, scheduleDate } = body
@@ -78,6 +82,9 @@ export async function POST(request: NextRequest) {
 
 // GET: ดึงข้อมูลสำหรับทดสอบ
 export async function GET(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
   const supabase = createServiceClient()
 
   try {

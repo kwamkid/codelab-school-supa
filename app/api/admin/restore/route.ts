@@ -1,7 +1,8 @@
 // app/api/admin/restore/route.ts
 
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -151,6 +152,10 @@ async function upsertInChunks(
 }
 
 export async function POST(request: NextRequest) {
+  // Overwrites the database from a backup file — super admin only.
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
   const startTime = Date.now()
 
   try {

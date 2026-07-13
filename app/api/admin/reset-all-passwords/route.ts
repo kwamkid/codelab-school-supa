@@ -2,12 +2,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_PASSWORD = 'codel@b1432';
 
 export async function POST(request: NextRequest) {
+  // Resets EVERY admin's password to a shared default — super admin only.
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')));
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
+  }
+
   try {
     const supabase = createServiceClient();
 

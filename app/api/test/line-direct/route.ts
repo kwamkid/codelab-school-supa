@@ -1,11 +1,15 @@
 // app/api/test/line-direct/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
   const supabase = createServiceClient()
 
   try {

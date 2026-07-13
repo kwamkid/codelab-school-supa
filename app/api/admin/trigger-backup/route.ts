@@ -1,7 +1,8 @@
 // app/api/admin/trigger-backup/route.ts
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,7 +46,10 @@ function getWeekOfMonth(): number {
   return Math.min(week, 4)
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
   const startTime = Date.now()
   console.log('\n=== Starting manual database backup ===')
   console.log('Thailand Time:', new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }))

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { authFetch } from '@/lib/auth-fetch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,7 +68,7 @@ export default function TestNotificationsPage() {
   const { data: parentsData, isLoading: loadingParents } = useQuery({
     queryKey: ['test-parents'],
     queryFn: async () => {
-      const res = await fetch('/api/notifications/test?type=parents-with-line');
+      const res = await authFetch('/api/notifications/test?type=parents-with-line');
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     }
@@ -78,7 +79,7 @@ export default function TestNotificationsPage() {
     queryKey: ['test-students', selectedParent?.id],
     queryFn: async () => {
       if (!selectedParent) return { data: [] };
-      const res = await fetch(`/api/notifications/test?type=students-by-parent&parentId=${selectedParent.id}`);
+      const res = await authFetch(`/api/notifications/test?type=students-by-parent&parentId=${selectedParent.id}`);
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
@@ -90,7 +91,7 @@ export default function TestNotificationsPage() {
     queryKey: ['test-classes', selectedStudent?.id],
     queryFn: async () => {
       if (!selectedStudent) return { data: [] };
-      const res = await fetch(`/api/notifications/test?type=classes-by-student&studentId=${selectedStudent.id}`);
+      const res = await authFetch(`/api/notifications/test?type=classes-by-student&studentId=${selectedStudent.id}`);
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
@@ -140,7 +141,7 @@ export default function TestNotificationsPage() {
     setResult(null);
 
     try {
-      const response = await fetch('/api/notifications/test', {
+      const response = await authFetch('/api/notifications/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

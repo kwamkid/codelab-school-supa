@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { authFetch } from '@/lib/auth-fetch';
 import {
   Dialog,
   DialogContent,
@@ -146,7 +147,7 @@ export default function RestoreDialog({
   const loadPreview = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/restore/preview?fileName=${encodeURIComponent(fileName)}`);
+      const response = await authFetch(`/api/admin/restore/preview?fileName=${encodeURIComponent(fileName)}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to load preview');
       setPreview(data);
@@ -164,7 +165,7 @@ export default function RestoreDialog({
     setProgressMessage('เริ่มต้น Restore...');
 
     try {
-      const response = await fetch('/api/admin/restore', {
+      const response = await authFetch('/api/admin/restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName }),

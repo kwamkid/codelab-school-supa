@@ -3,6 +3,7 @@
 'use client';
 
 import { useState } from 'react';
+import { authFetch } from '@/lib/auth-fetch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -59,7 +60,7 @@ export default function TestMakeupNotificationPage() {
       }
 
       // Send notification via the server route (LINE send is server-side)
-      const resp = await fetch('/api/test/makeup-notification', {
+      const resp = await authFetch('/api/test/makeup-notification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ makeupId, type: 'scheduled' }),
@@ -97,7 +98,7 @@ export default function TestMakeupNotificationPage() {
     setResult(null);
 
     try {
-      const response = await fetch('/api/test/makeup-notification', {
+      const response = await authFetch('/api/test/makeup-notification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

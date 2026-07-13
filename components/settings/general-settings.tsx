@@ -26,6 +26,7 @@ import {
   GeneralSettings
 } from '@/lib/services/settings';
 import { useAuth } from '@/hooks/useAuth';
+import { authFetch } from '@/lib/auth-fetch';
 import FactoryResetDialog from './factory-reset-dialog';
 import { SectionLoading } from '@/components/ui/loading';
 
@@ -88,7 +89,7 @@ export default function GeneralSettingsComponent() {
     setResettingPasswords(true);
 
     try {
-      const response = await fetch('/api/admin/reset-all-passwords', {
+      const response = await authFetch('/api/admin/reset-all-passwords', {
         method: 'POST',
       });
 

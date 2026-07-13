@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { authFetch } from '@/lib/auth-fetch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,7 +68,7 @@ export default function BackupLogsTab() {
   const loadLogs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/backup-logs');
+      const response = await authFetch('/api/admin/backup-logs');
       const data = await response.json();
       console.log('[BackupLogs] API response:', response.status, data);
       if (!response.ok) throw new Error(data.error || 'Failed to load logs');
@@ -90,7 +91,7 @@ export default function BackupLogsTab() {
       setBackingUp(true);
       toast.info('กำลัง Backup ข้อมูล...');
 
-      const response = await fetch('/api/admin/trigger-backup', { method: 'POST' })
+      const response = await authFetch('/api/admin/trigger-backup', { method: 'POST' })
       const data = await response.json();
 
       if (data.success) {
