@@ -90,10 +90,17 @@ export function EventRsvp({ kids, events, initialAttendance, onSave }: Props) {
 
     return (
       <div key={ev.id} className="relative pl-8 pb-8 last:pb-0">
+        {/* timeline rail — behind the node, centered on it (node center x=8px) */}
+        <span
+          className={cn(
+            'absolute left-[7px] top-1 bottom-0 w-0.5',
+            disabled ? 'bg-gray-200' : 'bg-primary/30'
+          )}
+        />
         {/* timeline node */}
         <span
           className={cn(
-            'absolute left-0 top-1 h-4 w-4 rounded-full border-[3px] bg-white',
+            'absolute left-0 top-1 h-4 w-4 rounded-full border-[3px] bg-white z-10',
             disabled ? 'border-gray-300' : 'border-primary'
           )}
         />
@@ -173,9 +180,7 @@ export function EventRsvp({ kids, events, initialAttendance, onSave }: Props) {
       {upcomingGroups.map((group) => (
         <div key={group.key}>
           <h2 className="text-sm font-bold text-gray-500 tracking-wider mb-3 pl-8">{group.label}</h2>
-          <div className="relative border-l-2 border-primary/30 ml-2">
-            {group.events.map((ev) => renderEvent(ev, false))}
-          </div>
+          <div>{group.events.map((ev) => renderEvent(ev, false))}</div>
         </div>
       ))}
 
@@ -183,9 +188,7 @@ export function EventRsvp({ kids, events, initialAttendance, onSave }: Props) {
       {past.length > 0 && (
         <div className="pt-2">
           <h2 className="text-sm font-bold text-gray-400 tracking-wider mb-3 pl-8">ผ่านมาแล้ว</h2>
-          <div className="relative border-l-2 border-gray-200 ml-2">
-            {past.map((ev) => renderEvent(ev, true))}
-          </div>
+          <div>{past.map((ev) => renderEvent(ev, true))}</div>
         </div>
       )}
     </div>

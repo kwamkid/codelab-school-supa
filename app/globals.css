@@ -351,9 +351,14 @@ button[aria-busy="true"]::after,
   font-size: 14px;
 }
 
-/* Hide 6th row when it's all next-month overflow dates (gray text in positions 36+) */
-.datepicker-custom .grid.grid-cols-7 > button.text-gray-400:nth-child(n+36) {
-  display: none !important;
+/* Keep the day grid a constant 6-row height across every month, so the
+   month/year header + prev/next arrows never shift vertically when paging
+   between a 5-row month (e.g. Jul) and a 6-row month (e.g. Aug). Each day cell
+   is 2.25rem tall → 6 rows = 13.5rem. (Previously the 6th overflow row was
+   hidden, which caused the height jump.) */
+.datepicker-custom .grid.grid-cols-7.gap-y-0\.5 {
+  align-content: start;
+  min-height: 14.125rem; /* 6 × 2.25rem cells + 5 × 0.125rem row gaps */
 }
 
 /* Calendar navigation arrows */

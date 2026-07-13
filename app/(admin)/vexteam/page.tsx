@@ -29,7 +29,7 @@ import { PageLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 import { Trophy, Copy, Users, CalendarDays, Globe, ChevronRight, MapPin, Pencil, Trash2 } from 'lucide-react'
-import { LEVELS, LEVEL_LABELS, type Level } from '@/lib/vex/types'
+import { LEVEL_META, PROGRAM_LOGO, type Level, type Program } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 import {
   thaiDateRange,
@@ -86,9 +86,10 @@ function VexTeamAdminInner() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Event filters
-  const [levelFilter, setLevelFilter] = useState<Level | 'all'>('all')
-  const [teamFilter, setTeamFilter] = useState<string>('all') // team id
+  // Event filter. Program = IQ / V5 (most competitions group ES+MS under IQ,
+  // MS+HS under V5). Events relate to LEVELS (via event_levels), not to teams,
+  // so a program filter is the meaningful one here.
+  const [programFilter, setProgramFilter] = useState<Program | 'all'>('all')
 
   // Active tab persisted in ?tab= (so refresh / back keeps the tab).
   const router = useRouter()
@@ -108,23 +109,13 @@ function VexTeamAdminInner() {
 
   const today = useMemo(() => localTodayStr(), [])
 
-  // Levels present across the teams, for the "team" filter → its level.
-  const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams])
-
   const filteredEvents = useMemo(() => {
-    let list = events as TimelineEvent[]
-    // Filter by an explicit level, OR by the selected team's level.
-    let effectiveLevel: Level | null = null
-    if (teamFilter !== 'all') {
-      effectiveLevel = teamById.get(teamFilter)?.level ?? null
-    } else if (levelFilter !== 'all') {
-      effectiveLevel = levelFilter
-    }
-    if (effectiveLevel) {
-      list = list.filter((e) => (e.levels || []).includes(effectiveLevel!))
-    }
-    return list
-  }, [events, levelFilter, teamFilter, teamById])
+    if (programFilter === 'all') return events as TimelineEvent[]
+    // Keep events open to ANY level of the selected program (IQ / V5).
+    return (events as TimelineEvent[]).filter((e) =>
+      (e.levels || []).some((lv) => LEVEL_META[lv]?.program === programFilter)
+    )
+  }, [events, programFilter])
 
   const { upcoming, past } = useMemo(
     () => splitByTime(filteredEvents, today),
@@ -179,9 +170,16 @@ function VexTeamAdminInner() {
   // One event node on the admin timeline.
   const renderAdminEvent = (ev: EventRow, disabled: boolean) => (
     <div key={ev.id} className="relative pl-8 pb-8 last:pb-0">
+      {/* timeline rail — centered on the node (node center x=8px) */}
       <span
         className={cn(
-          'absolute left-0 top-1 h-4 w-4 rounded-full border-[3px] bg-white',
+          'absolute left-[7px] top-1 bottom-0 w-0.5',
+          disabled ? 'bg-gray-200' : 'bg-primary/30'
+        )}
+      />
+      <span
+        className={cn(
+          'absolute left-0 top-1 h-4 w-4 rounded-full border-[3px] bg-white z-10',
           disabled ? 'border-gray-300' : 'border-primary'
         )}
       />
@@ -292,53 +290,43 @@ function VexTeamAdminInner() {
 
         {/* Events */}
         <TabsContent value="events" className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:justify-between">
-            <div className="flex flex-wrap gap-2">
-              <div className="space-y-1">
-                <label className="text-xs text-gray-500">กรองตามระดับ</label>
-                <Select
-                  value={levelFilter}
-                  onValueChange={(v) => {
-                    setLevelFilter(v as Level | 'all')
-                    if (v !== 'all') setTeamFilter('all')
-                  }}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+            {/* Program filter: All / IQ / V5 as logo toggle buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setProgramFilter('all')}
+                className={cn(
+                  'px-3 py-2 rounded-md border text-sm font-medium transition',
+                  programFilter === 'all'
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-input text-gray-600 hover:bg-gray-50'
+                )}
+              >
+                ทั้งหมด
+              </button>
+              {(['iq', 'v5'] as Program[]).map((prog) => (
+                <button
+                  key={prog}
+                  type="button"
+                  onClick={() => setProgramFilter(prog)}
+                  className={cn(
+                    'inline-flex items-center rounded-md border px-3 py-1.5 transition',
+                    programFilter === prog
+                      ? 'border-primary bg-primary/5'
+                      : 'border-input bg-white hover:bg-gray-50'
+                  )}
+                  aria-label={prog === 'iq' ? 'VEX IQ' : 'VEX V5'}
                 >
-                  <SelectTrigger className="w-[220px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทุกระดับ</SelectItem>
-                    {LEVELS.map((lv) => (
-                      <SelectItem key={lv} value={lv}>
-                        {LEVEL_LABELS[lv]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-gray-500">กรองตามทีม</label>
-                <Select
-                  value={teamFilter}
-                  onValueChange={(v) => {
-                    setTeamFilter(v)
-                    if (v !== 'all') setLevelFilter('all')
-                  }}
-                >
-                  <SelectTrigger className="w-[220px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทุกทีม</SelectItem>
-                    {teams.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.team_number}
-                        {t.name ? ` — ${t.name}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={PROGRAM_LOGO[prog]}
+                    alt={prog === 'iq' ? 'VEX IQ' : 'VEX V5'}
+                    style={{ height: 28, width: 'auto' }}
+                    className="object-contain"
+                  />
+                </button>
+              ))}
             </div>
             <CreateEventForm onSaved={loadEvents} />
           </div>
@@ -355,17 +343,13 @@ function VexTeamAdminInner() {
               {upcomingGroups.map((group) => (
                 <div key={group.key}>
                   <h2 className="text-sm font-bold text-gray-500 tracking-wider mb-3 pl-8">{group.label}</h2>
-                  <div className="relative border-l-2 border-primary/30 ml-2">
-                    {group.events.map((ev) => renderAdminEvent(ev as EventRow, false))}
-                  </div>
+                  <div>{group.events.map((ev) => renderAdminEvent(ev as EventRow, false))}</div>
                 </div>
               ))}
               {past.length > 0 && (
                 <div className="pt-2">
                   <h2 className="text-sm font-bold text-gray-400 tracking-wider mb-3 pl-8">ผ่านมาแล้ว</h2>
-                  <div className="relative border-l-2 border-gray-200 ml-2">
-                    {past.map((ev) => renderAdminEvent(ev as EventRow, true))}
-                  </div>
+                  <div>{past.map((ev) => renderAdminEvent(ev as EventRow, true))}</div>
                 </div>
               )}
             </div>
