@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AutocompleteInput, type AutocompleteOption } from '@/components/ui/autocomplete-input'
+import { TeamSearchSelect, type TeamSearchOption } from '@/components/ui/team-search-select'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-filter-tabs'
 import { useBranch } from '@/contexts/BranchContext'
@@ -125,18 +125,10 @@ export function PracticesReview({
   )
 
   // Team filter options (searchable). Scoped to the selected branch when set.
-  const teamOptions = useMemo<AutocompleteOption[]>(() => {
+  const teamSearchOptions = useMemo<TeamSearchOption[]>(() => {
     const scoped = selectedBranchId ? teams.filter((t) => t.branch_id === selectedBranchId) : teams
-    return [
-      { value: 'all', label: 'ทุกทีม' },
-      ...scoped.map((t) => ({ value: t.id, label: `${t.team_number}${t.name ? ` — ${t.name}` : ''}` })),
-    ]
+    return scoped.map((t) => ({ id: t.id, label: `${t.team_number}${t.name ? ` — ${t.name}` : ''}` }))
   }, [teams, selectedBranchId])
-
-  const teamFilterLabel = useMemo(
-    () => teamOptions.find((o) => o.value === teamFilter)?.label ?? 'ทุกทีม',
-    [teamOptions, teamFilter]
-  )
 
   const filterTabs: StatusFilterTab[] = [
     { value: 'proposed', label: 'รออนุมัติ', count: counts.proposed, activeBg: 'bg-amber-500', inactiveBg: 'bg-amber-50', inactiveLabel: 'text-amber-700', inactiveCount: 'text-amber-700', always: true },
@@ -185,35 +177,38 @@ export function PracticesReview({
 
   return (
     <div className="space-y-4">
-      {/* Filters: status tabs (shared) + team dropdown */}
+      {/* Filters: status tabs (shared) */}
       <div className="flex flex-col gap-3">
         <StatusFilterTabs tabs={filterTabs} value={statusFilter} onChange={(v) => setStatusFilter(v as any)} />
-        {teams.length > 1 && (
-          <AutocompleteInput
-            value={teamFilterLabel}
-            onChange={(v) => setTeamFilter(v || 'all')}
-            placeholder="ค้นหาทีม..."
-            options={teamOptions}
-            freeInput={false}
-            className="w-full sm:max-w-xs"
-          />
-        )}
-        {/* View toggle: list vs month calendar */}
-        <div className="inline-flex rounded-md border overflow-hidden w-fit">
-          <button
-            type="button"
-            onClick={() => setView('list')}
-            className={cn('px-3 py-1.5 text-sm font-medium', view === 'list' ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
-          >
-            รายการ
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('calendar')}
-            className={cn('px-3 py-1.5 text-sm font-medium border-l', view === 'calendar' ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
-          >
-            ปฏิทิน
-          </button>
+
+        {/* Searchable team filter (left) + list/calendar toggle (right) on one row */}
+        <div className="flex items-center gap-3">
+          {teams.length > 1 && (
+            <TeamSearchSelect
+              options={teamSearchOptions}
+              value={teamFilter}
+              onValueChange={setTeamFilter}
+              placeholder="ค้นหาทีม..."
+              allLabel="ทุกทีม"
+              className="w-full sm:max-w-xs"
+            />
+          )}
+          <div className="ml-auto inline-flex rounded-md border overflow-hidden shrink-0">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={cn('px-3 py-1.5 text-sm font-medium', view === 'list' ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+            >
+              รายการ
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('calendar')}
+              className={cn('px-3 py-1.5 text-sm font-medium border-l', view === 'calendar' ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+            >
+              ปฏิทิน
+            </button>
+          </div>
         </div>
       </div>
 
