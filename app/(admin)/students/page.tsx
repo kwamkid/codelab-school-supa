@@ -21,9 +21,12 @@ import {
   Users,
   Globe,
   Loader2,
-  Trash2
+  Trash2,
+  GraduationCap,
+  AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 import { Badge } from "@/components/ui/badge";
 import { calculateAge } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -219,77 +222,29 @@ export default function StudentsPage() {
         </p>
       </div>
 
-      {/* Summary Cards - แสดงข้อมูลจริงทั้งหมด */}
+      {/* Summary Cards — full-colour (matches the parents list) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">นักเรียนทั้งหมด</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {[
+          { label: 'นักเรียนทั้งหมด', value: stats.total, sub: `ใช้งาน ${stats.active} • ไม่ใช้งาน ${stats.inactive}`, Icon: GraduationCap, bg: 'bg-gradient-to-br from-gray-700 to-gray-900' },
+          { label: 'นักเรียนชาย', value: stats.male, sub: `${stats.total > 0 ? ((stats.male / stats.total) * 100).toFixed(0) : 0}%`, Icon: User, bg: 'bg-gradient-to-br from-blue-500 to-blue-600' },
+          { label: 'นักเรียนหญิง', value: stats.female, sub: `${stats.total > 0 ? ((stats.female / stats.total) * 100).toFixed(0) : 0}%`, Icon: User, bg: 'bg-gradient-to-br from-pink-500 to-pink-600' },
+          { label: 'มีประวัติแพ้', value: stats.withAllergies, sub: 'ต้องระวัง', Icon: AlertTriangle, bg: 'bg-gradient-to-br from-red-500 to-red-600' },
+        ].map((stat) => (
+          <div key={stat.label} className={cn('rounded-xl p-4 text-white shadow-sm', stat.bg)}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-white/90">{stat.label}</span>
+              <stat.Icon className="h-5 w-5 text-white/80" />
+            </div>
             {loadingStudents ? (
-              <InlineLoading />
+              <div className="mt-2"><InlineLoading /></div>
             ) : (
               <>
-                <div className="text-2xl font-bold">{stats.total}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  ใช้งาน {stats.active} คน • ไม่ใช้งาน {stats.inactive} คน
-                </p>
+                <div className="text-2xl font-bold mt-1">{stat.value}</div>
+                <p className="text-xs text-white/80 mt-1">{stat.sub}</p>
               </>
             )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">นักเรียนชาย</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingStudents ? (
-              <InlineLoading />
-            ) : (
-              <>
-                <div className="text-2xl font-bold text-blue-600">{stats.male}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stats.total > 0 ? ((stats.male / stats.total) * 100).toFixed(0) : 0}%
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">นักเรียนหญิง</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingStudents ? (
-              <InlineLoading />
-            ) : (
-              <>
-                <div className="text-2xl font-bold text-pink-600">{stats.female}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stats.total > 0 ? ((stats.female / stats.total) * 100).toFixed(0) : 0}%
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">มีประวัติแพ้</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingStudents ? (
-              <InlineLoading />
-            ) : (
-              <>
-                <div className="text-2xl font-bold text-red-600">{stats.withAllergies}</div>
-                <p className="text-xs text-gray-500 mt-1">ต้องระวัง</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        ))}
       </div>
 
       {/* Filters - แสดงทันที */}
@@ -390,8 +345,11 @@ export default function StudentsPage() {
                                 className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                               />
                             ) : (
-                              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                <User className="h-6 w-6 text-gray-500" />
+                              <div className={cn(
+                                'w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0',
+                                student.gender === 'M' ? 'bg-blue-100 text-blue-500' : 'bg-pink-100 text-pink-500'
+                              )}>
+                                <User className="h-6 w-6" />
                               </div>
                             )}
                             <div className="min-w-0">
