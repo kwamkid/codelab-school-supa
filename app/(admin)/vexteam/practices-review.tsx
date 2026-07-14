@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AutocompleteInput, type AutocompleteOption } from '@/components/ui/autocomplete-input'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-filter-tabs'
 import { useBranch } from '@/contexts/BranchContext'
@@ -43,6 +43,7 @@ interface TeamOption {
   id: string
   team_number: string
   name: string | null
+  branch_id?: string | null
 }
 
 const STATUS_META: Record<PracticeStatus, { label: string; chip: string }> = {
@@ -123,6 +124,20 @@ export function PracticesReview({
     [teamScoped, statusFilter]
   )
 
+  // Team filter options (searchable). Scoped to the selected branch when set.
+  const teamOptions = useMemo<AutocompleteOption[]>(() => {
+    const scoped = selectedBranchId ? teams.filter((t) => t.branch_id === selectedBranchId) : teams
+    return [
+      { value: 'all', label: 'ทุกทีม' },
+      ...scoped.map((t) => ({ value: t.id, label: `${t.team_number}${t.name ? ` — ${t.name}` : ''}` })),
+    ]
+  }, [teams, selectedBranchId])
+
+  const teamFilterLabel = useMemo(
+    () => teamOptions.find((o) => o.value === teamFilter)?.label ?? 'ทุกทีม',
+    [teamOptions, teamFilter]
+  )
+
   const filterTabs: StatusFilterTab[] = [
     { value: 'proposed', label: 'รออนุมัติ', count: counts.proposed, activeBg: 'bg-amber-500', inactiveBg: 'bg-amber-50', inactiveLabel: 'text-amber-700', inactiveCount: 'text-amber-700', always: true },
     { value: 'approved', label: 'อนุมัติแล้ว', count: counts.approved, activeBg: 'bg-green-600', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-700', inactiveCount: 'text-green-700', always: true },
@@ -174,20 +189,14 @@ export function PracticesReview({
       <div className="flex flex-col gap-3">
         <StatusFilterTabs tabs={filterTabs} value={statusFilter} onChange={(v) => setStatusFilter(v as any)} />
         {teams.length > 1 && (
-          <Select value={teamFilter} onValueChange={setTeamFilter}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">ทุกทีม</SelectItem>
-              {teams.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.team_number}
-                  {t.name ? ` — ${t.name}` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AutocompleteInput
+            value={teamFilterLabel}
+            onChange={(v) => setTeamFilter(v || 'all')}
+            placeholder="ค้นหาทีม..."
+            options={teamOptions}
+            freeInput={false}
+            className="w-full sm:max-w-xs"
+          />
         )}
         {/* View toggle: list vs month calendar */}
         <div className="inline-flex rounded-md border overflow-hidden w-fit">

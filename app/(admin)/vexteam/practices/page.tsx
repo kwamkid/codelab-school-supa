@@ -9,7 +9,7 @@ import { CalendarClock } from 'lucide-react'
 import { PracticesReview } from '../practices-review'
 
 export default function VexPracticesPage() {
-  const [teams, setTeams] = useState<{ id: string; team_number: string; name: string | null }[]>([])
+  const [teams, setTeams] = useState<{ id: string; team_number: string; name: string | null; branch_id: string | null }[]>([])
 
   const loadTeams = useCallback(async () => {
     try {
@@ -17,7 +17,7 @@ export default function VexPracticesPage() {
       const data = await res.json()
       if (res.ok) {
         setTeams(
-          (data.teams || []).map((t: any) => ({ id: t.id, team_number: t.team_number, name: t.name }))
+          (data.teams || []).map((t: any) => ({ id: t.id, team_number: t.team_number, name: t.name, branch_id: t.branch_id }))
         )
       }
     } catch {
