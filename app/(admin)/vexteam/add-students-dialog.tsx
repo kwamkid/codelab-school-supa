@@ -18,7 +18,7 @@ import {
 import { SearchInput } from '@/components/ui/search-input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SectionLoading } from '@/components/ui/loading'
-import { UserPlus, School, GraduationCap } from 'lucide-react'
+import { UserPlus, School, GraduationCap, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface StudentRow {
@@ -28,6 +28,7 @@ interface StudentRow {
   school_name: string | null
   grade_level: string | null
   student_code: string | null
+  courses?: string[]
 }
 
 export function AddStudentsDialog({
@@ -48,7 +49,7 @@ export function AddStudentsDialog({
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
 
-  // Debounced student search.
+  // Debounced student search — only fires once the admin actually types.
   const load = useCallback(async (q: string) => {
     setLoading(true)
     try {
@@ -64,7 +65,12 @@ export function AddStudentsDialog({
 
   useEffect(() => {
     if (!open) return
-    const t = setTimeout(() => load(search), 250)
+    const q = search.trim()
+    if (!q) {
+      setStudents([]) // don't preload — wait for a search term
+      return
+    }
+    const t = setTimeout(() => load(q), 250)
     return () => clearTimeout(t)
   }, [open, search, load])
 
@@ -192,6 +198,16 @@ export function AddStudentsDialog({
                         )}
                         {s.student_code && <span className="text-gray-400">{s.student_code}</span>}
                       </div>
+                      {/* Courses the student is enrolled in (one per line) */}
+                      {s.courses && s.courses.length > 0 && (
+                        <div className="mt-1 space-y-0.5">
+                          {s.courses.map((c, i) => (
+                            <div key={i} className="flex items-center gap-1 text-xs text-primary/80">
+                              <BookOpen className="h-3 w-3 shrink-0" /> {c}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </label>
                 )
