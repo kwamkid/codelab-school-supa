@@ -8,6 +8,7 @@ import { getActiveBranches } from '@/lib/services/branches';
 import { getClasses } from '@/lib/services/classes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ParentViewDialog } from '@/components/parents/parent-view-dialog';
 import { SearchInput } from '@/components/ui/search-input';
 import { FormSelect } from '@/components/ui/form-select';
 import { SortableTableHead, useSortableTable } from '@/components/ui/sortable-table-head';
@@ -89,6 +90,7 @@ export default function ParentsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterBranch, setFilterBranch] = useState<string>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [viewParentId, setViewParentId] = useState<string | null>(null);
   const { sort, toggle: toggleSort, sortRows } = useSortableTable();
   const [deletingParentId, setDeletingParentId] = useState<string | null>(null);
   const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
@@ -559,13 +561,15 @@ export default function ParentsPage() {
                           <TableCell>{formatDate(parent.createdAt)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Link href={`/parents/${parent.id}`} onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="sm">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); setViewParentId(parent.id); }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
                               <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-                                <Link href={`/parents/${parent.id}/edit`} onClick={(e) => e.stopPropagation()}>
+                                <Link href={`/parents/${parent.id}`} onClick={(e) => e.stopPropagation()}>
                                   <Button variant="ghost" size="sm">
                                     <Edit className="h-4 w-4" />
                                   </Button>
@@ -793,6 +797,12 @@ export default function ParentsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ParentViewDialog
+        parentId={viewParentId}
+        open={!!viewParentId}
+        onOpenChange={(o) => { if (!o) setViewParentId(null); }}
+      />
     </div>
   );
 }
