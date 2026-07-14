@@ -1,6 +1,7 @@
 // lib/services/credit-notes.ts
 
 import { CreditNote } from '@/types/models';
+import { authFetch } from '@/lib/auth-fetch';
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
 
@@ -71,7 +72,7 @@ function mapToCreditNote(row: CreditNoteRow): CreditNote {
 }
 
 async function getNextCreditNoteNumber(companyId: string): Promise<string> {
-  const res = await fetch('/api/admin/document-number', {
+  const res = await authFetch('/api/admin/document-number', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ companyId, type: 'credit-note' }),
@@ -234,7 +235,7 @@ export async function createRefundNote(data: {
   createdBy?: string;
 }): Promise<string> {
   // Use refund-note number series (RN-)
-  const res = await fetch('/api/admin/document-number', {
+  const res = await authFetch('/api/admin/document-number', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ companyId: data.invoiceCompanyId, type: 'refund-note' }),

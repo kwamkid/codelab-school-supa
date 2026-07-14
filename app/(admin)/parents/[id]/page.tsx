@@ -325,65 +325,6 @@ export default function ParentDetailPage() {
         </div>
       </div>
 
-      {/* Parent Header — compact card with an inline stat strip */}
-      <Card className="mb-6">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-start gap-4">
-            {parent.pictureUrl ? (
-              <img
-                src={parent.pictureUrl}
-                alt={parent.displayName}
-                className="w-16 h-16 rounded-full object-cover shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                <Users className="h-8 w-8 text-gray-400" />
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <ParentBadge
-                  name={parent.displayName}
-                  imageUrl={parent.pictureUrl}
-                  showAvatar={false}
-                  size="lg"
-                  className="text-xl sm:text-2xl font-bold text-gray-900"
-                />
-                {parent.lineUserId && (
-                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-                    <img src="/line-icon.svg" alt="LINE" className="w-3.5 h-3.5 mr-1" />
-                    LINE
-                  </Badge>
-                )}
-              </div>
-
-              {/* Stat strip — fills the header width, anchors the page */}
-              {!isEditing && (
-                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                  <span className="flex items-center gap-1.5 text-gray-700">
-                    <Phone className="h-4 w-4 text-gray-400" />
-                    {parent.phone || '—'}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-gray-700">
-                    <Users className="h-4 w-4 text-gray-400" />
-                    {activeStudents.length} นักเรียน
-                  </span>
-                  {preferredBranch && (
-                    <span className="flex items-center gap-1.5 text-gray-700">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      {preferredBranch.name}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1.5 text-gray-400">
-                    ลงทะเบียน {formatDate(parent.createdAt, 'long')}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Students column — right side; LINE/QR sits under it */}
         <div className="lg:order-2 space-y-6">
@@ -418,7 +359,7 @@ export default function ParentDetailPage() {
                   <Link href={`/parents/${parentId}/students/new`} className="block">
                     <Button
                       variant="outline"
-                      className="w-full border-dashed text-gray-600 hover:text-red-600 hover:border-red-300 hover:bg-red-50"
+                      className="w-full border-dashed border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 hover:text-red-700"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       เพิ่มนักเรียน
@@ -529,7 +470,29 @@ export default function ParentDetailPage() {
           {/* Contact Information */}
           <Card>
             <CardHeader>
-              <CardTitle>ข้อมูลติดต่อ</CardTitle>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <CardTitle>ข้อมูลติดต่อ</CardTitle>
+                  {parent.lineUserId && (
+                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100 mt-2">
+                      <img src="/line-icon.svg" alt="LINE" className="w-3.5 h-3.5 mr-1" />
+                      เชื่อมต่อ LINE แล้ว
+                    </Badge>
+                  )}
+                </div>
+                {/* Profile picture — top-right of the card */}
+                {parent.pictureUrl ? (
+                  <img
+                    src={parent.pictureUrl}
+                    alt={parent.displayName}
+                    className="w-14 h-14 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                    <Users className="h-7 w-7 text-gray-400" />
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {isEditing ? (

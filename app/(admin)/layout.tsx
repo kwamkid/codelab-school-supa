@@ -913,7 +913,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                             'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
                             sidebarCollapsed && 'lg:justify-center',
                             isSubItemActive(item)
-                              ? 'bg-[#ef443a] text-white font-semibold shadow-[0_4px_12px_rgba(239,68,58,0.28)]'
+                              ? 'bg-[#fbe9e7] text-[#ef443a] font-semibold'
                               : 'text-[#6b5f5a] hover:bg-[#f3ede9]'
                           )}
                         >
@@ -921,7 +921,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                             {ItemIcon && (
                               <ItemIcon
                                 className={cn('mr-3 h-5 w-5', sidebarCollapsed && 'lg:mr-0',
-                                  isSubItemActive(item) ? 'text-white' : (item.iconColor || 'text-[#6b5f5a]'))}
+                                  isSubItemActive(item) ? 'text-[#ef443a]' : (item.iconColor || 'text-[#6b5f5a]'))}
                               />
                             )}
                             <span className={cn(sidebarCollapsed && 'lg:hidden')}>{item.name}</span>

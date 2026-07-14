@@ -53,30 +53,34 @@ export function StudentMiniCard({ student, variant = 'full', editHref }: Student
           )}
           <div className={compact ? 'min-w-0' : 'space-y-2 min-w-0'}>
             <div>
-              <h4 className={compact ? 'font-semibold' : 'font-semibold text-lg'}>
+              <h4 className={compact ? 'font-semibold text-base' : 'font-semibold text-lg'}>
                 {student.nickname || student.name}
               </h4>
               {!compact && <p className="text-sm text-gray-600">{student.name}</p>}
             </div>
 
-            <div className={`flex flex-wrap items-center ${compact ? 'gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-0.5' : 'gap-4 text-sm'}`}>
-              <span className="flex items-center gap-1">
-                <Cake className={compact ? 'h-3 w-3' : 'h-4 w-4 text-gray-400'} />
+            <div className={compact
+              ? 'flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-gray-500 mt-0.5'
+              : 'flex flex-col gap-1.5 text-sm text-gray-600'}>
+              <span className="flex items-center gap-1.5">
+                <Cake className={compact ? 'h-3 w-3' : 'h-4 w-4 text-gray-400 shrink-0'} />
                 {compact
                   ? `${calculateAge(student.birthdate)} ปี`
                   : `${formatDate(student.birthdate)} (${calculateAge(student.birthdate)} ปี)`}
               </span>
               {student.schoolName && (
-                <span className="flex items-center gap-1">
-                  <School className={compact ? 'h-3 w-3' : 'h-4 w-4 text-gray-400'} />
-                  {student.schoolName}
-                  {student.gradeLevel && (compact ? ` (${student.gradeLevel})` : <span className="text-gray-500 ml-1">({student.gradeLevel})</span>)}
+                <span className="flex items-center gap-1.5">
+                  <School className={compact ? 'h-3 w-3' : 'h-4 w-4 text-gray-400 shrink-0'} />
+                  <span>
+                    {student.schoolName}
+                    {student.gradeLevel && <span className="text-gray-400 ml-1">({student.gradeLevel})</span>}
+                  </span>
                 </span>
               )}
               {compact ? (
                 <span>{student.gender === 'M' ? 'ชาย' : 'หญิง'}</span>
               ) : (
-                <Badge variant={student.gender === 'M' ? 'secondary' : 'default'}>
+                <Badge variant={student.gender === 'M' ? 'secondary' : 'default'} className="w-fit">
                   {student.gender === 'M' ? 'ชาย' : 'หญิง'}
                 </Badge>
               )}

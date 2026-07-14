@@ -1,6 +1,7 @@
 // lib/services/tax-invoices.ts
 
 import { TaxInvoice } from '@/types/models';
+import { authFetch } from '@/lib/auth-fetch';
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
 
@@ -89,7 +90,7 @@ function mapToTaxInvoice(row: TaxInvoiceRow): TaxInvoice {
 }
 
 async function generateDocumentNumber(companyId: string, type: 'receipt' | 'tax-invoice' | 'credit-note' | 'refund-note'): Promise<string> {
-  const res = await fetch('/api/admin/document-number', {
+  const res = await authFetch('/api/admin/document-number', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ companyId, type }),

@@ -114,7 +114,10 @@ export default function StudentForm({ parentId, student, isEdit = false, returnT
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="space-y-6">
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left column: basic + education */}
+        <div className="space-y-6">
         {/* Basic Information */}
         <Card>
           <CardHeader>
@@ -225,7 +228,10 @@ export default function StudentForm({ parentId, student, isEdit = false, returnT
             </div>
           </CardContent>
         </Card>
+        </div>
 
+        {/* Right column: health + emergency + status */}
+        <div className="space-y-6">
         {/* Health & Special Needs */}
         <Card>
           <CardHeader>
@@ -313,6 +319,8 @@ export default function StudentForm({ parentId, student, isEdit = false, returnT
             </CardContent>
           </Card>
         )}
+        </div>
+       </div>
 
         {/* Action Buttons */}
         <div className="flex justify-end gap-4">

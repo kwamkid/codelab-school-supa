@@ -3,6 +3,7 @@
 import { BranchPaymentSettings, PaymentMethod } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 interface BranchPaymentSettingsRow {
   id: string;
@@ -45,7 +46,7 @@ export function getDefaultBranchPaymentSettings(branchId: string): BranchPayment
 // Get payment settings for a branch (via API route with service role)
 export async function getBranchPaymentSettings(branchId: string): Promise<BranchPaymentSettings> {
   try {
-    const res = await fetch(`/api/admin/branch-payment-settings?branchId=${branchId}`);
+    const res = await authFetch(`/api/admin/branch-payment-settings?branchId=${branchId}`);
     if (!res.ok) throw new Error('Failed to fetch payment settings');
     const data = await res.json();
     return {
