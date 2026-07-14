@@ -222,7 +222,13 @@ export function TeamsTab() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        {t.eventLink && (
+                          <CopyLinkButton label="ตารางการแข่งขัน" url={publicUrl('e', t.eventLink)} />
+                        )}
+                        {t.practiceLink && (
+                          <CopyLinkButton label="ตารางเข้าซ้อม" url={publicUrl('p', t.practiceLink)} />
+                        )}
                         <LevelBadge level={t.level} logoHeight={24} />
                         <Button
                           variant="ghost"
@@ -255,21 +261,21 @@ export function TeamsTab() {
                         >
                           <span
                             className={cn(
-                              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                              'inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold',
                               k.hasLine ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
                             )}
                           >
                             <MessageCircle
-                              className={cn('h-3 w-3', k.hasLine ? 'text-green-500' : 'text-amber-400')}
+                              className={cn('h-4 w-4', k.hasLine ? 'text-green-500' : 'text-amber-400')}
                             />
-                            {k.nickname}
+                            <span className="vex-kid-name">{k.nickname}</span>
                             <button
                               type="button"
                               onClick={() => setRemoveKid({ team: t, kid: k })}
                               className="opacity-60 hover:text-red-600 hover:opacity-100"
                               aria-label={`ลบ ${k.nickname}`}
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           </span>
                         </Tooltip>
@@ -289,16 +295,6 @@ export function TeamsTab() {
                         มีนักเรียนที่ผู้ปกครองยังไม่เชื่อม LINE — แจ้งให้เชื่อมเพื่อรับการแจ้งเตือน
                       </p>
                     )}
-
-                    {/* Public links */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {t.eventLink && (
-                        <CopyLinkButton label="ตารางการแข่งขัน" url={publicUrl('e', t.eventLink)} />
-                      )}
-                      {t.practiceLink && (
-                        <CopyLinkButton label="ตารางเข้าซ้อม" url={publicUrl('p', t.practiceLink)} />
-                      )}
-                    </div>
                   </CardContent>
                 </Card>
               ))}

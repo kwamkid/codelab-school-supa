@@ -423,3 +423,9 @@ button[aria-busy="true"]::after,
   animation: ripple 0.6s;
   pointer-events: none;
 }
+
+/* VEX team-list kid chip: student nickname at 16px (no inline styles). */
+.vex-kid-name {
+  font-size: 16px;
+  line-height: 1.2;
+}
