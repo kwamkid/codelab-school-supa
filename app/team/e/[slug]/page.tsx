@@ -8,6 +8,7 @@ import { useParams } from 'next/navigation'
 import { LiffProvider } from '@/components/liff/liff-provider'
 import { Loading } from '@/components/ui/loading'
 import { LineGate } from '../../line-gate'
+import { TeamHeader } from '../../team-header'
 import { useTeamAuth } from '../../use-team-auth'
 import { EventRsvp } from './event-rsvp'
 import type { RsvpStatus } from '@/lib/vex/types'
@@ -33,17 +34,12 @@ function EventRsvpInner({ slug }: { slug: string }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-primary text-white p-4 pt-6">
-        <h1 className="text-xl font-bold">แจ้งเข้าร่วมการแข่งขัน</h1>
-        <p className="text-white/90 text-sm mt-1">
-          ทีม {data.team.team_number}
-          {data.team.name ? ` — ${data.team.name}` : ''}
-        </p>
-        {data.parentDisplayName && (
-          <p className="text-white/80 text-xs mt-1">ผู้ปกครอง: {data.parentDisplayName}</p>
-        )}
-      </div>
-      <div className="p-4">
+      <TeamHeader
+        title="แจ้งเข้าร่วมการแข่งขัน"
+        teamLabel={`ทีม ${data.team.team_number}${data.team.name ? ` — ${data.team.name}` : ''}`}
+        parentName={data.parentDisplayName}
+      />
+      <div className="mx-auto max-w-3xl p-4">
         {data.kids.length === 0 ? (
           <p className="text-center text-gray-500 py-8">ทีมนี้ยังไม่มีเด็ก</p>
         ) : (

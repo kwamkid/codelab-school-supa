@@ -18,6 +18,7 @@ import {
   isSameMonth,
   isBefore,
   startOfDay,
+  differenceInCalendarDays,
   format,
 } from 'date-fns'
 import { th } from 'date-fns/locale'
@@ -66,9 +67,24 @@ function hhmm(t: string | null) {
   return t ? t.slice(0, 5) : ''
 }
 
+interface LastUsed {
+  kidId: string
+  start: string
+  end: string
+  note: string
+}
+
 export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
   const [practices, setPractices] = useState<Practice[]>(initialPractices)
   const [currentDate, setCurrentDate] = useState(new Date())
+
+  // Remember the last-entered values so proposing the next day is one tap away.
+  const [lastUsed, setLastUsed] = useState<LastUsed>({
+    kidId: kids[0]?.id ?? '',
+    start: '09:00',
+    end: '12:00',
+    note: '',
+  })
 
   // Modals
   const [proposeDate, setProposeDate] = useState<string | null>(null) // YYYY-MM-DD
@@ -110,8 +126,9 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
     setProposeDate(format(date, 'yyyy-MM-dd'))
   }
 
-  const handleCreated = (p: Practice) => {
-    setPractices((prev) => [...prev, p])
+  const handleCreated = (created: Practice[], remember: LastUsed) => {
+    setPractices((prev) => [...prev, ...created])
+    setLastUsed(remember)
     setProposeDate(null)
   }
 
@@ -262,6 +279,7 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
         <ProposeModal
           kids={kids}
           date={proposeDate}
+          defaults={lastUsed}
           onClose={() => setProposeDate(null)}
           onSubmit={onSubmit}
           onCreated={handleCreated}
@@ -281,37 +299,63 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
 function ProposeModal({
   kids,
   date,
+  defaults,
   onClose,
   onSubmit,
   onCreated,
 }: {
   kids: Kid[]
   date: string
+  defaults: LastUsed
   onClose: () => void
   onSubmit: Props['onSubmit']
-  onCreated: (p: Practice) => void
+  onCreated: (created: Practice[], remember: LastUsed) => void
 }) {
-  const [kidId, setKidId] = useState(kids[0]?.id ?? '')
-  const [start, setStart] = useState('09:00')
-  const [end, setEnd] = useState('12:00')
-  const [note, setNote] = useState('')
+  // Pre-fill from the last-used values (so proposing the next day is fast).
+  const [kidId, setKidId] = useState(defaults.kidId || kids[0]?.id || '')
+  const [start, setStart] = useState(defaults.start || '09:00')
+  const [end, setEnd] = useState(defaults.end || '12:00')
+  const [note, setNote] = useState(defaults.note || '')
+  const [multiDay, setMultiDay] = useState(false)
+  const [endDate, setEndDate] = useState(date) // for the range
   const [submitting, setSubmitting] = useState(false)
+
+  // Days in the selected range (inclusive). 1 when single-day.
+  const daysCount = (() => {
+    if (!multiDay) return 1
+    const s = new Date(date + 'T00:00:00')
+    const e = new Date(endDate + 'T00:00:00')
+    const n = differenceInCalendarDays(e, s) + 1
+    return n > 0 ? n : 0
+  })()
 
   const submit = async () => {
     if (submitting) return
     if (!kidId) return toast.error('เลือกเด็ก')
     if (start && end && end <= start) return toast.error('เวลาสิ้นสุดต้องหลังเวลาเริ่ม')
+    if (multiDay && daysCount < 1) return toast.error('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม')
+
     setSubmitting(true)
     try {
-      const created = await onSubmit({
-        kid_id: kidId,
-        practice_date: date,
-        start_time: start || undefined,
-        end_time: end || undefined,
-        note: note.trim() || undefined,
-      })
-      toast.success('ส่งคำขอซ้อมแล้ว')
-      onCreated(created)
+      const dates: string[] = []
+      const startD = new Date(date + 'T00:00:00')
+      for (let i = 0; i < daysCount; i++) dates.push(format(addDays(startD, i), 'yyyy-MM-dd'))
+
+      // Submit each day (one audit row per day). Collect the created rows.
+      const created: Practice[] = []
+      for (const d of dates) {
+        const p = await onSubmit({
+          kid_id: kidId,
+          practice_date: d,
+          start_time: start || undefined,
+          end_time: end || undefined,
+          note: note.trim() || undefined,
+        })
+        created.push(p)
+      }
+
+      toast.success(daysCount > 1 ? `ส่งคำขอซ้อม ${daysCount} วันแล้ว` : 'ส่งคำขอซ้อมแล้ว')
+      onCreated(created, { kidId, start, end, note: note.trim() })
     } catch (e: any) {
       toast.error(e?.message || 'ส่งคำขอไม่สำเร็จ')
     } finally {
@@ -320,7 +364,11 @@ function ProposeModal({
   }
 
   return (
-    <ModalShell title="เสนอวันซ้อม" subtitle={format(new Date(date + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })} onClose={onClose}>
+    <ModalShell
+      title="เสนอวันซ้อม"
+      subtitle={format(new Date(date + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })}
+      onClose={onClose}
+    >
       <div className="space-y-4">
         <div className="space-y-2">
           <Label>เด็ก</Label>
@@ -337,6 +385,7 @@ function ProposeModal({
             </SelectContent>
           </Select>
         </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="pc_start">เวลาเริ่ม</Label>
@@ -347,16 +396,51 @@ function ProposeModal({
             <Input id="pc_end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
           </div>
         </div>
+
+        {/* Multi-day range: propose the same time across several days at once. */}
+        <div className="rounded-lg border p-3 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={multiDay}
+              onChange={(e) => {
+                setMultiDay(e.target.checked)
+                if (e.target.checked && endDate < date) setEndDate(date)
+              }}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="text-sm font-medium">ลงหลายวันรวด (เวลาเดียวกัน)</span>
+          </label>
+          {multiDay && (
+            <div className="space-y-1">
+              <Label htmlFor="pc_enddate" className="text-xs text-gray-500">
+                ถึงวันที่
+              </Label>
+              <Input
+                id="pc_enddate"
+                type="date"
+                value={endDate}
+                min={date}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+              {daysCount > 1 && (
+                <p className="text-xs text-primary">จะเสนอ {daysCount} วัน (แต่ละวันเป็นคำขอแยกกัน)</p>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="pc_note">หมายเหตุ (ไม่บังคับ)</Label>
           <Input id="pc_note" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
+
         <div className="flex gap-3 pt-1">
           <Button variant="outline" onClick={onClose} className="flex-1" disabled={submitting}>
             ยกเลิก
           </Button>
           <Button onClick={submit} className="flex-1" disabled={submitting}>
-            {submitting ? 'กำลังส่ง...' : 'ส่งคำขอ'}
+            {submitting ? 'กำลังส่ง...' : daysCount > 1 ? `ส่ง ${daysCount} วัน` : 'ส่งคำขอ'}
           </Button>
         </div>
       </div>
