@@ -13,14 +13,16 @@ export async function GET(request: Request) {
   if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status })
 
   const url = new URL(request.url)
-  const status = url.searchParams.get('status') // proposed | approved | rejected
+  const status = url.searchParams.get('status') // proposed | approved | rejected | all
   const teamId = url.searchParams.get('team_id')
+  const VALID_STATUSES = ['proposed', 'approved', 'rejected']
 
   const db = vexDb()
   try {
     let q = db.from('practices').select('*')
-    if (status) q = q.eq('status', status)
-    if (teamId) q = q.eq('team_id', teamId)
+    // 'all' (or anything not a real enum value) → no status filter.
+    if (status && VALID_STATUSES.includes(status)) q = q.eq('status', status)
+    if (teamId && teamId !== 'all') q = q.eq('team_id', teamId)
     q = q.order('practice_date', { ascending: true }).order('created_at', { ascending: true })
 
     const { data: practices, error } = await q
