@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { vexDb } from '@/lib/vex/supabase'
 import { requireAdmin } from '@/lib/vex/api'
 import { logAudit } from '@/lib/vex/audit'
+import { notifyParentPractice } from '@/lib/vex/notify'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,6 +100,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       before,
       after: updated,
     })
+
+    // Notify the proposing parent on approve/reject or a time edit.
+    // (Time edit without a review action → 'edited'.)
+    const kind =
+      parsed.data.status === 'approved'
+        ? 'approved'
+        : parsed.data.status === 'rejected'
+          ? 'rejected'
+          : edited
+            ? 'edited'
+            : null
+    if (kind) {
+      const { data: kid } = await db.from('kids').select('nickname').eq('id', updated.kid_id).maybeSingle()
+      await notifyParentPractice(updated, kind, kid?.nickname ?? null)
+    }
 
     return NextResponse.json({ practice: updated })
   } catch (e) {
