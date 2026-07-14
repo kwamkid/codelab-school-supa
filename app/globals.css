@@ -424,8 +424,8 @@ button[aria-busy="true"]::after,
   pointer-events: none;
 }
 
-/* VEX team-list kid chip: student nickname at 16px (no inline styles). */
+/* VEX team-list kid chip: student nickname at 14px (no inline styles). */
 .vex-kid-name {
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.2;
 }
