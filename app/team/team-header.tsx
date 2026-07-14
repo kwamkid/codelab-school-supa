@@ -21,7 +21,7 @@ export function TeamHeader({ title, teamLabel, parentName }: TeamHeaderProps) {
             alt="CodeLab"
             className="h-8 sm:h-9 w-auto brightness-0 invert shrink-0"
           />
-          <h1 className="text-xl sm:text-2xl font-bold leading-tight">{title}</h1>
+          <h1 className="text-xl font-bold leading-tight">{title}</h1>
         </div>
 
         {(teamLabel || parentName) && (

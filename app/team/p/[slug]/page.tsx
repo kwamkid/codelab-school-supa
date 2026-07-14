@@ -51,7 +51,7 @@ function ProposePracticeInner({ slug }: { slug: string }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <TeamHeader
-        title="เสนอวันซ้อม"
+        title="ตารางวันซ้อม"
         teamLabel={`ทีม ${data.team.team_number}${data.team.name ? ` — ${data.team.name}` : ''}`}
         parentName={data.parentDisplayName}
       />
