@@ -13,8 +13,8 @@ export type Program = 'iq' | 'v5'
 
 /** Public path to each program's logo (in public/vex/). */
 export const PROGRAM_LOGO: Record<Program, string> = {
-  iq: '/vex/VEX IQ RC Full Color.svg',
-  v5: '/vex/VEX V5 RC Full Color.svg',
+  iq: '/vex/vex-iq.svg',
+  v5: '/vex/vex-v5.svg',
 }
 
 /** Per-level metadata: which program logo + the short grade label (ES/MS/HS). */
