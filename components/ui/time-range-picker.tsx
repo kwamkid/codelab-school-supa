@@ -245,7 +245,7 @@ function TimePickerDropdown({
       {open && !disabled && (
         <div
           ref={listRef}
-          className="absolute z-50 mt-1 w-[120px] max-h-[240px] overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
+          className="absolute z-50 mt-1 w-[120px] max-h-[180px] overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
           style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
           onWheel={(e) => e.stopPropagation()}
           onTouchMove={(e) => e.stopPropagation()}
