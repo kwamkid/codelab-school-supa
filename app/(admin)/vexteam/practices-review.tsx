@@ -9,12 +9,20 @@ import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { StudentBadge } from '@/components/ui/student-badge'
 import { SectionLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Check, X, CalendarClock, RotateCcw } from 'lucide-react'
-import { thaiDateRange } from '@/lib/vex/event-timeline'
 import type { PracticeStatus } from '@/lib/vex/types'
+
+// "14", "ก.ค.", "26" from a YYYY-MM-DD string (for the prominent date block).
+const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+function splitDate(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return { day: d, month: THAI_MONTHS_SHORT[m - 1] || '', year: String(y % 100).padStart(2, '0') }
+}
 
 interface PracticeRow {
   id: string
@@ -117,33 +125,32 @@ export function PracticesReview({
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PracticeStatus | 'all')}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="proposed">รออนุมัติ</SelectItem>
-            <SelectItem value="approved">อนุมัติแล้ว</SelectItem>
-            <SelectItem value="rejected">ไม่อนุมัติ</SelectItem>
-            <SelectItem value="all">ทุกสถานะ</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={teamFilter} onValueChange={setTeamFilter}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุกทีม</SelectItem>
-            {teams.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.team_number}
-                {t.name ? ` — ${t.name}` : ''}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Filters: status as tabs, team as a dropdown (larger dataset). */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as PracticeStatus | 'all')}>
+          <TabsList>
+            <TabsTrigger value="proposed">รออนุมัติ</TabsTrigger>
+            <TabsTrigger value="approved">อนุมัติแล้ว</TabsTrigger>
+            <TabsTrigger value="rejected">ไม่อนุมัติ</TabsTrigger>
+            <TabsTrigger value="all">ทั้งหมด</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {teams.length > 1 && (
+          <Select value={teamFilter} onValueChange={setTeamFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกทีม</SelectItem>
+              {teams.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.team_number}
+                  {t.name ? ` — ${t.name}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {loading ? (
@@ -154,27 +161,42 @@ export function PracticesReview({
         <div className="grid gap-3">
           {rows.map((p) => (
             <Card key={p.id}>
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold">{p.kidNickname || '-'}</span>
-                    <span className="text-sm text-gray-500">
-                      · {p.teamNumber}
-                      {p.teamName ? ` (${p.teamName})` : ''}
-                    </span>
-                    {p.edited_by_admin && (
-                      <Badge variant="outline" className="text-[10px]">แก้โดยแอดมิน</Badge>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-600 mt-0.5">
-                    {thaiDateRange(p.practice_date, null)}
-                    {p.start_time ? ` · ${hhmm(p.start_time)}` : ''}
-                    {p.end_time ? ` - ${hhmm(p.end_time)}` : ''}
-                  </div>
-                  {p.note && <div className="text-xs text-gray-500 mt-0.5">{p.note}</div>}
-                </div>
+              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                {/* Prominent date block */}
+                {(() => {
+                  const d = splitDate(p.practice_date)
+                  return (
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="shrink-0 w-16 text-center leading-none">
+                        <div className="text-3xl font-bold text-gray-900">{d.day}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {d.month} {d.year}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        {/* prominent time */}
+                        <div className="text-lg font-bold text-gray-900">
+                          {p.start_time ? hhmm(p.start_time) : '—'}
+                          {p.end_time ? <span className="text-gray-400 font-semibold"> - {hhmm(p.end_time)}</span> : ''}
+                        </div>
+                        {/* kid + team */}
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          <StudentBadge name={p.kidNickname} />
+                          <span className="text-sm text-gray-500">
+                            {p.teamNumber}
+                            {p.teamName ? ` (${p.teamName})` : ''}
+                          </span>
+                          {p.edited_by_admin && (
+                            <Badge variant="outline" className="text-[10px]">แก้โดยแอดมิน</Badge>
+                          )}
+                        </div>
+                        {p.note && <div className="text-xs text-gray-500 mt-1 truncate">{p.note}</div>}
+                      </div>
+                    </div>
+                  )
+                })()}
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                   {p.status === 'proposed' ? (
                     <>
                       <Button
