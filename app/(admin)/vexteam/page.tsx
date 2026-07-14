@@ -29,9 +29,10 @@ import { PageLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 import { Trophy, Copy, Users, CalendarDays, Globe, ChevronRight, MapPin, Pencil, Trash2, CalendarClock } from 'lucide-react'
-import { LEVEL_META, PROGRAM_LOGO, type Level, type Program } from '@/lib/vex/types'
+import { LEVELS, LEVEL_META, PROGRAM_LOGO, type Level, type Program } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 import { StudentBadge } from '@/components/ui/student-badge'
+import { SearchInput } from '@/components/ui/search-input'
 import {
   thaiDateRange,
   groupByMonth,
@@ -94,6 +95,10 @@ function VexTeamAdminInner() {
   // so a program filter is the meaningful one here.
   const [programFilter, setProgramFilter] = useState<Program | 'all'>('all')
 
+  // Teams tab: search (team number/name/kid) + level filter.
+  const [teamSearch, setTeamSearch] = useState('')
+  const [teamLevelFilter, setTeamLevelFilter] = useState<Level | 'all'>('all')
+
   // Active tab persisted in ?tab= (so refresh / back keeps the tab).
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -129,6 +134,25 @@ function VexTeamAdminInner() {
     [filteredEvents, today]
   )
   const upcomingGroups = useMemo(() => groupByMonth(upcoming), [upcoming])
+
+  // Teams tab: count per level (for the summary) + search/level filtering.
+  const teamCountByLevel = useMemo(() => {
+    const m = new Map<Level, number>()
+    for (const t of teams) m.set(t.level, (m.get(t.level) || 0) + 1)
+    return m
+  }, [teams])
+
+  const filteredTeams = useMemo(() => {
+    const q = teamSearch.trim().toLowerCase()
+    return teams.filter((t) => {
+      if (teamLevelFilter !== 'all' && t.level !== teamLevelFilter) return false
+      if (!q) return true
+      const inTeam =
+        t.team_number.toLowerCase().includes(q) || (t.name || '').toLowerCase().includes(q)
+      const inKid = t.kids.some((k) => k.nickname.toLowerCase().includes(q))
+      return inTeam || inKid
+    })
+  }, [teams, teamSearch, teamLevelFilter])
 
   const loadTeams = useCallback(async () => {
     const res = await authFetch('/api/admin/vex/teams')
@@ -280,14 +304,57 @@ function VexTeamAdminInner() {
 
         {/* Teams */}
         <TabsContent value="teams" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+            <SearchInput
+              value={teamSearch}
+              onChange={setTeamSearch}
+              placeholder="ค้นหาชื่อทีม หรือชื่อเด็ก"
+              className="w-full sm:max-w-sm"
+            />
             <CreateTeamForm onCreated={loadTeams} />
           </div>
+
           {teams.length === 0 ? (
             <EmptyState icon={Users} title="ยังไม่มีทีม" description="สร้างทีม VEX ทีมแรกเพื่อเริ่มต้น" />
           ) : (
-            <div className="grid gap-3">
-              {teams.map((t) => (
+            <>
+              {/* Level summary + filter (count per level) */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTeamLevelFilter('all')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-md border text-sm font-medium transition',
+                    teamLevelFilter === 'all'
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-input text-gray-600 hover:bg-gray-50'
+                  )}
+                >
+                  ทั้งหมด ({teams.length})
+                </button>
+                {LEVELS.filter((lv) => (teamCountByLevel.get(lv) || 0) > 0).map((lv) => (
+                  <button
+                    key={lv}
+                    type="button"
+                    onClick={() => setTeamLevelFilter(lv)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition',
+                      teamLevelFilter === lv
+                        ? 'border-primary bg-primary/5'
+                        : 'border-input bg-white hover:bg-gray-50'
+                    )}
+                  >
+                    <LevelBadge level={lv} logoHeight={18} className="border-0 bg-transparent px-0 py-0" />
+                    <span className="text-gray-600">({teamCountByLevel.get(lv) || 0})</span>
+                  </button>
+                ))}
+              </div>
+
+              {filteredTeams.length === 0 ? (
+                <EmptyState icon={Users} title="ไม่พบทีม" description="ลองเปลี่ยนคำค้นหาหรือระดับ" />
+              ) : (
+                <div className="grid gap-3">
+                  {filteredTeams.map((t) => (
                 <Card key={t.id}>
                   <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <Link href={`/vexteam/${t.id}`} className="flex-1 min-w-0 group">
@@ -316,8 +383,10 @@ function VexTeamAdminInner() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
