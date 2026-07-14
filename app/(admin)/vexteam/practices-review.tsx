@@ -256,11 +256,13 @@ export function PracticesReview({
                           practice={p}
                           busy={busyId === p.id}
                           onCancel={() => setEditingId(null)}
-                          onSave={async (start, end) => {
+                          onSave={async (start, end, approve) => {
+                            const body: any = { start_time: start || null, end_time: end || null }
+                            if (approve) body.status = 'approved'
                             const updated = await patch(
                               p.id,
-                              { start_time: start || null, end_time: end || null },
-                              'ปรับเวลาแล้ว (แจ้งผู้ปกครองแล้ว)'
+                              body,
+                              approve ? 'ปรับเวลา + อนุมัติแล้ว (แจ้งผู้ปกครองแล้ว)' : 'ปรับเวลาแล้ว (แจ้งผู้ปกครองแล้ว)'
                             )
                             if (updated) setEditingId(null)
                           }}
@@ -346,7 +348,8 @@ export function PracticesReview({
   )
 }
 
-// Inline edit-time form (start/end only; date stays fixed).
+// Inline edit-time form (start/end only; date stays fixed). `approve` on save
+// commits the new time AND approves in one step.
 function EditTimeForm({
   practice,
   busy,
@@ -355,11 +358,19 @@ function EditTimeForm({
 }: {
   practice: PracticeRow
   busy: boolean
-  onSave: (start: string, end: string) => void
+  onSave: (start: string, end: string, approve: boolean) => void
   onCancel: () => void
 }) {
   const [start, setStart] = useState(hhmm(practice.start_time) || '09:00')
   const [end, setEnd] = useState(hhmm(practice.end_time) || '12:00')
+
+  const validate = () => {
+    if (start && end && end <= start) {
+      toast.error('เวลาสิ้นสุดต้องหลังเวลาเริ่ม')
+      return false
+    }
+    return true
+  }
 
   return (
     <div className="space-y-2">
@@ -370,23 +381,28 @@ function EditTimeForm({
         onEndTimeChange={setEnd}
         className="max-w-xs"
       />
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Button size="sm" variant="outline" onClick={onCancel} disabled={busy}>
           ยกเลิก
         </Button>
         <Button
           size="sm"
-          onClick={() => {
-            if (start && end && end <= start) {
-              toast.error('เวลาสิ้นสุดต้องหลังเวลาเริ่ม')
-              return
-            }
-            onSave(start, end)
-          }}
+          variant="outline"
+          onClick={() => validate() && onSave(start, end, false)}
           disabled={busy}
         >
-          {busy ? 'กำลังบันทึก...' : 'บันทึกเวลา'}
+          บันทึกเวลา
         </Button>
+        {practice.status === 'proposed' && (
+          <Button
+            size="sm"
+            onClick={() => validate() && onSave(start, end, true)}
+            disabled={busy}
+            className="gap-1 bg-green-600 hover:bg-green-700"
+          >
+            <Check className="h-4 w-4" /> {busy ? 'กำลังบันทึก...' : 'บันทึก + อนุมัติ'}
+          </Button>
+        )}
       </div>
     </div>
   )
