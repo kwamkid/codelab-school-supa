@@ -18,8 +18,9 @@ import {
   format,
 } from 'date-fns'
 import { th } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { StudentBadge } from '@/components/ui/student-badge'
 import type { PracticeStatus } from '@/lib/vex/types'
 
@@ -42,7 +43,16 @@ const STATUS_META: Record<PracticeStatus, { label: string; chip: string; dot: st
 const WEEKDAYS = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.']
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '')
 
-export function PracticeMonthView({ practices }: { practices: CalendarPractice[] }) {
+export function PracticeMonthView({
+  practices,
+  onReview,
+  busyId,
+}: {
+  practices: CalendarPractice[]
+  /** Approve/reject a proposed practice from the day list. */
+  onReview?: (id: string, status: 'approved' | 'rejected') => void
+  busyId?: string | null
+}) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
@@ -166,7 +176,7 @@ export function PracticeMonthView({ practices }: { practices: CalendarPractice[]
             {format(new Date(selectedDay + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })} ({selectedItems.length})
           </div>
           {selectedItems.map((p) => (
-            <div key={p.id} className="flex items-center justify-between gap-3 py-1.5 border-b last:border-0">
+            <div key={p.id} className="flex items-center justify-between gap-3 py-1.5 border-b last:border-0 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
                 <StudentBadge name={p.kidNickname} />
                 <span className="text-sm text-gray-500">{p.teamNumber}</span>
@@ -175,9 +185,32 @@ export function PracticeMonthView({ practices }: { practices: CalendarPractice[]
                   {p.end_time ? ` - ${hhmm(p.end_time)}` : ''}
                 </span>
               </div>
-              <span className={cn('text-xs px-2 py-0.5 rounded-full', STATUS_META[p.status].chip)}>
-                {STATUS_META[p.status].label}
-              </span>
+              {/* Approve/reject inline when still pending; else show the status */}
+              {onReview && p.status === 'proposed' ? (
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    onClick={() => onReview(p.id, 'approved')}
+                    disabled={busyId === p.id}
+                    className="gap-1 bg-green-600 hover:bg-green-700 h-8"
+                  >
+                    <Check className="h-4 w-4" /> อนุมัติ
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onReview(p.id, 'rejected')}
+                    disabled={busyId === p.id}
+                    className="gap-1 text-red-600 border-red-200 hover:bg-red-50 h-8"
+                  >
+                    <X className="h-4 w-4" /> ปฏิเสธ
+                  </Button>
+                </div>
+              ) : (
+                <span className={cn('text-xs px-2 py-0.5 rounded-full', STATUS_META[p.status].chip)}>
+                  {STATUS_META[p.status].label}
+                </span>
+              )}
             </div>
           ))}
         </div>

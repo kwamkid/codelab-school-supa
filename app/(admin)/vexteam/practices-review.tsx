@@ -10,9 +10,8 @@ import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { TeamSearchSelect, type TeamSearchOption } from '@/components/ui/team-search-select'
+import { TimeRangePicker } from '@/components/ui/time-range-picker'
+import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-filter-tabs'
 import { useBranch } from '@/contexts/BranchContext'
@@ -124,10 +123,13 @@ export function PracticesReview({
     [teamScoped, statusFilter]
   )
 
-  // Team filter options (searchable). Scoped to the selected branch when set.
-  const teamSearchOptions = useMemo<TeamSearchOption[]>(() => {
+  // Team filter options (auto-searchable when >7). Scoped to the selected branch.
+  const teamSearchOptions = useMemo<FormSelectOption[]>(() => {
     const scoped = selectedBranchId ? teams.filter((t) => t.branch_id === selectedBranchId) : teams
-    return scoped.map((t) => ({ id: t.id, label: `${t.team_number}${t.name ? ` — ${t.name}` : ''}` }))
+    return [
+      { value: 'all', label: 'ทุกทีม' },
+      ...scoped.map((t) => ({ value: t.id, label: `${t.team_number}${t.name ? ` — ${t.name}` : ''}` })),
+    ]
   }, [teams, selectedBranchId])
 
   const filterTabs: StatusFilterTab[] = [
@@ -184,12 +186,12 @@ export function PracticesReview({
         {/* Searchable team filter (left) + list/calendar toggle (right) on one row */}
         <div className="flex items-center gap-3">
           {teams.length > 1 && (
-            <TeamSearchSelect
+            <FormSelect
               options={teamSearchOptions}
               value={teamFilter}
               onValueChange={setTeamFilter}
-              placeholder="ค้นหาทีม..."
-              allLabel="ทุกทีม"
+              placeholder="ทุกทีม"
+              searchPlaceholder="ค้นหาทีม..."
               className="w-full sm:max-w-xs"
             />
           )}
@@ -227,6 +229,8 @@ export function PracticesReview({
             kidNickname: p.kidNickname,
             teamNumber: p.teamNumber,
           }))}
+          onReview={review}
+          busyId={busyId}
         />
       ) : rows.length === 0 ? (
         <EmptyState icon={CalendarClock} title="ไม่มีคำขอซ้อม" description="คำขอจากผู้ปกครองจะแสดงที่นี่" />
@@ -237,12 +241,12 @@ export function PracticesReview({
             const isEditing = editingId === p.id
             return (
               <Card key={p.id}>
-                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                <CardContent className="p-3 flex flex-col sm:flex-row sm:items-center gap-3">
                   {/* Prominent date block */}
-                  <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <div className="shrink-0 w-16 text-center leading-none pt-0.5">
-                      <div className="text-3xl font-bold text-gray-900">{d.day}</div>
-                      <div className="text-xs text-gray-500 mt-1">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="shrink-0 w-14 text-center leading-none">
+                      <div className="text-2xl font-bold text-gray-900">{d.day}</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
                         {d.month} {d.year}
                       </div>
                     </div>
@@ -359,16 +363,13 @@ function EditTimeForm({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2 max-w-xs">
-        <div className="space-y-1">
-          <Label className="text-xs text-gray-500">เวลาเริ่ม</Label>
-          <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-gray-500">เวลาจบ</Label>
-          <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
-        </div>
-      </div>
+      <TimeRangePicker
+        startTime={start}
+        endTime={end}
+        onStartTimeChange={setStart}
+        onEndTimeChange={setEnd}
+        className="max-w-xs"
+      />
       <div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={onCancel} disabled={busy}>
           ยกเลิก

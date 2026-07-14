@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TimeRangePicker } from '@/components/ui/time-range-picker'
 import { StudentBadge } from '@/components/ui/student-badge'
 import type { PracticeStatus } from '@/lib/vex/types'
 
@@ -445,15 +446,14 @@ function ProposeModal({
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="pc_start">เวลาเริ่ม</Label>
-            <Input id="pc_start" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="pc_end">เวลาจบ</Label>
-            <Input id="pc_end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
-          </div>
+        <div className="space-y-2">
+          <Label>เวลา</Label>
+          <TimeRangePicker
+            startTime={start}
+            endTime={end}
+            onStartTimeChange={setStart}
+            onEndTimeChange={setEnd}
+          />
         </div>
 
         {/* Multi-day range: propose the same time across several days at once. */}
@@ -600,15 +600,14 @@ function DetailModal({
           </>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="d_start" className="text-xs text-gray-500">เวลาเริ่ม</Label>
-                <Input id="d_start" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="d_end" className="text-xs text-gray-500">เวลาจบ</Label>
-                <Input id="d_end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
-              </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-500">เวลา</Label>
+              <TimeRangePicker
+                startTime={start}
+                endTime={end}
+                onStartTimeChange={setStart}
+                onEndTimeChange={setEnd}
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="d_note" className="text-xs text-gray-500">หมายเหตุ</Label>
