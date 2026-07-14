@@ -140,12 +140,23 @@ function TimePickerDropdown({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered.length])
 
-  // Scroll the highlighted item into view.
+  // Scroll the highlighted item into view. On open, CENTER the selected value
+  // (so the times before/after it are visible); while arrow-navigating, just
+  // keep it in view (nearest edge).
+  const justOpened = React.useRef(false)
+  React.useEffect(() => {
+    justOpened.current = open
+  }, [open])
   React.useEffect(() => {
     if (!open || highlight < 0) return
     const container = listRef.current
     const el = container?.querySelector(`[data-index="${highlight}"]`) as HTMLElement | null
-    if (container && el) {
+    if (!container || !el) return
+    if (justOpened.current) {
+      // center the selected item
+      container.scrollTop = el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2
+      justOpened.current = false
+    } else {
       const top = el.offsetTop
       const bottom = top + el.clientHeight
       if (top < container.scrollTop) container.scrollTop = top
