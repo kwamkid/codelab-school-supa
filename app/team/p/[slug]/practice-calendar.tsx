@@ -23,7 +23,7 @@ import {
 } from 'date-fns'
 import { th } from 'date-fns/locale'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Plus, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,6 +53,11 @@ interface Props {
     end_time?: string
     note?: string
   }) => Promise<Practice>
+  onEdit: (
+    id: string,
+    body: { start_time?: string; end_time?: string; note?: string | null; practice_date?: string }
+  ) => Promise<Practice>
+  onDelete: (id: string) => Promise<void>
 }
 
 const STATUS_META: Record<PracticeStatus, { label: string; chip: string; dot: string }> = {
@@ -74,9 +79,10 @@ interface LastUsed {
   note: string
 }
 
-export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
+export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onDelete }: Props) {
   const [practices, setPractices] = useState<Practice[]>(initialPractices)
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [kidFilter, setKidFilter] = useState<string>('all') // kid id
 
   // Remember the last-entered values so proposing the next day is one tap away.
   const [lastUsed, setLastUsed] = useState<LastUsed>({
@@ -109,15 +115,21 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
   const today = startOfDay(new Date())
   const totalWeeks = Math.ceil(days.length / 7)
 
+  // Kid filter applies to both the calendar chips and the list.
+  const visible = useMemo(
+    () => (kidFilter === 'all' ? practices : practices.filter((p) => p.kid_id === kidFilter)),
+    [practices, kidFilter]
+  )
+
   const forDay = (date: Date) =>
-    practices.filter((p) => isSameDay(new Date(p.practice_date + 'T00:00:00'), date))
+    visible.filter((p) => isSameDay(new Date(p.practice_date + 'T00:00:00'), date))
 
   const monthPractices = useMemo(
     () =>
-      practices
+      visible
         .filter((p) => isSameMonth(new Date(p.practice_date + 'T00:00:00'), currentDate))
         .sort((a, b) => a.practice_date.localeCompare(b.practice_date) || (a.start_time || '').localeCompare(b.start_time || '')),
-    [practices, currentDate]
+    [visible, currentDate]
   )
 
   const openPropose = (date: Date) => {
@@ -130,6 +142,16 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
     setPractices((prev) => [...prev, ...created])
     setLastUsed(remember)
     setProposeDate(null)
+  }
+
+  const handleUpdated = (updated: Practice) => {
+    setPractices((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+    setViewing(updated)
+  }
+
+  const handleDeleted = (id: string) => {
+    setPractices((prev) => prev.filter((p) => p.id !== id))
+    setViewing(null)
   }
 
   return (
@@ -156,6 +178,26 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
+
+      {/* Kid filter (only when the team has more than one kid) */}
+      {kids.length > 1 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500 shrink-0">กรองน้อง</span>
+          <Select value={kidFilter} onValueChange={setKidFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกคน</SelectItem>
+              {kids.map((k) => (
+                <SelectItem key={k.id} value={k.id}>
+                  {k.nickname}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Month grid */}
       <div className="bg-white rounded-xl border overflow-hidden">
@@ -291,7 +333,15 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
 
       {/* Detail modal */}
       {viewing && (
-        <DetailModal practice={viewing} kidName={kidName(viewing.kid_id)} onClose={() => setViewing(null)} />
+        <DetailModal
+          practice={viewing}
+          kidName={kidName(viewing.kid_id)}
+          onClose={() => setViewing(null)}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onUpdated={handleUpdated}
+          onDeleted={handleDeleted}
+        />
       )}
     </div>
   )
@@ -457,11 +507,61 @@ function DetailModal({
   practice,
   kidName,
   onClose,
+  onEdit,
+  onDelete,
+  onUpdated,
+  onDeleted,
 }: {
   practice: Practice
   kidName: string
   onClose: () => void
+  onEdit: Props['onEdit']
+  onDelete: Props['onDelete']
+  onUpdated: (p: Practice) => void
+  onDeleted: (id: string) => void
 }) {
+  const editable = practice.status === 'proposed'
+  const [mode, setMode] = useState<'view' | 'edit'>('view')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [start, setStart] = useState(hhmm(practice.start_time) || '09:00')
+  const [end, setEnd] = useState(hhmm(practice.end_time) || '12:00')
+  const [note, setNote] = useState(practice.note || '')
+  const [busy, setBusy] = useState(false)
+
+  const save = async () => {
+    if (busy) return
+    if (start && end && end <= start) return toast.error('เวลาสิ้นสุดต้องหลังเวลาเริ่ม')
+    setBusy(true)
+    try {
+      const updated = await onEdit(practice.id, {
+        start_time: start || undefined,
+        end_time: end || undefined,
+        note: note.trim() || null,
+      })
+      toast.success('บันทึกการแก้ไขแล้ว')
+      onUpdated(updated)
+      setMode('view')
+    } catch (e: any) {
+      toast.error(e?.message || 'แก้ไขไม่สำเร็จ')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doDelete = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      await onDelete(practice.id)
+      toast.success('ยกเลิกคำขอแล้ว')
+      onDeleted(practice.id)
+    } catch (e: any) {
+      toast.error(e?.message || 'ยกเลิกไม่สำเร็จ')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <ModalShell title="รายละเอียดการซ้อม" onClose={onClose}>
       <div className="space-y-3">
@@ -475,26 +575,91 @@ function DetailModal({
             {format(new Date(practice.practice_date + 'T00:00:00'), 'd MMM yyyy', { locale: th })}
           </span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-gray-500">เวลา</span>
-          <span className="font-medium">
-            {hhmm(practice.start_time) || '-'}
-            {practice.end_time ? ` - ${hhmm(practice.end_time)}` : ''}
-          </span>
-        </div>
-        {practice.note && (
-          <div>
-            <div className="text-gray-500 mb-1">หมายเหตุ</div>
-            <div className="bg-gray-50 rounded-lg p-2 text-sm">{practice.note}</div>
-          </div>
+
+        {mode === 'view' ? (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">เวลา</span>
+              <span className="font-medium">
+                {hhmm(practice.start_time) || '-'}
+                {practice.end_time ? ` - ${hhmm(practice.end_time)}` : ''}
+              </span>
+            </div>
+            {practice.note && (
+              <div>
+                <div className="text-gray-500 mb-1">หมายเหตุ</div>
+                <div className="bg-gray-50 rounded-lg p-2 text-sm">{practice.note}</div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="d_start" className="text-xs text-gray-500">เวลาเริ่ม</Label>
+                <Input id="d_start" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="d_end" className="text-xs text-gray-500">เวลาจบ</Label>
+                <Input id="d_end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="d_note" className="text-xs text-gray-500">หมายเหตุ</Label>
+              <Input id="d_note" value={note} onChange={(e) => setNote(e.target.value)} />
+            </div>
+          </>
         )}
+
         <div className="flex items-center justify-between pt-1">
           <span className="text-gray-500">สถานะ</span>
           <Badge className={STATUS_META[practice.status].chip}>{STATUS_META[practice.status].label}</Badge>
         </div>
-        <Button variant="outline" onClick={onClose} className="w-full mt-2">
-          ปิด
-        </Button>
+
+        {!editable && (
+          <p className="text-xs text-gray-400">คำขอนี้ถูกตรวจแล้ว จึงแก้ไข/ยกเลิกไม่ได้</p>
+        )}
+
+        {/* Actions */}
+        {mode === 'edit' ? (
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" onClick={() => setMode('view')} className="flex-1" disabled={busy}>
+              ยกเลิก
+            </Button>
+            <Button onClick={save} className="flex-1" disabled={busy}>
+              {busy ? 'กำลังบันทึก...' : 'บันทึก'}
+            </Button>
+          </div>
+        ) : confirmDelete ? (
+          <div className="space-y-2 pt-1">
+            <p className="text-sm text-center text-gray-600">ยกเลิกคำขอซ้อมนี้?</p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setConfirmDelete(false)} className="flex-1" disabled={busy}>
+                ไม่
+              </Button>
+              <Button onClick={doDelete} className="flex-1 bg-red-600 hover:bg-red-700" disabled={busy}>
+                {busy ? 'กำลังยกเลิก...' : 'ยกเลิกคำขอ'}
+              </Button>
+            </div>
+          </div>
+        ) : editable ? (
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" onClick={() => setMode('edit')} className="flex-1 gap-1">
+              <Pencil className="h-4 w-4" /> แก้ไข
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDelete(true)}
+              className="flex-1 gap-1 text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" /> ยกเลิก
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" onClick={onClose} className="w-full mt-1">
+            ปิด
+          </Button>
+        )}
       </div>
     </ModalShell>
   )

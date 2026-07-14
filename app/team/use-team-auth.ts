@@ -23,7 +23,7 @@ interface UseTeamAuthResult<T> {
   /** Re-run the summary fetch. */
   reload: () => void
   /** Call a /team API with the current identity attached. */
-  call: <R = any>(path: string, body: any) => Promise<R>
+  call: <R = any>(path: string, body: any, method?: 'POST' | 'PATCH' | 'DELETE') => Promise<R>
 }
 
 export function useTeamAuth<T = any>(
@@ -57,8 +57,8 @@ export function useTeamAuth<T = any>(
   }, [liff, isInClient, isLoggedIn])
 
   const call = useCallback(
-    <R = any,>(path: string, body: any) =>
-      vexLiffFetch<R>(path, body, profileUserId),
+    <R = any,>(path: string, body: any, method: 'POST' | 'PATCH' | 'DELETE' = 'POST') =>
+      vexLiffFetch<R>(path, body, profileUserId, method),
     [profileUserId]
   )
 

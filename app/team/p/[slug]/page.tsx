@@ -32,6 +32,18 @@ function ProposePracticeInner({ slug }: { slug: string }) {
     return res.practice
   }
 
+  const editPractice = async (
+    id: string,
+    body: { start_time?: string; end_time?: string; note?: string | null; practice_date?: string }
+  ) => {
+    const res = await call<{ practice: any }>(`/api/liff/vex/${slug}/practices/${id}`, body, 'PATCH')
+    return res.practice
+  }
+
+  const deletePractice = async (id: string) => {
+    await call(`/api/liff/vex/${slug}/practices/${id}`, {}, 'DELETE')
+  }
+
   if (loading) return <Loading fullScreen size="lg" />
   if (gate) return <LineGate message={gate} />
   if (!data) return <LineGate message="เกิดข้อผิดพลาด" />
@@ -47,7 +59,13 @@ function ProposePracticeInner({ slug }: { slug: string }) {
         {data.kids.length === 0 ? (
           <p className="text-center text-gray-500 py-8">ทีมนี้ยังไม่มีเด็ก</p>
         ) : (
-          <PracticeCalendar kids={data.kids} initialPractices={data.practices} onSubmit={submit} />
+          <PracticeCalendar
+            kids={data.kids}
+            initialPractices={data.practices}
+            onSubmit={submit}
+            onEdit={editPractice}
+            onDelete={deletePractice}
+          />
         )}
       </div>
     </div>

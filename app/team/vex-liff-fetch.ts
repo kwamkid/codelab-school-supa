@@ -8,7 +8,8 @@ import { getLiffInstance } from '@/lib/line/liff-client'
 export async function vexLiffFetch<T = any>(
   path: string,
   body: any,
-  lineUserId?: string | null
+  lineUserId?: string | null,
+  method: 'POST' | 'PATCH' | 'DELETE' = 'POST'
 ): Promise<T> {
   const liff = getLiffInstance()
   let idToken: string | null = null
@@ -19,7 +20,7 @@ export async function vexLiffFetch<T = any>(
   }
 
   const res = await fetch(path, {
-    method: 'POST',
+    method,
     headers: {
       'Content-Type': 'application/json',
       ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
