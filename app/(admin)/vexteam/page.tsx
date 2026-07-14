@@ -28,7 +28,7 @@ import {
 import { PageLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
-import { Trophy, Copy, Users, CalendarDays, Globe, ChevronRight, MapPin, Pencil, Trash2 } from 'lucide-react'
+import { Trophy, Copy, Users, CalendarDays, Globe, ChevronRight, MapPin, Pencil, Trash2, CalendarClock } from 'lucide-react'
 import { LEVEL_META, PROGRAM_LOGO, type Level, type Program } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 import {
@@ -40,6 +40,7 @@ import {
 } from '@/lib/vex/event-timeline'
 import { CreateTeamForm } from './create-team-form'
 import { CreateEventForm, type EditableEvent } from './create-event-form'
+import { PracticesReview } from './practices-review'
 
 interface TeamRow {
   id: string
@@ -94,12 +95,16 @@ function VexTeamAdminInner() {
   // Active tab persisted in ?tab= (so refresh / back keeps the tab).
   const router = useRouter()
   const searchParams = useSearchParams()
-  const activeTab = searchParams.get('tab') === 'events' ? 'events' : 'teams'
+  const tabParam = searchParams.get('tab')
+  const activeTab = tabParam === 'events' || tabParam === 'practices' ? tabParam : 'teams'
   const setActiveTab = (tab: string) => {
     const params = new URLSearchParams(Array.from(searchParams.entries()))
     params.set('tab', tab)
     router.replace(`/vexteam?${params.toString()}`, { scroll: false })
   }
+
+  // Pending practice-request count (badge on the tab).
+  const [pendingPractices, setPendingPractices] = useState(0)
 
   // Event edit/delete
   const [editEvent, setEditEvent] = useState<EditableEvent | null>(null)
@@ -137,11 +142,21 @@ function VexTeamAdminInner() {
     else toast.error(data.error || 'โหลดกิจกรรมไม่สำเร็จ')
   }, [])
 
+  const loadPendingCount = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/admin/vex/practices?status=proposed')
+      const data = await res.json()
+      if (res.ok) setPendingPractices((data.practices || []).length)
+    } catch {
+      // non-fatal
+    }
+  }, [])
+
   const loadAll = useCallback(async () => {
     setLoading(true)
-    await Promise.all([loadTeams(), loadEvents()])
+    await Promise.all([loadTeams(), loadEvents(), loadPendingCount()])
     setLoading(false)
-  }, [loadTeams, loadEvents])
+  }, [loadTeams, loadEvents, loadPendingCount])
 
   useEffect(() => {
     loadAll()
@@ -251,6 +266,14 @@ function VexTeamAdminInner() {
           <TabsTrigger value="events" className="gap-2">
             <CalendarDays className="h-4 w-4" /> กิจกรรม ({events.length})
           </TabsTrigger>
+          <TabsTrigger value="practices" className="gap-2">
+            <CalendarClock className="h-4 w-4" /> คำขอซ้อม
+            {pendingPractices > 0 && (
+              <span className="ml-0.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-xs font-semibold">
+                {pendingPractices}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Teams */}
@@ -354,6 +377,14 @@ function VexTeamAdminInner() {
               )}
             </div>
           )}
+        </TabsContent>
+
+        {/* Practice requests */}
+        <TabsContent value="practices" className="space-y-4">
+          <PracticesReview
+            teams={teams.map((t) => ({ id: t.id, team_number: t.team_number, name: t.name }))}
+            onPendingCount={setPendingPractices}
+          />
         </TabsContent>
       </Tabs>
 
