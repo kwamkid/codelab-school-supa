@@ -133,7 +133,9 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
+      {/* Left column: calendar */}
+      <div className="space-y-4">
       {/* Calendar nav */}
       <div className="flex items-center justify-between">
         <button
@@ -243,14 +245,15 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit }: Props) {
           </span>
         ))}
       </div>
+      </div>{/* /left column */}
 
-      {/* This month's list */}
-      <div>
+      {/* Right column: this month's list (sticks alongside the calendar on desktop) */}
+      <div className="lg:sticky lg:top-4">
         <h3 className="font-semibold px-1 mb-2">รายการเดือนนี้ ({monthPractices.length})</h3>
         {monthPractices.length === 0 ? (
           <p className="text-center text-gray-500 py-6 text-sm">แตะวันบนปฏิทินเพื่อเสนอวันซ้อม</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pr-1">
             {monthPractices.map((p) => (
               <button
                 key={p.id}

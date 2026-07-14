@@ -39,7 +39,7 @@ function EventRsvpInner({ slug }: { slug: string }) {
         teamLabel={`ทีม ${data.team.team_number}${data.team.name ? ` — ${data.team.name}` : ''}`}
         parentName={data.parentDisplayName}
       />
-      <div className="mx-auto max-w-3xl p-4">
+      <div className="mx-auto max-w-6xl p-4 sm:p-6">
         {data.kids.length === 0 ? (
           <p className="text-center text-gray-500 py-8">ทีมนี้ยังไม่มีเด็ก</p>
         ) : (
