@@ -15,6 +15,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-filter-tabs'
+import { useBranch } from '@/contexts/BranchContext'
+import { cn } from '@/lib/utils'
+import { PracticeMonthView } from './practice-month-view'
 import { SectionLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Check, X, CalendarClock, RotateCcw, Clock } from 'lucide-react'
@@ -33,6 +36,7 @@ interface PracticeRow {
   kidNickname: string | null
   teamNumber: string | null
   teamName: string | null
+  branch_id: string | null
 }
 
 interface TeamOption {
@@ -63,12 +67,14 @@ export function PracticesReview({
   teams: TeamOption[]
   onPendingCount?: (n: number) => void
 }) {
+  const { selectedBranchId } = useBranch()
   const [all, setAll] = useState<PracticeRow[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<PracticeStatus | 'all'>('proposed')
   const [teamFilter, setTeamFilter] = useState<string>('all')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [view, setView] = useState<'list' | 'calendar'>('list')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,11 +100,13 @@ export function PracticesReview({
     load()
   }, [load])
 
-  // Team-scoped set (status counts reflect the team filter).
-  const teamScoped = useMemo(
-    () => (teamFilter === 'all' ? all : all.filter((r) => r.team_id === teamFilter)),
-    [all, teamFilter]
-  )
+  // Scope by the top-bar branch first, then the team filter (status counts
+  // reflect both).
+  const teamScoped = useMemo(() => {
+    let list = selectedBranchId ? all.filter((r) => r.branch_id === selectedBranchId) : all
+    if (teamFilter !== 'all') list = list.filter((r) => r.team_id === teamFilter)
+    return list
+  }, [all, selectedBranchId, teamFilter])
 
   const counts = useMemo(
     () => ({
@@ -181,10 +189,41 @@ export function PracticesReview({
             </SelectContent>
           </Select>
         )}
+        {/* View toggle: list vs month calendar */}
+        <div className="inline-flex rounded-md border overflow-hidden w-fit">
+          <button
+            type="button"
+            onClick={() => setView('list')}
+            className={cn('px-3 py-1.5 text-sm font-medium', view === 'list' ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+          >
+            รายการ
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('calendar')}
+            className={cn('px-3 py-1.5 text-sm font-medium border-l', view === 'calendar' ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+          >
+            ปฏิทิน
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <SectionLoading />
+      ) : view === 'calendar' ? (
+        // Calendar shows all (branch+team-scoped) practices coloured by status.
+        <PracticeMonthView
+          practices={teamScoped.map((p) => ({
+            id: p.id,
+            kid_id: p.kid_id,
+            practice_date: p.practice_date,
+            start_time: p.start_time,
+            end_time: p.end_time,
+            status: p.status,
+            kidNickname: p.kidNickname,
+            teamNumber: p.teamNumber,
+          }))}
+        />
       ) : rows.length === 0 ? (
         <EmptyState icon={CalendarClock} title="ไม่มีคำขอซ้อม" description="คำขอจากผู้ปกครองจะแสดงที่นี่" />
       ) : (

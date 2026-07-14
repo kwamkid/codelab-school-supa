@@ -765,14 +765,14 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           requiredRole: ['super_admin', 'branch_admin']
         },
         {
-          name: 'กิจกรรม',
+          name: 'การแข่งขัน',
           href: '/vexteam/events',
           icon: CalendarDays,
           iconColor: 'text-red-500',
           requiredRole: ['super_admin', 'branch_admin']
         },
         {
-          name: 'คำขอซ้อม',
+          name: 'ตารางซ้อม',
           href: '/vexteam/practices',
           icon: CalendarClock,
           iconColor: 'text-red-500',

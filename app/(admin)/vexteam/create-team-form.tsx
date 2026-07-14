@@ -3,9 +3,11 @@
 // Create-team dialog form: team_number + optional name + level → POST authFetch.
 // On success, refreshes the parent list.
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
+import { getBranches } from '@/lib/services/branches'
+import { useBranch } from '@/contexts/BranchContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,17 +25,33 @@ import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 
 export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
+  const { selectedBranchId } = useBranch()
   const [open, setOpen] = useState(false)
   const [teamNumber, setTeamNumber] = useState('')
   const [name, setName] = useState('')
   const [level, setLevel] = useState<Level>('iq_elem')
+  const [branchId, setBranchId] = useState<string>('')
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+
+  // Load branches once the dialog opens; default to the top-bar branch.
+  useEffect(() => {
+    if (!open) return
+    getBranches()
+      .then((list) => {
+        setBranches(list.map((b: any) => ({ id: b.id, name: b.name })))
+        if (!branchId) setBranchId(selectedBranchId || list[0]?.id || '')
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const reset = () => {
     setTeamNumber('')
     setName('')
     setLevel('iq_elem')
+    setBranchId(selectedBranchId || '')
   }
 
   const submit = async () => {
@@ -42,13 +60,17 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
       toast.error('กรุณากรอกหมายเลขทีม')
       return
     }
+    if (!branchId) {
+      toast.error('กรุณาเลือกสาขา')
+      return
+    }
     submittingRef.current = true
     setSubmitting(true)
     try {
       const res = await authFetch('/api/admin/vex/teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ team_number: teamNumber.trim(), name: name.trim() || undefined, level }),
+        body: JSON.stringify({ team_number: teamNumber.trim(), name: name.trim() || undefined, level, branch_id: branchId }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -91,6 +113,21 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
           <div className="space-y-2">
             <Label htmlFor="team_name">ชื่อทีม (ไม่บังคับ)</Label>
             <Input id="team_name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>สาขา</Label>
+            <Select value={branchId} onValueChange={setBranchId}>
+              <SelectTrigger>
+                <SelectValue placeholder="เลือกสาขา" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>ระดับ</Label>

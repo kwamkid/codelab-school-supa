@@ -35,6 +35,8 @@ interface Team {
   team_number: string
   name: string | null
   level: Level
+  branch_id: string | null
+  branchName?: string | null
   eventLink: string | null
   practiceLink: string | null
 }

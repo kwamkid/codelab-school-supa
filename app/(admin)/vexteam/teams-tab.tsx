@@ -9,6 +9,7 @@ import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { PageLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
@@ -17,6 +18,7 @@ import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { SearchInput } from '@/components/ui/search-input'
+import { useBranch } from '@/contexts/BranchContext'
 import { CreateTeamForm } from './create-team-form'
 
 interface TeamRow {
@@ -24,6 +26,8 @@ interface TeamRow {
   team_number: string
   name: string | null
   level: Level
+  branch_id: string | null
+  branchName?: string | null
   eventLink: string | null
   practiceLink: string | null
   kids: { id: string; nickname: string }[]
@@ -51,6 +55,7 @@ function CopyLinkButton({ label, url }: { label: string; url: string }) {
 }
 
 export function TeamsTab() {
+  const { selectedBranchId } = useBranch()
   const [teams, setTeams] = useState<TeamRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -68,22 +73,28 @@ export function TeamsTab() {
     loadTeams()
   }, [loadTeams])
 
+  // Scope to the top-bar branch first (empty selectedBranchId = all branches).
+  const branchTeams = useMemo(
+    () => (selectedBranchId ? teams.filter((t) => t.branch_id === selectedBranchId) : teams),
+    [teams, selectedBranchId]
+  )
+
   const countByLevel = useMemo(() => {
     const m = new Map<Level, number>()
-    for (const t of teams) m.set(t.level, (m.get(t.level) || 0) + 1)
+    for (const t of branchTeams) m.set(t.level, (m.get(t.level) || 0) + 1)
     return m
-  }, [teams])
+  }, [branchTeams])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return teams.filter((t) => {
+    return branchTeams.filter((t) => {
       if (levelFilter !== 'all' && t.level !== levelFilter) return false
       if (!q) return true
       const inTeam = t.team_number.toLowerCase().includes(q) || (t.name || '').toLowerCase().includes(q)
       const inKid = t.kids.some((k) => k.nickname.toLowerCase().includes(q))
       return inTeam || inKid
     })
-  }, [teams, search, levelFilter])
+  }, [branchTeams, search, levelFilter])
 
   if (loading) return <PageLoading />
 
@@ -99,8 +110,8 @@ export function TeamsTab() {
         <CreateTeamForm onCreated={loadTeams} />
       </div>
 
-      {teams.length === 0 ? (
-        <EmptyState icon={Users} title="ยังไม่มีทีม" description="สร้างทีม VEX ทีมแรกเพื่อเริ่มต้น" />
+      {branchTeams.length === 0 ? (
+        <EmptyState icon={Users} title="ยังไม่มีทีมในสาขานี้" description="สร้างทีม VEX เพื่อเริ่มต้น" />
       ) : (
         <>
           <div className="flex flex-wrap gap-2">
@@ -114,7 +125,7 @@ export function TeamsTab() {
                   : 'border-input text-gray-600 hover:bg-gray-50'
               )}
             >
-              ทั้งหมด ({teams.length})
+              ทั้งหมด ({branchTeams.length})
             </button>
             {LEVELS.filter((lv) => (countByLevel.get(lv) || 0) > 0).map((lv) => (
               <button
@@ -140,9 +151,12 @@ export function TeamsTab() {
                 <Card key={t.id}>
                   <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <Link href={`/vexteam/${t.id}`} className="flex-1 min-w-0 group">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-lg">{t.team_number}</span>
                         {t.name && <span className="text-gray-500">— {t.name}</span>}
+                        {!selectedBranchId && t.branchName && (
+                          <Badge variant="outline" className="text-[10px] text-gray-500">{t.branchName}</Badge>
+                        )}
                         <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition" />
                       </div>
                       {t.kids.length > 0 && (

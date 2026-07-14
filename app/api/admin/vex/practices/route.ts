@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     const [kidsRes, teamsRes] = await Promise.all([
       kidIds.length ? db.from('kids').select('id, nickname').in('id', kidIds) : Promise.resolve({ data: [] }),
-      teamIds.length ? db.from('teams').select('id, team_number, name').in('id', teamIds) : Promise.resolve({ data: [] }),
+      teamIds.length ? db.from('teams').select('id, team_number, name, branch_id').in('id', teamIds) : Promise.resolve({ data: [] }),
     ])
     const kidMap = new Map<string, any>((kidsRes.data || []).map((k: any) => [k.id, k]))
     const teamMap = new Map<string, any>((teamsRes.data || []).map((t: any) => [t.id, t]))
@@ -45,6 +45,7 @@ export async function GET(request: Request) {
       kidNickname: kidMap.get(p.kid_id)?.nickname ?? null,
       teamNumber: teamMap.get(p.team_id)?.team_number ?? null,
       teamName: teamMap.get(p.team_id)?.name ?? null,
+      branch_id: teamMap.get(p.team_id)?.branch_id ?? null,
     }))
 
     return NextResponse.json({ practices: enriched })

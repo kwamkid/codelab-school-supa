@@ -9,6 +9,7 @@ import { requireAdmin } from '@/lib/vex/api'
 import { logAudit } from '@/lib/vex/audit'
 import { linkSlug } from '@/lib/vex/tokens'
 import { LEVELS } from '@/lib/vex/types'
+import { restSelect } from '@/lib/supabase/rest'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,7 @@ const updateSchema = z.object({
   team_number: z.string().trim().min(1).max(32).optional(),
   name: z.string().trim().max(120).nullable().optional(),
   level: z.enum(LEVELS as [string, ...string[]]).optional(),
+  branch_id: z.string().uuid().optional(),
 })
 
 /** Attach the two public link slugs to a team row for the response. */
@@ -45,9 +47,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       .eq('team_id', id)
       .order('created_at', { ascending: true })
 
+    let branchName: string | null = null
+    if (team.branch_id) {
+      const b = await restSelect<{ name: string }>('branches', {
+        id: `eq.${team.branch_id}`,
+        select: 'name',
+        limit: '1',
+      })
+      branchName = b?.[0]?.name ?? null
+    }
+
     return NextResponse.json({
       team: {
         ...team,
+        branchName,
         eventLink: team.event_token ? linkSlug(team.team_number, team.event_token) : null,
         practiceLink: team.practice_token ? linkSlug(team.team_number, team.practice_token) : null,
       },
@@ -103,6 +116,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (parsed.data.team_number !== undefined) patch.team_number = parsed.data.team_number
     if (parsed.data.name !== undefined) patch.name = parsed.data.name || null
     if (parsed.data.level !== undefined) patch.level = parsed.data.level
+    if (parsed.data.branch_id !== undefined) patch.branch_id = parsed.data.branch_id
     // Keep slug in sync when the team_number changes (slug = number-event_token).
     if (parsed.data.team_number !== undefined && before.event_token) {
       patch.slug = linkSlug(nextNumber, before.event_token)

@@ -48,6 +48,7 @@ export interface Team {
   team_number: string
   name: string | null
   level: Level
+  branch_id: string | null
   slug: string
   event_token: string | null
   practice_token: string | null

@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { getBranches } from '@/lib/services/branches'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 
@@ -24,6 +25,7 @@ interface EditableTeam {
   team_number: string
   name: string | null
   level: Level
+  branch_id: string | null
 }
 
 interface Props {
@@ -37,6 +39,8 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
   const [teamNumber, setTeamNumber] = useState(team.team_number)
   const [name, setName] = useState(team.name || '')
   const [level, setLevel] = useState<Level>(team.level)
+  const [branchId, setBranchId] = useState<string>(team.branch_id || '')
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
 
@@ -46,19 +50,24 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
       setTeamNumber(team.team_number)
       setName(team.name || '')
       setLevel(team.level)
+      setBranchId(team.branch_id || '')
+      getBranches()
+        .then((list) => setBranches(list.map((b: any) => ({ id: b.id, name: b.name }))))
+        .catch(() => {})
     }
   }, [open, team])
 
   const submit = async () => {
     if (submittingRef.current) return
     if (!teamNumber.trim()) return toast.error('กรุณากรอกหมายเลขทีม')
+    if (!branchId) return toast.error('กรุณาเลือกสาขา')
     submittingRef.current = true
     setSubmitting(true)
     try {
       const res = await authFetch(`/api/admin/vex/teams/${team.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ team_number: teamNumber.trim(), name: name.trim() || null, level }),
+        body: JSON.stringify({ team_number: teamNumber.trim(), name: name.trim() || null, level, branch_id: branchId }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -97,6 +106,21 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
           <div className="space-y-2">
             <Label htmlFor="edit_team_name">ชื่อทีม (ไม่บังคับ)</Label>
             <Input id="edit_team_name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>สาขา</Label>
+            <Select value={branchId} onValueChange={setBranchId}>
+              <SelectTrigger>
+                <SelectValue placeholder="เลือกสาขา" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>ระดับ</Label>

@@ -9,6 +9,7 @@ import { requireAdmin } from '@/lib/vex/api'
 import { newTeamToken, linkSlug } from '@/lib/vex/tokens'
 import { logAudit } from '@/lib/vex/audit'
 import { LEVELS } from '@/lib/vex/types'
+import { restSelect } from '@/lib/supabase/rest'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,7 @@ const createSchema = z.object({
   team_number: z.string().trim().min(1).max(32),
   name: z.string().trim().max(120).optional(),
   level: z.enum(LEVELS as [string, ...string[]]),
+  branch_id: z.string().uuid(),
 })
 
 export async function GET(request: Request) {
@@ -47,10 +49,22 @@ export async function GET(request: Request) {
       }
     }
 
+    // Resolve branch names (public.branches, read-only).
+    const branchIds = Array.from(new Set(teamRows.map((t: any) => t.branch_id).filter(Boolean)))
+    const branchName = new Map<string, string>()
+    if (branchIds.length) {
+      const branches = await restSelect<{ id: string; name: string }>('branches', {
+        id: `in.(${branchIds.join(',')})`,
+        select: 'id,name',
+      })
+      for (const b of branches || []) branchName.set(b.id, b.name)
+    }
+
     const teams = teamRows.map((t: any) => ({
       ...t,
       eventLink: t.event_token ? linkSlug(t.team_number, t.event_token) : null,
       practiceLink: t.practice_token ? linkSlug(t.team_number, t.practice_token) : null,
+      branchName: t.branch_id ? branchName.get(t.branch_id) ?? null : null,
       kids: kidsByTeam.get(t.id) || [],
     }))
     return NextResponse.json({ teams })
@@ -75,7 +89,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid input' }, { status: 400 })
   }
-  const { team_number, name, level } = parsed.data
+  const { team_number, name, level, branch_id } = parsed.data
 
   const db = vexDb()
 
@@ -103,7 +117,7 @@ export async function POST(request: Request) {
 
     const { data: created, error } = await db
       .from('teams')
-      .insert({ team_number, name: name || null, level, event_token, practice_token, slug })
+      .insert({ team_number, name: name || null, level, branch_id, event_token, practice_token, slug })
       .select('*')
       .single()
     if (error) {
