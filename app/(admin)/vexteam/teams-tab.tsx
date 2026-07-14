@@ -22,10 +22,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
-import { Copy, Users, UserPlus, Pencil, Trash2, X } from 'lucide-react'
+import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle } from 'lucide-react'
+import { Tooltip } from '@/components/ui/tooltip'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
-import { StudentBadge } from '@/components/ui/student-badge'
 import { SearchInput } from '@/components/ui/search-input'
 import { useBranch } from '@/contexts/BranchContext'
 import { CreateTeamForm } from './create-team-form'
@@ -35,6 +35,8 @@ import { AddStudentsDialog } from './add-students-dialog'
 interface KidRow {
   id: string
   nickname: string
+  student_id?: string | null
+  hasLine?: boolean
 }
 interface TeamRow {
   id: string
@@ -243,23 +245,34 @@ export function TeamsTab() {
                       </div>
                     </div>
 
-                    {/* Students (removable) + add button */}
+                    {/* Students (removable) + add button. Each chip shows LINE
+                        status so admins can tell the parent to connect LINE. */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {t.kids.map((k) => (
-                        <span
+                        <Tooltip
                           key={k.id}
-                          className="inline-flex items-center gap-1 rounded-full bg-green-50 text-green-700 px-2.5 py-0.5 text-xs font-semibold"
+                          label={k.hasLine ? 'ผู้ปกครองเชื่อม LINE แล้ว (รับแจ้งเตือนได้)' : 'ยังไม่เชื่อม LINE — แจ้งผู้ปกครองให้เชื่อมเพื่อรับการแจ้งเตือน'}
                         >
-                          {k.nickname}
-                          <button
-                            type="button"
-                            onClick={() => setRemoveKid({ team: t, kid: k })}
-                            className="text-green-600/60 hover:text-red-600"
-                            aria-label={`ลบ ${k.nickname}`}
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                              k.hasLine ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                            )}
                           >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
+                            <MessageCircle
+                              className={cn('h-3 w-3', k.hasLine ? 'text-green-500' : 'text-amber-400')}
+                            />
+                            {k.nickname}
+                            <button
+                              type="button"
+                              onClick={() => setRemoveKid({ team: t, kid: k })}
+                              className="opacity-60 hover:text-red-600 hover:opacity-100"
+                              aria-label={`ลบ ${k.nickname}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        </Tooltip>
                       ))}
                       <Button
                         variant="outline"
@@ -270,6 +283,12 @@ export function TeamsTab() {
                         <UserPlus className="h-3.5 w-3.5" /> เพิ่มสมาชิก
                       </Button>
                     </div>
+                    {t.kids.some((k) => !k.hasLine) && (
+                      <p className="text-[11px] text-amber-600">
+                        <MessageCircle className="h-3 w-3 inline mr-0.5" />
+                        มีนักเรียนที่ผู้ปกครองยังไม่เชื่อม LINE — แจ้งให้เชื่อมเพื่อรับการแจ้งเตือน
+                      </p>
+                    )}
 
                     {/* Public links */}
                     <div className="flex items-center gap-2 flex-wrap">

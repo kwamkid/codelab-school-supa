@@ -33,18 +33,48 @@ export async function GET(request: Request) {
     if (error) throw new Error(error.message)
     const teamRows = data || []
 
-    // Attach each team's kids (nickname) for the list display.
+    // Attach each team's kids (nickname + whether the linked student's parent is
+    // connected to LINE, so the UI can flag "not connected → won't get noti").
     const teamIds = teamRows.map((t: any) => t.id)
-    const kidsByTeam = new Map<string, { id: string; nickname: string }[]>()
+    const kidsByTeam = new Map<string, { id: string; nickname: string; student_id: string | null; hasLine: boolean }[]>()
     if (teamIds.length) {
       const { data: kids } = await db
         .from('kids')
-        .select('id, team_id, nickname')
+        .select('id, team_id, nickname, student_id')
         .in('team_id', teamIds)
         .order('created_at', { ascending: true })
-      for (const k of kids || []) {
+      const kidList = kids || []
+
+      // student_id → parent has LINE?  (student → students.parent_id → parents.line_user_id)
+      const studentIds = Array.from(new Set(kidList.map((k: any) => k.student_id).filter(Boolean)))
+      const studentHasLine = new Map<string, boolean>()
+      if (studentIds.length) {
+        const students = await restSelect<{ id: string; parent_id: string | null }>('students', {
+          id: `in.(${studentIds.join(',')})`,
+          select: 'id,parent_id',
+        })
+        const parentIds = Array.from(new Set((students || []).map((s) => s.parent_id).filter(Boolean)))
+        const parentHasLine = new Map<string, boolean>()
+        if (parentIds.length) {
+          const parents = await restSelect<{ id: string; line_user_id: string | null }>('parents', {
+            id: `in.(${parentIds.join(',')})`,
+            select: 'id,line_user_id',
+          })
+          for (const p of parents || []) parentHasLine.set(p.id, !!p.line_user_id)
+        }
+        for (const s of students || []) {
+          studentHasLine.set(s.id, s.parent_id ? parentHasLine.get(s.parent_id) === true : false)
+        }
+      }
+
+      for (const k of kidList) {
         const arr = kidsByTeam.get(k.team_id) || []
-        arr.push({ id: k.id, nickname: k.nickname })
+        arr.push({
+          id: k.id,
+          nickname: k.nickname,
+          student_id: k.student_id ?? null,
+          hasLine: k.student_id ? studentHasLine.get(k.student_id) === true : false,
+        })
         kidsByTeam.set(k.team_id, arr)
       }
     }

@@ -7,6 +7,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { restSelect } from '@/lib/supabase/rest'
+import { vexDb } from '@/lib/vex/supabase'
 
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 
@@ -46,11 +47,33 @@ export async function notifyParentPractice(
   kidNickname?: string | null
 ): Promise<void> {
   try {
-    if (!practice.parent_id) return
+    // Prefer the REAL parent of the kid's linked student
+    // (kid.student_id → students.parent_id → parents.line_user_id). Fall back to
+    // the practice's parent_id (the submitter) for kids without a student link.
+    let parentId: string | null = practice.parent_id
+    try {
+      const { data: kid } = await vexDb()
+        .from('kids')
+        .select('student_id')
+        .eq('id', practice.kid_id)
+        .maybeSingle()
+      if (kid?.student_id) {
+        const students = await restSelect<{ parent_id: string | null }>('students', {
+          id: `eq.${kid.student_id}`,
+          select: 'parent_id',
+          limit: '1',
+        })
+        if (students?.[0]?.parent_id) parentId = students[0].parent_id
+      }
+    } catch {
+      // fall back to practice.parent_id
+    }
+
+    if (!parentId) return
 
     // Resolve the parent's LINE userId (needed as the push target).
     const rows = await restSelect<{ line_user_id: string | null }>('parents', {
-      id: `eq.${practice.parent_id}`,
+      id: `eq.${parentId}`,
       select: 'line_user_id',
       limit: '1',
     })
