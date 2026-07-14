@@ -1,14 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  Popover,
-  PopoverContent,
-  PopoverAnchor,
-} from '@/components/ui/popover'
-import { Button } from '@/components/ui/button'
 
 // --- Generate time slots ---
 function generateTimeSlots(step: number, min?: string, max?: string): string[] {
@@ -70,7 +63,7 @@ function TimePickerDropdown({
   onChange,
   placeholder = 'เวลา',
   disabled = false,
-  step = 15,
+  step = 30,
   min,
   max,
   className,
@@ -82,6 +75,7 @@ function TimePickerDropdown({
   const [highlight, setHighlight] = React.useState(-1)
   const listRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
+  const wrapRef = React.useRef<HTMLDivElement>(null)
 
   const slots = React.useMemo(() => generateTimeSlots(step, min, max), [step, min, max])
 
@@ -168,76 +162,69 @@ function TimePickerDropdown({
     setOpen(false)
   }
 
+  // Plain absolutely-positioned dropdown (no Radix Popover) — its focus/dismiss
+  // layer fought the input anchor and made the list flicker / uncklickable.
+  // Close on click outside the wrapper.
+  React.useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        commit(text)
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, text])
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      {/* Anchor (not Trigger) so Radix only positions the popover and doesn't
-          also toggle it — the input controls `open` itself, which otherwise
-          fights Radix's trigger toggle and makes the popover flicker. */}
-      <PopoverAnchor asChild>
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="numeric"
-          value={text}
-          disabled={disabled}
-          placeholder={placeholder}
-          onFocus={() => setOpen(true)}
-          onClick={() => setOpen(true)}
-          onChange={(e) => {
-            setText(e.target.value)
-            if (!open) setOpen(true)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') {
-              e.preventDefault()
-              if (!open) { setOpen(true); return }
-              setHighlight((h) => (filtered.length === 0 ? -1 : (h + 1) % filtered.length))
-            } else if (e.key === 'ArrowUp') {
-              e.preventDefault()
-              if (!open) { setOpen(true); return }
-              setHighlight((h) => (filtered.length === 0 ? -1 : (h - 1 + filtered.length) % filtered.length))
-            } else if (e.key === 'Enter') {
-              e.preventDefault()
-              // Prefer the highlighted item, else the top match, else parse typed text.
-              if (highlight >= 0 && filtered[highlight]) pick(filtered[highlight])
-              else if (filtered.length > 0 && text.replace(/[^0-9:]/g, '')) pick(filtered[0])
-              else commit(text)
-              setOpen(false)
-            } else if (e.key === 'Escape') {
-              setText(formatTimeDisplay(value))
-              setOpen(false)
-            }
-          }}
-          onBlur={() => commit(text)}
-          className={cn(
-            'w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-base',
-            'ring-offset-background placeholder:text-muted-foreground',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            className
-          )}
-        />
-      </PopoverAnchor>
-      <PopoverContent
-        className="w-[120px] p-0"
-        align="start"
-        collisionPadding={8}
-        // Keep focus in the input so typing still works while the list is open.
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-        // Clicking the input (the anchor) counts as "outside" the content —
-        // don't let that close the popover (it would flicker on each click).
-        onPointerDownOutside={(e) => {
-          if (inputRef.current && e.target instanceof Node && inputRef.current.contains(e.target)) {
+    <div ref={wrapRef} className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="numeric"
+        value={text}
+        disabled={disabled}
+        placeholder={placeholder}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        onChange={(e) => {
+          setText(e.target.value)
+          if (!open) setOpen(true)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
             e.preventDefault()
+            if (!open) { setOpen(true); return }
+            setHighlight((h) => (filtered.length === 0 ? -1 : (h + 1) % filtered.length))
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            if (!open) { setOpen(true); return }
+            setHighlight((h) => (filtered.length === 0 ? -1 : (h - 1 + filtered.length) % filtered.length))
+          } else if (e.key === 'Enter') {
+            e.preventDefault()
+            if (highlight >= 0 && filtered[highlight]) pick(filtered[highlight])
+            else if (filtered.length > 0 && text.replace(/[^0-9:]/g, '')) pick(filtered[0])
+            else commit(text)
+            setOpen(false)
+          } else if (e.key === 'Escape') {
+            setText(formatTimeDisplay(value))
+            setOpen(false)
           }
         }}
-        onWheel={(e) => e.stopPropagation()}
-        onTouchMove={(e) => e.stopPropagation()}
-      >
+        className={cn(
+          'w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-base',
+          'ring-offset-background placeholder:text-muted-foreground',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          className
+        )}
+      />
+      {open && !disabled && (
         <div
           ref={listRef}
-          className="max-h-[240px] overflow-y-scroll p-1"
+          className="absolute z-50 mt-1 w-[120px] max-h-[240px] overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
           style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
           onWheel={(e) => e.stopPropagation()}
           onTouchMove={(e) => e.stopPropagation()}
@@ -249,13 +236,12 @@ function TimePickerDropdown({
               <button
                 key={slot}
                 type="button"
-                data-value={slot}
                 data-index={i}
                 onMouseDown={(e) => e.preventDefault()} // keep input from blurring first
                 onMouseEnter={() => setHighlight(i)}
                 onClick={() => pick(slot)}
                 className={cn(
-                  'flex w-full items-center justify-center rounded-sm px-2 py-1.5 text-sm outline-none select-none',
+                  'flex w-full items-center justify-center rounded-sm px-2 py-1.5 text-sm outline-none select-none cursor-pointer',
                   i === highlight && 'bg-accent text-accent-foreground',
                   value === slot && 'font-medium'
                 )}
@@ -265,8 +251,8 @@ function TimePickerDropdown({
             ))
           )}
         </div>
-      </PopoverContent>
-    </Popover>
+      )}
+    </div>
   )
 }
 
@@ -300,7 +286,7 @@ export function TimeRangePicker({
   startPlaceholder = 'เริ่ม',
   endPlaceholder = 'สิ้นสุด',
   disabled = false,
-  step = 15,
+  step = 30,
   min,
   max,
   className,
