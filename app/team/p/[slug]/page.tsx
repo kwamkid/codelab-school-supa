@@ -8,7 +8,7 @@ import { LiffProvider } from '@/components/liff/liff-provider'
 import { Loading } from '@/components/ui/loading'
 import { LineGate } from '../../line-gate'
 import { useTeamAuth } from '../../use-team-auth'
-import { ProposePractice } from './propose-practice'
+import { PracticeCalendar } from './practice-calendar'
 
 interface SummaryData {
   team: { id: string; team_number: string; name: string | null; level: string }
@@ -51,7 +51,7 @@ function ProposePracticeInner({ slug }: { slug: string }) {
         {data.kids.length === 0 ? (
           <p className="text-center text-gray-500 py-8">ทีมนี้ยังไม่มีเด็ก</p>
         ) : (
-          <ProposePractice kids={data.kids} initialPractices={data.practices} onSubmit={submit} />
+          <PracticeCalendar kids={data.kids} initialPractices={data.practices} onSubmit={submit} />
         )}
       </div>
     </div>
