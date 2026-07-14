@@ -322,10 +322,14 @@ export function TimeRangePicker({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When start time changes, auto-set end time to +1 hour
+  // When the start time changes, only auto-bump the end time if it would now be
+  // invalid (end <= start) or isn't set yet. If the existing end is still after
+  // the new start (e.g. editing 08:30–16:00), leave it alone.
   const handleStartTimeChange = (v: string) => {
     onStartTimeChange(v)
-    onEndTimeChange(addMinutes(v, 60))
+    if (!endTime || parseTime(endTime) <= parseTime(v)) {
+      onEndTimeChange(addMinutes(v, 60))
+    }
   }
 
   return (
