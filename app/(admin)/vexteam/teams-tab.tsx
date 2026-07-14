@@ -4,7 +4,6 @@
 // card shows kids + the two public-link copy buttons.
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import Link from 'next/link'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,15 +11,31 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PageLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
-import { Copy, Users, ChevronRight } from 'lucide-react'
+import { Copy, Users, UserPlus, Pencil, Trash2, X } from 'lucide-react'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { SearchInput } from '@/components/ui/search-input'
 import { useBranch } from '@/contexts/BranchContext'
 import { CreateTeamForm } from './create-team-form'
+import { EditTeamForm } from './edit-team-form'
+import { AddStudentsDialog } from './add-students-dialog'
 
+interface KidRow {
+  id: string
+  nickname: string
+}
 interface TeamRow {
   id: string
   team_number: string
@@ -30,7 +45,7 @@ interface TeamRow {
   branchName?: string | null
   eventLink: string | null
   practiceLink: string | null
-  kids: { id: string; nickname: string }[]
+  kids: KidRow[]
 }
 
 function publicUrl(kind: 'e' | 'p', slug: string) {
@@ -61,6 +76,13 @@ export function TeamsTab() {
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<Level | 'all'>('all')
 
+  // Per-card actions
+  const [editTeam, setEditTeam] = useState<TeamRow | null>(null)
+  const [deleteTeam, setDeleteTeam] = useState<TeamRow | null>(null)
+  const [addToTeam, setAddToTeam] = useState<TeamRow | null>(null)
+  const [removeKid, setRemoveKid] = useState<{ team: TeamRow; kid: KidRow } | null>(null)
+  const [busy, setBusy] = useState(false)
+
   const loadTeams = useCallback(async () => {
     const res = await authFetch('/api/admin/vex/teams')
     const data = await res.json()
@@ -68,6 +90,43 @@ export function TeamsTab() {
     else toast.error(data.error || 'โหลดทีมไม่สำเร็จ')
     setLoading(false)
   }, [])
+
+  const doDeleteTeam = async () => {
+    if (!deleteTeam) return
+    setBusy(true)
+    try {
+      const res = await authFetch(`/api/admin/vex/teams/${deleteTeam.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) return toast.error(data.error || 'ลบทีมไม่สำเร็จ')
+      toast.success('ลบทีมแล้ว')
+      setDeleteTeam(null)
+      loadTeams()
+    } catch {
+      toast.error('เกิดข้อผิดพลาด')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doRemoveKid = async () => {
+    if (!removeKid) return
+    setBusy(true)
+    try {
+      const res = await authFetch(
+        `/api/admin/vex/teams/${removeKid.team.id}/kids?kidId=${removeKid.kid.id}`,
+        { method: 'DELETE' }
+      )
+      const data = await res.json()
+      if (!res.ok) return toast.error(data.error || 'ลบนักเรียนไม่สำเร็จ')
+      toast.success('ลบออกจากทีมแล้ว')
+      setRemoveKid(null)
+      loadTeams()
+    } catch {
+      toast.error('เกิดข้อผิดพลาด')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   useEffect(() => {
     loadTeams()
@@ -149,32 +208,77 @@ export function TeamsTab() {
             <div className="grid gap-3">
               {filtered.map((t) => (
                 <Card key={t.id}>
-                  <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <Link href={`/vexteam/${t.id}`} className="flex-1 min-w-0 group">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-lg">{t.team_number}</span>
-                        {t.name && <span className="text-gray-500">— {t.name}</span>}
-                        {!selectedBranchId && t.branchName && (
-                          <Badge variant="outline" className="text-[10px] text-gray-500">{t.branchName}</Badge>
-                        )}
-                        <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition" />
-                      </div>
-                      {t.kids.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                          {t.kids.map((k) => (
-                            <StudentBadge key={k.id} name={k.nickname} />
-                          ))}
+                  <CardContent className="p-4 space-y-3">
+                    {/* Header row: name + branch + level + actions */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-lg">{t.team_number}</span>
+                          {t.name && <span className="text-gray-500">— {t.name}</span>}
+                          {!selectedBranchId && t.branchName && (
+                            <Badge variant="outline" className="text-[10px] text-gray-500">{t.branchName}</Badge>
+                          )}
                         </div>
-                      )}
-                    </Link>
-                    <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <LevelBadge level={t.level} logoHeight={24} />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-500 hover:text-primary"
+                          onClick={() => setEditTeam(t)}
+                          aria-label="แก้ไขทีม"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-500 hover:text-red-600"
+                          onClick={() => setDeleteTeam(t)}
+                          aria-label="ลบทีม"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Students (removable) + add button */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {t.kids.map((k) => (
+                        <span
+                          key={k.id}
+                          className="inline-flex items-center gap-1 rounded-full bg-green-50 text-green-700 px-2.5 py-0.5 text-xs font-semibold"
+                        >
+                          {k.nickname}
+                          <button
+                            type="button"
+                            onClick={() => setRemoveKid({ team: t, kid: k })}
+                            className="text-green-600/60 hover:text-red-600"
+                            aria-label={`ลบ ${k.nickname}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 text-primary border-primary/40 hover:bg-primary/5"
+                        onClick={() => setAddToTeam(t)}
+                      >
+                        <UserPlus className="h-3.5 w-3.5" /> เพิ่มสมาชิก
+                      </Button>
+                    </div>
+
+                    {/* Public links */}
+                    <div className="flex items-center gap-2 flex-wrap">
                       {t.eventLink && (
                         <CopyLinkButton label="ตารางการแข่งขัน" url={publicUrl('e', t.eventLink)} />
                       )}
                       {t.practiceLink && (
                         <CopyLinkButton label="ตารางเข้าซ้อม" url={publicUrl('p', t.practiceLink)} />
                       )}
-                      <LevelBadge level={t.level} logoHeight={26} />
                     </div>
                   </CardContent>
                 </Card>
@@ -183,6 +287,76 @@ export function TeamsTab() {
           )}
         </>
       )}
+
+      {/* Edit team */}
+      {editTeam && (
+        <EditTeamForm
+          team={editTeam}
+          open={!!editTeam}
+          onOpenChange={(o) => !o && setEditTeam(null)}
+          onSaved={loadTeams}
+        />
+      )}
+
+      {/* Add students */}
+      {addToTeam && (
+        <AddStudentsDialog
+          teamId={addToTeam.id}
+          open={!!addToTeam}
+          onOpenChange={(o) => !o && setAddToTeam(null)}
+          onAdded={loadTeams}
+        />
+      )}
+
+      {/* Delete team confirm */}
+      <AlertDialog open={!!deleteTeam} onOpenChange={(o) => !o && setDeleteTeam(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบทีม {deleteTeam?.team_number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              จะลบเด็ก, การแจ้งเข้าร่วม และการซ้อมของทีมนี้ทั้งหมด ไม่สามารถกู้คืนได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                doDeleteTeam()
+              }}
+              disabled={busy}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {busy ? 'กำลังลบ...' : 'ลบทีม'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove kid confirm */}
+      <AlertDialog open={!!removeKid} onOpenChange={(o) => !o && setRemoveKid(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบ {removeKid?.kid.nickname} ออกจากทีม?</AlertDialogTitle>
+            <AlertDialogDescription>
+              การแจ้งเข้าร่วมและการซ้อมของนักเรียนคนนี้ในทีมนี้จะถูกลบด้วย
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                doRemoveKid()
+              }}
+              disabled={busy}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {busy ? 'กำลังลบ...' : 'ลบออกจากทีม'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

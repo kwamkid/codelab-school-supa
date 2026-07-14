@@ -58,6 +58,7 @@ export interface Team {
 export interface Kid {
   id: string
   team_id: string
+  student_id: string | null
   nickname: string
   full_name: string | null
   created_at: string
