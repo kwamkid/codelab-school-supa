@@ -68,9 +68,13 @@ export function AddStudentsDialog({
     const q = search.trim()
     if (!q) {
       setStudents([]) // don't preload — wait for a search term
+      setLoading(false)
       return
     }
-    const t = setTimeout(() => load(q), 250)
+    // Show the loading state immediately, then search 450ms after typing stops
+    // (so it doesn't fire on every keystroke).
+    setLoading(true)
+    const t = setTimeout(() => load(q), 450)
     return () => clearTimeout(t)
   }, [open, search, load])
 
