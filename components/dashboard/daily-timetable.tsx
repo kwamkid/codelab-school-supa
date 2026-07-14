@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { User, Users, GraduationCap } from 'lucide-react';
+import { User, Users, GraduationCap, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TeacherBadge } from '@/components/ui/teacher-badge';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 // Types matching the RPC response
@@ -90,71 +91,148 @@ function fromMinutes(mins: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-/** A class card — shared by the grid cell. */
-function EventCard({ event, onClick }: { event: TimetableEvent; onClick: () => void }) {
+/** Small colored dot + type letter for an event, used inside the clash popover. */
+function clashDotColor(event: TimetableEvent): string {
+  if (event.event_type === 'makeup') return 'bg-purple-500';
+  if (event.event_type === 'trial') return 'bg-orange-500';
+  return 'bg-blue-500';
+}
+
+/**
+ * Red "+N" badge shown on a host card when other events clash under it (same
+ * room, overlapping time). Click opens a popover listing the hidden events;
+ * clicking one opens its detail dialog. Rendered as an overlay sibling of the
+ * card button (not nested) to keep valid button markup.
+ */
+function ClashBadge({ hidden, onPick }: { hidden: TimetableEvent[]; onPick: (e: TimetableEvent) => void }) {
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'w-full h-full text-left rounded-lg border p-2.5 transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer',
-        getEventBg(event)
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded-full bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 shadow-sm cursor-pointer"
+          title={`มีอีก ${hidden.length} คาบที่เวลาชนกัน`}
+        >
+          +{hidden.length}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-2">
+        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-1 pb-1.5 flex items-center gap-1">
+          <Clock className="h-3.5 w-3.5" /> เวลาชนกันในห้องนี้
+        </p>
+        <div className="flex flex-col gap-1">
+          {hidden.map((h) => (
+            <button
+              key={h.schedule_id}
+              type="button"
+              onClick={() => onPick(h)}
+              className="w-full text-left rounded-md border border-gray-200 dark:border-slate-700 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className={cn('w-2 h-2 rounded-full shrink-0', clashDotColor(h))} />
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
+                  {h.subject_name}
+                </span>
+                <span className="ml-auto shrink-0">{getTypeBadge(h.event_type)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-0.5 pl-3.5">
+                <span className="text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                  {h.start_time.substring(0, 5)}-{h.end_time.substring(0, 5)}
+                </span>
+                {(h.event_type === 'makeup' || h.event_type === 'trial') && h.student_info && (
+                  <span className="flex items-center gap-0.5 text-[11px] text-purple-600 dark:text-purple-300 truncate">
+                    <User className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{h.student_info}</span>
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** A class card — shared by the grid cell. `hidden` = events clashing under this host. */
+function EventCard({ event, onClick, hidden, onPickHidden }: {
+  event: TimetableEvent;
+  onClick: () => void;
+  hidden?: TimetableEvent[];
+  onPickHidden?: (e: TimetableEvent) => void;
+}) {
+  return (
+    <div className="relative w-full h-full">
+      {hidden && hidden.length > 0 && onPickHidden && (
+        <ClashBadge hidden={hidden} onPick={onPickHidden} />
       )}
-    >
-      {/* Subject + session no. (inline) + type badge */}
-      <div className="flex items-center gap-1.5 mb-1">
-        <div
-          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-          style={{ backgroundColor: event.subject_color }}
-        />
-        <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate min-w-0">
-          {event.subject_name}
-        </span>
-        {event.session_number != null && (
-          <span className="text-orange-600 dark:text-orange-400 font-semibold text-[11px] shrink-0 whitespace-nowrap">
-            ({event.session_number}{event.total_sessions != null ? `/${event.total_sessions}` : ''})
-          </span>
+      <button
+        onClick={onClick}
+        className={cn(
+          'w-full h-full text-left rounded-lg border p-2.5 transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer',
+          getEventBg(event)
         )}
-        <span className="ml-auto shrink-0">{getTypeBadge(event.event_type)}</span>
-      </div>
-
-      {/* Class code (de-emphasised) + this class's own time range */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        {event.class_name ? (
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">
-            {event.class_name}
-          </p>
-        ) : <span />}
-        <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0 whitespace-nowrap">
-          {event.start_time.substring(0, 5)}-{event.end_time.substring(0, 5)}
-        </span>
-      </div>
-
-      {/* Teacher (avatar + name) + right info */}
-      <div className="flex items-center justify-between gap-2 mt-1">
-        {event.teacher_name ? (
-          <TeacherBadge name={event.teacher_name} imageUrl={event.teacher_image} size="sm" />
-        ) : <span />}
-
-        {/* Regular class → enrolled count; makeup/trial → student name */}
-        {event.event_type === 'class' && event.enrolled_count != null && (
-          <span className="flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400 shrink-0">
-            <Users className="h-3.5 w-3.5" />
-            {event.enrolled_count}/{event.max_students}
+      >
+        {/* Subject + session no. (inline) + type badge */}
+        <div className="flex items-center gap-1.5 mb-1">
+          <div
+            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: event.subject_color }}
+          />
+          <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate min-w-0">
+            {event.subject_name}
           </span>
-        )}
-        {(event.event_type === 'makeup' || event.event_type === 'trial') && event.student_info && (
-          <span
-            className={cn(
-              'flex items-center gap-0.5 text-xs shrink-0 truncate max-w-[55%]',
-              event.event_type === 'makeup' ? 'text-purple-600 dark:text-purple-300' : 'text-orange-600 dark:text-orange-300'
-            )}
-          >
-            <User className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{event.student_info}</span>
+          {event.session_number != null && (
+            <span className="text-orange-600 dark:text-orange-400 font-semibold text-[11px] shrink-0 whitespace-nowrap">
+              ({event.session_number}{event.total_sessions != null ? `/${event.total_sessions}` : ''})
+            </span>
+          )}
+          {/* Leave room on the right for the clash badge overlay */}
+          <span className={cn('ml-auto shrink-0', hidden && hidden.length > 0 && 'mr-7')}>
+            {getTypeBadge(event.event_type)}
           </span>
-        )}
-      </div>
-    </button>
+        </div>
+
+        {/* Class code (de-emphasised) + this class's own time range */}
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          {event.class_name ? (
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">
+              {event.class_name}
+            </p>
+          ) : <span />}
+          <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0 whitespace-nowrap">
+            {event.start_time.substring(0, 5)}-{event.end_time.substring(0, 5)}
+          </span>
+        </div>
+
+        {/* Teacher (avatar + name) + right info */}
+        <div className="flex items-center justify-between gap-2 mt-1">
+          {event.teacher_name ? (
+            <TeacherBadge name={event.teacher_name} imageUrl={event.teacher_image} size="sm" />
+          ) : <span />}
+
+          {/* Regular class → enrolled count; makeup/trial → student name */}
+          {event.event_type === 'class' && event.enrolled_count != null && (
+            <span className="flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400 shrink-0">
+              <Users className="h-3.5 w-3.5" />
+              {event.enrolled_count}/{event.max_students}
+            </span>
+          )}
+          {(event.event_type === 'makeup' || event.event_type === 'trial') && event.student_info && (
+            <span
+              className={cn(
+                'flex items-center gap-0.5 text-xs shrink-0 truncate max-w-[55%]',
+                event.event_type === 'makeup' ? 'text-purple-600 dark:text-purple-300' : 'text-orange-600 dark:text-orange-300'
+              )}
+            >
+              <User className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{event.student_info}</span>
+            </span>
+          )}
+        </div>
+      </button>
+    </div>
   );
 }
 
@@ -184,27 +262,67 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
 
   // Place each event: which slot index it starts on (snapped down) and how many
   // 30-min slots it spans (rowspan). Keyed by roomId so each column is independent.
+  //
+  // A room's grid can only draw one event per time slot (rowspan model). When a
+  // shorter event starts *inside* a longer event's span in the same room (time
+  // clash), it can't get its own cell — instead we attach it to the covering
+  // "host" event as a hidden event, surfaced via a red "+N" badge on the host.
   const placement = useMemo(() => {
     const axisStart = axis[0] ?? 0;
     // roomId -> Map(slotIndex -> events starting there)
     const byRoom = new Map<string, Map<number, { event: TimetableEvent; span: number }[]>>();
     // roomId -> Set(slotIndex) covered by an ongoing (spanning) event, so we skip rendering a cell there
     const covered = new Map<string, Set<number>>();
+    // host schedule_id -> events clashing under it (hidden from the grid)
+    const hiddenByHost = new Map<string, TimetableEvent[]>();
 
+    // Precompute each event's slot span, grouped per room, sorted longest-first
+    // so a clashing shorter event resolves to the widest covering host.
+    type Placed = { event: TimetableEvent; startIdx: number; span: number };
+    const placedByRoom = new Map<string, Placed[]>();
     for (const e of events) {
       const startIdx = Math.floor((toMinutes(e.start_time) - axisStart) / SLOT_MINUTES);
       const endIdx = Math.ceil((toMinutes(e.end_time) - axisStart) / SLOT_MINUTES);
       const span = Math.max(1, endIdx - startIdx);
+      if (!placedByRoom.has(e.room_id)) placedByRoom.set(e.room_id, []);
+      placedByRoom.get(e.room_id)!.push({ event: e, startIdx, span });
+    }
 
-      if (!byRoom.has(e.room_id)) byRoom.set(e.room_id, new Map());
-      const slotMap = byRoom.get(e.room_id)!;
-      if (!slotMap.has(startIdx)) slotMap.set(startIdx, []);
-      slotMap.get(startIdx)!.push({ event: e, span });
+    for (const [roomId, placed] of placedByRoom) {
+      // Longest span first; ties keep input order. Longer events become hosts.
+      const ordered = [...placed].sort((a, b) => b.span - a.span);
+      const slotMap = new Map<number, { event: TimetableEvent; span: number }[]>();
+      const covSet = new Set<number>();
+      byRoom.set(roomId, slotMap);
+      covered.set(roomId, covSet);
 
-      if (!covered.has(e.room_id)) covered.set(e.room_id, new Set());
-      const covSet = covered.get(e.room_id)!;
-      // Mark the slots AFTER the start as covered (the start cell is the rendered one).
-      for (let i = startIdx + 1; i < startIdx + span; i++) covSet.add(i);
+      for (const { event: e, startIdx, span } of ordered) {
+        // Is this event's start slot already covered by an earlier (longer) host?
+        if (covSet.has(startIdx)) {
+          // Find the host that occupies this slot: the rendered event whose span
+          // includes startIdx. Search rendered start-cells at or before startIdx.
+          let host: TimetableEvent | undefined;
+          for (let i = startIdx; i >= 0 && !host; i--) {
+            const cell = slotMap.get(i);
+            if (cell) {
+              for (const c of cell) {
+                if (i + c.span > startIdx) { host = c.event; break; }
+              }
+            }
+          }
+          if (host) {
+            if (!hiddenByHost.has(host.schedule_id)) hiddenByHost.set(host.schedule_id, []);
+            hiddenByHost.get(host.schedule_id)!.push(e);
+            continue; // don't render its own cell
+          }
+          // No host found (shouldn't happen) → fall through and render normally.
+        }
+
+        if (!slotMap.has(startIdx)) slotMap.set(startIdx, []);
+        slotMap.get(startIdx)!.push({ event: e, span });
+        // Mark the slots AFTER the start as covered (the start cell is rendered).
+        for (let i = startIdx + 1; i < startIdx + span; i++) covSet.add(i);
+      }
     }
 
     // Sort co-starting events in a cell by end time for stable order.
@@ -213,7 +331,11 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
         list.sort((a, b) => a.event.end_time.localeCompare(b.event.end_time));
       }
     }
-    return { byRoom, covered };
+    // Sort hidden events under each host by start time for readable popovers.
+    for (const list of hiddenByHost.values()) {
+      list.sort((a, b) => a.start_time.localeCompare(b.start_time));
+    }
+    return { byRoom, covered, hiddenByHost };
   }, [events, axis]);
 
   if (events.length === 0) {
@@ -290,7 +412,12 @@ export default function DailyTimetable({ events, rooms, onEventClick }: DailyTim
                             key={event.schedule_id}
                             className={starting.length === 1 ? 'flex-1' : ''}
                           >
-                            <EventCard event={event} onClick={() => onEventClick(event)} />
+                            <EventCard
+                              event={event}
+                              onClick={() => onEventClick(event)}
+                              hidden={placement.hiddenByHost.get(event.schedule_id)}
+                              onPickHidden={onEventClick}
+                            />
                           </div>
                         ))}
                       </div>
