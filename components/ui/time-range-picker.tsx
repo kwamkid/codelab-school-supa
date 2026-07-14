@@ -71,6 +71,10 @@ function TimePickerDropdown({
   const [open, setOpen] = React.useState(false)
   // Display HH:MM only — value from DB may be "HH:MM:SS", strip the seconds.
   const [text, setText] = React.useState(formatTimeDisplay(value))
+  // Whether the user has typed since opening. While false, the list shows ALL
+  // slots (so a selected value doesn't collapse the list to a single row) — we
+  // only filter once they actually start typing.
+  const [typing, setTyping] = React.useState(false)
   // Keyboard-navigation highlight (index into `filtered`); -1 = none.
   const [highlight, setHighlight] = React.useState(-1)
   const listRef = React.useRef<HTMLDivElement>(null)
@@ -89,6 +93,8 @@ function TimePickerDropdown({
   // "0800", "830" etc. Splits on the first ':' or '.' into hour + minute parts;
   // hour matches with or without a leading zero ("8" → 08), minute is a prefix.
   const filtered = React.useMemo(() => {
+    // Before the user types, show every slot (highlight the current value).
+    if (!typing) return slots
     const raw = text.trim()
     if (!raw) return slots
 
@@ -115,12 +121,14 @@ function TimePickerDropdown({
       if (minPart == null || minPart === '') return true
       return sm.startsWith(minPart)
     })
-  }, [slots, text])
+  }, [slots, text, typing])
 
-  // On open, highlight the current value (or first item); scroll it into view.
+  // On open: reset the typing flag (show all slots) and highlight the current
+  // value; scroll it into view.
   React.useEffect(() => {
-    if (!open) { setHighlight(-1); return }
-    const idx = value ? filtered.findIndex((s) => s === formatTimeDisplay(value)) : -1
+    if (!open) { setHighlight(-1); setTyping(false); return }
+    setTyping(false)
+    const idx = value ? slots.findIndex((s) => s === formatTimeDisplay(value)) : -1
     setHighlight(idx >= 0 ? idx : 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -159,6 +167,7 @@ function TimePickerDropdown({
   const pick = (slot: string) => {
     onChange(slot)
     setText(slot)
+    setTyping(false)
     setOpen(false)
   }
 
@@ -191,6 +200,7 @@ function TimePickerDropdown({
         onClick={() => setOpen(true)}
         onChange={(e) => {
           setText(e.target.value)
+          setTyping(true)
           if (!open) setOpen(true)
         }}
         onKeyDown={(e) => {
