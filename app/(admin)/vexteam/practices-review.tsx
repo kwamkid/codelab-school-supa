@@ -142,6 +142,8 @@ export function PracticesReview({
         onPendingCount?.(next.filter((r) => r.status === 'proposed').length)
         return next
       })
+      // Let the sidebar badge refresh its pending count.
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('vex-practices-changed'))
       return data.practice as PracticeRow
     } catch {
       toast.error('เกิดข้อผิดพลาด')

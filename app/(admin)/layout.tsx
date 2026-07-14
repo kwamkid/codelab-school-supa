@@ -27,6 +27,7 @@ import {
   Building2,
   UserCog,
   CalendarDays,
+  CalendarClock,
   TestTube,
   Repeat,
   ChevronDown,
@@ -166,6 +167,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   
   // Chat unread badge state
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  // VEX pending practice-request badge state
+  const [vexPendingCount, setVexPendingCount] = useState(0);
 
   // Notifications state
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -312,6 +316,34 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       supabase.removeChannel(channel);
     };
   }, [user]);
+
+  // VEX pending practice-request count (badge on the "คำขอซ้อม" submenu).
+  // Only staff who can manage VEX (super_admin/branch_admin) hit this endpoint.
+  useEffect(() => {
+    if (!user) return;
+    if (adminUser?.role !== 'super_admin' && adminUser?.role !== 'branch_admin') return;
+
+    const loadVexPending = async () => {
+      try {
+        const { authFetch } = await import('@/lib/auth-fetch');
+        const res = await authFetch('/api/admin/vex/practices?status=proposed');
+        if (!res.ok) return;
+        const data = await res.json();
+        setVexPendingCount((data.practices || []).length);
+      } catch {
+        // non-fatal
+      }
+    };
+
+    loadVexPending();
+    const interval = setInterval(loadVexPending, 120000); // every 2 min
+    const handler = () => loadVexPending();
+    window.addEventListener('vex-practices-changed', handler);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('vex-practices-changed', handler);
+    };
+  }, [user, adminUser?.role]);
 
   // Load notifications
   useEffect(() => {
@@ -721,12 +753,35 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     // --- VEX Team (bottom-most, below settings) ---
     {
       name: 'VEX Team',
-      href: '/vexteam',
       icon: Trophy,
       iconColor: 'text-red-600',
-      requiredRole: ['super_admin', 'branch_admin']
+      requiredRole: ['super_admin', 'branch_admin'],
+      subItems: [
+        {
+          name: 'ทีม',
+          href: '/vexteam',
+          icon: Users,
+          iconColor: 'text-red-500',
+          requiredRole: ['super_admin', 'branch_admin']
+        },
+        {
+          name: 'กิจกรรม',
+          href: '/vexteam/events',
+          icon: CalendarDays,
+          iconColor: 'text-red-500',
+          requiredRole: ['super_admin', 'branch_admin']
+        },
+        {
+          name: 'คำขอซ้อม',
+          href: '/vexteam/practices',
+          icon: CalendarClock,
+          iconColor: 'text-red-500',
+          badge: vexPendingCount > 0 ? vexPendingCount : undefined,
+          requiredRole: ['super_admin', 'branch_admin']
+        },
+      ]
     },
-  ], [pendingMakeupCount, newTrialCount, chatUnreadCount]); // dependencies สำหรับ badges
+  ], [pendingMakeupCount, newTrialCount, chatUnreadCount, vexPendingCount]); // dependencies สำหรับ badges
 
   // ใช้ useMemo เพื่อ filter navigation
   const filteredNavigation = useMemo(
@@ -959,7 +1014,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                                   }}
                                 >
                                   {SubItemIcon && <SubItemIcon className="mr-3 h-4 w-4 opacity-70" />}
-                                  {subItem.name}
+                                  <span className="flex-1">{subItem.name}</span>
+                                  {subItem.badge && (
+                                    <span className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-xs font-semibold">
+                                      {subItem.badge}
+                                    </span>
+                                  )}
                                 </MenuLink>
                               ) : null;
                             })}
