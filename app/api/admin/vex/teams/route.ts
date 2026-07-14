@@ -23,16 +23,35 @@ export async function GET(request: Request) {
   if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status })
 
   try {
-    const { data, error } = await vexDb()
+    const db = vexDb()
+    const { data, error } = await db
       .from('teams')
       .select('*')
       .order('created_at', { ascending: false })
     if (error) throw new Error(error.message)
+    const teamRows = data || []
 
-    const teams = (data || []).map((t: any) => ({
+    // Attach each team's kids (nickname) for the list display.
+    const teamIds = teamRows.map((t: any) => t.id)
+    const kidsByTeam = new Map<string, { id: string; nickname: string }[]>()
+    if (teamIds.length) {
+      const { data: kids } = await db
+        .from('kids')
+        .select('id, team_id, nickname')
+        .in('team_id', teamIds)
+        .order('created_at', { ascending: true })
+      for (const k of kids || []) {
+        const arr = kidsByTeam.get(k.team_id) || []
+        arr.push({ id: k.id, nickname: k.nickname })
+        kidsByTeam.set(k.team_id, arr)
+      }
+    }
+
+    const teams = teamRows.map((t: any) => ({
       ...t,
       eventLink: t.event_token ? linkSlug(t.team_number, t.event_token) : null,
       practiceLink: t.practice_token ? linkSlug(t.team_number, t.practice_token) : null,
+      kids: kidsByTeam.get(t.id) || [],
     }))
     return NextResponse.json({ teams })
   } catch (e) {

@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils'
 import { Trophy, Copy, Users, CalendarDays, Globe, ChevronRight, MapPin, Pencil, Trash2, CalendarClock } from 'lucide-react'
 import { LEVEL_META, PROGRAM_LOGO, type Level, type Program } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
+import { StudentBadge } from '@/components/ui/student-badge'
 import {
   thaiDateRange,
   groupByMonth,
@@ -49,6 +50,7 @@ interface TeamRow {
   level: Level
   eventLink: string | null
   practiceLink: string | null
+  kids: { id: string; nickname: string }[]
 }
 
 interface EventRow {
@@ -294,13 +296,21 @@ function VexTeamAdminInner() {
                         {t.name && <span className="text-gray-500">— {t.name}</span>}
                         <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition" />
                       </div>
+                      {/* Student names */}
+                      {t.kids.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                          {t.kids.map((k) => (
+                            <StudentBadge key={k.id} name={k.nickname} />
+                          ))}
+                        </div>
+                      )}
                     </Link>
                     <div className="flex items-center gap-2 flex-wrap sm:justify-end">
                       {t.eventLink && (
-                        <CopyLinkButton label="RSVP กิจกรรม" url={publicUrl('e', t.eventLink)} />
+                        <CopyLinkButton label="ตารางการแข่งขัน" url={publicUrl('e', t.eventLink)} />
                       )}
                       {t.practiceLink && (
-                        <CopyLinkButton label="ซ้อม" url={publicUrl('p', t.practiceLink)} />
+                        <CopyLinkButton label="ตารางเข้าซ้อม" url={publicUrl('p', t.practiceLink)} />
                       )}
                       <LevelBadge level={t.level} logoHeight={26} />
                     </div>
