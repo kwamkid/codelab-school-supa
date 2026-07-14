@@ -95,7 +95,9 @@ function SearchableSelect({
 }: Omit<FormSelectProps, 'searchThreshold'>) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState('')
+  const [highlighted, setHighlighted] = React.useState(0)
   const inputRef = React.useRef<HTMLInputElement>(null)
+  const listRef = React.useRef<HTMLDivElement>(null)
 
   const selectedOption = React.useMemo(
     () => options.find((opt) => opt.value === value),
@@ -111,9 +113,45 @@ function SearchableSelect({
   React.useEffect(() => {
     if (open) {
       setSearch('')
+      // Start on the currently-selected option, if any.
+      const idx = options.findIndex((o) => o.value === value)
+      setHighlighted(idx >= 0 ? idx : 0)
       setTimeout(() => inputRef.current?.focus(), 0)
     }
-  }, [open])
+  }, [open, options, value])
+
+  // Reset highlight to the top whenever the filtered set changes.
+  React.useEffect(() => {
+    setHighlighted(0)
+  }, [search])
+
+  // Keep the highlighted item scrolled into view.
+  React.useEffect(() => {
+    if (!open) return
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${highlighted}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [highlighted, open])
+
+  const commit = (opt: FormSelectOption) => {
+    onValueChange(opt.value)
+    setOpen(false)
+  }
+
+  const onInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlighted((p) => (filtered.length ? (p + 1) % filtered.length : 0))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlighted((p) => (filtered.length ? (p - 1 + filtered.length) % filtered.length : 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (filtered[highlighted]) commit(filtered[highlighted])
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setOpen(false)
+    }
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -157,6 +195,7 @@ function SearchableSelect({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={onInputKeyDown}
             placeholder={searchPlaceholder}
             className="flex h-8 w-full bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
           />
@@ -164,6 +203,7 @@ function SearchableSelect({
 
         {/* Scrollable options list */}
         <div
+          ref={listRef}
           className="p-1"
           style={{ maxHeight: '260px', overflowY: 'scroll', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
           onWheel={(e) => e.stopPropagation()}
@@ -174,18 +214,17 @@ function SearchableSelect({
               ไม่พบข้อมูล
             </div>
           ) : (
-            filtered.map((opt) => (
+            filtered.map((opt, idx) => (
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => {
-                  onValueChange(opt.value)
-                  setOpen(false)
-                }}
+                data-idx={idx}
+                onClick={() => commit(opt)}
+                onMouseEnter={() => setHighlighted(idx)}
                 className={cn(
                   'relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none select-none',
-                  'hover:bg-accent hover:text-accent-foreground',
-                  value === opt.value && 'bg-accent/10 font-medium'
+                  idx === highlighted && 'bg-accent text-accent-foreground',
+                  value === opt.value && 'font-medium'
                 )}
               >
                 <Check
