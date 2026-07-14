@@ -35,7 +35,7 @@ function EventRsvpInner({ slug }: { slug: string }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <TeamHeader
-        title="แจ้งเข้าร่วมการแข่งขัน"
+        title="ตารางการแข่งขัน"
         teamLabel={`ทีม ${data.team.team_number}${data.team.name ? ` — ${data.team.name}` : ''}`}
         parentName={data.parentDisplayName}
       />
