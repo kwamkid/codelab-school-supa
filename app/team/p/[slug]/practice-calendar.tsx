@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { StudentBadge } from '@/components/ui/student-badge'
 import type { PracticeStatus } from '@/lib/vex/types'
 
 interface Kid { id: string; nickname: string }
@@ -179,23 +180,28 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
         </button>
       </div>
 
-      {/* Kid filter (only when the team has more than one kid) */}
+      {/* Kid filter — pill buttons (matches the LIFF schedule page). */}
       {kids.length > 1 && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 shrink-0">กรองน้อง</span>
-          <Select value={kidFilter} onValueChange={setKidFilter}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">ทุกคน</SelectItem>
-              {kids.map((k) => (
-                <SelectItem key={k.id} value={k.id}>
-                  {k.nickname}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <Button
+            variant={kidFilter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setKidFilter('all')}
+            className="whitespace-nowrap"
+          >
+            ทุกคน
+          </Button>
+          {kids.map((k) => (
+            <Button
+              key={k.id}
+              variant={kidFilter === k.id ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setKidFilter(k.id)}
+              className="whitespace-nowrap"
+            >
+              {k.nickname}
+            </Button>
+          ))}
         </div>
       )}
 
@@ -304,8 +310,8 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
                 className="w-full text-left bg-white rounded-lg border p-3 flex items-center justify-between gap-3 hover:bg-gray-50"
               >
                 <div className="min-w-0">
-                  <div className="font-medium">{kidName(p.kid_id)}</div>
-                  <div className="text-sm text-gray-600">
+                  <StudentBadge name={kidName(p.kid_id)} />
+                  <div className="text-sm text-gray-600 mt-1">
                     {format(new Date(p.practice_date + 'T00:00:00'), 'd MMM', { locale: th })}
                     {p.start_time ? ` ${hhmm(p.start_time)}` : ''}
                     {p.end_time ? ` - ${hhmm(p.end_time)}` : ''}
@@ -567,7 +573,7 @@ function DetailModal({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-gray-500">เด็ก</span>
-          <span className="font-medium">{kidName}</span>
+          <StudentBadge name={kidName} />
         </div>
         <div className="flex items-center justify-between">
           <span className="text-gray-500">วันที่</span>
