@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger,
+  PopoverAnchor,
 } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 
@@ -170,7 +170,10 @@ function TimePickerDropdown({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+      {/* Anchor (not Trigger) so Radix only positions the popover and doesn't
+          also toggle it — the input controls `open` itself, which otherwise
+          fights Radix's trigger toggle and makes the popover flicker. */}
+      <PopoverAnchor asChild>
         <input
           ref={inputRef}
           type="text"
@@ -214,12 +217,21 @@ function TimePickerDropdown({
             className
           )}
         />
-      </PopoverTrigger>
+      </PopoverAnchor>
       <PopoverContent
         className="w-[120px] p-0"
         align="start"
         collisionPadding={8}
+        // Keep focus in the input so typing still works while the list is open.
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        // Clicking the input (the anchor) counts as "outside" the content —
+        // don't let that close the popover (it would flicker on each click).
+        onPointerDownOutside={(e) => {
+          if (inputRef.current && e.target instanceof Node && inputRef.current.contains(e.target)) {
+            e.preventDefault()
+          }
+        }}
         onWheel={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
       >
