@@ -60,6 +60,21 @@ interface TempSchedule extends ScheduleFormData {
   isNew: boolean;
 }
 
+// Event status options. `liveOnly` ones describe how an existing event ended, so
+// they're hidden until the event is actually live (a new or duplicated draft has
+// nothing to complete or cancel yet).
+const STATUS_OPTIONS: {
+  value: Event['status'];
+  label: string;
+  color: string;
+  liveOnly?: boolean;
+}[] = [
+  { value: 'draft', label: 'ร่าง', color: '#9ca3af' },
+  { value: 'published', label: 'เผยแพร่', color: '#22c55e' },
+  { value: 'completed', label: 'จบแล้ว', color: '#3b82f6', liveOnly: true },
+  { value: 'cancelled', label: 'ยกเลิก', color: '#ef4444', liveOnly: true },
+];
+
 // Reusable section wrapper: rounded card with an orange icon chip header.
 function SectionCard({
   icon: Icon,
@@ -75,8 +90,8 @@ function SectionCard({
   className?: string;
 }) {
   return (
-    <Card className={cn('overflow-hidden border-gray-200 shadow-sm', className)}>
-      <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+    <Card className={cn('border-gray-200 shadow-sm', className)}>
+      <CardHeader className="rounded-t-xl border-b border-gray-100 bg-gray-50/60">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Icon className="h-5 w-5" />
@@ -95,6 +110,10 @@ function SectionCard({
 }
 
 export default function EventForm({ event, isEdit = false }: EventFormProps) {
+  // "จบแล้ว"/"ยกเลิก" describe an event that already exists and has run. A new
+  // event — or a duplicate, which lands here as a fresh draft — has nothing to
+  // complete or cancel, so offer only ร่าง/เผยแพร่ until it leaves draft.
+  const showLifecycleStatuses = isEdit && !!event?.id && event.status !== 'draft';
   const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -1084,14 +1103,13 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
               <FormSelect
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value as Event['status'] })}
-                options={[
-                  { value: 'draft', label: 'ร่าง' },
-                  { value: 'published', label: 'เผยแพร่' },
-                  ...(isEdit ? [
-                    { value: 'completed', label: 'จบแล้ว' },
-                    { value: 'cancelled', label: 'ยกเลิก' },
-                  ] : []),
-                ]}
+                options={STATUS_OPTIONS.filter(
+                  (opt) =>
+                    !opt.liveOnly ||
+                    showLifecycleStatuses ||
+                    // Never hide the value the event is already set to.
+                    opt.value === formData.status
+                )}
               />
               <p className="text-xs text-gray-500">
                 {formData.status === 'draft' && 'Event จะยังไม่แสดงให้ผู้ใช้เห็น'}

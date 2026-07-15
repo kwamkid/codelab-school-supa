@@ -66,6 +66,7 @@ import RegistrationList from '@/components/events/registration-list';
 import AttendanceChecker from '@/components/events/attendance-checker';
 import EventStatistics from '@/components/events/event-statistics';
 import { PermissionGuard } from '@/components/auth/permission-guard';
+import { getEventRegistrationUrl } from '@/lib/short-links';
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -83,10 +84,28 @@ export default function EventDetailPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [refreshKey, setRefreshKey] = useState(0);
   const [copyingLink, setCopyingLink] = useState(false);
+  // Short /e/<code> registration URL, resolved once the event is published.
+  const [registrationUrl, setRegistrationUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
   }, [eventId, refreshKey]);
+
+  // Resolve the short registration link once the event is published. Falls back
+  // to the long URL if the short-link API is unavailable.
+  useEffect(() => {
+    if (event?.status !== 'published') {
+      setRegistrationUrl(null);
+      return;
+    }
+    let cancelled = false;
+    getEventRegistrationUrl(eventId).then((url) => {
+      if (!cancelled) setRegistrationUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, event?.status]);
 
   const loadData = async () => {
     try {
@@ -335,19 +354,7 @@ export default function EventDetailPage() {
                 onClick={async () => {
                   setCopyingLink(true);
                   try {
-                    const res = await fetch('/api/admin/short-links', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ eventId: event.id }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok || !data.code) throw new Error(data.error || 'failed');
-                    const link = `${window.location.origin}/e/${data.code}`;
-                    await navigator.clipboard.writeText(link);
-                    toast.success('คัดลอกลิงก์ลงทะเบียนแล้ว');
-                  } catch {
-                    // Fallback to the long link so copy still works.
-                    const link = `${window.location.origin}/liff/events/register/${event.id}`;
+                    const link = await getEventRegistrationUrl(event.id);
                     await navigator.clipboard.writeText(link);
                     toast.success('คัดลอกลิงก์ลงทะเบียนแล้ว');
                   } finally {
@@ -691,13 +698,14 @@ export default function EventDetailPage() {
               <CardContent>
                 <div className="space-y-3">
                   <div className="p-3 bg-gray-50 rounded-lg font-mono text-sm break-all">
-                    {window.location.origin}/liff/events/register/{event.id}
+                    {registrationUrl ?? 'กำลังสร้างลิงก์...'}
                   </div>
                   <Button
                     className="w-full"
-                    onClick={() => {
-                      const link = `${window.location.origin}/liff/events/register/${event.id}`;
-                      navigator.clipboard.writeText(link);
+                    disabled={!registrationUrl}
+                    onClick={async () => {
+                      if (!registrationUrl) return;
+                      await navigator.clipboard.writeText(registrationUrl);
                       toast.success('คัดลอกลิงก์แล้ว');
                     }}
                   >

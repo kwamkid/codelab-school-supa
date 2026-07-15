@@ -58,7 +58,8 @@ import {
   Link as LinkIcon,
   CheckCircle2,
   Copy,
-  MoreHorizontal
+  MoreHorizontal,
+  ImageIcon
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { toast } from 'sonner';
@@ -66,6 +67,8 @@ import { formatDate, cn } from '@/lib/utils';
 import { StatusFilterTabs } from '@/components/ui/status-filter-tabs';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
+import { Lightbox } from '@/components/ui/lightbox';
+import { getEventRegistrationUrl } from '@/lib/short-links';
 
 type EventWithStats = Event & {
   totalRegistrations?: number;
@@ -89,6 +92,9 @@ export default function EventsPage() {
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
   const [duplicatingEventId, setDuplicatingEventId] = useState<string | null>(null);
+  const [lightboxEvent, setLightboxEvent] = useState<EventWithStats | null>(null);
+  // Events whose image failed to load -> fall back to the placeholder icon.
+  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadEvents();
@@ -178,21 +184,7 @@ export default function EventsPage() {
   };
 
   const copyRegistrationLink = async (eventId: string) => {
-    let link = `${window.location.origin}/liff/events/register/${eventId}`;
-    try {
-      const res = await fetch('/api/admin/short-links', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId }),
-      });
-      const data = await res.json();
-      if (res.ok && data.code) {
-        link = `${window.location.origin}/e/${data.code}`;
-      }
-    } catch {
-      // Fall back to the long link.
-    }
-
+    const link = await getEventRegistrationUrl(eventId);
     await navigator.clipboard.writeText(link);
     setCopiedEventId(eventId);
     toast.success('คัดลอกลิงก์แล้ว');
@@ -221,6 +213,9 @@ export default function EventsPage() {
     completed: events.filter(e => e.status === 'completed').length,
     cancelled: events.filter(e => e.status === 'cancelled').length,
   };
+
+  const markImageBroken = (eventId: string) =>
+    setBrokenImages((prev) => (prev[eventId] ? prev : { ...prev, [eventId]: true }));
 
   const getEventTypeLabel = (type: string) => {
     const types: Record<string, string> = {
@@ -288,13 +283,14 @@ export default function EventsPage() {
     });
   };
 
+  // Event date shown on two lines: start on the first, "- end" on the second.
   const formatEventDate = (event: EventWithStats) => {
     if (!event.firstEventDate) return null;
     const first = formatDate(event.firstEventDate, 'short');
     if (event.lastEventDate && event.lastEventDate.getTime() !== event.firstEventDate.getTime()) {
-      return `${first} - ${formatDate(event.lastEventDate, 'short')}`;
+      return { first, last: formatDate(event.lastEventDate, 'short') };
     }
-    return first;
+    return { first, last: null };
   };
 
   if (loading) {
@@ -409,43 +405,88 @@ export default function EventsPage() {
                   {filteredEvents.map((event) => (
                     <TableRow key={event.id}>
                       <TableCell>
-                        <div>
-                          <Link
-                            href={`/events/${event.id}`}
-                            className="font-medium text-gray-900 hover:text-primary hover:underline"
-                          >
-                            {event.name}
-                          </Link>
-                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                            {event.branchIds.length > 0 ? (
-                              event.branchIds.map((branchId) => (
-                                <Badge key={branchId} variant="outline" className="text-xs font-normal">
-                                  {getBranchName(branchId)}
-                                </Badge>
-                              ))
-                            ) : (
-                              <div className="flex items-center gap-1 text-gray-500 text-sm">
-                                <MapPin className="h-3 w-3 shrink-0" />
-                                <span className="truncate max-w-[260px]">{event.location}</span>
-                              </div>
-                            )}
+                        <div className="flex items-center gap-3">
+                          {event.imageUrl && !brokenImages[event.id] ? (
+                            <button
+                              type="button"
+                              onClick={() => setLightboxEvent(event)}
+                              className="shrink-0 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
+                              aria-label={`ดูรูป ${event.name}`}
+                            >
+                              {/* Natural ratio: fixed height, width follows the image. */}
+                              <img
+                                src={event.imageUrl}
+                                alt=""
+                                className="h-12 w-auto rounded-md border border-gray-200 object-contain bg-gray-50 transition-opacity hover:opacity-80"
+                                onError={() => markImageBroken(event.id)}
+                                // A decode that yields 0 width is unusable even though the
+                                // request resolved. The ref also catches images that finished
+                                // loading before React attached the handlers.
+                                ref={(node) => {
+                                  if (node?.complete && node.naturalWidth === 0) {
+                                    markImageBroken(event.id);
+                                  }
+                                }}
+                                onLoad={(e) => {
+                                  if (e.currentTarget.naturalWidth === 0) markImageBroken(event.id);
+                                }}
+                              />
+                            </button>
+                          ) : (
+                            <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-100 text-gray-300">
+                              <ImageIcon className="h-5 w-5" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <Link
+                              href={`/events/${event.id}`}
+                              className="font-medium text-gray-900 hover:text-primary hover:underline"
+                            >
+                              {event.name}
+                            </Link>
+                            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                              {event.branchIds.length > 0 ? (
+                                event.branchIds.map((branchId) => (
+                                  <Badge key={branchId} variant="outline" className="text-xs font-normal">
+                                    {getBranchName(branchId)}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <div className="flex items-center gap-1 text-gray-500 text-sm">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="truncate max-w-[260px]">{event.location}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getEventTypeColor(event.eventType)}>
+                        <Badge
+                          className={cn(
+                            'px-2 py-0.5 text-xs font-normal',
+                            getEventTypeColor(event.eventType)
+                          )}
+                        >
                           {getEventTypeLabel(event.eventType)}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {formatEventDate(event) ? (
-                          <div className="flex items-center gap-1 whitespace-nowrap">
-                            <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                            <span>{formatEventDate(event)}</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                        {(() => {
+                          const eventDate = formatEventDate(event);
+                          if (!eventDate) return <span className="text-gray-400">-</span>;
+                          return (
+                            <div className="flex items-start gap-1 whitespace-nowrap">
+                              <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0 mt-0.5" />
+                              <div>
+                                <p>{eventDate.first}</p>
+                                {eventDate.last && (
+                                  <p className="text-gray-500">- {eventDate.last}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -558,6 +599,15 @@ export default function EventsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Event image lightbox */}
+      {lightboxEvent?.imageUrl && (
+        <Lightbox
+          images={lightboxEvent.imageUrl}
+          caption={lightboxEvent.name}
+          onClose={() => setLightboxEvent(null)}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteEventId} onOpenChange={() => setDeleteEventId(null)}>

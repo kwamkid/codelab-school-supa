@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, ReactNode } from 'react';
 import { Phone, Mail, Tag, Link as LinkIcon, BookOpen, GraduationCap, ArrowLeft, X, Plus, MapPin, UserCheck, Unlink, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { ChatConversation, Branch } from '@/types/models';
 import { formatDate } from '@/lib/utils';
 import { School, CalendarDays } from 'lucide-react';
 import { ChannelIcon } from './channel-icon';
+import { Lightbox } from '@/components/ui/lightbox';
 
 export interface LinkedParentInfo {
   id: string;
@@ -102,14 +103,6 @@ export default function ActionPanel({
   const [refreshing, setRefreshing] = useState(false);
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
 
-  // Close lightbox on ESC
-  useEffect(() => {
-    if (!showAvatarPreview) return;
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowAvatarPreview(false); };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [showAvatarPreview]);
-
   if (!conversation) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
@@ -191,24 +184,10 @@ export default function ActionPanel({
 
       {/* Avatar lightbox */}
       {showAvatarPreview && contact?.avatarUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={() => setShowAvatarPreview(false)}
-        >
-          <button
-            onClick={() => setShowAvatarPreview(false)}
-            className="absolute top-4 right-4 p-2 rounded-full bg-black/40 text-white hover:bg-black/60"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={contact.avatarUrl}
-            alt={displayName}
-            className="max-w-[90vw] max-h-[90vh] rounded-xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
+        <Lightbox
+          images={contact.avatarUrl}
+          onClose={() => setShowAvatarPreview(false)}
+        />
       )}
 
       {/* Contact profile */}
