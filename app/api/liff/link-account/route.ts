@@ -47,16 +47,19 @@ export async function POST(request: NextRequest) {
     // Check if LINE User ID already exists
     const { data: existingParent } = await supabase
       .from('parents')
-      .select('id')
+      .select('id, display_name')
       .eq('line_user_id', lineUserId)
-      .single()
+      .maybeSingle()
 
     if (existingParent) {
       return NextResponse.json(
         {
-          error: 'LINE account นี้ถูกใช้งานแล้ว',
+          // Naming the existing account turns a dead end into something the
+          // parent (or an admin) can act on.
+          error: `LINE นี้ถูกเชื่อมกับบัญชี "${existingParent.display_name}" อยู่แล้ว หากต้องการย้ายบัญชี กรุณาติดต่อเจ้าหน้าที่`,
           errorCode: 'line_already_used',
-          existingParentId: existingParent.id
+          existingParentId: existingParent.id,
+          existingParentName: existingParent.display_name
         },
         { status: 400 }
       )

@@ -129,17 +129,9 @@ function LinkAccountContent() {
       const data = await response.json();
 
       if (!response.ok) {
-        // Handle specific error cases
-        if (data.errorCode === 'line_already_used') {
-          setError('LINE account นี้ถูกใช้งานแล้ว กรุณาใช้ LINE account อื่น');
-          
-          // Optional: Show which parent is using this LINE
-          if (data.existingParentId) {
-            console.log('LINE already used by parent:', data.existingParentId);
-          }
-        } else {
-          setError(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
-        }
+        // The server's message already names the conflicting account, so show it
+        // rather than a generic string.
+        setError(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
         return;
       }
 
