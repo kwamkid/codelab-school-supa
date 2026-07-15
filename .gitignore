@@ -63,5 +63,9 @@ supabase/.temp/
 # Session resume memo (local only)
 tbc.md
 
+# Working notes (local only)
+learning.md
+rules.md
+
 # Local DB backups (contain private data — never commit)
 backup/
