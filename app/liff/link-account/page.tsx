@@ -18,7 +18,8 @@ import {
   Link as LinkIcon
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
-import { useLiff } from '@/components/liff/liff-provider';
+import { LiffProvider, useLiff } from '@/components/liff/liff-provider';
+import { liffFetch } from '@/lib/line/liff-fetch';
 import { toast } from 'sonner';
 
 function LinkAccountContent() {
@@ -35,13 +36,8 @@ function LinkAccountContent() {
   const [error, setError] = useState('');
   const [tokenId, setTokenId] = useState('');
 
-  // Auto-redirect if not logged in
-  useEffect(() => {
-    if (!isLoggedIn && liff) {
-      // Redirect to LINE login
-      liff.login();
-    }
-  }, [isLoggedIn, liff]);
+  // Login is handled by <LiffProvider requireLogin> above; it redirects to LINE
+  // before rendering this component when the user isn't logged in.
 
   // Check if no token provided
   useEffect(() => {
@@ -76,21 +72,11 @@ function LinkAccountContent() {
       setVerifying(true);
       setError('');
 
-      const response = await fetch('/api/liff/verify-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          token, 
-          phone: phone.replace(/-/g, '') // Remove formatting
-        })
+      const data = await liffFetch<any>('/api/liff/verify-token', {
+        token,
+        phone: phone.replace(/-/g, ''), // Remove formatting
+        lineUserId: profile?.userId
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'เกิดข้อผิดพลาด');
-        return;
-      }
 
       if (data.valid) {
         setParentData(data.parent);
@@ -98,7 +84,7 @@ function LinkAccountContent() {
       }
     } catch (error) {
       console.error('Error verifying phone:', error);
-      setError('ไม่สามารถตรวจสอบข้อมูลได้');
+      setError(error instanceof Error ? error.message : 'ไม่สามารถตรวจสอบข้อมูลได้');
     } finally {
       setVerifying(false);
     }
@@ -111,9 +97,26 @@ function LinkAccountContent() {
       setLinking(true);
       setError('');
 
+      // Raw fetch (not liffFetch) so the `line_already_used` error code below is
+      // readable instead of being flattened into a thrown Error.
+      const idToken = liff?.getIDToken?.() ?? null;
+
+      // The server requires a verified ID token here (it writes the LINE id onto
+      // a parent). No token means the LIFF app's `openid` scope is off — say so
+      // instead of surfacing a bare 401.
+      if (!idToken) {
+        setError(
+          'ไม่สามารถอ่านข้อมูลยืนยันตัวตนจาก LINE ได้ (openid scope) — กรุณาแจ้งผู้ดูแลระบบ'
+        );
+        return;
+      }
+
       const response = await fetch('/api/liff/link-account', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {})
+        },
         body: JSON.stringify({
           token,
           phone: phone.replace(/-/g, ''),
@@ -396,7 +399,9 @@ function LinkAccountContent() {
 export default function LinkAccountPage() {
   return (
     <Suspense fallback={<SectionLoading text="กำลังโหลด..." />}>
-      <LinkAccountContent />
+      <LiffProvider requireLogin={true}>
+        <LinkAccountContent />
+      </LiffProvider>
     </Suspense>
   );
 }

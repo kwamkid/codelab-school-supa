@@ -55,7 +55,11 @@ export function LinkAccountQR({ parentId, parentName, parentPhone }: LinkAccount
     generateToken();
   }, [parentId]);
 
-  const linkUrl = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/liff/link-account?token=${token}`;
+  // Must be the liff.line.me deep link, not a plain web URL: scanning a bare
+  // https:// link opens the system browser with no LIFF context, so the page can
+  // never authenticate. This form opens LINE's in-app browser.
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID || '2007575627-GmKBZJdo';
+  const linkUrl = `https://liff.line.me/${liffId}/link-account?token=${token}`;
 
   const copyToClipboard = async () => {
     try {

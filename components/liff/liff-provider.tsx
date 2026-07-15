@@ -25,14 +25,10 @@ interface LiffContextType {
   isInClient: boolean
 }
 
-const LiffContext = createContext<LiffContextType>({
-  liff: null,
-  profile: null,
-  isLoading: true,
-  error: null,
-  isLoggedIn: false,
-  isInClient: false
-})
+// Default must be undefined: a truthy default makes the useLiff() guard below
+// unreachable, so a page missing its provider silently reads isLoggedIn=false /
+// liff=null forever instead of throwing.
+const LiffContext = createContext<LiffContextType | undefined>(undefined)
 
 export function useLiff() {
   const context = useContext(LiffContext)

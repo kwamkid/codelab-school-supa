@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Event, EventSchedule } from '@/types/models';
 import { getEvents, getAvailableSchedules, isRegistrationOpen } from '@/lib/services/events';
-import { useLiff } from '@/components/liff/liff-provider';
+import { LiffProvider, useLiff } from '@/components/liff/liff-provider';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,7 @@ import { SectionLoading } from '@/components/ui/loading';
 import { formatDate } from '@/lib/utils';
 import Image from 'next/image';
 
-export default function LiffEventsPage() {
+function LiffEventsContent() {
   const router = useRouter();
   const { profile, isLoggedIn } = useLiff();
   const [loading, setLoading] = useState(true);
@@ -268,5 +268,14 @@ export default function LiffEventsPage() {
         </div>
       </div>
     </div>
+  );
+}
+// This page browses events without requiring login; login state only changes the
+// header. requireLogin={false} keeps that behaviour while providing LIFF context.
+export default function LiffEventsPage() {
+  return (
+    <LiffProvider requireLogin={false}>
+      <LiffEventsContent />
+    </LiffProvider>
   );
 }

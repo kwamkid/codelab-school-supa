@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyLinkToken, markTokenAsUsed, linkParentToLine } from '@/lib/supabase/services/link-tokens'
 import { createServiceClient } from '@/lib/supabase/server'
+import { verifyLiffIdToken } from '@/lib/line/verify-liff-token'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -10,9 +11,34 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { token, phone, lineUserId, lineDisplayName, linePictureUrl } = body
+    const { token, phone, lineDisplayName, linePictureUrl } = body
 
-    if (!token || !phone || !lineUserId) {
+    // Identity MUST come from a verified LINE ID token. Deliberately not using
+    // resolveLiffUser(): its fallback to body.lineUserId is acceptable for
+    // read-only portal routes, but this endpoint *writes* the LINE id onto a
+    // parent row — trusting the body would let anyone who guesses a registered
+    // phone number attach an arbitrary LINE account to that parent.
+    const auth = request.headers.get('authorization') || request.headers.get('Authorization')
+    const idToken = auth?.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : null
+
+    if (!idToken) {
+      return NextResponse.json(
+        { error: 'ไม่สามารถยืนยันตัวตน LINE ได้ กรุณาเปิดลิงก์ผ่านแอป LINE อีกครั้ง' },
+        { status: 401 }
+      )
+    }
+
+    const verified = await verifyLiffIdToken(idToken)
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'ไม่สามารถยืนยันตัวตน LINE ได้ กรุณาลองใหม่อีกครั้ง' },
+        { status: 401 }
+      )
+    }
+
+    const lineUserId = verified.lineUserId
+
+    if (!token || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
