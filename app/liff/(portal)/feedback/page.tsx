@@ -28,12 +28,17 @@ interface FeedbackData {
   teacherName: string
 }
 
+// Cache stores raw (string) dates — sessionStorage JSON round-trips them — so
+// revive to Date at read time.
+const reviveFeedbacks = (list: any[]): FeedbackData[] =>
+  (list || []).map((f: any) => ({ ...f, sessionDate: new Date(f.sessionDate) }))
+
 function FeedbackContent() {
   const { profile, isLoggedIn, isLoading: liffLoading } = useLiff()
   const cacheKey = profile?.userId ? `feedback:${profile.userId}` : null
-  const cached = cacheKey ? getLiffCache<{ students: any[]; feedbacks: FeedbackData[] }>(cacheKey) : undefined
+  const cached = cacheKey ? getLiffCache<{ students: any[]; feedbacks: any[] }>(cacheKey) : undefined
   const [loading, setLoading] = useState(!cached)
-  const [feedbacks, setFeedbacks] = useState<FeedbackData[]>(cached?.feedbacks ?? [])
+  const [feedbacks, setFeedbacks] = useState<FeedbackData[]>(cached ? reviveFeedbacks(cached.feedbacks) : [])
   const [students, setStudents] = useState<any[]>(cached?.students ?? [])
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
   const [selectedSubject, setSelectedSubject] = useState<string>('all')
@@ -57,13 +62,9 @@ function FeedbackContent() {
       const studentsData = json.students || []
       setStudents(studentsData)
 
-      // Server returns ISO date strings → revive to Date for formatting
-      const revived: FeedbackData[] = (json.feedbacks || []).map((f: any) => ({
-        ...f,
-        sessionDate: new Date(f.sessionDate),
-      }))
-      setFeedbacks(revived)
-      if (cacheKey) setLiffCache(cacheKey, { students: studentsData, feedbacks: revived })
+      setFeedbacks(reviveFeedbacks(json.feedbacks || []))
+      // Cache the raw payload (JSON-safe for the sessionStorage layer).
+      if (cacheKey) setLiffCache(cacheKey, { students: studentsData, feedbacks: json.feedbacks || [] })
     } catch (error) {
       console.error('Error loading feedback:', error)
       toast.error(error instanceof Error ? `โหลด feedback ไม่ได้: ${error.message}` : 'ไม่สามารถโหลดข้อมูลได้')

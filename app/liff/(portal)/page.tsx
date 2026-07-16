@@ -15,15 +15,19 @@ import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { Loading } from '@/components/ui/loading'
 import { formatDate, getDayName } from '@/lib/utils'
 
+interface NextClass {
+  className: string; subjectName: string; sessionNumber: number
+  sessionDate: string; startTime: string; endTime: string
+  branchName: string; studentName: string
+}
+
 interface HomeSummary {
   hasParent: boolean
   parentName: string
   pendingMakeupCount: number
-  nextClass: null | {
-    className: string; subjectName: string; sessionNumber: number
-    sessionDate: string; startTime: string; endTime: string
-    branchName: string; studentName: string
-  }
+  // One upcoming class per student; nextClass kept for cached old payloads.
+  nextClasses?: NextClass[]
+  nextClass: NextClass | null
   latestFeedback: null | {
     studentName: string; className: string; sessionNumber: number
     sessionDate: string; feedback: string; photoCount: number
@@ -135,38 +139,48 @@ function Dashboard() {
           </Card>
         )}
 
-        {/* Next class */}
+        {/* Next class — one card per student */}
         <div>
           <h2 className="text-sm font-semibold text-gray-500 mb-2 px-1">คาบเรียนถัดไป</h2>
-          {data?.nextClass ? (
-            <Card className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/schedule')}>
-              <CardContent className="p-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-blue-500 text-white shrink-0">
-                    <Calendar className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold leading-tight">
-                        {data.nextClass.subjectName || data.nextClass.className}
-                        <span className="font-normal text-gray-400"> · ครั้งที่ {data.nextClass.sessionNumber}</span>
-                      </p>
-                      <StudentBadge name={data.nextClass.studentName} className="shrink-0" />
-                    </div>
-                    <p className="text-sm text-gray-600 mt-0.5">
-                      {getDayName(new Date(data.nextClass.sessionDate).getDay())} {formatDate(data.nextClass.sessionDate, 'long')}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {data.nextClass.startTime?.slice(0, 5)}-{data.nextClass.endTime?.slice(0, 5)} น.
-                      {data.nextClass.branchName && <> · {data.nextClass.branchName}</>}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card><CardContent className="p-4 text-center text-sm text-gray-400">ไม่มีคาบเรียนที่กำลังจะถึง</CardContent></Card>
-          )}
+          {(() => {
+            const nextClasses = data?.nextClasses?.length
+              ? data.nextClasses
+              : data?.nextClass ? [data.nextClass] : []
+            if (nextClasses.length === 0) {
+              return <Card><CardContent className="p-4 text-center text-sm text-gray-400">ไม่มีคาบเรียนที่กำลังจะถึง</CardContent></Card>
+            }
+            return (
+              <div className="space-y-2">
+                {nextClasses.map((nc, i) => (
+                  <Card key={`${nc.studentName}-${i}`} className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/schedule')}>
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-blue-500 text-white shrink-0">
+                          <Calendar className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-semibold leading-tight">
+                              {nc.subjectName || nc.className}
+                              <span className="font-normal text-gray-400"> · ครั้งที่ {nc.sessionNumber}</span>
+                            </p>
+                            <StudentBadge name={nc.studentName} className="shrink-0" />
+                          </div>
+                          <p className="text-sm text-gray-600 mt-0.5">
+                            {getDayName(new Date(nc.sessionDate).getDay())} {formatDate(nc.sessionDate, 'long')}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {nc.startTime?.slice(0, 5)}-{nc.endTime?.slice(0, 5)} น.
+                            {nc.branchName && <> · {nc.branchName}</>}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Latest feedback */}
@@ -177,10 +191,12 @@ function Dashboard() {
           </div>
           {data?.latestFeedback ? (
             <Card className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/feedback')}>
-              <CardContent className="p-4">
+              <CardContent className="p-3">
                 <div className="flex items-start gap-3">
-                  <div className="p-3 rounded-xl bg-purple-500 text-white shrink-0">
-                    <MessageSquare className="h-6 w-6" />
+                  {/* Same box/icon size as the next-class card so the column of
+                      cards reads as one system. */}
+                  <div className="p-2.5 rounded-xl bg-purple-500 text-white shrink-0">
+                    <MessageSquare className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-500">

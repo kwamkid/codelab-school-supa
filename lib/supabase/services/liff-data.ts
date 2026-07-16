@@ -85,6 +85,8 @@ export async function getHomeSummary(lineUserId: string) {
     hasParent: data?.has_parent ?? false,
     parentName: data?.parent_name ?? '',
     pendingMakeupCount: data?.pending_makeup_count ?? 0,
+    // One upcoming class per active student (a multi-kid parent sees them all).
+    nextClasses: data?.next_classes ?? (data?.next_class ? [data.next_class] : []),
     nextClass: data?.next_class ?? null,
     latestFeedback: data?.latest_feedback ?? null,
   };

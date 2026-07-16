@@ -43,22 +43,28 @@ export async function getParentScheduleEvents(
       return { events: [], students: [], stats: {} }
     }
 
-    const now = new Date()
     const events: ScheduleEvent[] = []
 
-    const toClock = (t: string) => {
-      const [h, m] = (t || '00:00').split(':').map(Number)
-      return [h || 0, m || 0] as const
+    // Times in the DB are Thai wall-clock. NEVER materialize them into Date
+    // objects here — setHours() uses the SERVER's timezone (UTC on Vercel), so
+    // a 09:00 class serialized as 09:00Z rendered as 16:00 on Thai phones.
+    // Emit timezone-less ISO strings instead; the client's `new Date()` parses
+    // them as its own local time (parents are in Thailand).
+    const naive = (dateStr: string, time: string) => {
+      const d = String(dateStr).slice(0, 10)
+      const [h = '00', m = '00'] = String(time || '00:00').split(':')
+      return `${d}T${h.padStart(2, '0')}:${m.padStart(2, '0')}:00`
     }
+    // "now" as a Bangkok wall-clock string, comparable with naive() output.
+    const nowStr = new Date()
+      .toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' })
+      .replace(' ', 'T')
 
     // Regular class sessions
     for (const s of (data?.sessions || [])) {
-      const sessionDate = new Date(s.sessionDate)
-      const [sh, sm] = toClock(s.startTime)
-      const [eh, em] = toClock(s.endTime)
-      const eventStart = new Date(sessionDate); eventStart.setHours(sh, sm, 0, 0)
-      const eventEnd = new Date(sessionDate); eventEnd.setHours(eh, em, 0, 0)
-      const passed = eventEnd < now
+      const eventStart = naive(s.sessionDate, s.startTime)
+      const eventEnd = naive(s.sessionDate, s.endTime)
+      const passed = eventEnd < nowStr
 
       let backgroundColor = '#E5E7EB', borderColor = '#D1D5DB', textColor = '#374151'
       let effectiveStatus: string = s.scheduleStatus
@@ -77,8 +83,10 @@ export async function getParentScheduleEvents(
         id: `${s.classId}-${s.scheduleId}-${s.studentId}`,
         classId: s.classId,
         title: `${s.studentNickname || s.studentName} - ${s.className}`,
-        start: eventStart,
-        end: eventEnd,
+        // Naive local strings; the JSON layer would stringify Dates anyway and
+        // the client revives with new Date() → its local timezone.
+        start: eventStart as unknown as Date,
+        end: eventEnd as unknown as Date,
         backgroundColor, borderColor, textColor,
         extendedProps: {
           type: 'class',
@@ -103,21 +111,18 @@ export async function getParentScheduleEvents(
 
     // Scheduled makeup events
     for (const m of (data?.makeups || [])) {
-      const d = new Date(m.makeupDate)
-      const [sh, sm] = toClock(m.startTime)
-      const [eh, em] = toClock(m.endTime)
-      const eventStart = new Date(d); eventStart.setHours(sh, sm, 0, 0)
-      const eventEnd = new Date(d); eventEnd.setHours(eh, em, 0, 0)
+      const eventStart = naive(m.makeupDate, m.startTime)
+      const eventEnd = naive(m.makeupDate, m.endTime)
       let backgroundColor = '#E9D5FF', borderColor = '#D8B4FE', textColor = '#6B21A8'
-      if (eventEnd < now || m.status === 'completed') {
+      if (eventEnd < nowStr || m.status === 'completed') {
         backgroundColor = '#D1FAE5'; borderColor = '#A7F3D0'; textColor = '#065F46'
       }
       events.push({
         id: `makeup-${m.id}-${m.studentId}`,
         classId: m.classId,
         title: `[Makeup] ${m.studentNickname || m.studentName} - ${m.className}`,
-        start: eventStart,
-        end: eventEnd,
+        start: eventStart as unknown as Date,
+        end: eventEnd as unknown as Date,
         backgroundColor, borderColor, textColor,
         extendedProps: {
           type: 'makeup',
@@ -137,7 +142,8 @@ export async function getParentScheduleEvents(
       })
     }
 
-    events.sort((a, b) => (a.start as Date).getTime() - (b.start as Date).getTime())
+    // start values are naive ISO strings — lexicographic order = chronological.
+    events.sort((a, b) => String(a.start).localeCompare(String(b.start)))
 
     const students: StudentScheduleData[] = (data?.students || []).map((s: any) => ({
       student: { id: s.id, name: s.name, nickname: s.nickname || undefined, profileImage: s.profileImage || undefined },

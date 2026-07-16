@@ -21,13 +21,20 @@ import { ScheduleEvent } from '@/components/liff/schedule-calendar'
 import CourseList from '@/components/liff/schedule/course-list'
 import MonthlyCalendar from '@/components/liff/schedule/monthly-calendar'
 
+// Server events carry timezone-less local strings for start/end; revive to Date
+// on the client (parents are in Thailand, so local parse = correct wall-clock).
+// The cache stores the RAW strings — sessionStorage JSON round-trips would
+// silently turn cached Date objects back into strings.
+const reviveEvents = (list: any[]): ScheduleEvent[] =>
+  (list || []).map((e: any) => ({ ...e, start: new Date(e.start), end: new Date(e.end) }))
+
 function ScheduleContent() {
   const router = useRouter()
   const { profile, isLoggedIn, isLoading: liffLoading, liff } = useLiff()
   const cacheKey = profile?.userId ? `schedule:${profile.userId}` : null
-  const cached = cacheKey ? getLiffCache<{ events: ScheduleEvent[]; students: any[]; stats: Record<string, StudentStats> }>(cacheKey) : undefined
+  const cached = cacheKey ? getLiffCache<{ events: any[]; students: any[]; stats: Record<string, StudentStats> }>(cacheKey) : undefined
   const [loading, setLoading] = useState(!cached)
-  const [events, setEvents] = useState<ScheduleEvent[]>(cached?.events ?? [])
+  const [events, setEvents] = useState<ScheduleEvent[]>(cached ? reviveEvents(cached.events) : [])
   const [students, setStudents] = useState<any[]>(cached?.students ?? [])
   const [selectedStudentId, setSelectedStudentId] = useState<string>('')
   const [overallStats, setOverallStats] = useState<Record<string, StudentStats>>(cached?.stats ?? {})
@@ -78,12 +85,7 @@ function ScheduleContent() {
         end: yearEnd.toISOString(),
       })
 
-      // JSON turns Date into ISO strings — revive start/end back into Date objects.
-      const fetchedEvents: ScheduleEvent[] = (data.events || []).map((e: any) => ({
-        ...e,
-        start: new Date(e.start),
-        end: new Date(e.end),
-      }))
+      const fetchedEvents = reviveEvents(data.events || [])
       const studentsData = data.students || []
 
       setEvents(fetchedEvents)
@@ -91,7 +93,8 @@ function ScheduleContent() {
       setOverallStats(data.stats || {})
       setLoadingStats(false)
       setDataLoaded(true)
-      if (cacheKey) setLiffCache(cacheKey, { events: fetchedEvents, students: studentsData, stats: data.stats || {} })
+      // Cache the raw (string) events — they must survive a JSON round-trip.
+      if (cacheKey) setLiffCache(cacheKey, { events: data.events || [], students: studentsData, stats: data.stats || {} })
       
       // Set default selected student
       if (studentsData.length > 0 && !selectedStudentId) {
