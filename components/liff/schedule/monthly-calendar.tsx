@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, ChevronRight, Calendar, MapPin, User, Clock } from 'lucide-react'
 import { ScheduleEvent } from '@/components/liff/schedule-calendar'
 import { StudentBadge } from '@/components/ui/student-badge'
+import { TeacherBadge } from '@/components/ui/teacher-badge'
 import { cn } from '@/lib/utils'
 
 interface MonthlyCalendarProps {
@@ -156,7 +157,7 @@ export default function MonthlyCalendar({ events, selectedStudentId, onEventClic
       {selectedDay && (
         <Card>
           <CardContent className="p-4">
-            <h4 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+            <h4 className="font-semibold mb-3 flex items-center gap-2 text-base">
               <Calendar className="h-4 w-4 text-primary" />
               {selectedDay} {THAI_MONTHS[month]} {year + 543}
             </h4>
@@ -167,38 +168,41 @@ export default function MonthlyCalendar({ events, selectedStudentId, onEventClic
                 {selectedEvents.map(event => {
                   const past = event.end < now
                   return (
+                    // Same title / student badge / teacher badge treatment as the
+                    // home + list cards — the shared badges ARE the global style.
                     <div
                       key={event.id}
                       className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 cursor-pointer active:bg-gray-100"
                       onClick={() => onEventClick(event)}
                     >
-                      <span className={cn('w-2 h-2 rounded-full mt-1.5 shrink-0', eventColor(event, past))} />
+                      <span className={cn('w-3 h-3 rounded-full mt-1.5 shrink-0', eventColor(event, past))} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium text-sm truncate">
+                          <span className="text-base font-semibold truncate">
                             {event.extendedProps.subjectName || event.extendedProps.className}
                           </span>
                           {event.extendedProps.type === 'makeup' ? (
                             <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 shrink-0">Makeup</Badge>
                           ) : (
-                            <StudentBadge name={event.extendedProps.studentNickname || event.extendedProps.studentName} className="shrink-0" />
+                            <StudentBadge name={event.extendedProps.studentNickname || event.extendedProps.studentName} size="md" className="shrink-0" />
                           )}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
+                        <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5" />
                             {event.start.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                             {' - '}
                             {event.end.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
                           </div>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5" />
                             {event.extendedProps.branchName} - {event.extendedProps.roomName}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            ครู{event.extendedProps.teacherName}
-                          </div>
+                          <TeacherBadge
+                            name={event.extendedProps.teacherName}
+                            imageUrl={event.extendedProps.teacherImage}
+                            size="md"
+                          />
                         </div>
                       </div>
                     </div>
