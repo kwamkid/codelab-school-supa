@@ -18,6 +18,7 @@ interface BookingRequest {
     name: string
     schoolName?: string
     gradeLevel?: string
+    birthdate?: string
     subjectInterests: string[]
   }>
   contactNote?: string
@@ -119,6 +120,8 @@ export async function POST(request: NextRequest) {
         name: s.name.trim(),
         school_name: s.schoolName?.trim() || null,
         grade_level: s.gradeLevel || null,
+        // date column; an ISO timestamp string's date part is what we want
+        birthdate: s.birthdate ? s.birthdate.split('T')[0] : null,
         subject_interests: s.subjectInterests || []
       }))
 

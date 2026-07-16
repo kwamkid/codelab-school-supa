@@ -382,21 +382,44 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
       };
       if (selectedParentId) bookingData.parentId = selectedParentId;
 
-      const bookingId = await createTrialBooking(bookingData);
+      let bookingId: string;
+      if (isLiff) {
+        // LIFF parents aren't staff, so createTrialBooking (adminMutation) 401s.
+        // The public booking route inserts with the service role and fires the FB
+        // conversion itself — so no client-side FB call on this path.
+        const res = await fetch('/api/liff/trial-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...bookingData,
+            students: bookingData.students.map((s: any) => ({
+              ...s,
+              birthdate: s.birthdate ? s.birthdate.toISOString() : undefined,
+            })),
+          }),
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || !result.bookingId) {
+          throw new Error(result?.error || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+        }
+        bookingId = result.bookingId;
+      } else {
+        bookingId = await createTrialBooking(bookingData);
 
-      if (!isChat) {
-        try {
-          await fetch('/api/fb/send-conversion', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              event_type: 'trial',
-              phone: parentPhone.replace(/[-\s]/g, ''),
-              entity_id: bookingId,
-              branch_id: selectedBranch,
-            }),
-          });
-        } catch {}
+        if (!isChat) {
+          try {
+            await fetch('/api/fb/send-conversion', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                event_type: 'trial',
+                phone: parentPhone.replace(/[-\s]/g, ''),
+                entity_id: bookingId,
+                branch_id: selectedBranch,
+              }),
+            });
+          } catch {}
+        }
       }
 
       if (withSession) {
@@ -423,9 +446,9 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
         toast.success('บันทึกการจองทดลองเรียนสำเร็จ');
         onSuccess?.(bookingId);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating booking:', error);
-      toast.error('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      toast.error(error?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
     } finally {
       submitGuardRef.current = false;
       setSubmitting(false);
