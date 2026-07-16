@@ -402,3 +402,161 @@ export async function cancelLeave(
 
   return { ok: true, message: 'ยกเลิกการลาเรียนเรียบร้อยแล้ว' };
 }
+
+// ---- registration / student writes ----------------------------------------
+// LIFF parents aren't Supabase-authed, so they can't use /api/admin/mutation
+// (requireStaff → 401). These run with the service role and are scoped to the
+// verified LINE user, mirroring the read layer above.
+
+interface StudentInput {
+  name: string;
+  nameEn?: string | null;
+  nickname: string;
+  birthdate: string; // ISO or yyyy-mm-dd
+  gender?: 'M' | 'F';
+  schoolName?: string | null;
+  gradeLevel?: string | null;
+  allergies?: string | null;
+  specialNeeds?: string | null;
+  emergencyContact?: string | null;
+  emergencyPhone?: string | null;
+}
+
+function studentRow(parentId: string, s: StudentInput) {
+  return {
+    parent_id: parentId,
+    name: s.name?.trim(),
+    name_en: s.nameEn?.trim() || null,
+    nickname: s.nickname?.trim(),
+    birthdate: s.birthdate, // date column accepts an ISO timestamp string
+    gender: s.gender || 'M',
+    school_name: s.schoolName?.trim() || null,
+    grade_level: s.gradeLevel?.trim() || null,
+    allergies: s.allergies?.trim() || null,
+    special_needs: s.specialNeeds?.trim() || null,
+    emergency_contact: s.emergencyContact?.trim() || null,
+    emergency_phone: s.emergencyPhone?.trim() || null,
+    is_active: true,
+  };
+}
+
+// Register flow: if this LINE user already has a parent record, reuse it and just
+// add the student; otherwise create the parent (bound to this LINE id) first.
+export async function registerParentWithStudent(
+  lineUserId: string,
+  payload: {
+    parentName: string;
+    parentPhone: string;
+    lineDisplayName?: string | null;
+    linePictureUrl?: string | null;
+    student: StudentInput;
+  }
+) {
+  const supabase = createServiceClient() as any;
+  const phone = (payload.parentPhone || '').replace(/[-\s]/g, '');
+
+  if (!payload.student?.name || !payload.student?.nickname || !payload.student?.birthdate) {
+    return { ok: false, status: 400, message: 'กรุณากรอกข้อมูลนักเรียนให้ครบถ้วน' };
+  }
+
+  let parent = await getParentByLine(supabase, lineUserId);
+
+  if (!parent) {
+    if (!payload.parentName?.trim() || !phone) {
+      return { ok: false, status: 400, message: 'กรุณากรอกชื่อและเบอร์โทรผู้ปกครอง' };
+    }
+
+    // Guard the phone unique constraint with a friendly message instead of a 500.
+    const { data: dup } = await supabase
+      .from('parents')
+      .select('id, line_user_id')
+      .eq('phone', phone)
+      .maybeSingle();
+
+    if (dup) {
+      // If the existing record is already this LINE user's, reuse it; otherwise
+      // it's someone else's phone.
+      if (dup.line_user_id && dup.line_user_id === lineUserId) {
+        parent = dup;
+      } else {
+        return {
+          ok: false,
+          status: 409,
+          message: 'เบอร์โทรศัพท์นี้ถูกลงทะเบียนแล้ว กรุณาติดต่อสถาบัน',
+        };
+      }
+    }
+  }
+
+  if (!parent) {
+    const { data: created, error } = await supabase
+      .from('parents')
+      .insert({
+        display_name: payload.parentName.trim(),
+        phone,
+        line_user_id: lineUserId,
+        line_display_name: payload.lineDisplayName || null,
+        picture_url: payload.linePictureUrl || null,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+    parent = created;
+  }
+
+  const { data: student, error: studentError } = await supabase
+    .from('students')
+    .insert(studentRow(parent.id, payload.student))
+    .select('id')
+    .single();
+  if (studentError) throw studentError;
+
+  return { ok: true, parentId: parent.id, studentId: student.id };
+}
+
+// Add a student to the verified parent's own account (portal "add student").
+export async function createStudentForParent(lineUserId: string, student: StudentInput) {
+  const supabase = createServiceClient() as any;
+  const parent = await getParentByLine(supabase, lineUserId);
+  if (!parent) return { ok: false, status: 404, message: 'ไม่พบข้อมูลผู้ปกครอง' };
+
+  if (!student?.name || !student?.nickname || !student?.birthdate) {
+    return { ok: false, status: 400, message: 'กรุณากรอกข้อมูลนักเรียนให้ครบถ้วน' };
+  }
+
+  const { data, error } = await supabase
+    .from('students')
+    .insert(studentRow(parent.id, student))
+    .select('id')
+    .single();
+  if (error) throw error;
+  return { ok: true, studentId: data.id };
+}
+
+// Edit one of the verified parent's own students.
+export async function updateStudentForParent(
+  lineUserId: string,
+  studentId: string,
+  data: Partial<StudentInput>
+) {
+  const supabase = createServiceClient() as any;
+  await assertStudentOwnedByLine(supabase, lineUserId, studentId);
+
+  const update: any = {};
+  if (data.name !== undefined) update.name = data.name?.trim();
+  if (data.nameEn !== undefined) update.name_en = data.nameEn?.trim() || null;
+  if (data.nickname !== undefined) update.nickname = data.nickname?.trim();
+  if (data.birthdate !== undefined) update.birthdate = data.birthdate;
+  if (data.gender !== undefined) update.gender = data.gender;
+  if (data.schoolName !== undefined) update.school_name = data.schoolName?.trim() || null;
+  if (data.gradeLevel !== undefined) update.grade_level = data.gradeLevel?.trim() || null;
+  if (data.allergies !== undefined) update.allergies = data.allergies?.trim() || null;
+  if (data.specialNeeds !== undefined) update.special_needs = data.specialNeeds?.trim() || null;
+  if (data.emergencyContact !== undefined) update.emergency_contact = data.emergencyContact?.trim() || null;
+  if (data.emergencyPhone !== undefined) update.emergency_phone = data.emergencyPhone?.trim() || null;
+  if (Object.keys(update).length === 0) return { ok: true };
+
+  const { error } = await supabase.from('students').update(update).eq('id', studentId);
+  if (error) throw error;
+  return { ok: true };
+}

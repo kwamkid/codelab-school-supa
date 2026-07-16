@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { GradeLevelCombobox } from "@/components/ui/grade-level-combobox"
 import { SchoolNameCombobox } from "@/components/ui/school-name-combobox"
 import { ChevronLeft, User, Calendar, School, AlertCircle, Loader2 } from 'lucide-react'
-import { getStudent, updateStudent } from '@/lib/services/parents'
+import { getStudent } from '@/lib/services/parents'
+import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useForm, Controller } from 'react-hook-form'
@@ -148,30 +149,32 @@ function EditStudentContent() {
   const onSubmit = async (data: FormData) => {
     try {
       setSaving(true)
-      
-      const birthdate = new Date(data.birthdate)
-      
-      await updateStudent(parentId, studentId, {
-        name: data.name,
-        nameEn: data.nameEn?.trim() || '',
-        nickname: data.nickname,
-        birthdate,
-        gender: data.gender,
-        gradeLevel: data.gradeLevel,
-        schoolName: data.schoolName || '',
-        allergies: data.allergies || '',
-        specialNeeds: data.specialNeeds || '',
-        emergencyContact: data.emergencyContact || '',
-        emergencyPhone: data.emergencyPhone || '',
-        isActive: true // Always keep active
-      })
-      
+
+      // Service-role update via LINE-verified route; ownership checked server-side.
+      await liffFetch('/api/liff/student', {
+        lineUserId: profile?.userId,
+        studentId,
+        student: {
+          name: data.name,
+          nameEn: data.nameEn?.trim() || null,
+          nickname: data.nickname,
+          birthdate: new Date(data.birthdate).toISOString(),
+          gender: data.gender,
+          gradeLevel: data.gradeLevel || null,
+          schoolName: data.schoolName || null,
+          allergies: data.allergies || null,
+          specialNeeds: data.specialNeeds || null,
+          emergencyContact: data.emergencyContact || null,
+          emergencyPhone: data.emergencyPhone || null,
+        },
+      }, 'PATCH')
+
       toast.success('บันทึกข้อมูลเรียบร้อย')
       navigateBack()
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Error saving:', error)
-      toast.error('เกิดข้อผิดพลาดในการบันทึก')
+      toast.error(error?.message || 'เกิดข้อผิดพลาดในการบันทึก')
     } finally {
       setSaving(false)
     }

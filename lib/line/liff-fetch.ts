@@ -6,7 +6,11 @@
 
 import { getLiffInstance } from './liff-client';
 
-export async function liffFetch<T = any>(path: string, body?: any): Promise<T> {
+export async function liffFetch<T = any>(
+  path: string,
+  body?: any,
+  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'POST'
+): Promise<T> {
   const liff = getLiffInstance();
   let idToken: string | null = null;
   try {
@@ -16,7 +20,7 @@ export async function liffFetch<T = any>(path: string, body?: any): Promise<T> {
   }
 
   const res = await fetch(path, {
-    method: 'POST',
+    method,
     headers: {
       'Content-Type': 'application/json',
       ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),

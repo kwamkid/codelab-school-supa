@@ -11,7 +11,8 @@ import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { SchoolNameCombobox } from '@/components/ui/school-name-combobox';
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
 import { LiffProvider, useLiff } from '@/components/liff/liff-provider';
-import { createParent, createStudent, getParentByLineId, checkParentPhoneExists } from '@/lib/services/parents';
+import { getParentByLineId } from '@/lib/services/parents';
+import { liffFetch } from '@/lib/line/liff-fetch';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle, User, GraduationCap } from 'lucide-react';
 
@@ -104,47 +105,30 @@ function LiffRegisterContent() {
     setSubmitting(true);
 
     try {
-      let parentId = existingParentId;
-
-      if (!parentId) {
-        // New parent — check phone duplicate
-        const phoneExists = await checkParentPhoneExists(parentPhone.replace(/[-\s]/g, ''));
-        if (phoneExists) {
-          toast.error('เบอร์โทรศัพท์นี้ถูกลงทะเบียนแล้ว กรุณาติดต่อสถาบัน');
-          return;
-        }
-
-        parentId = await createParent({
-          displayName: parentName.trim(),
-          phone: parentPhone.replace(/[-\s]/g, ''),
-          lineUserId: profile?.userId || null,
-          email: null,
-          // Pull the LINE profile pic + real LINE name on registration
-          pictureUrl: profile?.pictureUrl || null,
-          lineDisplayName: profile?.displayName || null,
-        });
-      }
-
-      // Create student
-      await createStudent(parentId, {
-        name: studentName.trim(),
-        nickname: studentNickname.trim(),
-        birthdate: new Date(studentBirthdate),
-        gender: studentGender,
-        schoolName: studentSchoolName.trim() || '',
-        gradeLevel: studentGradeLevel.trim() || '',
-        isActive: true,
-        allergies: '',
-        specialNeeds: '',
-        emergencyContact: '',
-        emergencyPhone: '',
-        profileImage: '',
+      // Parent + student are created server-side via the LINE-verified route.
+      // LIFF parents can't use /api/admin/mutation (staff-only), so this goes
+      // through /api/liff/register (service role, scoped to the verified LINE id).
+      await liffFetch('/api/liff/register', {
+        lineUserId: profile?.userId,
+        parentName: parentName.trim(),
+        parentPhone: parentPhone.replace(/[-\s]/g, ''),
+        lineDisplayName: profile?.displayName || null,
+        linePictureUrl: profile?.pictureUrl || null,
+        student: {
+          name: studentName.trim(),
+          nickname: studentNickname.trim(),
+          birthdate: new Date(studentBirthdate).toISOString(),
+          gender: studentGender,
+          schoolName: studentSchoolName.trim() || null,
+          gradeLevel: studentGradeLevel.trim() || null,
+        },
       });
 
       setShowSuccess(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      toast.error('เกิดข้อผิดพลาดในการลงทะเบียน');
+      // The server returns a friendly message (duplicate phone, missing data, …).
+      toast.error(error?.message || 'เกิดข้อผิดพลาดในการลงทะเบียน');
     } finally {
       submitGuardRef.current = false;
       setSubmitting(false);
