@@ -16,7 +16,8 @@ import { Loading } from '@/components/ui/loading'
 import { formatDate, getDayName } from '@/lib/utils'
 
 interface NextClass {
-  className: string; subjectName: string; sessionNumber: number
+  className: string; subjectName: string; subjectColor?: string | null
+  sessionNumber: number
   totalSessions?: number
   sessionDate: string; startTime: string; endTime: string
   branchName: string; studentName: string
@@ -30,7 +31,8 @@ interface HomeSummary {
   nextClasses?: NextClass[]
   nextClass: NextClass | null
   latestFeedback: null | {
-    studentName: string; className: string; subjectName?: string; sessionNumber: number
+    studentName: string; className: string; subjectName?: string
+    subjectColor?: string | null; sessionNumber: number
     sessionDate: string; feedback: string; photoCount: number
   }
 }
@@ -155,29 +157,29 @@ function Dashboard() {
                 {nextClasses.map((nc, i) => (
                   <Card key={`${nc.studentName}-${i}`} className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/schedule')}>
                     <CardContent className="p-3">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2.5 rounded-xl bg-blue-500 text-white shrink-0">
-                          <Calendar className="h-5 w-5" />
+                      {/* Subject color dot — same treatment as the schedule tab */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className="w-4 h-4 rounded-full shrink-0"
+                            style={{ backgroundColor: nc.subjectColor || '#94A3B8' }}
+                          />
+                          <p className="text-lg font-semibold leading-tight truncate">{nc.subjectName || nc.className}</p>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-lg font-semibold leading-tight">{nc.subjectName || nc.className}</p>
-                            <p className="text-sm text-gray-500 shrink-0 mt-0.5">
-                              ครั้งที่ <span className="font-bold text-gray-900">{nc.sessionNumber}</span>
-                              {nc.totalSessions ? <span className="font-normal">/{nc.totalSessions}</span> : null}
-                            </p>
-                          </div>
-                          <p className="text-sm text-gray-600 mt-0.5">
-                            {getDayName(new Date(nc.sessionDate).getDay())} {formatDate(nc.sessionDate, 'long')}
-                          </p>
-                          <div className="flex items-end justify-between gap-2">
-                            <p className="text-sm text-gray-500">
-                              {nc.startTime?.slice(0, 5)}-{nc.endTime?.slice(0, 5)} น.
-                              {nc.branchName && <> · {nc.branchName}</>}
-                            </p>
-                            <StudentBadge name={nc.studentName} size="md" className="shrink-0" />
-                          </div>
-                        </div>
+                        <p className="text-sm text-gray-500 shrink-0 mt-0.5">
+                          ครั้งที่ <span className="font-bold text-gray-900">{nc.sessionNumber}</span>
+                          {nc.totalSessions ? <span className="font-normal">/{nc.totalSessions}</span> : null}
+                        </p>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1 ml-6">
+                        {getDayName(new Date(nc.sessionDate).getDay())} {formatDate(nc.sessionDate, 'long')}
+                      </p>
+                      <div className="flex items-end justify-between gap-2 ml-6">
+                        <p className="text-sm text-gray-500">
+                          {nc.startTime?.slice(0, 5)}-{nc.endTime?.slice(0, 5)} น.
+                          {nc.branchName && <> · {nc.branchName}</>}
+                        </p>
+                        <StudentBadge name={nc.studentName} size="md" className="shrink-0" />
                       </div>
                     </CardContent>
                   </Card>
@@ -196,30 +198,29 @@ function Dashboard() {
           {data?.latestFeedback ? (
             <Card className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/feedback')}>
               <CardContent className="p-3">
-                <div className="flex items-start gap-3">
-                  {/* Same box/icon size as the next-class card so the column of
-                      cards reads as one system. */}
-                  <div className="p-2.5 rounded-xl bg-purple-500 text-white shrink-0">
-                    <MessageSquare className="h-5 w-5" />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className="w-4 h-4 rounded-full shrink-0"
+                      style={{ backgroundColor: data.latestFeedback.subjectColor || '#94A3B8' }}
+                    />
+                    {/* Subject name only — class `name` is an internal code parents shouldn't see */}
+                    <p className="text-lg font-semibold leading-tight truncate">
+                      {data.latestFeedback.subjectName || data.latestFeedback.className}
+                      <span className="text-sm font-normal text-gray-500"> · ครั้งที่ {data.latestFeedback.sessionNumber}</span>
+                    </p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      {/* Subject name only — class `name` is an internal code parents shouldn't see */}
-                      <p className="text-lg font-semibold leading-tight">
-                        {data.latestFeedback.subjectName || data.latestFeedback.className}
-                        <span className="text-sm font-normal text-gray-500"> · ครั้งที่ {data.latestFeedback.sessionNumber}</span>
-                      </p>
-                      <StudentBadge name={data.latestFeedback.studentName} size="md" className="shrink-0" />
-                    </div>
-                    {data.latestFeedback.feedback && (
-                      <p className="text-base font-normal mt-1 line-clamp-2">{data.latestFeedback.feedback}</p>
-                    )}
-                    {data.latestFeedback.photoCount > 0 && (
-                      <p className="flex items-center gap-1 text-xs text-purple-600 mt-1">
-                        <ImageIcon className="h-3.5 w-3.5" /> {data.latestFeedback.photoCount} รูป
-                      </p>
-                    )}
-                  </div>
+                  <StudentBadge name={data.latestFeedback.studentName} size="md" className="shrink-0" />
+                </div>
+                <div className="ml-6">
+                  {data.latestFeedback.feedback && (
+                    <p className="text-base font-normal mt-1 line-clamp-2">{data.latestFeedback.feedback}</p>
+                  )}
+                  {data.latestFeedback.photoCount > 0 && (
+                    <p className="flex items-center gap-1 text-xs text-purple-600 mt-1">
+                      <ImageIcon className="h-3.5 w-3.5" /> {data.latestFeedback.photoCount} รูป
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -19,12 +19,17 @@ interface CourseListProps {
   onLeaveRequest: (event: ScheduleEvent) => void
 }
 
-export default function CourseList({ 
-  events, 
-  selectedStudentId, 
+// How many upcoming sessions to show per course before "ดูทั้งหมด".
+const UPCOMING_PREVIEW = 5
+
+export default function CourseList({
+  events,
+  selectedStudentId,
   students,
-  onLeaveRequest 
+  onLeaveRequest
 }: CourseListProps) {
+  // Course keys the user expanded to see all upcoming sessions.
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set())
   // Filter events by student
   const studentEvents = selectedStudentId 
     ? events.filter(e => e.extendedProps.studentId === selectedStudentId)
@@ -45,6 +50,7 @@ export default function CourseList({
           branchName: event.extendedProps.branchName,
           roomName: event.extendedProps.roomName,
           teacherName: event.extendedProps.teacherName,
+          teacherImage: event.extendedProps.teacherImage || null,
           events: []
         }
       }
@@ -168,37 +174,53 @@ export default function CourseList({
 
   return (
     <div className="space-y-3">
-      {Object.values(eventsByClass).map((classData: any) => (
-        <Card key={`${classData.classId}-${classData.studentId}`}>
+      {Object.values(eventsByClass)
+        // Finished courses (every session already passed) sink to the bottom.
+        .sort((a: any, b: any) => {
+          const fin = (cd: any) => Number(cd.events.every((e: ScheduleEvent) => e.end < now))
+          return fin(a) - fin(b)
+        })
+        .map((classData: any) => {
+        const courseKey = `${classData.classId}-${classData.studentId}`
+        const finished = classData.events.every((e: ScheduleEvent) => e.end < now)
+        return (
+        <Card key={courseKey} className={cn(finished && 'opacity-70 bg-gray-50/50')}>
           <CardContent className="p-3">
             {/* Class Header */}
             <div className="mb-3">
               <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   {classData.subjectColor && (
-                    <div 
-                      className="w-4 h-4 rounded-full flex-shrink-0" 
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
                       style={{ backgroundColor: classData.subjectColor }}
                     />
                   )}
-                  <h3 className="text-lg font-semibold">{classData.subjectName}</h3>
+                  <h3 className={cn('text-lg font-semibold truncate', finished && 'text-gray-400')}>
+                    {classData.subjectName}
+                  </h3>
+                  {finished && (
+                    <Badge variant="secondary" className="shrink-0 bg-gray-200 text-gray-500">จบคอร์สแล้ว</Badge>
+                  )}
                 </div>
                 <StudentBadge name={classData.studentName} size="md" />
               </div>
-              
+
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
                   {classData.branchName} - {classData.roomName}
                 </div>
-                <TeacherBadge name={classData.teacherName} size="sm" />
+                <TeacherBadge name={classData.teacherName} imageUrl={classData.teacherImage} size="md" />
               </div>
             </div>
 
-            {/* Sessions: past sessions collapsed, upcoming shown */}
+            {/* Sessions: past collapsed; upcoming previews 5 then "ดูทั้งหมด" */}
             {(() => {
               const past = classData.events.filter((e: ScheduleEvent) => e.end < now)
               const upcoming = classData.events.filter((e: ScheduleEvent) => e.end >= now)
+              const isExpanded = expanded.has(courseKey)
+              const shown = isExpanded ? upcoming : upcoming.slice(0, UPCOMING_PREVIEW)
               return (
                 <div className="space-y-2">
                   {past.length > 0 && (
@@ -210,7 +232,16 @@ export default function CourseList({
                       <div className="space-y-2 mt-2">{past.map(renderSession)}</div>
                     </details>
                   )}
-                  {upcoming.map(renderSession)}
+                  {shown.map(renderSession)}
+                  {!isExpanded && upcoming.length > UPCOMING_PREVIEW && (
+                    <button
+                      type="button"
+                      className="w-full text-center text-sm font-medium text-primary py-2 rounded-lg active:bg-gray-50"
+                      onClick={() => setExpanded(new Set([...expanded, courseKey]))}
+                    >
+                      ดูทั้งหมด ({upcoming.length} คาบ)
+                    </button>
+                  )}
                 </div>
               )
             })()}
@@ -242,7 +273,8 @@ export default function CourseList({
             </div>
           </CardContent>
         </Card>
-      ))}
+        )
+      })}
     </div>
   )
 }

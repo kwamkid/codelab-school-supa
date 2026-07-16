@@ -21,6 +21,7 @@ interface FeedbackData {
   studentName: string
   className: string
   subjectName: string
+  subjectColor?: string | null
   sessionNumber: number
   sessionDate: Date
   feedback: string
@@ -152,10 +153,16 @@ function FeedbackContent() {
                 {/* Card's own gap separates header/content — extra pb just stacks */}
                 <CardHeader className="pb-0">
                   <div className="flex justify-between items-start gap-2">
-                    <div>
-                      {/* Same title/badge treatment as the home + schedule cards */}
-                      <CardTitle className="text-lg">{feedback.subjectName}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                    <div className="min-w-0">
+                      {/* Same title/dot/badge treatment as the home + schedule cards */}
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded-full shrink-0"
+                          style={{ backgroundColor: feedback.subjectColor || '#94A3B8' }}
+                        />
+                        <CardTitle className="text-lg truncate">{feedback.subjectName}</CardTitle>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 ml-6 text-sm text-muted-foreground">
                         <span>ครั้งที่ {feedback.sessionNumber}</span>
                       </div>
                     </div>
@@ -186,7 +193,7 @@ function FeedbackContent() {
                         ))}
                       </div>
                     )}
-                    <TeacherBadge name={feedback.teacherName} imageUrl={feedback.teacherImage} size="sm" />
+                    <TeacherBadge name={feedback.teacherName} imageUrl={feedback.teacherImage} size="lg" />
                   </div>
                 </CardContent>
               </Card>

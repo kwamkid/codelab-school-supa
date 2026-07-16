@@ -32,6 +32,7 @@ export interface ScheduleEvent {
     branchName: string;
     roomName: string;
     teacherName: string;
+    teacherImage?: string | null;
     subjectName: string;
     className?: string;
     subjectColor?: string;
