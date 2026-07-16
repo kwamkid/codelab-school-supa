@@ -17,6 +17,7 @@ import { formatDate, getDayName } from '@/lib/utils'
 
 interface NextClass {
   className: string; subjectName: string; sessionNumber: number
+  totalSessions?: number
   sessionDate: string; startTime: string; endTime: string
   branchName: string; studentName: string
 }
@@ -154,25 +155,28 @@ function Dashboard() {
                 {nextClasses.map((nc, i) => (
                   <Card key={`${nc.studentName}-${i}`} className="cursor-pointer active:scale-[0.98] transition-transform" onClick={() => router.push('/liff/schedule')}>
                     <CardContent className="p-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3">
                         <div className="p-2.5 rounded-xl bg-blue-500 text-white shrink-0">
                           <Calendar className="h-5 w-5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="font-semibold leading-tight">
-                              {nc.subjectName || nc.className}
-                              <span className="font-normal text-gray-400"> · ครั้งที่ {nc.sessionNumber}</span>
+                            <p className="text-lg font-semibold leading-tight">{nc.subjectName || nc.className}</p>
+                            <p className="text-sm text-gray-500 shrink-0 mt-0.5">
+                              ครั้งที่ <span className="font-bold text-gray-900">{nc.sessionNumber}</span>
+                              {nc.totalSessions ? <span className="font-normal">/{nc.totalSessions}</span> : null}
                             </p>
-                            <StudentBadge name={nc.studentName} className="shrink-0" />
                           </div>
                           <p className="text-sm text-gray-600 mt-0.5">
                             {getDayName(new Date(nc.sessionDate).getDay())} {formatDate(nc.sessionDate, 'long')}
                           </p>
-                          <p className="text-sm text-gray-500">
-                            {nc.startTime?.slice(0, 5)}-{nc.endTime?.slice(0, 5)} น.
-                            {nc.branchName && <> · {nc.branchName}</>}
-                          </p>
+                          <div className="flex items-end justify-between gap-2">
+                            <p className="text-sm text-gray-500">
+                              {nc.startTime?.slice(0, 5)}-{nc.endTime?.slice(0, 5)} น.
+                              {nc.branchName && <> · {nc.branchName}</>}
+                            </p>
+                            <StudentBadge name={nc.studentName} size="md" className="shrink-0" />
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -199,10 +203,14 @@ function Dashboard() {
                     <MessageSquare className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-500">
+                    <div className="flex items-start justify-between gap-2">
                       {/* Subject name only — class `name` is an internal code parents shouldn't see */}
-                      {data.latestFeedback.studentName} · {data.latestFeedback.subjectName || data.latestFeedback.className} (ครั้งที่ {data.latestFeedback.sessionNumber})
-                    </p>
+                      <p className="text-lg font-semibold leading-tight">
+                        {data.latestFeedback.subjectName || data.latestFeedback.className}
+                        <span className="text-sm font-normal text-gray-500"> · ครั้งที่ {data.latestFeedback.sessionNumber}</span>
+                      </p>
+                      <StudentBadge name={data.latestFeedback.studentName} size="md" className="shrink-0" />
+                    </div>
                     {data.latestFeedback.feedback && (
                       <p className="text-base font-normal mt-1 line-clamp-2">{data.latestFeedback.feedback}</p>
                     )}

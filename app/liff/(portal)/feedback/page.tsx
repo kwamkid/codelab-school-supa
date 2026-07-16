@@ -153,13 +153,14 @@ function FeedbackContent() {
                 <CardHeader className="pb-0">
                   <div className="flex justify-between items-start gap-2">
                     <div>
-                      <CardTitle className="text-base">{feedback.subjectName}</CardTitle>
+                      {/* Same title/badge treatment as the home + schedule cards */}
+                      <CardTitle className="text-lg">{feedback.subjectName}</CardTitle>
                       <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                         <span>ครั้งที่ {feedback.sessionNumber}</span>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
-                      <StudentBadge name={feedback.studentName} />
+                      <StudentBadge name={feedback.studentName} size="md" />
                       <span className="text-xs text-muted-foreground">{formatDate(feedback.sessionDate, 'short')}</span>
                     </div>
                   </div>

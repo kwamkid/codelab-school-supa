@@ -181,9 +181,9 @@ export default function CourseList({
                       style={{ backgroundColor: classData.subjectColor }}
                     />
                   )}
-                  <h3 className="font-semibold text-lg">{classData.subjectName}</h3>
+                  <h3 className="text-lg font-semibold">{classData.subjectName}</h3>
                 </div>
-                <StudentBadge name={classData.studentName} />
+                <StudentBadge name={classData.studentName} size="md" />
               </div>
               
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
