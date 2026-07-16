@@ -88,7 +88,7 @@ export default function MonthlyCalendar({ events, selectedStudentId, onEventClic
   const selectedEvents = selectedDay ? (eventsMap.get(selectedDay) || []) : []
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Card>
         <CardContent className="p-4">
           {/* Month nav */}

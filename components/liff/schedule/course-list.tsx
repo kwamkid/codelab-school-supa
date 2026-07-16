@@ -167,12 +167,12 @@ export default function CourseList({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {Object.values(eventsByClass).map((classData: any) => (
         <Card key={`${classData.classId}-${classData.studentId}`}>
           <CardContent className="p-3">
             {/* Class Header */}
-            <div className="mb-4">
+            <div className="mb-3">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {classData.subjectColor && (
@@ -216,7 +216,7 @@ export default function CourseList({
             })()}
 
             {/* Class Summary */}
-            <div className="mt-4 pt-4 border-t flex justify-between text-sm">
+            <div className="mt-3 pt-3 border-t flex justify-between text-sm">
               <div className="flex gap-4">
                 <span className="text-green-600">
                   เรียนแล้ว: {classData.events.filter((e: ScheduleEvent) => 

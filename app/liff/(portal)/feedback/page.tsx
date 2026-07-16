@@ -146,10 +146,11 @@ function FeedbackContent() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredFeedbacks.map((feedback) => (
               <Card key={feedback.id}>
-                <CardHeader className="pb-3">
+                {/* Card's own gap separates header/content — extra pb just stacks */}
+                <CardHeader className="pb-0">
                   <div className="flex justify-between items-start gap-2">
                     <div>
                       <CardTitle className="text-base">{feedback.subjectName}</CardTitle>

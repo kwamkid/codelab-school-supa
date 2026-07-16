@@ -91,7 +91,7 @@ function Dashboard() {
   return (
     <div className="max-w-md mx-auto">
       {/* Header */}
-      <div className="bg-gradient-to-br from-primary to-orange-500 text-white px-5 pt-9 pb-8 rounded-b-3xl">
+      <div className="bg-gradient-to-br from-primary to-orange-500 text-white px-5 pt-7 pb-6 rounded-b-3xl">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-white/80 text-sm">สวัสดีค่ะ 👋</p>

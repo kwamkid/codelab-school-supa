@@ -45,6 +45,14 @@
     --border: 220 14% 96%;
   }
 
+  /* Tighter cards for the mobile parent portal. The shared Card carries its own
+     py-6/gap-4 AND portal pages add CardContent p-3/p-4, so vertical padding
+     stacks to ~40px per card — reads as empty space on a 390px phone. */
+  .liff-theme [data-slot='card'] {
+    padding-block: 1rem;
+    gap: 0.75rem;
+  }
+
   .dark {
     /* Page canvas — near-black */
     --background: 240 4% 5%;
