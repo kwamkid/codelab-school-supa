@@ -167,7 +167,7 @@ function FeedbackContent() {
                   <div className="space-y-3">
                     {feedback.feedback && (
                       <div className="bg-blue-50 p-4 rounded-lg">
-                        <p className="text-sm whitespace-pre-wrap">{feedback.feedback}</p>
+                        <p className="text-base font-normal whitespace-pre-wrap">{feedback.feedback}</p>
                       </div>
                     )}
                     {feedback.photos && feedback.photos.length > 0 && (

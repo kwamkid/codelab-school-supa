@@ -29,7 +29,7 @@ interface HomeSummary {
   nextClasses?: NextClass[]
   nextClass: NextClass | null
   latestFeedback: null | {
-    studentName: string; className: string; sessionNumber: number
+    studentName: string; className: string; subjectName?: string; sessionNumber: number
     sessionDate: string; feedback: string; photoCount: number
   }
 }
@@ -200,10 +200,11 @@ function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-500">
-                      {data.latestFeedback.studentName} · {data.latestFeedback.className} (ครั้งที่ {data.latestFeedback.sessionNumber})
+                      {/* Subject name only — class `name` is an internal code parents shouldn't see */}
+                      {data.latestFeedback.studentName} · {data.latestFeedback.subjectName || data.latestFeedback.className} (ครั้งที่ {data.latestFeedback.sessionNumber})
                     </p>
                     {data.latestFeedback.feedback && (
-                      <p className="text-sm mt-1 line-clamp-2">{data.latestFeedback.feedback}</p>
+                      <p className="text-base font-normal mt-1 line-clamp-2">{data.latestFeedback.feedback}</p>
                     )}
                     {data.latestFeedback.photoCount > 0 && (
                       <p className="flex items-center gap-1 text-xs text-purple-600 mt-1">
