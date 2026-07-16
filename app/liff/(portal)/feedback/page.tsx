@@ -26,6 +26,7 @@ interface FeedbackData {
   feedback: string
   photos: string[]
   teacherName: string
+  teacherImage?: string | null
 }
 
 // Cache stores raw (string) dates — sessionStorage JSON round-trips them — so
@@ -73,15 +74,15 @@ function FeedbackContent() {
     }
   }
 
-  // Filter feedbacks
-  const filteredFeedbacks = feedbacks.filter(f => {
-    if (selectedStudentId && f.studentId !== selectedStudentId) return false
-    if (selectedSubject !== 'all' && f.subjectName !== selectedSubject) return false
-    return true
-  })
-
-  // Get unique subjects
-  const subjects = [...new Set(feedbacks.map(f => f.subjectName))]
+  // Scope everything to the selected student first, so the subject chips show
+  // that student's courses (not a global list that ignores the selection).
+  const studentFeedbacks = selectedStudentId
+    ? feedbacks.filter(f => f.studentId === selectedStudentId)
+    : feedbacks
+  const subjects = [...new Set(studentFeedbacks.map(f => f.subjectName))]
+  const filteredFeedbacks = studentFeedbacks.filter(
+    f => selectedSubject === 'all' || f.subjectName === selectedSubject
+  )
 
   if (loading || liffLoading) return <PageLoading />
 
@@ -99,7 +100,7 @@ function FeedbackContent() {
             <Button
               variant={!selectedStudentId ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setSelectedStudentId('')}
+              onClick={() => { setSelectedStudentId(''); setSelectedSubject('all') }}
               className="whitespace-nowrap"
             >
               ทุกคน
@@ -109,7 +110,9 @@ function FeedbackContent() {
                 key={student.id}
                 variant={selectedStudentId === student.id ? "default" : "outline"}
                 size="sm"
-                onClick={() => setSelectedStudentId(student.id)}
+                // Reset the subject filter — the new student's courses differ,
+                // and a stale subject would show an empty list.
+                onClick={() => { setSelectedStudentId(student.id); setSelectedSubject('all') }}
                 className="whitespace-nowrap"
               >
                 {student.nickname || student.name}
@@ -118,16 +121,18 @@ function FeedbackContent() {
           </div>
         )}
 
-        {/* Subject Filter */}
+        {/* Subject Filter — scrolls horizontally so 3+ course names don't squeeze */}
         <Tabs value={selectedSubject} onValueChange={setSelectedSubject} className="w-full">
-          <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${subjects.length + 1}, 1fr)` }}>
-            <TabsTrigger value="all">ทั้งหมด</TabsTrigger>
-            {subjects.map(subject => (
-              <TabsTrigger key={subject} value={subject} className="text-xs">
-                {subject}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="overflow-x-auto pb-1">
+            <TabsList className="inline-flex w-max">
+              <TabsTrigger value="all">ทั้งหมด</TabsTrigger>
+              {subjects.map(subject => (
+                <TabsTrigger key={subject} value={subject} className="text-xs whitespace-nowrap">
+                  {subject}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
         </Tabs>
 
         {/* Feedback List */}
@@ -179,7 +184,7 @@ function FeedbackContent() {
                         ))}
                       </div>
                     )}
-                    <TeacherBadge name={feedback.teacherName} size="sm" />
+                    <TeacherBadge name={feedback.teacherName} imageUrl={feedback.teacherImage} size="sm" />
                   </div>
                 </CardContent>
               </Card>
