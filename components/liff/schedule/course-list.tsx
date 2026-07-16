@@ -175,10 +175,20 @@ export default function CourseList({
   return (
     <div className="space-y-3">
       {Object.values(eventsByClass)
-        // Finished courses (every session already passed) sink to the bottom.
+        // Order: active courses by their NEXT upcoming session (soonest first)
+        // — without this they surface in data order, i.e. whichever course had
+        // the earliest session months ago, which reads as random. Finished
+        // courses sink to the bottom, most recently finished first.
         .sort((a: any, b: any) => {
-          const fin = (cd: any) => Number(cd.events.every((e: ScheduleEvent) => e.end < now))
-          return fin(a) - fin(b)
+          const nextStart = (cd: any) => {
+            const next = cd.events.find((e: ScheduleEvent) => e.end >= now)
+            return next ? next.start.getTime() : Infinity // Infinity = finished → bottom
+          }
+          const na = nextStart(a), nb = nextStart(b)
+          if (na !== nb) return na - nb
+          // both finished: most recently ended course first
+          const lastEnd = (cd: any) => cd.events[cd.events.length - 1]?.end.getTime() ?? 0
+          return lastEnd(b) - lastEnd(a)
         })
         .map((classData: any) => {
         const courseKey = `${classData.classId}-${classData.studentId}`
