@@ -686,6 +686,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           iconColor: 'text-blue-600'
         },
         {
+          name: 'VEX Team',
+          href: '/reports/vex-team',
+          icon: Trophy,
+          iconColor: 'text-amber-500'
+        },
+        {
           name: 'Notification Logs',
           href: '/reports/notification-logs',
           icon: Bell,
