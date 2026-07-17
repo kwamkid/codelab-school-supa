@@ -12,8 +12,8 @@ import { Trophy, CalendarClock, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const TABS = [
-  { kind: 'e', label: 'ตารางแข่งขัน', icon: Trophy },
   { kind: 'p', label: 'ตารางซ้อม', icon: CalendarClock },
+  { kind: 'e', label: 'ตารางแข่งขัน', icon: Trophy },
 ] as const
 
 export function TeamBottomNav() {
