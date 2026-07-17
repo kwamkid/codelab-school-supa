@@ -227,6 +227,8 @@ export function TeamsTab() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
+                          {/* Level logo leads the row — program identity first */}
+                          <LevelBadge level={t.level} logoHeight={24} />
                           <span className="font-semibold text-lg">{t.team_number}</span>
                           {t.name && <span className="text-gray-500">— {t.name}</span>}
                           {!selectedBranchId && t.branchName && (
@@ -243,7 +245,6 @@ export function TeamsTab() {
                             url={t.practiceLink ? publicUrl('p', t.practiceLink) : publicUrl('e', t.eventLink)}
                           />
                         )}
-                        <LevelBadge level={t.level} logoHeight={24} />
                         <Button
                           variant="ghost"
                           size="icon"
