@@ -36,7 +36,10 @@ export async function GET(request: NextRequest) {
   const authorizeUrl = new URL('https://access.line.me/oauth2/v2.1/authorize')
   authorizeUrl.searchParams.set('response_type', 'code')
   authorizeUrl.searchParams.set('client_id', settings.loginChannelId)
-  authorizeUrl.searchParams.set('redirect_uri', `${baseUrl(request)}/api/team/line-callback`)
+  // Standard callback path — registered in the LINE console for the prod,
+  // vercel, and ngrok domains (the old /api/team/line-callback stays as an
+  // alias for in-flight logins).
+  authorizeUrl.searchParams.set('redirect_uri', `${baseUrl(request)}/api/auth/callback/line`)
   authorizeUrl.searchParams.set('state', state)
   authorizeUrl.searchParams.set('scope', 'profile openid')
 
