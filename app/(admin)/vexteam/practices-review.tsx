@@ -14,7 +14,6 @@ import { TimeRangePicker } from '@/components/ui/time-range-picker'
 import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-filter-tabs'
-import { Tooltip } from '@/components/ui/tooltip'
 import { useBranch } from '@/contexts/BranchContext'
 import { cn } from '@/lib/utils'
 import { PracticeMonthView } from './practice-month-view'
@@ -292,47 +291,39 @@ export function PracticesReview({
                     </div>
                   </div>
 
-                  {/* Actions — icon-only on mobile (labels made the row read
-                      lopsided at 390px); tooltips carry the labels there. */}
+                  {/* Actions — full labels; left-aligned on mobile (right-aligned
+                      icons left a lopsided gap), right-aligned beside the info
+                      from sm up. */}
                   {!isEditing && (
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto flex-wrap justify-end">
-                      <Tooltip label="ปรับเวลา">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setEditingId(p.id)}
-                          disabled={busyId === p.id}
-                          className="gap-1"
-                        >
-                          <Clock className="h-4 w-4" />
-                          <span className="hidden sm:inline">ปรับเวลา</span>
-                        </Button>
-                      </Tooltip>
+                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto flex-wrap justify-start sm:justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingId(p.id)}
+                        disabled={busyId === p.id}
+                        className="gap-1"
+                      >
+                        <Clock className="h-4 w-4" /> ปรับเวลา
+                      </Button>
                       {p.status === 'proposed' ? (
                         <>
-                          <Tooltip label="อนุมัติ">
-                            <Button
-                              size="sm"
-                              onClick={() => review(p.id, 'approved')}
-                              disabled={busyId === p.id}
-                              className="gap-1 bg-green-600 hover:bg-green-700"
-                            >
-                              <Check className="h-4 w-4" />
-                              <span className="hidden sm:inline">อนุมัติ</span>
-                            </Button>
-                          </Tooltip>
-                          <Tooltip label="ปฏิเสธ">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => review(p.id, 'rejected')}
-                              disabled={busyId === p.id}
-                              className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
-                            >
-                              <X className="h-4 w-4" />
-                              <span className="hidden sm:inline">ปฏิเสธ</span>
-                            </Button>
-                          </Tooltip>
+                          <Button
+                            size="sm"
+                            onClick={() => review(p.id, 'approved')}
+                            disabled={busyId === p.id}
+                            className="gap-1 bg-green-600 hover:bg-green-700"
+                          >
+                            <Check className="h-4 w-4" /> อนุมัติ
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => review(p.id, 'rejected')}
+                            disabled={busyId === p.id}
+                            className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" /> ปฏิเสธ
+                          </Button>
                         </>
                       ) : (
                         <>
