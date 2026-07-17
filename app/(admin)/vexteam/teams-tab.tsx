@@ -65,9 +65,14 @@ function CopyLinkButton({ label, url }: { label: string; url: string }) {
     }
   }
   return (
-    <Button variant="outline" size="sm" onClick={copy} className="gap-1">
-      <Copy className="h-3.5 w-3.5" /> {label}
-    </Button>
+    // Icon-only on mobile (the two text buttons were shoving the team number
+    // off the card at 390px); the tooltip carries the label there.
+    <Tooltip label={label}>
+      <Button variant="outline" size="sm" onClick={copy} className="gap-1">
+        <Copy className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">{label}</span>
+      </Button>
+    </Tooltip>
   )
 }
 
