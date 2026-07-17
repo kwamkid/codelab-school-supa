@@ -15,6 +15,9 @@ import type { LinkKind, Team } from './types'
 /**
  * Resolve a team by its public slug. `kind` selects which DATA the caller wants
  * (event vs practice view) — it no longer restricts which token may be used.
+ * Matching is by TOKEN ONLY: the random token is the actual secret, and the
+ * team_number in the slug is cosmetic — so renaming a team (e.g. the 3883F.
+ * → 3883F cleanup) never breaks links that were already handed out.
  * Returns null on any mismatch (caller returns 404).
  */
 export async function resolveTeamBySlug(slug: string, _kind: LinkKind): Promise<Team | null> {
@@ -27,7 +30,6 @@ export async function resolveTeamBySlug(slug: string, _kind: LinkKind): Promise<
   const { data, error } = await vexDb()
     .from('teams')
     .select('*')
-    .eq('team_number', parsed.teamNumber)
     .or(`event_token.eq.${parsed.token},practice_token.eq.${parsed.token}`)
     .limit(1)
     .maybeSingle()
