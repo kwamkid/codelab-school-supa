@@ -71,8 +71,11 @@ export function useTeamAuth<T = any>(
       if (e?.status === 401) {
         // No identity yet.
         if (isInClient && liff) {
-          // Inside LINE: let LIFF log the user in (same-origin redirect round-trip).
-          liff.login()
+          // Inside LINE: let LIFF log the user in. redirectUri is REQUIRED here:
+          // /team/* is outside the LIFF endpoint path (/liff), so a bare
+          // liff.login() bounces back to the endpoint root — the parent portal —
+          // instead of this team page.
+          liff.login({ redirectUri: window.location.href })
           return
         }
         // Outside LINE: kick off the web-login OAuth flow, returning here after.

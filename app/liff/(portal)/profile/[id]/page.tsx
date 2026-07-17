@@ -83,7 +83,7 @@ function EditParentProfileContent() {
     if (!liffLoading) {
       if (!isLoggedIn && liff) {
         console.log('[EditParentProfileContent] Not logged in, redirecting...')
-        liff.login()
+        liff.login({ redirectUri: window.location.href })
       } else if (isLoggedIn) {
         setAuthChecked(true)
       }

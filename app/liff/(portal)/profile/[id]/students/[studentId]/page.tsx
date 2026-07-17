@@ -79,7 +79,7 @@ function EditStudentContent() {
     if (!liffLoading) {
       if (!isLoggedIn && liff) {
         console.log('[EditStudentContent] Not logged in, redirecting...')
-        liff.login()
+        liff.login({ redirectUri: window.location.href })
       } else if (isLoggedIn) {
         setAuthChecked(true)
       }

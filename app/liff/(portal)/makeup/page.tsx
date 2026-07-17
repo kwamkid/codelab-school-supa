@@ -72,7 +72,7 @@ function MakeupContent() {
     if (!liffLoading && isLoggedIn && profile?.userId) {
       loadData()
     } else if (!liffLoading && !isLoggedIn && liff) {
-      liff.login()
+      liff.login({ redirectUri: window.location.href })
     }
   }, [liffLoading, isLoggedIn, profile, liff])
 

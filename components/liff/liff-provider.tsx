@@ -105,7 +105,10 @@ export function LiffProvider({ children, requireLogin = false }: LiffProviderPro
               console.log('[LiffProvider] Token expired')
               if (requireLogin) {
                 console.log('[LiffProvider] requireLogin is true, triggering login...')
-                liffInstance.login()
+                // redirectUri keeps the user on THIS page (incl. query string like
+                // ?token=) — without it LINE bounces back to the LIFF endpoint
+                // root (/liff), dumping everyone on the portal home after login.
+                liffInstance.login({ redirectUri: window.location.href })
               } else {
                 console.log('[LiffProvider] requireLogin is false, not triggering login')
                 // Clear login state
@@ -118,7 +121,8 @@ export function LiffProvider({ children, requireLogin = false }: LiffProviderPro
           }
         } else if (requireLogin) {
           console.log('[LiffProvider] Not logged in and requireLogin is true, redirecting to login...')
-          liffInstance.login()
+          // Come back to the current page after login, not the endpoint root.
+          liffInstance.login({ redirectUri: window.location.href })
         }
         
       } catch (err) {
