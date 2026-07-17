@@ -12,9 +12,9 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { cn } from '@/lib/utils'
 import { LevelBadge } from '@/components/vex/level-badge'
-import { SectionLoading } from '@/components/ui/loading'
+import { Loading, SectionLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Trophy, Users, School, Cake, Building2, Loader2 } from 'lucide-react'
+import { Trophy, Users, School, Cake, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ReportData {
@@ -98,10 +98,10 @@ export default function VexTeamReportPage() {
 
   return (
     <div className="p-6 space-y-6 relative">
-      {/* Branch-switch refetch: dim current data + spinner instead of a blank page */}
+      {/* Branch-switch refetch: dim current data under the shared loader */}
       {loading && data && (
-        <div className="absolute inset-0 z-20 bg-white/60 flex items-start justify-center pt-40">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="absolute inset-0 z-20 bg-white/60 flex items-start justify-center pt-32">
+          <Loading size="md" />
         </div>
       )}
       <div className={cn('space-y-6', loading && data && 'pointer-events-none')}>

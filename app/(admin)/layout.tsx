@@ -908,14 +908,14 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
         {/* Sidebar */}
         <div
           className={cn(
-            'fixed inset-y-0 left-0 z-50 w-64 transform bg-[#faf7f5] shadow-lg transition-all duration-200 ease-in-out lg:static lg:translate-x-0',
+            'fixed inset-y-0 left-0 z-50 w-64 transform bg-[#faf7f5] dark:bg-card shadow-lg transition-all duration-200 ease-in-out lg:static lg:translate-x-0',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
             sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'
           )}
         >
           <div className="flex h-full flex-col">
             {/* Logo */}
-            <div className={cn('flex h-16 items-center justify-between border-b border-[#efe9e6] px-6', sidebarCollapsed && 'lg:justify-center lg:px-2')}>
+            <div className={cn('flex h-16 items-center justify-between border-b border-[#efe9e6] dark:border-border px-6', sidebarCollapsed && 'lg:justify-center lg:px-2')}>
               {/* Wordmark — hidden on desktop when collapsed (still shown in mobile drawer) */}
               <div className={cn('flex items-center', sidebarCollapsed && 'lg:hidden')}>
                 <Image
@@ -923,7 +923,15 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                   alt="CodeLab School"
                   width={150}
                   height={40}
-                  className="h-8 w-auto"
+                  className="h-8 w-auto dark:hidden"
+                  priority
+                />
+                <Image
+                  src="/logo-white.svg"
+                  alt="CodeLab School"
+                  width={150}
+                  height={40}
+                  className="h-8 w-auto hidden dark:block"
                   priority
                 />
               </div>
@@ -942,7 +950,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 onClick={() => setSidebarOpen(false)}
                 className="lg:hidden ml-2"
               >
-                <X className="h-6 w-6 text-[#6b5f5a]" />
+                <X className="h-6 w-6 text-[#6b5f5a] dark:text-muted-foreground" />
               </button>
             </div>
 
@@ -954,9 +962,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 return (
                   <div key={item.name} className={item.isDivider ? '' : 'mb-2'}>
                     {item.isDivider ? (
-                      <div className="my-3 border-t border-[#efe9e6]">
+                      <div className="my-3 border-t border-[#efe9e6] dark:border-border">
                         {item.sectionLabel && (
-                          <div className={cn('pt-2 px-3 text-xs font-semibold text-[#a99f99] uppercase tracking-wider', sidebarCollapsed && 'lg:hidden')}>
+                          <div className={cn('pt-2 px-3 text-xs font-semibold text-[#a99f99] dark:text-muted-foreground uppercase tracking-wider', sidebarCollapsed && 'lg:hidden')}>
                             {item.sectionLabel}
                           </div>
                         )}
@@ -974,15 +982,15 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                             'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
                             sidebarCollapsed && 'lg:justify-center',
                             isSubItemActive(item)
-                              ? 'bg-[#fbe9e7] text-[#ef443a] font-semibold'
-                              : 'text-[#6b5f5a] hover:bg-[#f3ede9]'
+                              ? 'bg-[#fbe9e7] text-[#ef443a] font-semibold dark:bg-primary/15 dark:text-primary'
+                              : 'text-[#6b5f5a] hover:bg-[#f3ede9] dark:text-foreground/80 dark:hover:bg-muted'
                           )}
                         >
                           <div className="flex items-center">
                             {ItemIcon && (
                               <ItemIcon
                                 className={cn('mr-3 h-5 w-5', sidebarCollapsed && 'lg:mr-0',
-                                  isSubItemActive(item) ? 'text-[#ef443a]' : (item.iconColor || 'text-[#6b5f5a]'))}
+                                  isSubItemActive(item) ? 'text-[#ef443a] dark:text-primary' : (item.iconColor || 'text-[#6b5f5a] dark:text-muted-foreground'))}
                               />
                             )}
                             <span className={cn(sidebarCollapsed && 'lg:hidden')}>{item.name}</span>
@@ -1009,7 +1017,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                                     'flex items-center rounded-lg px-3 py-2 text-base font-medium transition-colors',
                                     isActive(subItem.href)
                                       ? 'bg-[#ef443a] text-white font-semibold shadow-[0_4px_12px_rgba(239,68,58,0.28)]'
-                                      : 'text-[#8a7d77] hover:bg-[#f3ede9]'
+                                      : 'text-[#8a7d77] hover:bg-[#f3ede9] dark:text-muted-foreground dark:hover:bg-muted'
                                   )}
                                   onClick={() => {
                                     // เช็คว่าถ้ากำลังอยู่ที่หน้านี้อยู่แล้ว ไม่ต้องทำอะไร
@@ -1042,7 +1050,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                           sidebarCollapsed && 'lg:justify-center',
                           isActive(item.href)
                             ? 'bg-[#ef443a] text-white font-semibold shadow-[0_4px_12px_rgba(239,68,58,0.28)]'
-                            : 'text-[#6b5f5a] hover:bg-[#f3ede9]'
+                            : 'text-[#6b5f5a] hover:bg-[#f3ede9] dark:text-foreground/80 dark:hover:bg-muted'
                         )}
                         onClick={() => {
                           setSidebarOpen(false);
@@ -1054,7 +1062,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                             {ItemIcon && (
                               <ItemIcon
                                 className={cn('mr-3 h-5 w-5', sidebarCollapsed && 'lg:mr-0',
-                                  isActive(item.href) ? 'text-white' : (item.iconColor || 'text-[#6b5f5a]'))}
+                                  isActive(item.href) ? 'text-white' : (item.iconColor || 'text-[#6b5f5a] dark:text-muted-foreground'))}
                               />
                             )}
                             <span className={cn(sidebarCollapsed && 'lg:hidden')}>{item.name}</span>
