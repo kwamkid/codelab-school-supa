@@ -235,11 +235,13 @@ export function TeamsTab() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                        {t.eventLink && (
-                          <CopyLinkButton label="ตารางการแข่งขัน" url={publicUrl('e', t.eventLink)} />
-                        )}
-                        {t.practiceLink && (
-                          <CopyLinkButton label="ตารางเข้าซ้อม" url={publicUrl('p', t.practiceLink)} />
+                        {/* One link per team — both views share it (bottom tab bar
+                            switches; either token resolves the team server-side). */}
+                        {(t.practiceLink || t.eventLink) && (
+                          <CopyLinkButton
+                            label="ลิงก์ทีม"
+                            url={t.practiceLink ? publicUrl('p', t.practiceLink) : publicUrl('e', t.eventLink)}
+                          />
                         )}
                         <LevelBadge level={t.level} logoHeight={24} />
                         <Button
