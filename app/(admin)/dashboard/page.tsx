@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useBranch } from '@/contexts/BranchContext';
 import DailyTimetable, { TimetableEvent, TimetableRoom } from '@/components/dashboard/daily-timetable';
+import BirthdayCard from '@/components/dashboard/birthday-card';
 import ClassDetailDialog from '@/components/dashboard/class-detail-dialog';
 import { CalendarEvent, clearDashboardCache } from '@/lib/services/dashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -194,6 +195,9 @@ export default function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      {/* Birthdays: kids in class around their birthday (renders nothing when empty) */}
+      <BirthdayCard />
 
       {/* Timetable Grid */}
       <Card>

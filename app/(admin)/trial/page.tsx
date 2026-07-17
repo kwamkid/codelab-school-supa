@@ -98,7 +98,8 @@ export default function TrialBookingsPage() {
   const { selectedBranchId, isAllBranches } = useBranch();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  // Land on ใหม่ — leads needing first contact; 'ทั้งหมด' is the last tab
+  const [selectedStatus, setSelectedStatus] = useState<string>('new');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookingToDelete, setBookingToDelete] = useState<TrialBooking | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -384,13 +385,13 @@ export default function TrialBookingsPage() {
         value={selectedStatus}
         onChange={(v) => setSelectedStatus(v as any)}
         tabs={[
-          { value: 'all', label: 'ทั้งหมด', count: statusCounts.all, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
           { value: 'new', label: 'ใหม่', count: statusCounts.new, activeBg: 'bg-blue-500', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700', always: true },
           { value: 'contacted', label: 'ติดต่อแล้ว', count: statusCounts.contacted, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700', always: true },
           { value: 'scheduled', label: 'นัดหมายแล้ว', count: statusCounts.scheduled, activeBg: 'bg-purple-500', inactiveBg: 'bg-purple-50', inactiveLabel: 'text-purple-600', inactiveCount: 'text-purple-700', always: true },
           { value: 'completed', label: 'เรียนแล้ว', count: statusCounts.completed, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700', always: true },
           { value: 'converted', label: 'ลงทะเบียนแล้ว', count: statusCounts.converted, activeBg: 'bg-emerald-500', inactiveBg: 'bg-emerald-50', inactiveLabel: 'text-emerald-600', inactiveCount: 'text-emerald-700', always: true },
           { value: 'cancelled', label: 'ยกเลิก', count: statusCounts.cancelled, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600', always: true, separatorBefore: true },
+          { value: 'all', label: 'ทั้งหมด', count: statusCounts.all, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true, separatorBefore: true },
         ]}
       />
 

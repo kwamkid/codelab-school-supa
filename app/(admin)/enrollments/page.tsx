@@ -152,7 +152,8 @@ export default function EnrollmentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>('all');
+  // Land on รอชำระ — the actionable bucket; 'ทั้งหมด' is one tap away (last tab)
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>('pending');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
 
   // Date range filter
@@ -494,7 +495,6 @@ export default function EnrollmentsPage() {
           }
         }}
         tabs={[
-          { value: 'all', label: 'ทั้งหมด', count: filteredStats?.total ?? stats?.total ?? 0, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
           { value: 'paid', label: 'ชำระแล้ว', count: filteredStats?.paidCount ?? stats?.paidCount ?? 0, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700', always: true },
           { value: 'pending', label: 'รอชำระ', count: filteredStats?.pendingCount ?? stats?.pendingCount ?? 0, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700', always: true,
             subtitle: (stats?.pendingAmount ?? 0) > 0
@@ -508,6 +508,7 @@ export default function EnrollmentsPage() {
               </span>
             ) : undefined },
           { value: 'dropped', label: 'ยกเลิก', count: filteredStats?.droppedCount ?? stats?.dropped ?? 0, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700', always: true, separatorBefore: true },
+          { value: 'all', label: 'ทั้งหมด', count: filteredStats?.total ?? stats?.total ?? 0, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true, separatorBefore: true },
         ]}
       />
 

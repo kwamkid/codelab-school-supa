@@ -110,7 +110,8 @@ export default function MakeupPage() {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  // Land on รอจัดตาราง — the queue needing action; 'ทั้งหมด' is the last tab
+  const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterOverdue, setFilterOverdue] = useState(false);
   
@@ -355,11 +356,11 @@ export default function MakeupPage() {
         value={filterStatus}
         onChange={(v) => setFilterStatus(v as any)}
         tabs={[
-          { value: 'all', label: 'ทั้งหมด', count: stats.total, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
           { value: 'pending', label: 'รอจัดตาราง', count: stats.pending, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700', always: true },
           { value: 'scheduled', label: 'นัดแล้ว', count: stats.scheduled, activeBg: 'bg-blue-500', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700', always: true },
           { value: 'completed', label: 'เรียนแล้ว', count: stats.completed, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700', always: true },
           { value: 'cancelled', label: 'ยกเลิก', count: stats.cancelled, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600', always: true, separatorBefore: true },
+          { value: 'all', label: 'ทั้งหมด', count: stats.total, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true, separatorBefore: true },
         ]}
       />
 
