@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const teamIds = (teams || []).map((t: any) => t.id)
     if (teamIds.length === 0) {
       return NextResponse.json({
-        totalTeams: 0, totalKids: 0, byLevel: [], schools: [], ages: [], courses: [],
+        totalTeams: 0, totalKids: 0, byLevel: [], byBranch: [], schools: [], ages: [], courses: [],
       })
     }
 
@@ -54,8 +54,30 @@ export async function GET(request: Request) {
       byLevelMap.set(lv, e)
     }
 
-    // Students → school + age (kids link real students; see rules.md)
+    // Per-branch breakdown (branch names live in public.branches)
     const supabase = createServiceClient()
+    const branchIds = [...new Set((teams || []).map((t: any) => t.branch_id).filter(Boolean))] as string[]
+    const branchName = new Map<string, string>()
+    if (branchIds.length > 0) {
+      const { data } = await supabase.from('branches').select('id, name').in('id', branchIds)
+      for (const b of data || []) branchName.set(b.id, b.name)
+    }
+    const byBranchMap = new Map<string, { teams: number; kids: number }>()
+    const branchByTeam = new Map<string, string>((teams || []).map((t: any) => [t.id as string, (t.branch_id || '') as string]))
+    for (const t of (teams || []) as any[]) {
+      const key = branchName.get(t.branch_id) || 'ไม่ระบุสาขา'
+      const e = byBranchMap.get(key) || { teams: 0, kids: 0 }
+      e.teams++
+      byBranchMap.set(key, e)
+    }
+    for (const k of (kids || []) as any[]) {
+      const key = branchName.get(branchByTeam.get(k.team_id) || '') || 'ไม่ระบุสาขา'
+      const e = byBranchMap.get(key) || { teams: 0, kids: 0 }
+      e.kids++
+      byBranchMap.set(key, e)
+    }
+
+    // Students → school + age (kids link real students; see rules.md)
     let students: any[] = []
     if (studentIds.length > 0) {
       const { data, error } = await supabase
@@ -125,6 +147,9 @@ export async function GET(request: Request) {
       totalTeams: teams?.length || 0,
       totalKids: kids?.length || 0,
       byLevel: [...byLevelMap.entries()].map(([level, v]) => ({ level, ...v })),
+      byBranch: [...byBranchMap.entries()]
+        .map(([branch, v]) => ({ branch, ...v }))
+        .sort((a, b) => b.kids - a.kids),
       schools: [...schoolMap.entries()]
         .map(([school, count]) => ({ school, count }))
         .sort((a, b) => b.count - a.count),

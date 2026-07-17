@@ -11,13 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LevelBadge } from '@/components/vex/level-badge'
 import { SectionLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Trophy, Users, School, Cake } from 'lucide-react'
+import { Trophy, Users, School, Cake, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ReportData {
   totalTeams: number
   totalKids: number
   byLevel: { level: string; teams: number; kids: number }[]
+  byBranch: { branch: string; teams: number; kids: number }[]
   schools: { school: string; count: number }[]
   ages: { age: number; count: number }[]
   courses: { name: string; color: string | null; students: number }[]
@@ -107,15 +108,27 @@ export default function VexTeamReportPage() {
         </div>
       </div>
 
-      {/* Per-level breakdown */}
-      {(data?.byLevel.length || 0) > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {data!.byLevel.map((lv) => (
+      {/* Per-level + per-branch breakdown */}
+      {((data?.byLevel.length || 0) > 0 || (data?.byBranch.length || 0) > 0) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {data?.byLevel.map((lv) => (
             <div key={lv.level} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-1.5">
               <LevelBadge level={lv.level as any} logoHeight={18} className="border-0 bg-transparent px-0 py-0" />
               <span className="text-sm text-gray-600">{lv.teams} ทีม · {lv.kids} คน</span>
             </div>
           ))}
+          {(data?.byBranch.length || 0) > 1 && (
+            <>
+              <div className="w-px self-stretch bg-gray-200 mx-1" aria-hidden />
+              {data!.byBranch.map((b) => (
+                <div key={b.branch} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-1.5">
+                  <Building2 className="h-4 w-4 text-indigo-500" />
+                  <span className="text-sm font-medium">{b.branch}</span>
+                  <span className="text-sm text-gray-600">{b.teams} ทีม · {b.kids} คน</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 
