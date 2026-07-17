@@ -183,7 +183,9 @@ export function PracticesReview({
       <div className="flex flex-col gap-3">
         <StatusFilterTabs tabs={filterTabs} value={statusFilter} onChange={(v) => setStatusFilter(v as any)} />
 
-        {/* Searchable team filter (left) + list/calendar toggle (right) on one row */}
+        {/* Searchable team filter (left) + list/calendar toggle (right) on one row.
+            The select must be flex-1 min-w-0 (not w-full): w-full = 100% of the
+            row, which shoves the toggle past the right edge on mobile. */}
         <div className="flex items-center gap-3">
           {teams.length > 1 && (
             <FormSelect
@@ -192,7 +194,7 @@ export function PracticesReview({
               onValueChange={setTeamFilter}
               placeholder="ทุกทีม"
               searchPlaceholder="ค้นหาทีม..."
-              className="w-full sm:max-w-xs"
+              className="flex-1 min-w-0 sm:max-w-xs"
             />
           )}
           <div className="ml-auto inline-flex rounded-md border overflow-hidden shrink-0">
