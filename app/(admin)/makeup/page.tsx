@@ -63,6 +63,7 @@ import { useBranch } from '@/contexts/BranchContext';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLoading } from '@/components/ui/loading';
+import { StatusFilterTabs } from '@/components/ui/status-filter-tabs';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import ScheduleMakeupDialog from '@/components/makeup/schedule-makeup-dialog';
 import CreateMakeupDialog from '@/components/makeup/create-makeup-dialog';
@@ -348,43 +349,19 @@ export default function MakeupPage() {
         </PermissionGuard>
       </div>
 
-      {/* Status Filter Tabs */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        {[
-          { value: 'all', label: 'ทั้งหมด', count: stats.total, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700' },
-          { value: 'pending', label: 'รอจัดตาราง', count: stats.pending, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700' },
-          { value: 'scheduled', label: 'นัดแล้ว', count: stats.scheduled, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-blue-500', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700' },
-          { value: 'completed', label: 'เรียนแล้ว', count: stats.completed, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700' },
-          { value: 'cancelled', label: 'ยกเลิก', count: stats.cancelled, labelColor: 'text-white', countColor: 'text-white', activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600' },
-        ].map((tab) => {
-          const isActive = filterStatus === tab.value;
-          return (
-            <button
-              key={tab.value}
-              onClick={() => setFilterStatus(tab.value)}
-              className={cn(
-                'flex flex-col items-center justify-center w-24 h-[72px] rounded-xl transition-all',
-                isActive
-                  ? `${tab.activeBg} shadow-md`
-                  : `${tab.inactiveBg} hover:shadow-sm`
-              )}
-            >
-              <span className={cn(
-                'text-sm font-medium',
-                isActive ? tab.labelColor : tab.inactiveLabel
-              )}>
-                {tab.label}
-              </span>
-              <span className={cn(
-                'text-2xl font-bold mt-0.5',
-                isActive ? tab.countColor : tab.inactiveCount
-              )}>
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Status filter — shared component (dropdown on mobile, cards on sm+) */}
+      <StatusFilterTabs
+        className="mb-6"
+        value={filterStatus}
+        onChange={(v) => setFilterStatus(v as any)}
+        tabs={[
+          { value: 'all', label: 'ทั้งหมด', count: stats.total, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
+          { value: 'pending', label: 'รอจัดตาราง', count: stats.pending, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700', always: true },
+          { value: 'scheduled', label: 'นัดแล้ว', count: stats.scheduled, activeBg: 'bg-blue-500', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700', always: true },
+          { value: 'completed', label: 'เรียนแล้ว', count: stats.completed, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700', always: true },
+          { value: 'cancelled', label: 'ยกเลิก', count: stats.cancelled, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600', always: true, separatorBefore: true },
+        ]}
+      />
 
       {/* Source Tabs */}
       <div className="flex gap-2 mb-4">

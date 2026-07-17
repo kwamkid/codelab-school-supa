@@ -64,6 +64,7 @@ import { PermissionGuard } from '@/components/auth/permission-guard';
 import { SearchInput } from '@/components/ui/search-input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLoading } from '@/components/ui/loading';
+import { StatusFilterTabs } from '@/components/ui/status-filter-tabs';
 import TrialSessionDialog from '@/components/trial/trial-session-dialog';
 import { MarkAttendedDialog } from '@/components/trial/mark-attended-dialog';
 
@@ -378,57 +379,20 @@ export default function TrialBookingsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Status Filter Tabs */}
-      <div className="flex flex-wrap gap-3">
-        {[
-          { value: 'all', label: 'ทั้งหมด', count: statusCounts.all, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700' },
-          { value: 'new', label: 'ใหม่', count: statusCounts.new, activeBg: 'bg-blue-500', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700' },
-          { value: 'contacted', label: 'ติดต่อแล้ว', count: statusCounts.contacted, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700' },
-          { value: 'scheduled', label: 'นัดหมายแล้ว', count: statusCounts.scheduled, activeBg: 'bg-purple-500', inactiveBg: 'bg-purple-50', inactiveLabel: 'text-purple-600', inactiveCount: 'text-purple-700' },
-          { value: 'completed', label: 'เรียนแล้ว', count: statusCounts.completed, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700' },
-          { value: 'converted', label: 'ลงทะเบียนแล้ว', count: statusCounts.converted, activeBg: 'bg-emerald-500', inactiveBg: 'bg-emerald-50', inactiveLabel: 'text-emerald-600', inactiveCount: 'text-emerald-700' },
-          { value: 'cancelled', label: 'ยกเลิก', count: statusCounts.cancelled, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600' },
-        ].map((tab) => {
-          const isActive = selectedStatus === tab.value;
-          const total = statusCounts.all;
-          const pct = total > 0 && tab.value !== 'all'
-            ? ((tab.count / total) * 100).toFixed(0)
-            : null;
-          return (
-            <button
-              key={tab.value}
-              onClick={() => setSelectedStatus(tab.value)}
-              className={cn(
-                'flex flex-col items-center justify-center w-24 h-[72px] rounded-xl transition-all',
-                isActive
-                  ? `${tab.activeBg} shadow-md`
-                  : `${tab.inactiveBg} hover:shadow-sm`
-              )}
-            >
-              <span className={cn(
-                'text-xs font-medium',
-                isActive ? 'text-white' : tab.inactiveLabel
-              )}>
-                {tab.label}
-              </span>
-              <span className={cn(
-                'text-2xl font-bold mt-0.5',
-                isActive ? 'text-white' : tab.inactiveCount
-              )}>
-                {tab.count}
-              </span>
-              {pct !== null && (
-                <span className={cn(
-                  'text-[10px] leading-none',
-                  isActive ? 'text-white/80' : 'text-gray-400'
-                )}>
-                  {pct}%
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* Status filter — shared component (dropdown on mobile, cards on sm+) */}
+      <StatusFilterTabs
+        value={selectedStatus}
+        onChange={(v) => setSelectedStatus(v as any)}
+        tabs={[
+          { value: 'all', label: 'ทั้งหมด', count: statusCounts.all, activeBg: 'bg-indigo-500', inactiveBg: 'bg-indigo-50', inactiveLabel: 'text-indigo-600', inactiveCount: 'text-indigo-700', always: true },
+          { value: 'new', label: 'ใหม่', count: statusCounts.new, activeBg: 'bg-blue-500', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700', always: true },
+          { value: 'contacted', label: 'ติดต่อแล้ว', count: statusCounts.contacted, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700', always: true },
+          { value: 'scheduled', label: 'นัดหมายแล้ว', count: statusCounts.scheduled, activeBg: 'bg-purple-500', inactiveBg: 'bg-purple-50', inactiveLabel: 'text-purple-600', inactiveCount: 'text-purple-700', always: true },
+          { value: 'completed', label: 'เรียนแล้ว', count: statusCounts.completed, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700', always: true },
+          { value: 'converted', label: 'ลงทะเบียนแล้ว', count: statusCounts.converted, activeBg: 'bg-emerald-500', inactiveBg: 'bg-emerald-50', inactiveLabel: 'text-emerald-600', inactiveCount: 'text-emerald-700', always: true },
+          { value: 'cancelled', label: 'ยกเลิก', count: statusCounts.cancelled, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600', always: true, separatorBefore: true },
+        ]}
+      />
 
       {/* Search */}
       <SearchInput
