@@ -69,16 +69,11 @@ export function useTeamAuth<T = any>(
       setGate(null)
     } catch (e: any) {
       if (e?.status === 401) {
-        // No identity yet.
-        if (isInClient && liff) {
-          // Inside LINE: let LIFF log the user in. redirectUri is REQUIRED here:
-          // /team/* is outside the LIFF endpoint path (/liff), so a bare
-          // liff.login() bounces back to the endpoint root — the parent portal —
-          // instead of this team page.
-          liff.login({ redirectUri: window.location.href })
-          return
-        }
-        // Outside LINE: kick off the web-login OAuth flow, returning here after.
+        // No identity yet → LINE web-login OAuth (works in the LINE in-app
+        // browser AND external browsers), returning to this exact page via our
+        // own callback. Do NOT use liff.login() here: its redirectUri must live
+        // UNDER the LIFF endpoint (/liff), so from /team/* it always bounced
+        // the user to the parent portal after login.
         const ret = typeof window !== 'undefined' ? window.location.pathname : '/team'
         window.location.href = `/api/team/line-login?return=${encodeURIComponent(ret)}`
         return
@@ -89,7 +84,7 @@ export function useTeamAuth<T = any>(
     } finally {
       setLoading(false)
     }
-  }, [slug, kind, profileUserId, isInClient, liff])
+  }, [slug, kind, profileUserId])
 
   useEffect(() => {
     if (liffLoading) return // wait for LIFF init to settle first

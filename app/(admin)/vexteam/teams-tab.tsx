@@ -51,6 +51,11 @@ interface TeamRow {
 }
 
 function publicUrl(kind: 'e' | 'p', slug: string) {
+  // With the "Team" LIFF app configured (endpoint = /team), hand out
+  // liff.line.me links: inside LINE they authenticate silently — no login
+  // screen, no bounce to the parent portal.
+  const vexLiffId = process.env.NEXT_PUBLIC_VEX_LIFF_ID
+  if (vexLiffId) return `https://liff.line.me/${vexLiffId}/${kind}/${slug}`
   if (typeof window === 'undefined') return `/team/${kind}/${slug}`
   return `${window.location.origin}/team/${kind}/${slug}`
 }

@@ -41,9 +41,12 @@ export function useLiff() {
 interface LiffProviderProps {
   children: React.ReactNode
   requireLogin?: boolean
+  /** Init as a different LIFF app (e.g. the /team portal's own LIFF).
+      Defaults to the parent-portal LIFF (NEXT_PUBLIC_LIFF_ID). */
+  liffId?: string
 }
 
-export function LiffProvider({ children, requireLogin = false }: LiffProviderProps) {
+export function LiffProvider({ children, requireLogin = false, liffId }: LiffProviderProps) {
   const [liff, setLiff] = useState<Liff | null>(null)
   const [profile, setProfile] = useState<LiffProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -65,7 +68,7 @@ export function LiffProvider({ children, requireLogin = false }: LiffProviderPro
       
       try {
         // Initialize LIFF
-        const liffInstance = await initializeLiff()
+        const liffInstance = await initializeLiff(liffId)
         console.log('[LiffProvider] LIFF initialized')
         
         setLiff(liffInstance)

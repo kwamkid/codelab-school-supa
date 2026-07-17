@@ -27,7 +27,11 @@ async function getLiffId(): Promise<string> {
   }
 }
 
-export async function initializeLiff(): Promise<Liff> {
+// `overrideLiffId` lets a page init as a DIFFERENT LIFF app than the parent
+// portal (e.g. the /team portal has its own LIFF app whose endpoint is /team).
+// One page load only ever uses one LIFF app; if init already happened, the
+// existing instance is returned regardless of the override.
+export async function initializeLiff(overrideLiffId?: string): Promise<Liff> {
   console.log('[LIFF] initializeLiff called')
   
   // Prevent multiple simultaneous initialization
@@ -60,7 +64,7 @@ export async function initializeLiff(): Promise<Liff> {
     console.log('[LIFF] Starting fresh initialization...')
     
     // Get LIFF ID
-    const liffIdValue = await getLiffId()
+    const liffIdValue = overrideLiffId || await getLiffId()
     console.log('[LIFF] Using LIFF ID:', liffIdValue)
     
     // Import LIFF SDK

@@ -61,7 +61,7 @@ export default function EventRsvpPage() {
   const params = useParams()
   const slug = params.slug as string
   return (
-    <LiffProvider requireLogin={false}>
+    <LiffProvider requireLogin={false} liffId={process.env.NEXT_PUBLIC_VEX_LIFF_ID}>
       <EventRsvpInner slug={slug} />
     </LiffProvider>
   )

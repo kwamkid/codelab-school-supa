@@ -76,7 +76,7 @@ export default function ProposePracticePage() {
   const params = useParams()
   const slug = params.slug as string
   return (
-    <LiffProvider requireLogin={false}>
+    <LiffProvider requireLogin={false} liffId={process.env.NEXT_PUBLIC_VEX_LIFF_ID}>
       <ProposePracticeInner slug={slug} />
     </LiffProvider>
   )
