@@ -44,9 +44,13 @@ interface LiffProviderProps {
   /** Init as a different LIFF app (e.g. the /team portal's own LIFF).
       Defaults to the parent-portal LIFF (NEXT_PUBLIC_LIFF_ID). */
   liffId?: string
+  /** liff.init auto-login outside LINE (default true). /team pages pass false —
+      their external-browser auth is the cookie web-login; LIFF's auto-login
+      would strand users on the endpoint root. */
+  externalBrowserLogin?: boolean
 }
 
-export function LiffProvider({ children, requireLogin = false, liffId }: LiffProviderProps) {
+export function LiffProvider({ children, requireLogin = false, liffId, externalBrowserLogin = true }: LiffProviderProps) {
   const [liff, setLiff] = useState<Liff | null>(null)
   const [profile, setProfile] = useState<LiffProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -68,7 +72,7 @@ export function LiffProvider({ children, requireLogin = false, liffId }: LiffPro
       
       try {
         // Initialize LIFF
-        const liffInstance = await initializeLiff(liffId)
+        const liffInstance = await initializeLiff(liffId, { withLoginOnExternalBrowser: externalBrowserLogin })
         console.log('[LiffProvider] LIFF initialized')
         
         setLiff(liffInstance)

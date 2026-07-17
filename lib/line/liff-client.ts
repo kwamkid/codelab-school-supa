@@ -31,7 +31,16 @@ async function getLiffId(): Promise<string> {
 // portal (e.g. the /team portal has its own LIFF app whose endpoint is /team).
 // One page load only ever uses one LIFF app; if init already happened, the
 // existing instance is returned regardless of the override.
-export async function initializeLiff(overrideLiffId?: string): Promise<Liff> {
+export async function initializeLiff(
+  overrideLiffId?: string,
+  opts?: {
+    /** liff.init's auto-login outside LINE. Default true (portal). The /team
+        pages pass false: their external-browser auth is the cookie web-login,
+        and LIFF's auto-login returns users to the ENDPOINT ROOT, stranding
+        them off their team page. */
+    withLoginOnExternalBrowser?: boolean
+  }
+): Promise<Liff> {
   console.log('[LIFF] initializeLiff called')
   
   // Prevent multiple simultaneous initialization
@@ -73,9 +82,9 @@ export async function initializeLiff(overrideLiffId?: string): Promise<Liff> {
     
     // Initialize LIFF
     console.log('[LIFF] Calling liff.init()...')
-    await liff.init({ 
+    await liff.init({
       liffId: liffIdValue,
-      withLoginOnExternalBrowser: true
+      withLoginOnExternalBrowser: opts?.withLoginOnExternalBrowser ?? true
     })
     
     console.log('[LIFF] Init completed successfully')

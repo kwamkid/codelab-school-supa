@@ -6,6 +6,7 @@
 
 import { useParams } from 'next/navigation'
 import { LiffProvider } from '@/components/liff/liff-provider'
+import { LiffUpgradeGate } from '../../liff-upgrade-gate'
 import { Loading } from '@/components/ui/loading'
 import { LineGate } from '../../line-gate'
 import { TeamHeader } from '../../team-header'
@@ -61,8 +62,12 @@ export default function EventRsvpPage() {
   const params = useParams()
   const slug = params.slug as string
   return (
-    <LiffProvider requireLogin={false} liffId={process.env.NEXT_PUBLIC_VEX_LIFF_ID}>
-      <EventRsvpInner slug={slug} />
-    </LiffProvider>
+    // Gate BEFORE the provider: plain links inside LINE bounce to the LIFF deep
+    // link before liff.init can auto-login and strand the user at /team root.
+    <LiffUpgradeGate kind="e" slug={slug}>
+      <LiffProvider requireLogin={false} liffId={process.env.NEXT_PUBLIC_VEX_LIFF_ID} externalBrowserLogin={false}>
+        <EventRsvpInner slug={slug} />
+      </LiffProvider>
+    </LiffUpgradeGate>
   )
 }

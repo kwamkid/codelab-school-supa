@@ -55,7 +55,9 @@ function publicUrl(kind: 'e' | 'p', slug: string) {
   // liff.line.me links: inside LINE they authenticate silently — no login
   // screen, no bounce to the parent portal.
   const vexLiffId = process.env.NEXT_PUBLIC_VEX_LIFF_ID
-  if (vexLiffId) return `https://liff.line.me/${vexLiffId}/${kind}/${slug}`
+  // ?li=1 marks "arrived via the LIFF deep link" so the page's upgrade gate
+  // won't bounce it back to liff.line.me (redirect-loop guard).
+  if (vexLiffId) return `https://liff.line.me/${vexLiffId}/${kind}/${slug}?li=1`
   if (typeof window === 'undefined') return `/team/${kind}/${slug}`
   return `${window.location.origin}/team/${kind}/${slug}`
 }

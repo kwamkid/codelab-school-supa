@@ -6,10 +6,20 @@
 // /team/p/<slug> automatically. A direct visit (no liff.state) just shows a
 // hint — there is nothing at the bare /team path.
 
+import { useEffect, useState } from 'react'
 import { LiffProvider } from '@/components/liff/liff-provider'
+import { Loading } from '@/components/ui/loading'
 import { Users } from 'lucide-react'
 
 function TeamRootContent() {
+  // While ?liff.state=... is present, liff.init is about to secondary-redirect
+  // to the real team page — show a loader, not the "open via your link" hint.
+  const [pendingState, setPendingState] = useState<boolean | null>(null)
+  useEffect(() => {
+    setPendingState(window.location.search.includes('liff.state'))
+  }, [])
+  if (pendingState !== false) return <Loading fullScreen size="lg" />
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
       <div className="text-center space-y-3 max-w-sm">
@@ -25,7 +35,7 @@ function TeamRootContent() {
 
 export default function TeamRootPage() {
   return (
-    <LiffProvider requireLogin={false} liffId={process.env.NEXT_PUBLIC_VEX_LIFF_ID}>
+    <LiffProvider requireLogin={false} liffId={process.env.NEXT_PUBLIC_VEX_LIFF_ID} externalBrowserLogin={false}>
       <TeamRootContent />
     </LiffProvider>
   )
