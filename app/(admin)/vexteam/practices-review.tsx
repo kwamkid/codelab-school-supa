@@ -242,8 +242,10 @@ export function PracticesReview({
             const d = splitDate(p.practice_date)
             const isEditing = editingId === p.id
             return (
-              <Card key={p.id}>
-                <CardContent className="p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+              // py-0: the shared Card's own py-6 stacks with CardContent's
+              // padding into ~36px of dead space top/bottom on mobile.
+              <Card key={p.id} className="py-0">
+                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
                   {/* Prominent date block */}
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="shrink-0 w-14 text-center leading-none">

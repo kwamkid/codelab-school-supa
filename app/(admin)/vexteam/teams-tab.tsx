@@ -214,7 +214,9 @@ export function TeamsTab() {
           ) : (
             <div className="grid gap-3">
               {filtered.map((t) => (
-                <Card key={t.id}>
+                // py-0: shared Card's py-6 + CardContent p-4 double the
+                // vertical padding otherwise.
+                <Card key={t.id} className="py-0">
                   <CardContent className="p-4 space-y-3">
                     {/* Header row: name + branch + level + actions */}
                     <div className="flex items-start justify-between gap-3">
