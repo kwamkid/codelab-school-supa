@@ -88,18 +88,32 @@ export async function GET(request: Request) {
       students = data || []
     }
 
-    const schoolMap = new Map<string, number>()
-    const ageMap = new Map<number, number>()
+    // Display name per student (nickname first) — reused by every hover list
+    const nameById = new Map<string, string>(
+      students.map((s: any) => [s.id as string, (s.nickname || s.name || '') as string])
+    )
+
+    const schoolMap = new Map<string, { count: number; names: string[] }>()
+    const ageMap = new Map<number, { count: number; names: string[] }>()
     for (const s of students) {
+      const display = nameById.get(s.id) || ''
       const school = (s.school_name || '').trim() || 'ไม่ระบุ'
-      schoolMap.set(school, (schoolMap.get(school) || 0) + 1)
+      const sc = schoolMap.get(school) || { count: 0, names: [] }
+      sc.count++
+      sc.names.push(display)
+      schoolMap.set(school, sc)
       if (s.birthdate) {
         const b = new Date(s.birthdate)
         const now = new Date()
         let age = now.getFullYear() - b.getFullYear()
         const m = now.getMonth() - b.getMonth()
         if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--
-        if (age >= 0 && age < 30) ageMap.set(age, (ageMap.get(age) || 0) + 1)
+        if (age >= 0 && age < 30) {
+          const ac = ageMap.get(age) || { count: 0, names: [] }
+          ac.count++
+          ac.names.push(display)
+          ageMap.set(age, ac)
+        }
       }
     }
 
@@ -151,13 +165,18 @@ export async function GET(request: Request) {
         .map(([branch, v]) => ({ branch, ...v }))
         .sort((a, b) => b.kids - a.kids),
       schools: [...schoolMap.entries()]
-        .map(([school, count]) => ({ school, count }))
+        .map(([school, v]) => ({ school, count: v.count, names: v.names.sort() }))
         .sort((a, b) => b.count - a.count),
       ages: [...ageMap.entries()]
-        .map(([age, count]) => ({ age, count }))
+        .map(([age, v]) => ({ age, count: v.count, names: v.names.sort() }))
         .sort((a, b) => a.age - b.age),
       courses: [...courseMap.values()]
-        .map((c) => ({ name: c.name, color: c.color, students: c.students.size }))
+        .map((c) => ({
+          name: c.name,
+          color: c.color,
+          students: c.students.size,
+          names: [...c.students].map((id) => nameById.get(id) || '').filter(Boolean).sort(),
+        }))
         .sort((a, b) => b.students - a.students),
     })
   } catch (e) {

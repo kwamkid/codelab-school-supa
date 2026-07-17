@@ -7,11 +7,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { authFetch } from '@/lib/auth-fetch'
 import { useBranch } from '@/contexts/BranchContext'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardTitle } from '@/components/ui/card'
+import { Tooltip } from '@/components/ui/tooltip'
+import { StudentBadge } from '@/components/ui/student-badge'
+import { cn } from '@/lib/utils'
 import { LevelBadge } from '@/components/vex/level-badge'
 import { SectionLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Trophy, Users, School, Cake, Building2 } from 'lucide-react'
+import { Trophy, Users, School, Cake, Building2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ReportData {
@@ -19,16 +22,19 @@ interface ReportData {
   totalKids: number
   byLevel: { level: string; teams: number; kids: number }[]
   byBranch: { branch: string; teams: number; kids: number }[]
-  schools: { school: string; count: number }[]
-  ages: { age: number; count: number }[]
-  courses: { name: string; color: string | null; students: number }[]
+  schools: { school: string; count: number; names: string[] }[]
+  ages: { age: number; count: number; names: string[] }[]
+  courses: { name: string; color: string | null; students: number; names: string[] }[]
 }
 
 // Simple horizontal bar row: label left, count right, tinted bar underneath.
-function BarRow({ label, count, max, color }: { label: React.ReactNode; count: number; max: number; color?: string }) {
+// Hovering a row pops the kids behind the number (shared StudentBadge colors).
+function BarRow({ label, count, max, color, names }: {
+  label: React.ReactNode; count: number; max: number; color?: string; names?: string[]
+}) {
   const pct = max > 0 ? Math.max(4, Math.round((count / max) * 100)) : 0
-  return (
-    <div className="space-y-1">
+  const row = (
+    <div className="space-y-1 rounded-md px-1 -mx-1 hover:bg-gray-50 transition-colors">
       <div className="flex items-center justify-between gap-3 text-base">
         <div className="min-w-0 truncate">{label}</div>
         <div className="font-semibold tabular-nums shrink-0">{count} คน</div>
@@ -40,6 +46,18 @@ function BarRow({ label, count, max, color }: { label: React.ReactNode; count: n
         />
       </div>
     </div>
+  )
+  if (!names?.length) return row
+  return (
+    <Tooltip
+      label={
+        <span className="flex flex-wrap gap-1 max-w-[280px] py-0.5">
+          {names.map((n, i) => <StudentBadge key={`${n}-${i}`} name={n} />)}
+        </span>
+      }
+    >
+      {row}
+    </Tooltip>
   )
 }
 
@@ -79,7 +97,14 @@ export default function VexTeamReportPage() {
   const maxCourse = Math.max(0, ...(data?.courses.map((c) => c.students) || []))
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 relative">
+      {/* Branch-switch refetch: dim current data + spinner instead of a blank page */}
+      {loading && data && (
+        <div className="absolute inset-0 z-20 bg-white/60 flex items-start justify-center pt-40">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
+      <div className={cn('space-y-6', loading && data && 'pointer-events-none')}>
       <div>
         <h1 className="text-xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
           <Trophy className="h-8 w-8 text-amber-500" />
@@ -144,7 +169,7 @@ export default function VexTeamReportPage() {
               </CardTitle>
               <div className="space-y-3">
                 {data?.schools.map((s) => (
-                  <BarRow key={s.school} label={s.school} count={s.count} max={maxSchool} color="#10B981" />
+                  <BarRow key={s.school} label={s.school} count={s.count} max={maxSchool} color="#10B981" names={s.names} />
                 ))}
               </div>
             </CardContent>
@@ -161,7 +186,7 @@ export default function VexTeamReportPage() {
                   <p className="text-sm text-gray-400">ไม่มีข้อมูลวันเกิด</p>
                 )}
                 {data?.ages.map((a) => (
-                  <BarRow key={a.age} label={`${a.age} ปี`} count={a.count} max={maxAge} color="#A855F7" />
+                  <BarRow key={a.age} label={`${a.age} ปี`} count={a.count} max={maxAge} color="#A855F7" names={a.names} />
                 ))}
               </div>
             </CardContent>
@@ -192,6 +217,7 @@ export default function VexTeamReportPage() {
                     count={c.students}
                     max={maxCourse}
                     color={c.color || '#3B82F6'}
+                    names={c.names}
                   />
                 ))}
               </div>
@@ -199,6 +225,7 @@ export default function VexTeamReportPage() {
           </Card>
         </div>
       )}
+      </div>
     </div>
   )
 }
