@@ -30,15 +30,17 @@ export async function requireAdmin(request: Request): Promise<VexAdmin> {
     return { ok: false, status: 403, error: 'Forbidden' }
   }
 
-  // Best-effort display name for audit (non-fatal).
+  // Best-effort display name for audit (non-fatal). Column is display_name —
+  // selecting `name` here was spamming "column admin_users.name does not exist"
+  // into the Postgres log on every admin call.
   let name: string | undefined
   try {
-    const rows = await restSelect<{ name?: string }>('admin_users', {
+    const rows = await restSelect<{ display_name?: string }>('admin_users', {
       id: `eq.${staff.adminId}`,
-      select: 'name',
+      select: 'display_name',
       limit: '1',
     })
-    name = rows?.[0]?.name
+    name = rows?.[0]?.display_name
   } catch {
     // ignore — audit name is optional
   }

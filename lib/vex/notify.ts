@@ -26,7 +26,7 @@ function timeRange(start: string | null, end: string | null): string {
   return `${hhmm(start) || '-'}${end ? ` - ${hhmm(end)}` : ''}`
 }
 
-export type PracticeNotifyKind = 'approved' | 'rejected' | 'edited'
+export type PracticeNotifyKind = 'approved' | 'rejected' | 'edited' | 'scheduled'
 
 export interface PracticeForNotify {
   parent_id: string | null
@@ -88,6 +88,9 @@ export async function notifyParentPractice(
       text = `✅ คำขอซ้อม${who}ได้รับการอนุมัติแล้ว\n📅 ${when}`
     } else if (kind === 'rejected') {
       text = `❌ คำขอซ้อม${who}ไม่ได้รับการอนุมัติ\n📅 ${when}\nกรุณาติดต่อแอดมินหรือเสนอวันใหม่`
+    } else if (kind === 'scheduled') {
+      // Admin-created practice (not a reply to a parent request)
+      text = `🗓️ แอดมินนัดวันซ้อม${who}\n📅 ${when}`
     } else {
       text = `✏️ แอดมินปรับเวลาซ้อม${who}ให้ใหม่\n📅 ${when}`
     }

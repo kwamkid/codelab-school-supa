@@ -1,12 +1,115 @@
 // app/api/admin/vex/practices/route.ts
-// GET → all practice proposals (optionally ?status= / ?team_id=), enriched with
-// the kid nickname + team number/name for the admin review list.
+// GET  → all practice proposals (optionally ?status= / ?team_id=), enriched with
+//        the kid nickname + team number/name for the admin review list.
+// POST → admin schedules a practice directly for one or more kids of a team.
+//        Created rows are APPROVED immediately (no review — the admin is the
+//        reviewer); parents get a "แอดมินนัดซ้อม" LINE notification.
 
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { vexDb } from '@/lib/vex/supabase'
 import { requireAdmin } from '@/lib/vex/api'
+import { logAudit } from '@/lib/vex/audit'
+import { notifyParentPractice } from '@/lib/vex/notify'
 
 export const dynamic = 'force-dynamic'
+
+const createSchema = z.object({
+  team_id: z.string().uuid(),
+  kid_ids: z.array(z.string().uuid()).min(1),
+  practice_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  start_time: z.string().regex(/^\d{2}:\d{2}/),
+  end_time: z.string().regex(/^\d{2}:\d{2}/),
+  note: z.string().trim().max(500).optional(),
+})
+
+export async function POST(request: Request) {
+  const admin = await requireAdmin(request)
+  if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status })
+
+  try {
+    const parsed = createSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'ข้อมูลไม่ถูกต้อง' }, { status: 400 })
+    }
+    const { team_id, kid_ids, practice_date, start_time, end_time, note } = parsed.data
+
+    const db = vexDb()
+
+    // Kids must belong to the team.
+    const { data: kids, error: kidsError } = await db
+      .from('kids')
+      .select('id, nickname')
+      .eq('team_id', team_id)
+      .in('id', kid_ids)
+    if (kidsError) throw new Error(kidsError.message)
+    if (!kids || kids.length === 0) {
+      return NextResponse.json({ error: 'ไม่พบเด็กในทีมนี้' }, { status: 400 })
+    }
+
+    // Skip kids who already have a non-rejected practice on that date.
+    const { data: existing } = await db
+      .from('practices')
+      .select('kid_id')
+      .eq('team_id', team_id)
+      .eq('practice_date', practice_date)
+      .neq('status', 'rejected')
+      .in('kid_id', kids.map((k: any) => k.id))
+    const already = new Set((existing || []).map((p: any) => p.kid_id))
+    const toCreate = kids.filter((k: any) => !already.has(k.id))
+
+    if (toCreate.length === 0) {
+      return NextResponse.json(
+        { error: 'เด็กที่เลือกมีตารางซ้อมวันนั้นอยู่แล้วทุกคน' },
+        { status: 409 }
+      )
+    }
+
+    const now = new Date().toISOString()
+    const rows = toCreate.map((k: any) => ({
+      team_id,
+      kid_id: k.id,
+      parent_id: null, // admin-created, not a parent submission
+      practice_date,
+      start_time,
+      end_time,
+      note: note || null,
+      status: 'approved', // admin schedules → no review round-trip
+      reviewed_by: admin.adminId,
+      reviewed_at: now,
+    }))
+
+    const { data: created, error: insertError } = await db
+      .from('practices')
+      .insert(rows)
+      .select('*')
+    if (insertError) throw new Error(insertError.message)
+
+    await logAudit({
+      actorType: 'admin',
+      actorId: admin.adminId,
+      actorName: admin.name,
+      action: 'create_scheduled_practice',
+      entity: 'practice',
+      entityId: team_id,
+      after: { practice_date, start_time, end_time, kids: toCreate.map((k: any) => k.nickname) },
+    })
+
+    // Tell each kid's parent (best-effort; cron drains the queue if send fails).
+    for (const p of created || []) {
+      const kid = toCreate.find((k: any) => k.id === p.kid_id)
+      await notifyParentPractice(p as any, 'scheduled', kid?.nickname ?? null)
+    }
+
+    return NextResponse.json({
+      created: created?.length || 0,
+      skipped: kids.length - toCreate.length,
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Server error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
 
 export async function GET(request: Request) {
   const admin = await requireAdmin(request)
