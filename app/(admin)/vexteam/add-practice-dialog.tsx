@@ -17,13 +17,12 @@ import {
 } from '@/components/ui/dialog'
 import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { TimeRangePicker } from '@/components/ui/time-range-picker'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { AutocompleteInput, type AutocompleteOption } from '@/components/ui/autocomplete-input'
-import { CalendarDays, Loader2, Plus, X } from 'lucide-react'
+import { Loader2, Plus, X } from 'lucide-react'
 
 interface VexKid {
   id: string
@@ -43,7 +42,7 @@ export function AddPracticeDialog({
   const [kids, setKids] = useState<VexKid[]>([])
   const [teamOptions, setTeamOptions] = useState<FormSelectOption[]>([])
   const [selected, setSelected] = useState<Map<string, VexKid>>(new Map())
-  const [dates, setDates] = useState<Date[]>([])
+  const [dates, setDates] = useState<string[]>([]) // yyyy-mm-dd
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [note, setNote] = useState('')
@@ -98,9 +97,6 @@ export function AddPracticeDialog({
     })
   }
 
-  const toDateStr = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
   const reset = () => {
     setSelected(new Map()); setDates([]); setStartTime(''); setEndTime(''); setNote('')
   }
@@ -117,7 +113,7 @@ export function AddPracticeDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           kid_ids: [...selected.keys()],
-          practice_dates: dates.map(toDateStr).sort(),
+          practice_dates: [...dates].sort(),
           start_time: startTime,
           end_time: endTime,
           note: note.trim() || undefined,
@@ -210,28 +206,11 @@ export function AddPracticeDialog({
               )}
             </div>
 
-            {/* Dates (multi-select calendar) + time on one row (stacks on mobile) */}
+            {/* Dates (shared multi-date picker) + time on one row (stacks on mobile) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>วันที่ซ้อม (เลือกได้หลายวัน)</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start font-normal">
-                      <CalendarDays className="h-4 w-4 mr-2 text-gray-500" />
-                      {dates.length === 0
-                        ? 'เลือกวันที่...'
-                        : `เลือกแล้ว ${dates.length} วัน`}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="multiple"
-                      selected={dates}
-                      onSelect={(d) => setDates(d || [])}
-                      disabled={{ before: new Date() }}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateRangePicker mode="multiple" values={dates} onChange={setDates} minDate={new Date()} />
               </div>
               <div className="space-y-2">
                 <Label>เวลา (ทุกวันที่เลือก)</Label>
@@ -243,28 +222,6 @@ export function AddPracticeDialog({
                 />
               </div>
             </div>
-
-            {/* Chosen dates as removable chips */}
-            {dates.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {[...dates].sort((a, b) => a.getTime() - b.getTime()).map((d) => (
-                  <span
-                    key={d.toISOString()}
-                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-2.5 py-0.5 text-sm"
-                  >
-                    {d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    <button
-                      type="button"
-                      onClick={() => setDates(dates.filter((x) => x.getTime() !== d.getTime()))}
-                      className="opacity-60 hover:opacity-100"
-                      aria-label="เอาวันนี้ออก"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label>หมายเหตุ (ไม่บังคับ)</Label>

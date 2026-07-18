@@ -1,10 +1,12 @@
 "use client"
 
 import Datepicker from "react-tailwindcss-datepicker"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Tooltip } from "@/components/ui/tooltip"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 function toDateStr(d: Date | string | null | undefined): string {
   if (!d) return ""
@@ -50,7 +52,26 @@ interface DateRangePickerSingleProps {
   withStepper?: boolean
 }
 
-type DateRangePickerProps = DateRangePickerRangeProps | DateRangePickerSingleProps
+// --- Multiple discrete dates mode props ---
+// (react-tailwindcss-datepicker can't do multi-date, so this mode renders the
+// shared shadcn Calendar in a portaled Popover instead — same component API.)
+interface DateRangePickerMultipleProps {
+  mode: "multiple"
+  /** Selected dates as "YYYY-MM-DD" strings (matches the other modes). */
+  values?: string[]
+  onChange: (dates: string[]) => void
+  placeholder?: string
+  className?: string
+  minDate?: Date
+  maxDate?: Date
+  disabled?: boolean
+  popoverDirection?: "up" | "down"
+}
+
+type DateRangePickerProps =
+  | DateRangePickerRangeProps
+  | DateRangePickerSingleProps
+  | DateRangePickerMultipleProps
 
 const INPUT_CLASS =
   "w-full h-10 rounded-md border border-input bg-background pl-3 pr-10 py-2.5 text-base ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -59,6 +80,61 @@ export function DateRangePicker(props: DateRangePickerProps) {
   const { placeholder, className, minDate, maxDate, disabled, popoverDirection } = props
 
   const now = new Date()
+
+  if (props.mode === "multiple") {
+    // --- Multiple discrete dates ---
+    const selectedDates = (props.values || []).map(toDate).filter(Boolean) as Date[]
+    const sorted = [...selectedDates].sort((a, b) => a.getTime() - b.getTime())
+
+    return (
+      <div className={cn("space-y-2", className)}>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button type="button" disabled={disabled} className={cn(INPUT_CLASS, "flex items-center text-left")}>
+              <CalendarDays className="h-4 w-4 mr-2 text-gray-500 shrink-0" />
+              {sorted.length === 0 ? (
+                <span className="text-muted-foreground">{placeholder || "เลือกวันที่..."}</span>
+              ) : (
+                `เลือกแล้ว ${sorted.length} วัน`
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="multiple"
+              selected={selectedDates}
+              onSelect={(d) => props.onChange((d || []).map((x) => toDateStr(x)))}
+              disabled={[
+                ...(minDate ? [{ before: minDate }] : []),
+                ...(maxDate ? [{ after: maxDate }] : []),
+              ]}
+            />
+          </PopoverContent>
+        </Popover>
+
+        {sorted.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {sorted.map((d) => (
+              <span
+                key={d.toISOString()}
+                className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-2.5 py-0.5 text-sm"
+              >
+                {d.toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short" })}
+                <button
+                  type="button"
+                  onClick={() => props.onChange((props.values || []).filter((v) => v !== toDateStr(d)))}
+                  className="opacity-60 hover:opacity-100"
+                  aria-label="เอาวันนี้ออก"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   if (props.mode === "single") {
     // --- Single date mode ---
