@@ -17,7 +17,8 @@ export const dynamic = 'force-dynamic'
 const createSchema = z.object({
   // Kids may span teams — each practice row gets its own kid's team_id.
   kid_ids: z.array(z.string().uuid()).min(1),
-  practice_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // One or many dates — same kids + time across all of them (kids × dates rows).
+  practice_dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1).max(31),
   start_time: z.string().regex(/^\d{2}:\d{2}/),
   end_time: z.string().regex(/^\d{2}:\d{2}/),
   note: z.string().trim().max(500).optional(),
@@ -32,7 +33,8 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'ข้อมูลไม่ถูกต้อง' }, { status: 400 })
     }
-    const { kid_ids, practice_date, start_time, end_time, note } = parsed.data
+    const { kid_ids, practice_dates, start_time, end_time, note } = parsed.data
+    const dates = [...new Set(practice_dates)].sort()
 
     const db = vexDb()
 
@@ -46,36 +48,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ไม่พบเด็กที่เลือก' }, { status: 400 })
     }
 
-    // Skip kids who already have a non-rejected practice on that date.
+    // Skip kid×date combos that already have a non-rejected practice.
     const { data: existing } = await db
       .from('practices')
-      .select('kid_id')
-      .eq('practice_date', practice_date)
+      .select('kid_id, practice_date')
+      .in('practice_date', dates)
       .neq('status', 'rejected')
       .in('kid_id', kids.map((k: any) => k.id))
-    const already = new Set((existing || []).map((p: any) => p.kid_id))
-    const toCreate = kids.filter((k: any) => !already.has(k.id))
+    const already = new Set((existing || []).map((p: any) => `${p.kid_id}|${p.practice_date}`))
 
-    if (toCreate.length === 0) {
+    const now = new Date().toISOString()
+    const rows = kids.flatMap((k: any) =>
+      dates
+        .filter((d) => !already.has(`${k.id}|${d}`))
+        .map((d) => ({
+          team_id: k.team_id,
+          kid_id: k.id,
+          parent_id: null, // admin-created, not a parent submission
+          practice_date: d,
+          start_time,
+          end_time,
+          note: note || null,
+          status: 'approved', // admin schedules → no review round-trip
+          reviewed_by: admin.adminId,
+          reviewed_at: now,
+        }))
+    )
+
+    if (rows.length === 0) {
       return NextResponse.json(
-        { error: 'เด็กที่เลือกมีตารางซ้อมวันนั้นอยู่แล้วทุกคน' },
+        { error: 'เด็กที่เลือกมีตารางซ้อมวันที่เลือกอยู่แล้วทั้งหมด' },
         { status: 409 }
       )
     }
-
-    const now = new Date().toISOString()
-    const rows = toCreate.map((k: any) => ({
-      team_id: k.team_id,
-      kid_id: k.id,
-      parent_id: null, // admin-created, not a parent submission
-      practice_date,
-      start_time,
-      end_time,
-      note: note || null,
-      status: 'approved', // admin schedules → no review round-trip
-      reviewed_by: admin.adminId,
-      reviewed_at: now,
-    }))
 
     const { data: created, error: insertError } = await db
       .from('practices')
@@ -90,18 +95,30 @@ export async function POST(request: Request) {
       action: 'create_scheduled_practice',
       entity: 'practice',
       entityId: null,
-      after: { practice_date, start_time, end_time, kids: toCreate.map((k: any) => k.nickname) },
+      after: { practice_dates: dates, start_time, end_time, kids: kids.map((k: any) => k.nickname) },
     })
 
-    // Tell each kid's parent (best-effort; cron drains the queue if send fails).
+    // One LINE message per kid covering ALL their new dates (not one per row —
+    // a 4-date schedule shouldn't spam the parent 4 times).
+    const createdByKid = new Map<string, any[]>()
     for (const p of created || []) {
-      const kid = toCreate.find((k: any) => k.id === p.kid_id)
-      await notifyParentPractice(p as any, 'scheduled', kid?.nickname ?? null)
+      const list = createdByKid.get(p.kid_id) || []
+      list.push(p)
+      createdByKid.set(p.kid_id, list)
+    }
+    for (const [kidId, practices] of createdByKid) {
+      const kid = kids.find((k: any) => k.id === kidId)
+      await notifyParentPractice(
+        practices[0] as any,
+        'scheduled',
+        kid?.nickname ?? null,
+        practices.map((p) => p.practice_date)
+      )
     }
 
     return NextResponse.json({
       created: created?.length || 0,
-      skipped: kids.length - toCreate.length,
+      skipped: kids.length * dates.length - rows.length,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Server error'

@@ -44,7 +44,10 @@ export interface PracticeForNotify {
 export async function notifyParentPractice(
   practice: PracticeForNotify,
   kind: PracticeNotifyKind,
-  kidNickname?: string | null
+  kidNickname?: string | null,
+  /** Multi-date schedule (kind 'scheduled'): list ALL dates in one message
+      instead of sending one message per row. */
+  allDates?: string[]
 ): Promise<void> {
   try {
     // Prefer the REAL parent of the kid's linked student
@@ -90,7 +93,12 @@ export async function notifyParentPractice(
       text = `❌ คำขอซ้อม${who}ไม่ได้รับการอนุมัติ\n📅 ${when}\nกรุณาติดต่อแอดมินหรือเสนอวันใหม่`
     } else if (kind === 'scheduled') {
       // Admin-created practice (not a reply to a parent request)
-      text = `🗓️ แอดมินนัดวันซ้อม${who}\n📅 ${when}`
+      if (allDates && allDates.length > 1) {
+        const dateList = allDates.map(thaiDate).join(', ')
+        text = `🗓️ แอดมินนัดวันซ้อม${who}\n📅 ${dateList}\n⏰ เวลา ${timeRange(practice.start_time, practice.end_time)}`
+      } else {
+        text = `🗓️ แอดมินนัดวันซ้อม${who}\n📅 ${when}`
+      }
     } else {
       text = `✏️ แอดมินปรับเวลาซ้อม${who}ให้ใหม่\n📅 ${when}`
     }

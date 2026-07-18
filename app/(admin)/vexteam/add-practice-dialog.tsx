@@ -17,11 +17,12 @@ import {
 } from '@/components/ui/dialog'
 import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { TimeRangePicker } from '@/components/ui/time-range-picker'
-import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StudentBadge } from '@/components/ui/student-badge'
-import { Loader2, Plus, Search, X } from 'lucide-react'
+import { CalendarDays, Loader2, Plus, Search, X } from 'lucide-react'
 
 interface VexKid {
   id: string
@@ -43,7 +44,7 @@ export function AddPracticeDialog({
   const [selected, setSelected] = useState<Map<string, VexKid>>(new Map())
   const [query, setQuery] = useState('')
   const [showResults, setShowResults] = useState(false)
-  const [date, setDate] = useState('')
+  const [dates, setDates] = useState<Date[]>([])
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [note, setNote] = useState('')
@@ -93,7 +94,8 @@ export function AddPracticeDialog({
 
   const addKid = (k: VexKid) => {
     setSelected((prev) => new Map(prev).set(k.id, k))
-    // Keep the query + focus so เลือกๆๆๆ ต่อเนื่องได้
+    // Clear for the next search; the full list stays open for เลือกๆๆๆ
+    setQuery('')
   }
   const removeKid = (id: string) => {
     setSelected((prev) => { const n = new Map(prev); n.delete(id); return n })
@@ -106,12 +108,15 @@ export function AddPracticeDialog({
     })
   }
 
+  const toDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
   const reset = () => {
-    setSelected(new Map()); setQuery(''); setDate(''); setStartTime(''); setEndTime(''); setNote('')
+    setSelected(new Map()); setQuery(''); setDates([]); setStartTime(''); setEndTime(''); setNote('')
   }
 
   const submit = async () => {
-    if (selected.size === 0 || !date || !startTime || !endTime) {
+    if (selected.size === 0 || dates.length === 0 || !startTime || !endTime) {
       toast.error('กรุณาเลือกเด็ก วันที่ และเวลาให้ครบ')
       return
     }
@@ -122,7 +127,7 @@ export function AddPracticeDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           kid_ids: [...selected.keys()],
-          practice_date: date,
+          practice_dates: dates.map(toDateStr).sort(),
           start_time: startTime,
           end_time: endTime,
           note: note.trim() || undefined,
@@ -230,14 +235,31 @@ export function AddPracticeDialog({
               )}
             </div>
 
-            {/* Date + time on one row (stacks on mobile) */}
+            {/* Dates (multi-select calendar) + time on one row (stacks on mobile) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>วันที่ซ้อม</Label>
-                <DateRangePicker mode="single" value={date} onChange={(d) => setDate(d || '')} placeholder="เลือกวันที่" />
+                <Label>วันที่ซ้อม (เลือกได้หลายวัน)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start font-normal">
+                      <CalendarDays className="h-4 w-4 mr-2 text-gray-500" />
+                      {dates.length === 0
+                        ? 'เลือกวันที่...'
+                        : `เลือกแล้ว ${dates.length} วัน`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="multiple"
+                      selected={dates}
+                      onSelect={(d) => setDates(d || [])}
+                      disabled={{ before: new Date() }}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
-                <Label>เวลา</Label>
+                <Label>เวลา (ทุกวันที่เลือก)</Label>
                 <TimeRangePicker
                   startTime={startTime}
                   endTime={endTime}
@@ -246,6 +268,28 @@ export function AddPracticeDialog({
                 />
               </div>
             </div>
+
+            {/* Chosen dates as removable chips */}
+            {dates.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {[...dates].sort((a, b) => a.getTime() - b.getTime()).map((d) => (
+                  <span
+                    key={d.toISOString()}
+                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-2.5 py-0.5 text-sm"
+                  >
+                    {d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    <button
+                      type="button"
+                      onClick={() => setDates(dates.filter((x) => x.getTime() !== d.getTime()))}
+                      className="opacity-60 hover:opacity-100"
+                      aria-label="เอาวันนี้ออก"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>หมายเหตุ (ไม่บังคับ)</Label>
