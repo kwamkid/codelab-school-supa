@@ -2,9 +2,13 @@
 
 // Admin schedules a practice directly (no parent request, no approval round —
 // rows are created APPROVED and parents get a "แอดมินนัดซ้อม" LINE noti).
-// Pick team → kids (all pre-checked) → date + time → save.
+//
+// Kid picking is search-first over VEX kids ONLY (not the whole student body):
+// type → pick → pick → pick, each selection becomes a removable chip. A team
+// select adds the whole team in one go. Kids may span teams — the API stores
+// each row under the kid's own team.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -14,92 +18,101 @@ import {
 import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { TimeRangePicker } from '@/components/ui/time-range-picker'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StudentBadge } from '@/components/ui/student-badge'
-import { Loader2, Plus } from 'lucide-react'
+import { Loader2, Plus, Search, X } from 'lucide-react'
 
-interface TeamWithKids {
+interface VexKid {
   id: string
-  team_number: string
-  name: string | null
-  branch_id?: string | null
-  kids: { id: string; nickname: string }[]
+  nickname: string
+  teamId: string
+  teamNumber: string
 }
 
 export function AddPracticeDialog({
   branchId,
-  defaultTeamId,
   onCreated,
 }: {
   branchId?: string | null
-  defaultTeamId?: string
   onCreated: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const [teams, setTeams] = useState<TeamWithKids[]>([])
-  const [teamId, setTeamId] = useState('')
-  const [selectedKids, setSelectedKids] = useState<Set<string>>(new Set())
+  const [kids, setKids] = useState<VexKid[]>([])
+  const [teamOptions, setTeamOptions] = useState<FormSelectOption[]>([])
+  const [selected, setSelected] = useState<Map<string, VexKid>>(new Map())
+  const [query, setQuery] = useState('')
+  const [showResults, setShowResults] = useState(false)
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
 
-  // Load teams (with kids) when the dialog opens.
+  // Load VEX teams + kids once per open (branch-scoped like the page).
   useEffect(() => {
     if (!open) return
     ;(async () => {
       try {
         const res = await authFetch('/api/admin/vex/teams')
         const data = await res.json()
-        if (res.ok) {
-          const list: TeamWithKids[] = (data.teams || []).filter(
-            (t: TeamWithKids) => !branchId || t.branch_id === branchId
+        if (!res.ok) return
+        const teams = (data.teams || []).filter((t: any) => !branchId || t.branch_id === branchId)
+        setTeamOptions(
+          teams.map((t: any) => ({ value: t.id, label: `${t.team_number}${t.name ? ` — ${t.name}` : ''}` }))
+        )
+        setKids(
+          teams.flatMap((t: any) =>
+            (t.kids || []).map((k: any) => ({
+              id: k.id, nickname: k.nickname, teamId: t.id, teamNumber: t.team_number,
+            }))
           )
-          setTeams(list)
-          const initial = defaultTeamId && list.some((t) => t.id === defaultTeamId)
-            ? defaultTeamId
-            : ''
-          if (initial) selectTeam(initial, list)
-        }
+        )
       } catch {
         toast.error('โหลดทีมไม่สำเร็จ')
       }
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, branchId, defaultTeamId])
+  }, [open, branchId])
 
-  const selectTeam = (id: string, list?: TeamWithKids[]) => {
-    setTeamId(id)
-    const team = (list || teams).find((t) => t.id === id)
-    // Whole-team practice is the common case → pre-check everyone.
-    setSelectedKids(new Set(team?.kids.map((k) => k.id) || []))
+  // Close the result list when clicking outside the search box.
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!searchRef.current?.contains(e.target as Node)) setShowResults(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const pool = kids.filter((k) => !selected.has(k.id))
+    const hits = q ? pool.filter((k) => k.nickname.toLowerCase().includes(q)) : pool
+    return hits.slice(0, 8)
+  }, [kids, query, selected])
+
+  const addKid = (k: VexKid) => {
+    setSelected((prev) => new Map(prev).set(k.id, k))
+    // Keep the query + focus so เลือกๆๆๆ ต่อเนื่องได้
   }
-
-  const team = teams.find((t) => t.id === teamId)
-  const teamOptions = useMemo<FormSelectOption[]>(
-    () => teams.map((t) => ({ value: t.id, label: `${t.team_number}${t.name ? ` — ${t.name}` : ''}` })),
-    [teams]
-  )
-
-  const toggleKid = (id: string) => {
-    setSelectedKids((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+  const removeKid = (id: string) => {
+    setSelected((prev) => { const n = new Map(prev); n.delete(id); return n })
+  }
+  const addTeam = (teamId: string) => {
+    setSelected((prev) => {
+      const n = new Map(prev)
+      kids.filter((k) => k.teamId === teamId).forEach((k) => n.set(k.id, k))
+      return n
     })
   }
 
   const reset = () => {
-    setTeamId(''); setSelectedKids(new Set()); setDate(''); setStartTime(''); setEndTime(''); setNote('')
+    setSelected(new Map()); setQuery(''); setDate(''); setStartTime(''); setEndTime(''); setNote('')
   }
 
   const submit = async () => {
-    if (!teamId || selectedKids.size === 0 || !date || !startTime || !endTime) {
-      toast.error('กรุณาเลือกทีม เด็ก วันที่ และเวลาให้ครบ')
+    if (selected.size === 0 || !date || !startTime || !endTime) {
+      toast.error('กรุณาเลือกเด็ก วันที่ และเวลาให้ครบ')
       return
     }
     try {
@@ -108,8 +121,7 @@ export function AddPracticeDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          team_id: teamId,
-          kid_ids: [...selectedKids],
+          kid_ids: [...selected.keys()],
           practice_date: date,
           start_time: startTime,
           end_time: endTime,
@@ -144,74 +156,95 @@ export function AddPracticeDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset() }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>เพิ่มการซ้อม</DialogTitle>
             <DialogDescription>
-              แอดมินนัดวันซ้อมให้ทีมโดยตรง — อนุมัติทันที และแจ้งผู้ปกครองทาง LINE
+              แอดมินนัดวันซ้อมโดยตรง — อนุมัติทันที และแจ้งผู้ปกครองทาง LINE
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Kid search (VEX kids only) + whole-team quick add */}
             <div className="space-y-2">
-              <Label>ทีม</Label>
-              <FormSelect
-                options={teamOptions}
-                value={teamId}
-                onValueChange={(v) => selectTeam(v)}
-                placeholder="เลือกทีม"
-                searchPlaceholder="ค้นหาทีม..."
-              />
-            </div>
+              <Label>เลือกเด็ก (พิมพ์ค้นหา เลือกได้หลายคน)</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="relative" ref={searchRef}>
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    value={query}
+                    onChange={(e) => { setQuery(e.target.value); setShowResults(true) }}
+                    onFocus={() => setShowResults(true)}
+                    placeholder="ชื่อเด็กในทีม VEX..."
+                    className="pl-9"
+                  />
+                  {showResults && results.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full rounded-md border bg-white shadow-lg max-h-56 overflow-auto">
+                      {results.map((k) => (
+                        <button
+                          key={k.id}
+                          type="button"
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                          onClick={() => addKid(k)}
+                        >
+                          <StudentBadge name={k.nickname} />
+                          <span className="text-xs text-gray-500 shrink-0">{k.teamNumber}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <FormSelect
+                  options={teamOptions}
+                  value=""
+                  onValueChange={addTeam}
+                  placeholder="หรือเลือกทั้งทีม..."
+                  searchPlaceholder="ค้นหาทีม..."
+                />
+              </div>
 
-            {team && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>สมาชิกที่มาซ้อม ({selectedKids.size}/{team.kids.length})</Label>
+              {/* Selected chips */}
+              {selected.size > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-gray-50/60 p-2">
+                  {[...selected.values()].map((k) => (
+                    <span key={k.id} className="inline-flex items-center gap-1">
+                      <StudentBadge name={k.nickname} />
+                      <button
+                        type="button"
+                        onClick={() => removeKid(k.id)}
+                        className="text-gray-400 hover:text-red-600"
+                        aria-label={`เอา ${k.nickname} ออก`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
                   <button
                     type="button"
-                    className="text-xs text-primary font-medium"
-                    onClick={() =>
-                      setSelectedKids(
-                        selectedKids.size === team.kids.length
-                          ? new Set()
-                          : new Set(team.kids.map((k) => k.id))
-                      )
-                    }
+                    className="ml-auto text-xs text-gray-500 hover:text-red-600 shrink-0"
+                    onClick={() => setSelected(new Map())}
                   >
-                    {selectedKids.size === team.kids.length ? 'เอาออกทั้งหมด' : 'เลือกทั้งหมด'}
+                    ล้างทั้งหมด ({selected.size})
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {team.kids.length === 0 && (
-                    <p className="text-sm text-gray-400">ทีมนี้ยังไม่มีสมาชิก</p>
-                  )}
-                  {team.kids.map((k) => (
-                    <label key={k.id} className="flex items-center gap-1.5 cursor-pointer">
-                      <Checkbox
-                        checked={selectedKids.has(k.id)}
-                        onCheckedChange={() => toggleKid(k.id)}
-                      />
-                      <StudentBadge name={k.nickname} />
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>วันที่ซ้อม</Label>
-              <DateRangePicker mode="single" value={date} onChange={(d) => setDate(d || '')} placeholder="เลือกวันที่" />
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label>เวลา</Label>
-              <TimeRangePicker
-                startTime={startTime}
-                endTime={endTime}
-                onStartTimeChange={setStartTime}
-                onEndTimeChange={setEndTime}
-              />
+            {/* Date + time on one row (stacks on mobile) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>วันที่ซ้อม</Label>
+                <DateRangePicker mode="single" value={date} onChange={(d) => setDate(d || '')} placeholder="เลือกวันที่" />
+              </div>
+              <div className="space-y-2">
+                <Label>เวลา</Label>
+                <TimeRangePicker
+                  startTime={startTime}
+                  endTime={endTime}
+                  onStartTimeChange={setStartTime}
+                  onEndTimeChange={setEndTime}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -223,7 +256,7 @@ export function AddPracticeDialog({
               <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>ยกเลิก</Button>
               <Button onClick={submit} disabled={saving} className="gap-1">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                เพิ่มการซ้อม
+                เพิ่มการซ้อม ({selected.size})
               </Button>
             </div>
           </div>

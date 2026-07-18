@@ -15,7 +15,7 @@ import { notifyParentPractice } from '@/lib/vex/notify'
 export const dynamic = 'force-dynamic'
 
 const createSchema = z.object({
-  team_id: z.string().uuid(),
+  // Kids may span teams — each practice row gets its own kid's team_id.
   kid_ids: z.array(z.string().uuid()).min(1),
   practice_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   start_time: z.string().regex(/^\d{2}:\d{2}/),
@@ -32,26 +32,24 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'ข้อมูลไม่ถูกต้อง' }, { status: 400 })
     }
-    const { team_id, kid_ids, practice_date, start_time, end_time, note } = parsed.data
+    const { kid_ids, practice_date, start_time, end_time, note } = parsed.data
 
     const db = vexDb()
 
-    // Kids must belong to the team.
+    // Resolve the kids (VEX kids only) with their own team.
     const { data: kids, error: kidsError } = await db
       .from('kids')
-      .select('id, nickname')
-      .eq('team_id', team_id)
+      .select('id, nickname, team_id')
       .in('id', kid_ids)
     if (kidsError) throw new Error(kidsError.message)
     if (!kids || kids.length === 0) {
-      return NextResponse.json({ error: 'ไม่พบเด็กในทีมนี้' }, { status: 400 })
+      return NextResponse.json({ error: 'ไม่พบเด็กที่เลือก' }, { status: 400 })
     }
 
     // Skip kids who already have a non-rejected practice on that date.
     const { data: existing } = await db
       .from('practices')
       .select('kid_id')
-      .eq('team_id', team_id)
       .eq('practice_date', practice_date)
       .neq('status', 'rejected')
       .in('kid_id', kids.map((k: any) => k.id))
@@ -67,7 +65,7 @@ export async function POST(request: Request) {
 
     const now = new Date().toISOString()
     const rows = toCreate.map((k: any) => ({
-      team_id,
+      team_id: k.team_id,
       kid_id: k.id,
       parent_id: null, // admin-created, not a parent submission
       practice_date,
@@ -91,7 +89,7 @@ export async function POST(request: Request) {
       actorName: admin.name,
       action: 'create_scheduled_practice',
       entity: 'practice',
-      entityId: team_id,
+      entityId: null,
       after: { practice_date, start_time, end_time, kids: toCreate.map((k: any) => k.nickname) },
     })
 
