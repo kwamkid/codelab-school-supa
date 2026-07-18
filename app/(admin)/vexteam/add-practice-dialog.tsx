@@ -8,7 +8,7 @@
 // select adds the whole team in one go. Kids may span teams — the API stores
 // each row under the kid's own team.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StudentBadge } from '@/components/ui/student-badge'
-import { CalendarDays, Loader2, Plus, Search, X } from 'lucide-react'
+import { AutocompleteInput, type AutocompleteOption } from '@/components/ui/autocomplete-input'
+import { CalendarDays, Loader2, Plus, X } from 'lucide-react'
 
 interface VexKid {
   id: string
@@ -42,14 +43,11 @@ export function AddPracticeDialog({
   const [kids, setKids] = useState<VexKid[]>([])
   const [teamOptions, setTeamOptions] = useState<FormSelectOption[]>([])
   const [selected, setSelected] = useState<Map<string, VexKid>>(new Map())
-  const [query, setQuery] = useState('')
-  const [showResults, setShowResults] = useState(false)
   const [dates, setDates] = useState<Date[]>([])
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
-  const searchRef = useRef<HTMLDivElement>(null)
 
   // Load VEX teams + kids once per open (branch-scoped like the page).
   useEffect(() => {
@@ -76,26 +74,18 @@ export function AddPracticeDialog({
     })()
   }, [open, branchId])
 
-  // Close the result list when clicking outside the search box.
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (!searchRef.current?.contains(e.target as Node)) setShowResults(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [])
+  // Options for the shared AutocompleteInput (arrow keys / Enter / Esc built in).
+  const kidOptions = useMemo<AutocompleteOption[]>(
+    () =>
+      kids
+        .filter((k) => !selected.has(k.id))
+        .map((k) => ({ value: k.id, label: k.nickname, description: k.teamNumber })),
+    [kids, selected]
+  )
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const pool = kids.filter((k) => !selected.has(k.id))
-    const hits = q ? pool.filter((k) => k.nickname.toLowerCase().includes(q)) : pool
-    return hits.slice(0, 8)
-  }, [kids, query, selected])
-
-  const addKid = (k: VexKid) => {
-    setSelected((prev) => new Map(prev).set(k.id, k))
-    // Clear for the next search; the full list stays open for เลือกๆๆๆ
-    setQuery('')
+  const addKid = (id: string) => {
+    const k = kids.find((x) => x.id === id)
+    if (k) setSelected((prev) => new Map(prev).set(k.id, k))
   }
   const removeKid = (id: string) => {
     setSelected((prev) => { const n = new Map(prev); n.delete(id); return n })
@@ -112,7 +102,7 @@ export function AddPracticeDialog({
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
   const reset = () => {
-    setSelected(new Map()); setQuery(''); setDates([]); setStartTime(''); setEndTime(''); setNote('')
+    setSelected(new Map()); setDates([]); setStartTime(''); setEndTime(''); setNote('')
   }
 
   const submit = async () => {
@@ -174,31 +164,16 @@ export function AddPracticeDialog({
             <div className="space-y-2">
               <Label>เลือกเด็ก (พิมพ์ค้นหา เลือกได้หลายคน)</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div className="relative" ref={searchRef}>
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    value={query}
-                    onChange={(e) => { setQuery(e.target.value); setShowResults(true) }}
-                    onFocus={() => setShowResults(true)}
-                    placeholder="ชื่อเด็กในทีม VEX..."
-                    className="pl-9"
-                  />
-                  {showResults && results.length > 0 && (
-                    <div className="absolute z-50 mt-1 w-full rounded-md border bg-white shadow-lg max-h-56 overflow-auto">
-                      {results.map((k) => (
-                        <button
-                          key={k.id}
-                          type="button"
-                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-gray-50"
-                          onClick={() => addKid(k)}
-                        >
-                          <StudentBadge name={k.nickname} />
-                          <span className="text-xs text-gray-500 shrink-0">{k.teamNumber}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Shared autocomplete: arrow-key nav, Enter to pick, Esc to
+                    close; clearOnSelect readies it for the next name. */}
+                <AutocompleteInput
+                  value=""
+                  onChange={addKid}
+                  options={kidOptions}
+                  placeholder="ชื่อเด็กในทีม VEX..."
+                  freeInput={false}
+                  clearOnSelect
+                />
                 <FormSelect
                   options={teamOptions}
                   value=""

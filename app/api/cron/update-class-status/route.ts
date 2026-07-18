@@ -104,10 +104,17 @@ export async function GET(request: NextRequest) {
           if (!hasFutureSessions) {
             console.log(`  ✓ Marking class as completed`)
 
+            // เติม "(จบแล้ว)" ท้ายชื่อ — ชื่อคลาสไม่ unique ทำให้คลาสเปิดใหม่ชื่อเดิม
+            // ปนกับคลาสเก่าตอนค้นหา (idempotent: ไม่เติมซ้ำ)
+            const completedName = cls.name.endsWith('(จบแล้ว)')
+              ? cls.name
+              : `${cls.name} (จบแล้ว)`
+
             const { error: updateError } = await supabase
               .from('classes')
               .update({
-                status: 'completed'
+                status: 'completed',
+                name: completedName
               })
               .eq('id', cls.id)
 

@@ -24,6 +24,9 @@ interface AutocompleteInputProps {
   className?: string
   /** When false, onChange only fires on selection from dropdown. Input reverts on blur. */
   freeInput?: boolean
+  /** Multi-pick mode: after selecting, clear the input (ready for the next
+      search) instead of filling it with the picked label. Keeps focus. */
+  clearOnSelect?: boolean
 }
 
 export function AutocompleteInput({
@@ -38,6 +41,7 @@ export function AutocompleteInput({
   minChars = 1,
   className,
   freeInput = true,
+  clearOnSelect = false,
 }: AutocompleteInputProps) {
   const [inputValue, setInputValue] = React.useState(value || "")
   const [suggestions, setSuggestions] = React.useState<AutocompleteOption[]>([])
@@ -113,6 +117,14 @@ export function AutocompleteInput({
   }
 
   const handleSelect = (opt: AutocompleteOption) => {
+    if (clearOnSelect) {
+      setInputValue("")
+      confirmedRef.current = ""
+      onChange(opt.value)
+      setShowDropdown(false)
+      setHighlightIndex(-1)
+      return
+    }
     setInputValue(opt.label)
     confirmedRef.current = opt.label
     onChange(opt.value)
