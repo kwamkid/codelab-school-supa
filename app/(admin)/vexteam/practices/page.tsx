@@ -6,9 +6,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { authFetch } from '@/lib/auth-fetch'
 import { PageHeader } from '@/components/ui/page-header'
 import { CalendarClock } from 'lucide-react'
+import { useBranch } from '@/contexts/BranchContext'
 import { PracticesReview } from '../practices-review'
+import { AddPracticeDialog } from '../add-practice-dialog'
 
 export default function VexPracticesPage() {
+  const { selectedBranchId } = useBranch()
   const [teams, setTeams] = useState<{ id: string; team_number: string; name: string | null; branch_id: string | null }[]>([])
 
   const loadTeams = useCallback(async () => {
@@ -36,6 +39,13 @@ export default function VexPracticesPage() {
         icon={CalendarClock}
         iconColor="text-red-600"
         description="อนุมัติ / ปฏิเสธ / ปรับเวลา คำขอเข้าซ้อมจากผู้ปกครอง"
+        action={
+          <AddPracticeDialog
+            branchId={selectedBranchId}
+            // PracticesReview listens for this event and reloads its list
+            onCreated={() => window.dispatchEvent(new Event('vex-practices-changed'))}
+          />
+        }
       />
       <PracticesReview teams={teams} />
     </div>

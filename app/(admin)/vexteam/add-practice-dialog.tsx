@@ -137,9 +137,10 @@ export function AddPracticeDialog({
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)} className="gap-1 shrink-0">
-        <Plus className="h-4 w-4" />
-        <span className="hidden sm:inline">เพิ่มการซ้อม</span>
+      {/* Page-header primary action, same shape as สร้าง Makeup / สร้างทีม */}
+      <Button onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4 mr-2" />
+        เพิ่มการซ้อม
       </Button>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset() }}>

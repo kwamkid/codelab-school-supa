@@ -14,7 +14,6 @@ import { TimeRangePicker } from '@/components/ui/time-range-picker'
 import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-filter-tabs'
-import { AddPracticeDialog } from './add-practice-dialog'
 import { useBranch } from '@/contexts/BranchContext'
 import { cn } from '@/lib/utils'
 import { PracticeMonthView } from './practice-month-view'
@@ -99,6 +98,11 @@ export function PracticesReview({
 
   useEffect(() => {
     load()
+    // Reload when a practice is created/changed elsewhere (e.g. the
+    // "เพิ่มการซ้อม" dialog in the page header).
+    const onChanged = () => load()
+    window.addEventListener('vex-practices-changed', onChanged)
+    return () => window.removeEventListener('vex-practices-changed', onChanged)
   }, [load])
 
   // Scope by the top-bar branch first, then the team filter (status counts
@@ -198,8 +202,6 @@ export function PracticesReview({
               className="flex-1 min-w-0 sm:max-w-xs"
             />
           )}
-          {/* Admin schedules a practice directly (approved instantly) */}
-          <AddPracticeDialog branchId={selectedBranchId} onCreated={load} />
           <div className="ml-auto inline-flex rounded-md border overflow-hidden shrink-0">
             <button
               type="button"
