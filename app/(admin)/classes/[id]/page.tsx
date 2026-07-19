@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Class, Branch, Subject, Teacher, Room, ClassSchedule } from '@/types/models';
-import { getClass, getClassSchedules, updateClass, deleteClass, fixEnrolledCount, getEndClassPreview, endClassNow } from '@/lib/services/classes';
+import { getClass, getClassSchedules, updateClass, deleteClass, fixEnrolledCount, getEndClassPreview, endClassNow, undoShiftClassFromSession } from '@/lib/services/classes';
 import { getEnrollmentsByClass, pauseEnrollment, resumeEnrollment } from '@/lib/services/enrollments';
 import { getStudentWithParent } from '@/lib/services/parents';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +34,7 @@ import {
   TrendingUp,
   CreditCard,
   CalendarClock,
+  Undo2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -116,6 +117,8 @@ export default function ClassDetailPage() {
   const [cancelClassOpen, setCancelClassOpen] = useState(false);
   const [attendanceScheduleId, setAttendanceScheduleId] = useState<string | null>(null);
   const [showRescheduleHistory, setShowRescheduleHistory] = useState(false);
+  const [undoShiftOpen, setUndoShiftOpen] = useState(false);
+  const [undoingShift, setUndoingShift] = useState(false);
   const [endClassDialogOpen, setEndClassDialogOpen] = useState(false);
   const [endClassPreview, setEndClassPreview] = useState<{
     lastSessionDate: string | null;
@@ -476,6 +479,53 @@ export default function ClassDetailPage() {
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
               ลบคลาส
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Undo class shift (ยกเลิกการลายกคลาส) confirmation */}
+      <AlertDialog open={undoShiftOpen} onOpenChange={setUndoShiftOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยกเลิกการลายกคลาส</AlertDialogTitle>
+            <AlertDialogDescription>
+              ตารางเรียนจะเลื่อนกลับตามเดิม โดยคาบวันที่{' '}
+              {classData.lastShiftDate ? formatDate(classData.lastShiftDate, 'long') : ''} กลับมาเรียนตามปกติ
+              และวันจบคลาสถอยกลับมาเท่าเดิม
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={undoingShift}>ไม่ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={undoingShift}
+              onClick={async (e) => {
+                e.preventDefault(); // keep dialog open while working
+                setUndoingShift(true);
+                try {
+                  const result = await undoShiftClassFromSession(classId);
+                  toast.success(
+                    result.conflicts > 0
+                      ? `เลื่อนตารางกลับแล้ว แต่พบคาบที่ห้อง/ครูชน ${result.conflicts} คาบ กรุณาตรวจสอบ`
+                      : 'เลื่อนตารางกลับเรียบร้อยแล้ว'
+                  );
+                  setUndoShiftOpen(false);
+                  await loadClassDetails();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : 'ไม่สามารถยกเลิกการเลื่อนได้');
+                } finally {
+                  setUndoingShift(false);
+                }
+              }}
+            >
+              {undoingShift ? (
+                <>
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  กำลังเลื่อนกลับ...
+                </>
+              ) : (
+                'ยืนยันเลื่อนกลับ'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1022,6 +1072,23 @@ export default function ClassDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
+              {/* ลายกคลาสไปแล้วแต่ยังไม่ถึงวันคาบที่ถูกยก → เสนอปุ่มยกเลิก (ผปค.เปลี่ยนใจ) */}
+              {classData.lastShiftDate && new Date(classData.lastShiftDate) >= todayStart && (
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/40">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    มีการลายกคลาส (คาบวันที่ {formatDate(classData.lastShiftDate, 'short')} ถูกเลื่อนออกไป)
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setUndoShiftOpen(true)}
+                  >
+                    <Undo2 className="mr-1 h-3 w-3" />
+                    ยกเลิกการเลื่อน
+                  </Button>
+                </div>
+              )}
               <div>
                 <div className="max-h-[640px] overflow-y-auto">
                   <Table>

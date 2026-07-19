@@ -167,6 +167,8 @@ export interface Class {
   // พักทั้งคลาส (whole-class pause window). paused ⇔ pauseTo != null
   pauseFrom?: Date | null;
   pauseTo?: Date | null;
+  // วันของคาบที่ถูก "ลายกคลาส" ล่าสุด — ใช้เปิดปุ่มยกเลิกการเลื่อนจนกว่าจะเลยวันนั้น
+  lastShiftDate?: Date | null;
   createdAt: Date;
 }
 

@@ -97,6 +97,7 @@ function mapToClass(row: any): Class {
     status: row.status || 'draft',
     pauseFrom: row.pause_from ? new Date(row.pause_from) : null,
     pauseTo: row.pause_to ? new Date(row.pause_to) : null,
+    lastShiftDate: row.last_shift_date ? new Date(row.last_shift_date) : null,
     createdAt: new Date(row.created_at),
   };
 }
@@ -1801,7 +1802,7 @@ export async function shiftClassFromSession(
   await adminMutation({
     table: 'classes',
     operation: 'update',
-    data: { end_date: result.newEndDate },
+    data: { end_date: result.newEndDate, last_shift_date: sessionDate },
     match: { id: classId },
   });
 
@@ -1830,6 +1831,65 @@ export async function shiftClassFromSession(
   );
   void reason; void by; // reason/by reserved for future audit note
   return { cancelled: 1, created: result.created, newEndDate: result.newEndDate, conflicts };
+}
+
+// Undo the most recent "ลายกคลาส" shift: regenerate the remaining sessions from
+// the cancelled date INCLUSIVE (same pattern generator the shift used, so the
+// original dates come back exactly — holidays included). Only valid while that
+// date hasn't passed and none of the shifted sessions has been checked yet.
+export async function undoShiftClassFromSession(
+  classId: string
+): Promise<{ restoredDate: string; created: number; newEndDate: string; conflicts: number }> {
+  const cls = await getClass(classId);
+  if (!cls) throw new Error('ไม่พบข้อมูลคลาส');
+  if (!cls.lastShiftDate) throw new Error('คลาสนี้ไม่มีการลายกคลาสให้ยกเลิก');
+
+  const shiftDate = getLocalDateString(cls.lastShiftDate);
+  if (shiftDate < getLocalDateString(new Date())) {
+    throw new Error('เลยวันของคาบที่ถูกเลื่อนแล้ว ไม่สามารถยกเลิกได้');
+  }
+
+  const schedules = await getScheduleRowsLite(classId);
+  const touched = schedules.some(
+    (s) => s.status === 'completed' && getLocalDateString(s.sessionDate) >= shiftDate
+  );
+  if (touched) throw new Error('มีคาบหลังวันเลื่อนถูกเช็คชื่อไปแล้ว ไม่สามารถยกเลิกได้');
+
+  // keptBefore = genFrom = shiftDate → the cancelled session itself is re-created.
+  const rows = await computeDefaultRows(cls, schedules, shiftDate, shiftDate);
+  const result = await rebookSessions(cls, shiftDate, rows);
+
+  await adminMutation({
+    table: 'classes',
+    operation: 'update',
+    data: { end_date: result.newEndDate, last_shift_date: null },
+    match: { id: classId },
+  });
+
+  // Same non-fatal room/teacher conflict count as the shift itself.
+  let conflicts = 0;
+  try {
+    const supabase = getClient();
+    const { data, error } = await (supabase as any).rpc('check_range_availability', {
+      p_dates: rows.map((r) => r.date),
+      p_start_time: normalizeTime(cls.startTime),
+      p_end_time: normalizeTime(cls.endTime),
+      p_branch_id: cls.branchId,
+      p_room_id: cls.roomId,
+      p_teacher_id: cls.teacherId,
+      p_exclude_class_id: classId,
+    });
+    if (!error) {
+      conflicts = ((data || []) as any[]).filter((row) => (row.conflicts || []).length > 0).length;
+    }
+  } catch (e) {
+    console.warn('[undoShiftClassFromSession] conflict check failed (non-fatal):', e);
+  }
+
+  console.log(
+    `[undoShiftClassFromSession] class=${classId} restored from ${shiftDate}, rebooked ${result.created}, conflicts ${conflicts}`
+  );
+  return { restoredDate: shiftDate, created: result.created, newEndDate: result.newEndDate, conflicts };
 }
 
 // Read-only: auto-fill default resume rows starting from the day after the last

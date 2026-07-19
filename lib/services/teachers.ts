@@ -129,24 +129,20 @@ export async function getTeachersBySpecialty(subjectId: string): Promise<Teacher
   }
 }
 
-// Get single teacher
+// Get single teacher.
+// Uses the avatar-resolving RPC (same COALESCE as the list RPC) so pages that
+// show ONE teacher — e.g. class detail — get the Google-avatar fallback too.
 export async function getTeacher(id: string): Promise<Teacher | null> {
   try {
     const supabase = getClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { data, error } = await (supabase.rpc as any)('get_teacher_with_avatar', { p_id: id });
 
-    if (error) {
-      if (error.code === 'PGRST116') return null;
-      throw error;
-    }
+    if (error) throw error;
 
-    if (!data) return null;
+    const row = (data || [])[0];
+    if (!row) return null;
 
-    return mapToTeacher(data as TeacherRow);
+    return mapToTeacher(row as TeacherRow);
   } catch (error) {
     console.error('Error getting teacher:', error);
     throw error;
