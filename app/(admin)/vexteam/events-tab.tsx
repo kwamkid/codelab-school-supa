@@ -21,7 +21,9 @@ import {
 import { PageLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
-import { CalendarDays, Globe, MapPin, Pencil, Trash2 } from 'lucide-react'
+import { CalendarDays, Globe, MapPin, Pencil, Trash2, Users } from 'lucide-react'
+import { useBranch } from '@/contexts/BranchContext'
+import { EventRsvpsDialog } from './event-rsvps-dialog'
 import { LEVEL_META, PROGRAM_LOGO, type Level, type Program } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 import {
@@ -51,6 +53,9 @@ export function EventsTab() {
   const [editEvent, setEditEvent] = useState<EditableEvent | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteEvent, setDeleteEvent] = useState<EditableEvent | null>(null)
+  const { selectedBranchId } = useBranch()
+  // Which event's RSVP list is open
+  const [rsvpEvent, setRsvpEvent] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   const today = useMemo(() => localTodayStr(), [])
@@ -129,6 +134,16 @@ export function EventsTab() {
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div className="flex items-center gap-1">
+            {/* Who confirmed for this event (parents' RSVP from /team/e links) */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1 text-gray-600"
+              onClick={() => setRsvpEvent({ id: ev.id, name: ev.name })}
+            >
+              <Users className="h-4 w-4" />
+              รายชื่อ
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -236,6 +251,16 @@ export function EventsTab() {
             if (!o) setEditEvent(null)
           }}
           onSaved={loadEvents}
+        />
+      )}
+
+      {rsvpEvent && (
+        <EventRsvpsDialog
+          eventId={rsvpEvent.id}
+          eventName={rsvpEvent.name}
+          branchId={selectedBranchId}
+          open={!!rsvpEvent}
+          onOpenChange={(o) => !o && setRsvpEvent(null)}
         />
       )}
 
