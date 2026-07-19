@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Bell, Copy, Check, Loader2, Trash2, UserPlus, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { Tooltip } from '@/components/ui/tooltip';
 import { adminMutation } from '@/lib/admin-mutation';
 import { parentLiffUrl } from '@/lib/line/liff-id';
 
@@ -162,9 +163,11 @@ export function LineRecipientsCard({ parentId }: { parentId: string }) {
                     {!r.accepted_at && (
                       <>
                         <Badge variant="secondary" className="text-xs shrink-0">รอตอบรับ</Badge>
-                        <Button variant="ghost" size="sm" className="shrink-0" onClick={() => copyInvite(r)}>
-                          {copiedId === r.id ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                        </Button>
+                        <Tooltip label="คัดลอกลิงก์">
+                          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => copyInvite(r)}>
+                            {copiedId === r.id ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                        </Tooltip>
                       </>
                     )}
                     <Button

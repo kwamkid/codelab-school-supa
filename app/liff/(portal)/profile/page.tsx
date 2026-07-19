@@ -24,7 +24,8 @@ import {
   Loader2,
   UserPlus,
   Link as LinkIcon,
-  MessageCircle
+  MessageCircle,
+  Share2
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { useLiff } from '@/components/liff/liff-provider'
@@ -61,7 +62,7 @@ function ProfileContent() {
   const [navigating, setNavigating] = useState(false)
 
   // ผู้รับแจ้งเตือน LINE เพิ่มเติม (พ่อ/แม่คนที่ 2)
-  interface LineRecipient { id: string; label: string | null; displayName: string | null; pictureUrl: string | null; accepted: boolean }
+  interface LineRecipient { id: string; label: string | null; displayName: string | null; pictureUrl: string | null; accepted: boolean; inviteUrl: string | null }
   const [recipients, setRecipients] = useState<LineRecipient[]>([])
   const [showInviteForm, setShowInviteForm] = useState(false)
   const [inviteLabel, setInviteLabel] = useState('')
@@ -77,6 +78,42 @@ function ProfileContent() {
     }
   }
 
+  // แชร์ลิงก์เชิญ: ใช้ทั้งตอนสร้างใหม่ และกดแชร์ซ้ำจากแถวที่รอตอบรับ
+  const shareInviteUrl = async (inviteUrl: string) => {
+    const inviteText =
+      `👨‍👩‍👧 คำเชิญรับการแจ้งเตือนจาก CodeLab School\n` +
+      `${parentData?.displayName || 'ผู้ปกครอง'} เชิญคุณรับแจ้งเตือนตารางเรียน/ข่าวสารของบุตรหลานทาง LINE\n\n` +
+      `กดลิงก์นี้เพื่อตอบรับ (ภายใน 3 วัน):\n${inviteUrl}`
+
+    try {
+      // ทางหลัก: shareTargetPicker = เลือกชื่อเพื่อน/ห้องแล้วส่งให้เลย
+      // (ต้องเปิดสวิตช์ Share target picker ของ LIFF app ใน LINE Developers ก่อน)
+      if (liff?.isApiAvailable?.('shareTargetPicker')) {
+        await liff.shareTargetPicker([{ type: 'text', text: inviteText }])
+        toast.success('ส่งคำเชิญแล้ว รอผู้รับกดตอบรับ')
+        return
+      }
+      // fallback: เปิดหน้าแชร์ของ LINE (line.me/R/share) — ยังเลือกคนส่งได้ ไม่ใช่แค่ copy
+      const shareUrl = `https://line.me/R/share?text=${encodeURIComponent(inviteText)}`
+      if (liff?.openWindow) {
+        liff.openWindow({ url: shareUrl, external: true })
+      } else {
+        window.open(shareUrl, '_blank')
+      }
+      toast.success('เปิดหน้าแชร์ของ LINE แล้ว เลือกคนที่จะส่งได้เลย')
+    } catch (error: any) {
+      // ผู้ใช้กดปิด share picker เอง ไม่ต้องเด้ง error
+      if (String(error?.message || '').includes('CANCEL')) return
+      // ทางสุดท้ายจริง ๆ ค่อย copy
+      try {
+        await navigator.clipboard.writeText(inviteText)
+        toast.success('คัดลอกลิงก์เชิญแล้ว ส่งต่อให้ผู้รับได้เลย')
+      } catch {
+        toast.error(error?.message || 'แชร์ไม่สำเร็จ')
+      }
+    }
+  }
+
   const createInvite = async () => {
     if (!profile?.userId) return
     setCreatingInvite(true)
@@ -88,27 +125,12 @@ function ProfileContent() {
       })
       if (!data?.success || !data.inviteUrl) throw new Error(data?.error || 'สร้างลิงก์ไม่สำเร็จ')
 
-      const inviteText =
-        `👨‍👩‍👧 คำเชิญรับการแจ้งเตือนจาก CodeLab School\n` +
-        `${parentData?.displayName || 'ผู้ปกครอง'} เชิญคุณรับแจ้งเตือนตารางเรียน/ข่าวสารของบุตรหลานทาง LINE\n\n` +
-        `กดลิงก์นี้เพื่อตอบรับ (ภายใน 3 วัน):\n${data.inviteUrl}`
-
-      // แชร์ตรงเข้าห้องแชท LINE ได้เลยถ้ารองรับ ไม่งั้น copy ลิงก์
-      if (liff?.isApiAvailable?.('shareTargetPicker')) {
-        await liff.shareTargetPicker([{ type: 'text', text: inviteText }])
-        toast.success('ส่งคำเชิญแล้ว รอผู้รับกดตอบรับ')
-      } else {
-        await navigator.clipboard.writeText(inviteText)
-        toast.success('คัดลอกลิงก์เชิญแล้ว ส่งต่อให้ผู้รับได้เลย')
-      }
+      await shareInviteUrl(data.inviteUrl)
       setShowInviteForm(false)
       setInviteLabel('')
       loadRecipients(profile.userId)
     } catch (error: any) {
-      // ผู้ใช้กดปิด share picker เอง ไม่ต้องเด้ง error
-      if (!String(error?.message || '').includes('CANCEL')) {
-        toast.error(error?.message || 'สร้างคำเชิญไม่สำเร็จ')
-      }
+      toast.error(error?.message || 'สร้างคำเชิญไม่สำเร็จ')
     } finally {
       setCreatingInvite(false)
     }
@@ -297,7 +319,7 @@ function ProfileContent() {
             <h2 className="text-xl font-semibold text-center text-gray-800">
               ระบบจัดการโรงเรียน
             </h2>
-            <p className="text-center text-gray-600 text-sm px-4 mt-1">
+            <p className="text-center text-gray-600 text-base px-4 mt-1">
               สำหรับผู้ปกครองและนักเรียน
             </p>
           </div>
@@ -333,7 +355,7 @@ function ProfileContent() {
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
+                  <div className="relative flex justify-center text-sm uppercase">
                     <span className="bg-white px-2 text-gray-500">หรือ</span>
                   </div>
                 </div>
@@ -346,7 +368,7 @@ function ProfileContent() {
                       <p className="font-medium text-blue-900">
                         เคยลงทะเบียนที่เคาน์เตอร์แล้ว?
                       </p>
-                      <p className="text-sm text-blue-700 mt-1">
+                      <p className="text-base text-blue-700 mt-1">
                         คลิกปุ่มด้านล่างเพื่อขอลิงก์เชื่อมต่อบัญชี
                       </p>
                       
@@ -452,18 +474,18 @@ function ProfileContent() {
           <CardContent>
             <div className="space-y-3">
               <div className="space-y-0.5">
-                <p className="text-xs text-muted-foreground">ชื่อ-นามสกุล</p>
+                <p className="text-sm text-muted-foreground">ชื่อ-นามสกุล</p>
                 <h3 className="font-semibold text-lg">
                   {parentData?.displayName || <span className="text-red-500 text-base font-normal">ยังไม่ได้ระบุ — แตะแก้ไขเพื่อเพิ่ม</span>}
                 </h3>
                 {(parentData?.lineDisplayName || profile?.displayName) && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-base text-muted-foreground">
                     ชื่อ LINE: {parentData?.lineDisplayName || profile?.displayName}
                   </p>
                 )}
               </div>
 
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-base">
                 {parentData?.phone && (
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -498,12 +520,12 @@ function ProfileContent() {
 
               {preferredBranch && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-start gap-2 text-sm">
+                  <div className="flex items-start gap-2 text-base">
                     <School className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="font-medium">{preferredBranch.name}</p>
                       {preferredBranch.address && (
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           {preferredBranch.address}
                         </p>
                       )}
@@ -526,7 +548,7 @@ function ProfileContent() {
               <Button
                 size="sm"
                 variant={showInviteForm ? 'outline' : 'default'}
-                className="text-xs"
+                className="text-sm"
                 onClick={() => setShowInviteForm((v) => !v)}
               >
                 {showInviteForm ? 'ปิด' : (<><UserPlus className="h-4 w-4 mr-1" />เพิ่ม</>)}
@@ -534,7 +556,7 @@ function ProfileContent() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               แจ้งเตือนตารางเรียน/ข่าวสารจะส่งถึง LINE ของคุณ และผู้รับเพิ่มเติมทุกคนด้านล่าง
             </p>
 
@@ -554,11 +576,21 @@ function ProfileContent() {
                       <p className="font-medium truncate">
                         {r.displayName || r.label || 'รอตอบรับคำเชิญ'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {r.accepted ? (r.label || 'รับการแจ้งเตือนแล้ว') : 'ส่งคำเชิญแล้ว — รอกดตอบรับ'}
                       </p>
                     </div>
-                    {!r.accepted && <Badge variant="secondary" className="text-xs shrink-0">รอตอบรับ</Badge>}
+                    {!r.accepted && <Badge variant="secondary" className="text-sm shrink-0">รอตอบรับ</Badge>}
+                    {!r.accepted && r.inviteUrl && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-green-600 shrink-0"
+                        onClick={() => shareInviteUrl(r.inviteUrl!)}
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -577,7 +609,7 @@ function ProfileContent() {
 
             {showInviteForm && (
               <div className="space-y-2 border rounded-lg p-3">
-                <p className="text-sm font-medium">เชิญผู้รับการแจ้งเตือนคนใหม่</p>
+                <p className="text-base font-medium">เชิญผู้รับการแจ้งเตือนคนใหม่</p>
                 <div className="flex gap-2">
                   {['พ่อ', 'แม่'].map((l) => (
                     <Button
@@ -585,7 +617,7 @@ function ProfileContent() {
                       type="button"
                       size="sm"
                       variant={inviteLabel === l ? 'default' : 'outline'}
-                      className="text-xs"
+                      className="text-sm"
                       onClick={() => setInviteLabel(l)}
                     >
                       {l}
@@ -595,7 +627,7 @@ function ProfileContent() {
                     value={['พ่อ', 'แม่'].includes(inviteLabel) ? '' : inviteLabel}
                     onChange={(e) => setInviteLabel(e.target.value)}
                     placeholder="หรือพิมพ์เอง เช่น คุณยาย"
-                    className="h-9 text-sm flex-1"
+                    className="h-9 text-base flex-1"
                   />
                 </div>
                 <Button className="w-full" size="sm" disabled={creatingInvite} onClick={createInvite}>
@@ -603,14 +635,14 @@ function ProfileContent() {
                     ? (<><Loader2 className="h-4 w-4 mr-1 animate-spin" />กำลังสร้างคำเชิญ...</>)
                     : (<><LinkIcon className="h-4 w-4 mr-1" />ส่งคำเชิญทาง LINE</>)}
                 </Button>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   ระบบจะเปิดหน้าแชร์ให้เลือกส่งหาคนที่ต้องการ (ลิงก์มีอายุ 3 วัน)
                 </p>
               </div>
             )}
 
             {recipients.length === 0 && !showInviteForm && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 ยังไม่มีผู้รับเพิ่มเติม — กด &quot;เพิ่ม&quot; เพื่อเชิญพ่อ/แม่อีกคนรับแจ้งเตือนด้วย
               </p>
             )}
@@ -630,7 +662,7 @@ function ProfileContent() {
                   size="sm"
                   onClick={() => navigateTo(`/liff/profile/${parentId}/students/new`)}
                   disabled={navigating}
-                  className="text-xs"
+                  className="text-sm"
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   เพิ่ม
@@ -663,7 +695,7 @@ function ProfileContent() {
                         <p className="font-medium text-base">
                           {student.nickname || student.name}
                         </p>
-                        <div className="text-sm text-muted-foreground space-y-1 mt-1">
+                        <div className="text-base text-muted-foreground space-y-1 mt-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span>{student.gradeLevel || 'ไม่ระบุชั้นเรียน'}</span>
                             <span>•</span>
@@ -722,7 +754,7 @@ function ProfileContent() {
                 disabled={navigating}
               >
                 <Calendar className="h-6 w-6" />
-                <span className="text-sm">ตารางเรียน</span>
+                <span className="text-base">ตารางเรียน</span>
               </Button>
               <Button
                 variant="outline"
@@ -731,7 +763,7 @@ function ProfileContent() {
                 disabled={navigating}
               >
                 <Users className="h-6 w-6" />
-                <span className="text-sm">Makeup Class</span>
+                <span className="text-base">Makeup Class</span>
               </Button>
             </CardContent>
           </Card>
@@ -749,7 +781,7 @@ function ProfileContent() {
             <AlertDialogDescription>
               คุณต้องการลบข้อมูลของ <strong>{deleteStudentData?.nickname || deleteStudentData?.name}</strong> ใช่หรือไม่?
               <br />
-              <span className="text-destructive text-sm mt-2 block">
+              <span className="text-destructive text-base mt-2 block">
                 ⚠️ การลบข้อมูลนี้ไม่สามารถย้อนกลับได้
               </span>
             </AlertDialogDescription>
