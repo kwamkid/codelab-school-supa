@@ -39,13 +39,39 @@ async function getMakeupQuota(supabase: any): Promise<number> {
   return DEFAULT_MAKEUP_QUOTA;
 }
 
+// หา parents ของ line id นี้ — account หลัก (parents.line_user_id) ก่อน,
+// ไม่เจอค่อยเช็ค account รอง (parent_line_recipients ที่ตอบรับคำเชิญแล้ว)
+// → account รองใช้ portal ได้เหมือน account หลักโดยไม่ต้องมี parents row ของตัวเอง
 async function getParentByLine(supabase: any, lineUserId: string) {
   const { data } = await supabase
     .from('parents')
     .select('*')
     .eq('line_user_id', lineUserId)
-    .single();
-  return data || null;
+    .maybeSingle();
+  if (data) return data;
+
+  const { data: rec } = await supabase
+    .from('parent_line_recipients')
+    .select('parent_id')
+    .eq('line_user_id', lineUserId)
+    .eq('is_active', true)
+    .not('accepted_at', 'is', null)
+    .maybeSingle();
+  if (!rec?.parent_id) return null;
+
+  const { data: family } = await supabase
+    .from('parents')
+    .select('*')
+    .eq('id', rec.parent_id)
+    .maybeSingle();
+  return family || null;
+}
+
+// RPC ฝั่ง LIFF ทุกตัว key ด้วย "line id หลัก" ของครอบครัว — ถ้าผู้เรียกเป็น
+// account รอง ให้ map ไปใช้ line id หลักก่อนเรียก RPC (โครงสร้าง RPC เดิมไม่ต้องแก้)
+export async function resolveFamilyLineId(supabase: any, lineUserId: string): Promise<string> {
+  const parent = await getParentByLine(supabase, lineUserId);
+  return parent?.line_user_id || lineUserId;
 }
 
 async function getActiveStudents(supabase: any, parentId: string) {
@@ -78,8 +104,9 @@ export async function getPendingMakeupCount(lineUserId: string): Promise<number>
 
 export async function getHomeSummary(lineUserId: string) {
   const supabase = createServiceClient() as any;
+  const familyLineId = await resolveFamilyLineId(supabase, lineUserId);
   // Single round-trip via Postgres function (was ~10 sequential queries).
-  const { data, error } = await supabase.rpc('get_liff_home', { p_line_user_id: lineUserId });
+  const { data, error } = await supabase.rpc('get_liff_home', { p_line_user_id: familyLineId });
   if (error) throw error;
   return {
     hasParent: data?.has_parent ?? false,
@@ -96,9 +123,10 @@ export async function getHomeSummary(lineUserId: string) {
 
 export async function getMakeupData(lineUserId: string) {
   const supabase = createServiceClient() as any;
+  const familyLineId = await resolveFamilyLineId(supabase, lineUserId);
   const MAKEUP_QUOTA = await getMakeupQuota(supabase);
   // Single round-trip; assemble the per-class makeup view + stats in JS.
-  const { data, error } = await supabase.rpc('get_liff_makeup', { p_line_user_id: lineUserId });
+  const { data, error } = await supabase.rpc('get_liff_makeup', { p_line_user_id: familyLineId });
   if (error) throw error;
 
   const studentsRaw: any[] = data?.students ?? [];
@@ -179,8 +207,9 @@ export async function getMakeupData(lineUserId: string) {
 
 export async function getFeedbackData(lineUserId: string) {
   const supabase = createServiceClient() as any;
+  const familyLineId = await resolveFamilyLineId(supabase, lineUserId);
   // Single round-trip via Postgres function.
-  const { data, error } = await supabase.rpc('get_liff_feedback', { p_line_user_id: lineUserId });
+  const { data, error } = await supabase.rpc('get_liff_feedback', { p_line_user_id: familyLineId });
   if (error) throw error;
   return { students: data?.students ?? [], feedbacks: data?.feedbacks ?? [] };
 }
@@ -189,8 +218,9 @@ export async function getFeedbackData(lineUserId: string) {
 
 export async function getProfileData(lineUserId: string) {
   const supabase = createServiceClient() as any;
+  const familyLineId = await resolveFamilyLineId(supabase, lineUserId);
   // Single round-trip; returns camelCase parent + students + preferred branch.
-  const { data, error } = await supabase.rpc('get_liff_profile', { p_line_user_id: lineUserId });
+  const { data, error } = await supabase.rpc('get_liff_profile', { p_line_user_id: familyLineId });
   if (error) throw error;
   return {
     hasParent: data?.hasParent ?? false,

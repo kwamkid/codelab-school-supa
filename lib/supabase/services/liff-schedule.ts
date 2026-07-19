@@ -31,10 +31,13 @@ export async function getParentScheduleEvents(
 }> {
   const supabase = createServiceClient() as any
   try {
+    // account รอง → ใช้ line id หลักของครอบครัว (ดู resolveFamilyLineId)
+    const { resolveFamilyLineId } = await import('./liff-data')
+    const familyLineId = await resolveFamilyLineId(supabase, lineUserId)
     const startStr = start.toISOString().split('T')[0]
     const endStr = end.toISOString().split('T')[0]
     const { data, error } = await supabase.rpc('get_liff_schedule', {
-      p_line_user_id: lineUserId,
+      p_line_user_id: familyLineId,
       p_start: startStr,
       p_end: endStr,
     })

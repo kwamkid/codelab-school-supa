@@ -26,6 +26,7 @@ import {
   Link as LinkIcon,
   MessageCircle
 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { useLiff } from '@/components/liff/liff-provider'
 import { deleteStudent as deleteStudentService } from '@/lib/services/parents'
 import { liffFetch } from '@/lib/line/liff-fetch'
@@ -59,6 +60,75 @@ function ProfileContent() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [navigating, setNavigating] = useState(false)
 
+  // ผู้รับแจ้งเตือน LINE เพิ่มเติม (พ่อ/แม่คนที่ 2)
+  interface LineRecipient { id: string; label: string | null; displayName: string | null; pictureUrl: string | null; accepted: boolean }
+  const [recipients, setRecipients] = useState<LineRecipient[]>([])
+  const [showInviteForm, setShowInviteForm] = useState(false)
+  const [inviteLabel, setInviteLabel] = useState('')
+  const [creatingInvite, setCreatingInvite] = useState(false)
+  const [removingRecipientId, setRemovingRecipientId] = useState<string | null>(null)
+
+  const loadRecipients = async (lineUserId: string) => {
+    try {
+      const data = await liffFetch('/api/liff/recipients', { lineUserId, action: 'list' })
+      if (data?.success) setRecipients(data.recipients || [])
+    } catch (error) {
+      console.error('Error loading recipients:', error)
+    }
+  }
+
+  const createInvite = async () => {
+    if (!profile?.userId) return
+    setCreatingInvite(true)
+    try {
+      const data = await liffFetch('/api/liff/recipients', {
+        lineUserId: profile.userId,
+        action: 'invite',
+        label: inviteLabel.trim(),
+      })
+      if (!data?.success || !data.inviteUrl) throw new Error(data?.error || 'สร้างลิงก์ไม่สำเร็จ')
+
+      const inviteText =
+        `👨‍👩‍👧 คำเชิญรับการแจ้งเตือนจาก CodeLab School\n` +
+        `${parentData?.displayName || 'ผู้ปกครอง'} เชิญคุณรับแจ้งเตือนตารางเรียน/ข่าวสารของบุตรหลานทาง LINE\n\n` +
+        `กดลิงก์นี้เพื่อตอบรับ (ภายใน 3 วัน):\n${data.inviteUrl}`
+
+      // แชร์ตรงเข้าห้องแชท LINE ได้เลยถ้ารองรับ ไม่งั้น copy ลิงก์
+      if (liff?.isApiAvailable?.('shareTargetPicker')) {
+        await liff.shareTargetPicker([{ type: 'text', text: inviteText }])
+        toast.success('ส่งคำเชิญแล้ว รอผู้รับกดตอบรับ')
+      } else {
+        await navigator.clipboard.writeText(inviteText)
+        toast.success('คัดลอกลิงก์เชิญแล้ว ส่งต่อให้ผู้รับได้เลย')
+      }
+      setShowInviteForm(false)
+      setInviteLabel('')
+      loadRecipients(profile.userId)
+    } catch (error: any) {
+      // ผู้ใช้กดปิด share picker เอง ไม่ต้องเด้ง error
+      if (!String(error?.message || '').includes('CANCEL')) {
+        toast.error(error?.message || 'สร้างคำเชิญไม่สำเร็จ')
+      }
+    } finally {
+      setCreatingInvite(false)
+    }
+  }
+
+  const removeRecipient = async (id: string) => {
+    if (!profile?.userId) return
+    setRemovingRecipientId(id)
+    try {
+      const data = await liffFetch('/api/liff/recipients', { lineUserId: profile.userId, action: 'remove', id })
+      if (!data?.success) throw new Error(data?.error || 'ลบไม่สำเร็จ')
+      setRecipients((prev) => prev.filter((r) => r.id !== id))
+      toast.success('ลบผู้รับการแจ้งเตือนแล้ว')
+    } catch (error: any) {
+      toast.error(error?.message || 'ลบไม่สำเร็จ')
+    } finally {
+      setRemovingRecipientId(null)
+    }
+  }
+
   // Check authentication
   useEffect(() => {
     if (!liffLoading) {
@@ -90,6 +160,7 @@ function ProfileContent() {
         setHasParent(true)
         setPreferredBranch((data.preferredBranch as Branch) || null)
         setStudents((data.students || []) as Student[])
+        loadRecipients(lineUserId)
       } else {
         setHasParent(false)
       }
@@ -441,6 +512,108 @@ function ProfileContent() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ผู้รับแจ้งเตือน LINE เพิ่มเติม (พ่อ/แม่คนที่ 2) */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5" />
+                ผู้รับการแจ้งเตือน
+              </CardTitle>
+              <Button
+                size="sm"
+                variant={showInviteForm ? 'outline' : 'default'}
+                className="text-xs"
+                onClick={() => setShowInviteForm((v) => !v)}
+              >
+                {showInviteForm ? 'ปิด' : (<><UserPlus className="h-4 w-4 mr-1" />เพิ่ม</>)}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              แจ้งเตือนตารางเรียน/ข่าวสารจะส่งถึง LINE ของคุณ และผู้รับเพิ่มเติมทุกคนด้านล่าง
+            </p>
+
+            {recipients.length > 0 && (
+              <div className="space-y-2">
+                {recipients.map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
+                    {r.pictureUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={r.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center">
+                        <User className="h-4 w-4 text-gray-500" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {r.displayName || r.label || 'รอตอบรับคำเชิญ'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {r.accepted ? (r.label || 'รับการแจ้งเตือนแล้ว') : 'ส่งคำเชิญแล้ว — รอกดตอบรับ'}
+                      </p>
+                    </div>
+                    {!r.accepted && <Badge variant="secondary" className="text-xs shrink-0">รอตอบรับ</Badge>}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 shrink-0"
+                      disabled={removingRecipientId === r.id}
+                      onClick={() => removeRecipient(r.id)}
+                    >
+                      {removingRecipientId === r.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showInviteForm && (
+              <div className="space-y-2 border rounded-lg p-3">
+                <p className="text-sm font-medium">เชิญผู้รับการแจ้งเตือนคนใหม่</p>
+                <div className="flex gap-2">
+                  {['พ่อ', 'แม่'].map((l) => (
+                    <Button
+                      key={l}
+                      type="button"
+                      size="sm"
+                      variant={inviteLabel === l ? 'default' : 'outline'}
+                      className="text-xs"
+                      onClick={() => setInviteLabel(l)}
+                    >
+                      {l}
+                    </Button>
+                  ))}
+                  <Input
+                    value={['พ่อ', 'แม่'].includes(inviteLabel) ? '' : inviteLabel}
+                    onChange={(e) => setInviteLabel(e.target.value)}
+                    placeholder="หรือพิมพ์เอง เช่น คุณยาย"
+                    className="h-9 text-sm flex-1"
+                  />
+                </div>
+                <Button className="w-full" size="sm" disabled={creatingInvite} onClick={createInvite}>
+                  {creatingInvite
+                    ? (<><Loader2 className="h-4 w-4 mr-1 animate-spin" />กำลังสร้างคำเชิญ...</>)
+                    : (<><LinkIcon className="h-4 w-4 mr-1" />ส่งคำเชิญทาง LINE</>)}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  ระบบจะเปิดหน้าแชร์ให้เลือกส่งหาคนที่ต้องการ (ลิงก์มีอายุ 3 วัน)
+                </p>
+              </div>
+            )}
+
+            {recipients.length === 0 && !showInviteForm && (
+              <p className="text-sm text-muted-foreground">
+                ยังไม่มีผู้รับเพิ่มเติม — กด &quot;เพิ่ม&quot; เพื่อเชิญพ่อ/แม่อีกคนรับแจ้งเตือนด้วย
+              </p>
+            )}
           </CardContent>
         </Card>
 

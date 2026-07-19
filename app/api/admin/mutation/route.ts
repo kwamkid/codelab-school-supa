@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 
 // Whitelist of tables that can be mutated via this endpoint
 const ALLOWED_TABLES = [
+  'parent_line_recipients',
   'branches',
   'rooms',
   'teachers',

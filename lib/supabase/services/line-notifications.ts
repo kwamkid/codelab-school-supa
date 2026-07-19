@@ -112,6 +112,44 @@ export async function sendLineMessage(
   }
 }
 
+// ผู้รับ LINE ทั้งหมดของครอบครัว = ผู้รับหลัก (parents.line_user_id) + ผู้รับเพิ่มเติม
+// (parent_line_recipients ที่รับคำเชิญแล้ว) — ถ้า query พังให้ fallback เป็นผู้รับหลัก
+// อย่างเดียว เพื่อไม่ให้พฤติกรรมเดิมเสีย. ระบุ parentId ได้จะแม่นสุด; ถ้ามีแต่
+// primaryLineId (เช่น sendFeedbackNotification) จะ resolve parent จาก line id ให้
+export async function getParentLineIds(
+  parentId: string | null | undefined,
+  primaryLineId: string | null | undefined
+): Promise<string[]> {
+  const ids: string[] = []
+  if (primaryLineId) ids.push(primaryLineId)
+  try {
+    const supabase = createServiceClient()
+    let pid = parentId
+    if (!pid && primaryLineId) {
+      const { data } = await supabase
+        .from('parents')
+        .select('id')
+        .eq('line_user_id', primaryLineId)
+        .maybeSingle()
+      pid = data?.id
+    }
+    if (pid) {
+      const { data: extras } = await (supabase as any)
+        .from('parent_line_recipients')
+        .select('line_user_id')
+        .eq('parent_id', pid)
+        .eq('is_active', true)
+        .not('line_user_id', 'is', null)
+      for (const r of (extras || []) as Array<{ line_user_id: string }>) {
+        if (r.line_user_id && !ids.includes(r.line_user_id)) ids.push(r.line_user_id)
+      }
+    }
+  } catch (e) {
+    console.warn('[getParentLineIds] recipients lookup failed, primary only:', e)
+  }
+  return ids
+}
+
 // 1. แจ้งเตือนก่อนเรียน (คลาสปกติ)
 export async function sendClassReminder(
   studentId: string,
@@ -190,32 +228,6 @@ export async function sendClassReminder(
 
     console.log('[sendClassReminder] All data collected, preparing to send...')
 
-    // ส่งข้อความแบบ Flex Message
-    const result = await sendLineMessage(parent.line_user_id, '', undefined, {
-      useFlexMessage: true,
-      flexTemplate: 'classReminder',
-      flexData: {
-        studentName: student.nickname || student.name,
-        className: classData.name,
-        subjectName: subject?.name || classData.name,
-        sessionNumber,
-        date: formatDate(scheduleDate, 'long'),
-        startTime: formatTime(classData.start_time),
-        endTime: formatTime(classData.end_time),
-        teacherName: `ครู${teacher?.nickname || teacher?.name || 'ไม่ระบุ'}`,
-        location: branch?.name || '',
-        roomName: room?.name || classData.room_id
-      },
-      altText: `แจ้งเตือนคลาสเรียนพรุ่งนี้ - น้อง${student.nickname || student.name}`
-    })
-
-    if (result.success) {
-      console.log(`[sendClassReminder] Successfully sent reminder for student ${studentId}`)
-    } else {
-      console.log(`[sendClassReminder] Failed to send reminder: ${result.error}`)
-    }
-
-    // Build detailed message preview
     const studentName = student.nickname || student.name
     const sessionText = sessionNumber ? ` (ครั้งที่ ${sessionNumber})` : ''
     const messagePreview = [
@@ -229,25 +241,49 @@ export async function sendClassReminder(
       `🚪 ห้อง: ${room?.name || classData.room_id || '-'}`
     ].join('\n')
 
-    // Log notification
-    await logNotification({
-      type: 'class-reminder',
-      recipientType: 'parent',
-      recipientId: parent.id,
-      recipientName: `${studentName}'s parent`,
-      lineUserId: parent.line_user_id,
-      studentId: student.id,
-      studentName: studentName,
-      classId: classData.id,
-      className: classData.name,
-      scheduleId: scheduleId,
-      messagePreview: messagePreview,
-      status: result.success ? 'success' : 'failed',
-      errorMessage: result.error,
-      sentAt: new Date()
-    })
+    // ส่ง Flex Message ถึงผู้รับทุกคนของครอบครัว (หลัก + ผู้รับเพิ่มเติม) + log รายคน
+    const lineIds = await getParentLineIds(parent.id, parent.line_user_id)
+    let anySuccess = false
+    for (const [i, lineId] of lineIds.entries()) {
+      const result = await sendLineMessage(lineId, '', undefined, {
+        useFlexMessage: true,
+        flexTemplate: 'classReminder',
+        flexData: {
+          studentName,
+          className: classData.name,
+          subjectName: subject?.name || classData.name,
+          sessionNumber,
+          date: formatDate(scheduleDate, 'long'),
+          startTime: formatTime(classData.start_time),
+          endTime: formatTime(classData.end_time),
+          teacherName: `ครู${teacher?.nickname || teacher?.name || 'ไม่ระบุ'}`,
+          location: branch?.name || '',
+          roomName: room?.name || classData.room_id
+        },
+        altText: `แจ้งเตือนคลาสเรียนพรุ่งนี้ - น้อง${studentName}`
+      })
+      anySuccess = anySuccess || !!result.success
 
-    return result.success
+      await logNotification({
+        type: 'class-reminder',
+        recipientType: 'parent',
+        recipientId: parent.id,
+        recipientName: `${studentName}'s parent${i > 0 ? ' (ผู้รับเพิ่มเติม)' : ''}`,
+        lineUserId: lineId,
+        studentId: student.id,
+        studentName: studentName,
+        classId: classData.id,
+        className: classData.name,
+        scheduleId: scheduleId,
+        messagePreview: messagePreview,
+        status: result.success ? 'success' : 'failed',
+        errorMessage: result.error,
+        sentAt: new Date()
+      })
+    }
+
+    console.log(`[sendClassReminder] Sent to ${lineIds.length} recipient(s), anySuccess=${anySuccess}`)
+    return anySuccess
   } catch (error) {
     console.error('[sendClassReminder] Error:', error)
     return false
@@ -276,32 +312,15 @@ export interface ClassReminderRow {
 }
 
 // 1b. แจ้งเตือนก่อนเรียน — fed by the get_class_reminders RPC.
-// The RPC has already done all the joins + filtering (pause / leave / makeup), so this
-// does NO extra queries: it just formats the LINE message, sends it, and logs.
+// The RPC has already done all the joins + filtering (pause / leave / makeup);
+// this formats the LINE message and sends to every family recipient
+// (primary + parent_line_recipients — one extra lookup per row), then logs per recipient.
 export async function sendClassReminderFromRow(row: ClassReminderRow): Promise<boolean> {
   try {
     const studentName = row.student_nickname || row.student_name
     const teacherLabel = `ครู${row.teacher_nickname || row.teacher_name || 'ไม่ระบุ'}`
     const scheduleDate = new Date(row.session_date)
     const sessionNumber = row.session_number ?? undefined
-
-    const result = await sendLineMessage(row.line_user_id, '', undefined, {
-      useFlexMessage: true,
-      flexTemplate: 'classReminder',
-      flexData: {
-        studentName,
-        className: row.class_name,
-        subjectName: row.subject_name || row.class_name,
-        sessionNumber,
-        date: formatDate(scheduleDate, 'long'),
-        startTime: formatTime(row.start_time || ''),
-        endTime: formatTime(row.end_time || ''),
-        teacherName: teacherLabel,
-        location: row.branch_name || '',
-        roomName: row.room_name || ''
-      },
-      altText: `แจ้งเตือนคลาสเรียนพรุ่งนี้ - น้อง${studentName}`
-    })
 
     const sessionText = sessionNumber ? ` (ครั้งที่ ${sessionNumber})` : ''
     const messagePreview = [
@@ -315,24 +334,47 @@ export async function sendClassReminderFromRow(row: ClassReminderRow): Promise<b
       `🚪 ห้อง: ${row.room_name || '-'}`
     ].join('\n')
 
-    await logNotification({
-      type: 'class-reminder',
-      recipientType: 'parent',
-      recipientId: row.parent_id,
-      recipientName: `${studentName}'s parent`,
-      lineUserId: row.line_user_id,
-      studentId: row.student_id,
-      studentName,
-      classId: row.class_id,
-      className: row.class_name,
-      scheduleId: row.schedule_id,
-      messagePreview,
-      status: result.success ? 'success' : 'failed',
-      errorMessage: result.error,
-      sentAt: new Date()
-    })
+    const lineIds = await getParentLineIds(row.parent_id, row.line_user_id)
+    let anySuccess = false
+    for (const [i, lineId] of lineIds.entries()) {
+      const result = await sendLineMessage(lineId, '', undefined, {
+        useFlexMessage: true,
+        flexTemplate: 'classReminder',
+        flexData: {
+          studentName,
+          className: row.class_name,
+          subjectName: row.subject_name || row.class_name,
+          sessionNumber,
+          date: formatDate(scheduleDate, 'long'),
+          startTime: formatTime(row.start_time || ''),
+          endTime: formatTime(row.end_time || ''),
+          teacherName: teacherLabel,
+          location: row.branch_name || '',
+          roomName: row.room_name || ''
+        },
+        altText: `แจ้งเตือนคลาสเรียนพรุ่งนี้ - น้อง${studentName}`
+      })
+      anySuccess = anySuccess || !!result.success
 
-    return result.success
+      await logNotification({
+        type: 'class-reminder',
+        recipientType: 'parent',
+        recipientId: row.parent_id,
+        recipientName: `${studentName}'s parent${i > 0 ? ' (ผู้รับเพิ่มเติม)' : ''}`,
+        lineUserId: lineId,
+        studentId: row.student_id,
+        studentName,
+        classId: row.class_id,
+        className: row.class_name,
+        scheduleId: row.schedule_id,
+        messagePreview,
+        status: result.success ? 'success' : 'failed',
+        errorMessage: result.error,
+        sentAt: new Date()
+      })
+    }
+
+    return anySuccess
   } catch (error) {
     console.error('[sendClassReminderFromRow] Error:', error)
     return false
@@ -406,35 +448,6 @@ export async function sendMakeupNotification(
 
     console.log('[sendMakeupNotification] All data collected, preparing to send...')
 
-    // ส่งข้อความแบบ Flex Message
-    const result = await sendLineMessage(parent.line_user_id, '', undefined, {
-      useFlexMessage: true,
-      flexTemplate: type === 'reminder' ? 'makeupReminder' : 'makeupConfirmation',
-      flexData: {
-        studentName: student?.nickname || student?.name,
-        className: classData?.name || 'Makeup Class',
-        subjectName,
-        sessionNumber: makeup.original_session_number,
-        date: formatDate(makeupDate, 'long'),
-        startTime: formatTime(makeup.makeup_start_time),
-        endTime: formatTime(makeup.makeup_end_time),
-        teacherName: `ครู${teacher?.nickname || teacher?.name || 'ไม่ระบุ'}`,
-        location: branch?.name || '',
-        roomName: room?.name || makeup.makeup_room_id
-      },
-      altText:
-        type === 'reminder'
-          ? `แจ้งเตือน Makeup Class พรุ่งนี้ - น้อง${student?.nickname || student?.name}`
-          : `ยืนยันการนัด Makeup Class - น้อง${student?.nickname || student?.name}`
-    })
-
-    if (result.success) {
-      console.log(`[sendMakeupNotification] Successfully sent makeup ${type}`)
-    } else {
-      console.error(`[sendMakeupNotification] Failed to send makeup ${type}:`, result.error)
-    }
-
-    // Build detailed message preview
     const studentName = student?.nickname || student?.name
     const sessionText = makeup.original_session_number ? ` (ครั้งที่ ${makeup.original_session_number})` : ''
     const headerText = type === 'reminder' ? '⏰ แจ้งเตือน Makeup Class พรุ่งนี้' : '✅ ยืนยันการนัด Makeup Class'
@@ -449,25 +462,52 @@ export async function sendMakeupNotification(
       `🚪 ห้อง: ${room?.name || makeup.makeup_room_id || '-'}`
     ].join('\n')
 
-    // Log notification
-    await logNotification({
-      type: type === 'reminder' ? 'makeup-reminder' : 'makeup-scheduled',
-      recipientType: 'parent',
-      recipientId: parent.id,
-      recipientName: `${studentName}'s parent`,
-      lineUserId: parent.line_user_id,
-      studentId: student?.id,
-      studentName: studentName,
-      classId: classData?.id,
-      className: classData?.name,
-      makeupId: makeupId,
-      messagePreview: messagePreview,
-      status: result.success ? 'success' : 'failed',
-      errorMessage: result.error,
-      sentAt: new Date()
-    })
+    // ส่ง Flex Message ถึงผู้รับทุกคนของครอบครัว + log รายคน
+    const lineIds = await getParentLineIds(parent.id, parent.line_user_id)
+    let anySuccess = false
+    for (const [i, lineId] of lineIds.entries()) {
+      const result = await sendLineMessage(lineId, '', undefined, {
+        useFlexMessage: true,
+        flexTemplate: type === 'reminder' ? 'makeupReminder' : 'makeupConfirmation',
+        flexData: {
+          studentName: student?.nickname || student?.name,
+          className: classData?.name || 'Makeup Class',
+          subjectName,
+          sessionNumber: makeup.original_session_number,
+          date: formatDate(makeupDate, 'long'),
+          startTime: formatTime(makeup.makeup_start_time),
+          endTime: formatTime(makeup.makeup_end_time),
+          teacherName: `ครู${teacher?.nickname || teacher?.name || 'ไม่ระบุ'}`,
+          location: branch?.name || '',
+          roomName: room?.name || makeup.makeup_room_id
+        },
+        altText:
+          type === 'reminder'
+            ? `แจ้งเตือน Makeup Class พรุ่งนี้ - น้อง${student?.nickname || student?.name}`
+            : `ยืนยันการนัด Makeup Class - น้อง${student?.nickname || student?.name}`
+      })
+      anySuccess = anySuccess || !!result.success
 
-    return result.success
+      await logNotification({
+        type: type === 'reminder' ? 'makeup-reminder' : 'makeup-scheduled',
+        recipientType: 'parent',
+        recipientId: parent.id,
+        recipientName: `${studentName}'s parent${i > 0 ? ' (ผู้รับเพิ่มเติม)' : ''}`,
+        lineUserId: lineId,
+        studentId: student?.id,
+        studentName: studentName,
+        classId: classData?.id,
+        className: classData?.name,
+        makeupId: makeupId,
+        messagePreview: messagePreview,
+        status: result.success ? 'success' : 'failed',
+        errorMessage: result.error,
+        sentAt: new Date()
+      })
+    }
+
+    console.log(`[sendMakeupNotification] Sent makeup ${type} to ${lineIds.length} recipient(s), anySuccess=${anySuccess}`)
+    return anySuccess
   } catch (error) {
     console.error('[sendMakeupNotification] Error:', error)
     return false
@@ -595,29 +635,29 @@ export async function sendFeedbackNotification(
       `"${feedback}"\n\n` +
       `ดูทั้งหมดได้ที่เมนู Teacher Feedback`
 
-    const result = await sendLineMessage(parentLineId, message)
+    // ส่งถึงผู้รับทุกคนของครอบครัว (resolve parent จาก line id หลัก) + log รายคน
+    const lineIds = await getParentLineIds(undefined, parentLineId)
+    let anySuccess = false
+    for (const [i, lineId] of lineIds.entries()) {
+      const result = await sendLineMessage(lineId, message)
+      anySuccess = anySuccess || !!result.success
 
-    if (result.success) {
-      console.log('[sendFeedbackNotification] Successfully sent feedback notification')
-    } else {
-      console.log('[sendFeedbackNotification] Failed to send feedback notification:', result.error)
+      await logNotification({
+        type: 'feedback',
+        recipientType: 'parent',
+        recipientName: `${studentName}'s parent${i > 0 ? ' (ผู้รับเพิ่มเติม)' : ''}`,
+        lineUserId: lineId,
+        studentName: studentName,
+        className: className,
+        messagePreview: message,
+        status: result.success ? 'success' : 'failed',
+        errorMessage: result.error,
+        sentAt: new Date()
+      })
     }
 
-    // Log notification
-    await logNotification({
-      type: 'feedback',
-      recipientType: 'parent',
-      recipientName: `${studentName}'s parent`,
-      lineUserId: parentLineId,
-      studentName: studentName,
-      className: className,
-      messagePreview: message,
-      status: result.success ? 'success' : 'failed',
-      errorMessage: result.error,
-      sentAt: new Date()
-    })
-
-    return result.success
+    console.log(`[sendFeedbackNotification] Sent to ${lineIds.length} recipient(s), anySuccess=${anySuccess}`)
+    return anySuccess
   } catch (error) {
     console.error('[sendFeedbackNotification] Error:', error)
     return false
@@ -653,29 +693,29 @@ export async function sendScheduleChangeNotification(
         `วันใหม่: ${newDate ? formatDate(newDate, 'long') : 'รอกำหนด'}`
     }
 
-    const result = await sendLineMessage(parentLineId, message)
+    // ส่งถึงผู้รับทุกคนของครอบครัว + log รายคน
+    const lineIds = await getParentLineIds(undefined, parentLineId)
+    let anySuccess = false
+    for (const [i, lineId] of lineIds.entries()) {
+      const result = await sendLineMessage(lineId, message)
+      anySuccess = anySuccess || !!result.success
 
-    if (result.success) {
-      console.log('[sendScheduleChangeNotification] Successfully sent notification')
-    } else {
-      console.log('[sendScheduleChangeNotification] Failed to send notification:', result.error)
+      await logNotification({
+        type: 'schedule-change',
+        recipientType: 'parent',
+        recipientName: `${studentName}'s parent${i > 0 ? ' (ผู้รับเพิ่มเติม)' : ''}`,
+        lineUserId: lineId,
+        studentName: studentName,
+        className: className,
+        messagePreview: message,
+        status: result.success ? 'success' : 'failed',
+        errorMessage: result.error,
+        sentAt: new Date()
+      })
     }
 
-    // Log notification
-    await logNotification({
-      type: 'schedule-change',
-      recipientType: 'parent',
-      recipientName: `${studentName}'s parent`,
-      lineUserId: parentLineId,
-      studentName: studentName,
-      className: className,
-      messagePreview: message,
-      status: result.success ? 'success' : 'failed',
-      errorMessage: result.error,
-      sentAt: new Date()
-    })
-
-    return result.success
+    console.log(`[sendScheduleChangeNotification] Sent to ${lineIds.length} recipient(s), anySuccess=${anySuccess}`)
+    return anySuccess
   } catch (error) {
     console.error('[sendScheduleChangeNotification] Error:', error)
     return false
@@ -701,29 +741,29 @@ export async function sendPaymentReminder(
       `กำหนดชำระ: ${formatDate(dueDate, 'long')}\n\n` +
       `กรุณาชำระเงินภายในวันที่กำหนด`
 
-    const result = await sendLineMessage(parentLineId, message)
+    // ส่งถึงผู้รับทุกคนของครอบครัว + log รายคน
+    const lineIds = await getParentLineIds(undefined, parentLineId)
+    let anySuccess = false
+    for (const [i, lineId] of lineIds.entries()) {
+      const result = await sendLineMessage(lineId, message)
+      anySuccess = anySuccess || !!result.success
 
-    if (result.success) {
-      console.log('[sendPaymentReminder] Successfully sent payment reminder')
-    } else {
-      console.log('[sendPaymentReminder] Failed to send payment reminder:', result.error)
+      await logNotification({
+        type: 'payment-reminder',
+        recipientType: 'parent',
+        recipientName: `${studentName}'s parent${i > 0 ? ' (ผู้รับเพิ่มเติม)' : ''}`,
+        lineUserId: lineId,
+        studentName: studentName,
+        className: className,
+        messagePreview: message,
+        status: result.success ? 'success' : 'failed',
+        errorMessage: result.error,
+        sentAt: new Date()
+      })
     }
 
-    // Log notification
-    await logNotification({
-      type: 'payment-reminder',
-      recipientType: 'parent',
-      recipientName: `${studentName}'s parent`,
-      lineUserId: parentLineId,
-      studentName: studentName,
-      className: className,
-      messagePreview: message,
-      status: result.success ? 'success' : 'failed',
-      errorMessage: result.error,
-      sentAt: new Date()
-    })
-
-    return result.success
+    console.log(`[sendPaymentReminder] Sent to ${lineIds.length} recipient(s), anySuccess=${anySuccess}`)
+    return anySuccess
   } catch (error) {
     console.error('[sendPaymentReminder] Error:', error)
     return false

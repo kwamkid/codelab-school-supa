@@ -14,6 +14,7 @@ import { liffFetch } from '@/lib/line/liff-fetch'
 import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { Loading } from '@/components/ui/loading'
 import { formatDate, getDayName } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface NextClass {
   className: string; subjectName: string; subjectColor?: string | null
@@ -45,6 +46,45 @@ function Dashboard() {
   const [loading, setLoading] = useState(!cached)
   const [data, setData] = useState<HomeSummary | null>(cached ?? null)
   const [goingProfile, setGoingProfile] = useState(false)
+  const [inviteHandled, setInviteHandled] = useState(false)
+
+  // ตอบรับคำเชิญ "ผู้รับการแจ้งเตือนเพิ่มเติม" — ลิงก์เชิญเปิดมาที่หน้านี้พร้อม
+  // ?recipientInvite=<token> (บางเคส LIFF ห่อไว้ใน liff.state) ผู้กดลิงก์คือผู้รับใหม่
+  // ทำงานได้แม้ยังไม่ลงทะเบียนเป็นผู้ปกครองเอง
+  useEffect(() => {
+    if (liffLoading || !profile?.userId || inviteHandled) return
+    const params = new URLSearchParams(window.location.search)
+    let token = params.get('recipientInvite')
+    if (!token) {
+      const state = params.get('liff.state')
+      if (state) token = new URLSearchParams(state.replace(/^\?/, '')).get('recipientInvite')
+    }
+    if (!token) return
+    setInviteHandled(true)
+    ;(async () => {
+      try {
+        const res = await liffFetch('/api/liff/recipients', {
+          lineUserId: profile.userId,
+          action: 'accept',
+          token,
+          displayName: profile.displayName,
+          pictureUrl: (profile as any).pictureUrl,
+        })
+        toast.success(
+          res?.alreadyAccepted
+            ? 'คุณรับการแจ้งเตือนของครอบครัวนี้อยู่แล้ว'
+            : '🎉 ตอบรับสำเร็จ! การแจ้งเตือนของบุตรหลานจะส่งมาที่ LINE นี้ด้วย',
+          { duration: 6000 }
+        )
+      } catch (e: any) {
+        toast.error(e?.message || 'ตอบรับคำเชิญไม่สำเร็จ', { duration: 6000 })
+      } finally {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('recipientInvite')
+        window.history.replaceState({}, '', url.toString())
+      }
+    })()
+  }, [liffLoading, profile, inviteHandled])
 
   useEffect(() => {
     if (liffLoading || !profile?.userId) return
