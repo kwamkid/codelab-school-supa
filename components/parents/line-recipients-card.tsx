@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Bell, Copy, Check, Loader2, Trash2, UserPlus, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminMutation } from '@/lib/admin-mutation';
+import { parentLiffUrl } from '@/lib/line/liff-id';
 
 interface RecipientRow {
   id: string;
@@ -34,8 +35,7 @@ function generateToken(): string {
   return token;
 }
 
-const inviteUrlOf = (token: string) =>
-  `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID || ''}?recipientInvite=${token}`;
+const inviteUrlOf = (token: string) => parentLiffUrl(`?recipientInvite=${token}`);
 
 export function LineRecipientsCard({ parentId }: { parentId: string }) {
   const [rows, setRows] = useState<RecipientRow[]>([]);

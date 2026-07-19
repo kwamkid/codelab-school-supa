@@ -9,22 +9,10 @@ let isInitializing = false
 async function getLiffId(): Promise<string> {
   if (liffId) return liffId
   
-  try {
-    // Use env variable if available
-    const envLiffId = process.env.NEXT_PUBLIC_LIFF_ID
-    if (envLiffId) {
-      liffId = envLiffId
-      return liffId
-    }
-
-    // Fallback to hardcoded
-    liffId = '2007575627-GmKBZJdo'
-    return liffId
-  } catch (error) {
-    console.error('Failed to get LIFF ID:', error)
-    liffId = '2007575627-GmKBZJdo'
-    return liffId
-  }
+  // env-or-fallback รวมไว้ที่ lib/line/liff-id.ts (ลิงก์เชิญผู้รับ noti ก็ใช้ตัวเดียวกัน)
+  const { PARENT_LIFF_ID } = await import('./liff-id')
+  liffId = PARENT_LIFF_ID
+  return liffId
 }
 
 // `overrideLiffId` lets a page init as a DIFFERENT LIFF app than the parent

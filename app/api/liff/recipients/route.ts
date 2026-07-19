@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveLiffUser } from '@/lib/line/verify-liff-token';
 import { createServiceClient } from '@/lib/supabase/server';
+import { parentLiffUrl } from '@/lib/line/liff-id';
 
 export const dynamic = 'force-dynamic';
 
@@ -140,8 +141,7 @@ export async function POST(request: NextRequest) {
         });
       if (insertError) throw insertError;
 
-      const liffId = process.env.NEXT_PUBLIC_LIFF_ID || '';
-      const inviteUrl = `https://liff.line.me/${liffId}?recipientInvite=${token}`;
+      const inviteUrl = parentLiffUrl(`?recipientInvite=${token}`);
       return NextResponse.json({ success: true, inviteUrl, expiresAt: expiresAt.toISOString() });
     }
 
