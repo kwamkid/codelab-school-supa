@@ -624,8 +624,8 @@ export default function ParentsPage() {
                         
                         {/* Expandable row for students */}
                         {expandedRows.has(parent.id) && parent.students && parent.students.length > 0 && (
-                          <TableRow>
-                            <TableCell colSpan={9} className="bg-gray-50 p-0">
+                          <TableRow className="hover:bg-transparent">
+                            <TableCell colSpan={9} className="bg-orange-50/70 dark:bg-orange-950/20 border-l-4 border-l-primary/60 p-0">
                               <div className="pl-12 pr-4 py-4">
                                 <div className="flex items-center justify-between mb-3">
                                   <h4 className="font-medium text-sm text-gray-700 flex items-center gap-1.5">
@@ -641,35 +641,50 @@ export default function ParentsPage() {
                                 </div>
                                 <div className="space-y-2">
                                   {parent.students.map((student) => (
-                                    <div key={student.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                                      <div className="flex items-center gap-3">
-                                        <div>
-                                          <p className="font-medium">{student.name}</p>
-                                          <div className="flex items-center gap-4 text-gray-600">
-                                            <span>{student.nickname || '-'}</span>
-                                            <Badge 
-                                              className={student.gender === 'M' 
-                                                ? 'bg-blue-100 text-blue-700 text-xs' 
-                                                : 'bg-pink-100 text-pink-700 text-xs'
-                                              }
-                                            >
-                                              {student.gender === 'M' ? 'ชาย' : 'หญิง'}
-                                            </Badge>
+                                    <div key={student.id} className="flex items-start gap-4 p-3 bg-white rounded-lg border">
+                                      {/* ซ้าย: ข้อมูลนักเรียน (ความกว้างคงที่) */}
+                                      <div className="w-80 shrink-0">
+                                        <p className="font-medium">{student.name}</p>
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-600">
+                                          <span>{student.nickname || '-'}</span>
+                                          <Badge
+                                            className={student.gender === 'M'
+                                              ? 'bg-blue-100 text-blue-700 text-xs'
+                                              : 'bg-pink-100 text-pink-700 text-xs'
+                                            }
+                                          >
+                                            {student.gender === 'M' ? 'ชาย' : 'หญิง'}
+                                          </Badge>
+                                          <span className="flex items-center gap-1">
+                                            <Cake className="h-3 w-3" />
+                                            {calculateAge(student.birthdate)} ปี
+                                          </span>
+                                          {student.schoolName && (
                                             <span className="flex items-center gap-1">
-                                              <Cake className="h-3 w-3" />
-                                              {calculateAge(student.birthdate)} ปี
+                                              <School className="h-3 w-3" />
+                                              {student.schoolName}
                                             </span>
-                                            {student.schoolName && (
-                                              <span className="flex items-center gap-1">
-                                                <School className="h-3 w-3" />
-                                                {student.schoolName}
-                                              </span>
-                                            )}
-                                          </div>
+                                          )}
                                         </div>
                                       </div>
-                                      <div className="flex items-center gap-3">
-                                        <div className="flex flex-wrap gap-1">
+
+                                      {/* กลาง: สถานะ + สาขา + ชื่อคลาส — ใช้พื้นที่ที่เหลือทั้งหมด ตัดบรรทัดได้ */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          {student.enrollmentStatus === 'active' ? (
+                                            <Badge className="bg-green-100 text-green-700 text-xs">
+                                              <GraduationCap className="h-3 w-3 mr-1" />
+                                              กำลังเรียน
+                                            </Badge>
+                                          ) : student.enrollmentStatus === 'completed' ? (
+                                            <Badge className="bg-orange-100 text-orange-700 text-xs">
+                                              จบคอร์สแล้ว
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="secondary" className="text-xs">
+                                              ยังไม่ลงคอร์ส
+                                            </Badge>
+                                          )}
                                           {loadingBranches ? (
                                             <InlineLoading />
                                           ) : (() => {
@@ -677,11 +692,11 @@ export default function ParentsPage() {
                                             student.enrollments?.forEach(enrollment => {
                                               studentBranches.add(enrollment.branchId);
                                             });
-                                            
+
                                             return studentBranches.size > 0 ? (
                                               Array.from(studentBranches).map(branchId => (
-                                                <Badge 
-                                                  key={branchId} 
+                                                <Badge
+                                                  key={branchId}
                                                   variant="outline"
                                                   className="text-xs"
                                                 >
@@ -690,35 +705,23 @@ export default function ParentsPage() {
                                               ))
                                             ) : null;
                                           })()}
+                                          {!student.isActive && (
+                                            <Badge variant="destructive" className="text-xs">ไม่ใช้งาน</Badge>
+                                          )}
                                         </div>
-                                        
-                                        {student.enrollmentStatus === 'active' ? (
-                                          <div className="space-y-1">
-                                            <Badge className="bg-green-100 text-green-700 text-xs">
-                                              <GraduationCap className="h-3 w-3 mr-1" />
-                                              กำลังเรียน
-                                            </Badge>
-                                            {student.enrollments && student.enrollments.length > 0 && !loadingClasses && (
-                                              <div className="text-gray-600 max-w-[300px]">
-                                                {student.enrollments
-                                                  .filter(e => e.status === 'active')
-                                                  .map(e => getClassInfo(e.classId)?.name || e.classId)
-                                                  .join(', ')}
-                                              </div>
-                                            )}
+                                        {student.enrollmentStatus === 'active' &&
+                                          student.enrollments && student.enrollments.length > 0 && !loadingClasses && (
+                                          <div className="text-gray-600 mt-1 break-words">
+                                            {student.enrollments
+                                              .filter(e => e.status === 'active')
+                                              .map(e => getClassInfo(e.classId)?.name || e.classId)
+                                              .join(', ')}
                                           </div>
-                                        ) : student.enrollmentStatus === 'completed' ? (
-                                          <Badge className="bg-orange-100 text-orange-700 text-xs">
-                                            จบคอร์สแล้ว
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="secondary" className="text-xs">
-                                            ยังไม่ลงคอร์ส
-                                          </Badge>
                                         )}
-                                        {!student.isActive && (
-                                          <Badge variant="destructive" className="text-xs">ไม่ใช้งาน</Badge>
-                                        )}
+                                      </div>
+
+                                      {/* ขวา: ปุ่มแก้ไข/ลบ */}
+                                      <div className="flex items-center shrink-0">
                                         <Link href={`/parents/${parent.id}/students/${student.id}/edit`}>
                                           <Button size="sm" variant="ghost">
                                             <Edit className="h-4 w-4" />
