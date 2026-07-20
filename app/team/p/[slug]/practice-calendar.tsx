@@ -262,7 +262,8 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
                   !inMonth && 'bg-gray-50/60',
                   isPast ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-primary/5',
                   isToday && 'bg-amber-50/60',
-                  isSelected && 'bg-primary/10 ring-2 ring-inset ring-primary'
+                  // rounded-lg กันกรอบไฮไลต์โดนมุมโค้งของกล่องปฏิทิน (overflow-hidden) เฉือน
+                  isSelected && 'bg-primary/10 ring-2 ring-inset ring-primary rounded-lg'
                 )}
               >
                 <div className="flex items-center justify-between">
