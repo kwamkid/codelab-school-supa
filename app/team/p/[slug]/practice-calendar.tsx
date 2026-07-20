@@ -1,9 +1,11 @@
 'use client'
 
 // Practice scheduling calendar for parents (ported from codelab-team-scheduler).
-// Month grid: tap a day to propose a practice (kid + start/end time + note); each
-// proposed practice shows as a chip coloured by its approval status. Below the
-// grid, a list of this month's proposals. Tapping a chip opens its detail.
+// Month grid: tap days to SELECT them (multi-select, toggle) → an action bar
+// appears → "เสนอซ้อม" opens one form (kid + start/end time + note) that submits
+// one practice request per selected day. Each proposed practice shows as a chip
+// coloured by its approval status. Below the grid, a list of this month's
+// proposals. Tapping a chip opens its detail.
 
 import { useState, useMemo } from 'react'
 import {
@@ -18,7 +20,6 @@ import {
   isSameMonth,
   isBefore,
   startOfDay,
-  differenceInCalendarDays,
   format,
 } from 'date-fns'
 import { th } from 'date-fns/locale'
@@ -94,8 +95,9 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
     note: '',
   })
 
-  // Modals
-  const [proposeDate, setProposeDate] = useState<string | null>(null) // YYYY-MM-DD
+  // จิ้มเลือกหลายวันบนปฏิทินก่อน แล้วค่อยกด "เสนอซ้อม" เปิดฟอร์มครั้งเดียว
+  const [selectedDates, setSelectedDates] = useState<string[]>([]) // YYYY-MM-DD[]
+  const [proposeOpen, setProposeOpen] = useState(false)
   const [viewing, setViewing] = useState<Practice | null>(null)
 
   const kidName = (id: string) => kids.find((k) => k.id === id)?.nickname || '-'
@@ -134,16 +136,21 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
     [visible, currentDate]
   )
 
-  const openPropose = (date: Date) => {
+  // จิ้มวัน = toggle เลือก/ไม่เลือก (เลือกได้หลายวัน ข้ามสัปดาห์/ข้ามเดือนก็ได้)
+  const toggleDay = (date: Date) => {
     // Don't allow proposing on past days.
     if (isBefore(date, today)) return
-    setProposeDate(format(date, 'yyyy-MM-dd'))
+    const key = format(date, 'yyyy-MM-dd')
+    setSelectedDates((prev) =>
+      prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key].sort()
+    )
   }
 
   const handleCreated = (created: Practice[], remember: LastUsed) => {
     setPractices((prev) => [...prev, ...created])
     setLastUsed(remember)
-    setProposeDate(null)
+    setProposeOpen(false)
+    setSelectedDates([])
   }
 
   const handleUpdated = (updated: Practice) => {
@@ -206,6 +213,21 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
         </div>
       )}
 
+      {/* แถบสรุปวันที่จิ้มเลือก — โผล่เมื่อเลือกอย่างน้อย 1 วัน */}
+      {selectedDates.length > 0 && (
+        <div className="sticky top-2 z-30 flex items-center gap-2 rounded-xl border-2 border-primary/40 bg-white p-2 shadow-sm">
+          <p className="flex-1 pl-1 text-sm font-medium">
+            เลือกแล้ว {selectedDates.length} วัน
+          </p>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedDates([])}>
+            ล้าง
+          </Button>
+          <Button size="sm" onClick={() => setProposeOpen(true)}>
+            เสนอซ้อม
+          </Button>
+        </div>
+      )}
+
       {/* Month grid */}
       <div className="bg-white rounded-xl border overflow-hidden">
         <div className="grid grid-cols-7 bg-gray-50">
@@ -227,18 +249,20 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
             const isWeekend = day.getDay() === 0 || day.getDay() === 6
             const isLastRow = idx >= days.length - 7
             const isLastCol = (idx + 1) % 7 === 0
+            const isSelected = selectedDates.includes(format(day, 'yyyy-MM-dd'))
 
             return (
               <div
                 key={idx}
-                onClick={() => openPropose(day)}
+                onClick={() => toggleDay(day)}
                 className={cn(
                   'min-h-[64px] p-1 transition-colors',
                   !isLastRow && 'border-b',
                   !isLastCol && 'border-r',
                   !inMonth && 'bg-gray-50/60',
                   isPast ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-primary/5',
-                  isToday && 'bg-amber-50/60'
+                  isToday && 'bg-amber-50/60',
+                  isSelected && 'bg-primary/10 ring-2 ring-inset ring-primary'
                 )}
               >
                 <div className="flex items-center justify-between">
@@ -248,7 +272,8 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
                       !inMonth && 'text-gray-300',
                       inMonth && isPast && 'text-gray-400',
                       inMonth && isWeekend && !isPast && 'text-primary',
-                      isToday && 'bg-primary text-white'
+                      isToday && 'bg-primary text-white',
+                      isSelected && !isToday && 'bg-primary text-white'
                     )}
                   >
                     {format(day, 'd')}
@@ -327,12 +352,12 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
       </div>
 
       {/* Propose modal */}
-      {proposeDate && (
+      {proposeOpen && selectedDates.length > 0 && (
         <ProposeModal
           kids={kids}
-          date={proposeDate}
+          dates={selectedDates}
           defaults={lastUsed}
-          onClose={() => setProposeDate(null)}
+          onClose={() => setProposeOpen(false)}
           onSubmit={onSubmit}
           onCreated={handleCreated}
         />
@@ -358,14 +383,14 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
 
 function ProposeModal({
   kids,
-  date,
+  dates,
   defaults,
   onClose,
   onSubmit,
   onCreated,
 }: {
   kids: Kid[]
-  date: string
+  dates: string[] // YYYY-MM-DD, sorted — จิ้มเลือกจากปฏิทินมาแล้ว
   defaults: LastUsed
   onClose: () => void
   onSubmit: Props['onSubmit']
@@ -376,31 +401,17 @@ function ProposeModal({
   const [start, setStart] = useState(defaults.start || '09:00')
   const [end, setEnd] = useState(defaults.end || '12:00')
   const [note, setNote] = useState(defaults.note || '')
-  const [multiDay, setMultiDay] = useState(false)
-  const [endDate, setEndDate] = useState(date) // for the range
   const [submitting, setSubmitting] = useState(false)
 
-  // Days in the selected range (inclusive). 1 when single-day.
-  const daysCount = (() => {
-    if (!multiDay) return 1
-    const s = new Date(date + 'T00:00:00')
-    const e = new Date(endDate + 'T00:00:00')
-    const n = differenceInCalendarDays(e, s) + 1
-    return n > 0 ? n : 0
-  })()
+  const daysCount = dates.length
 
   const submit = async () => {
     if (submitting) return
     if (!kidId) return toast.error('เลือกเด็ก')
     if (start && end && end <= start) return toast.error('เวลาสิ้นสุดต้องหลังเวลาเริ่ม')
-    if (multiDay && daysCount < 1) return toast.error('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม')
 
     setSubmitting(true)
     try {
-      const dates: string[] = []
-      const startD = new Date(date + 'T00:00:00')
-      for (let i = 0; i < daysCount; i++) dates.push(format(addDays(startD, i), 'yyyy-MM-dd'))
-
       // Submit each day (one audit row per day). Collect the created rows.
       const created: Practice[] = []
       for (const d of dates) {
@@ -426,7 +437,11 @@ function ProposeModal({
   return (
     <ModalShell
       title="เสนอวันซ้อม"
-      subtitle={format(new Date(date + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })}
+      subtitle={
+        daysCount === 1
+          ? format(new Date(dates[0] + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })
+          : `${daysCount} วัน (เวลาเดียวกันทุกวัน)`
+      }
       onClose={onClose}
     >
       <div className="space-y-4">
@@ -456,38 +471,20 @@ function ProposeModal({
           />
         </div>
 
-        {/* Multi-day range: propose the same time across several days at once. */}
-        <div className="rounded-lg border p-3 space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={multiDay}
-              onChange={(e) => {
-                setMultiDay(e.target.checked)
-                if (e.target.checked && endDate < date) setEndDate(date)
-              }}
-              className="h-4 w-4 accent-primary"
-            />
-            <span className="text-sm font-medium">ลงหลายวันรวด (เวลาเดียวกัน)</span>
-          </label>
-          {multiDay && (
-            <div className="space-y-1">
-              <Label htmlFor="pc_enddate" className="text-xs text-gray-500">
-                ถึงวันที่
-              </Label>
-              <Input
-                id="pc_enddate"
-                type="date"
-                value={endDate}
-                min={date}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-              {daysCount > 1 && (
-                <p className="text-xs text-primary">จะเสนอ {daysCount} วัน (แต่ละวันเป็นคำขอแยกกัน)</p>
-              )}
+        {/* วันที่เลือกมาจากปฏิทิน — โชว์ให้ทวนก่อนส่ง */}
+        {daysCount > 1 && (
+          <div className="rounded-lg border p-3 space-y-1.5">
+            <p className="text-sm font-medium">วันที่เลือก ({daysCount} วัน)</p>
+            <div className="flex flex-wrap gap-1.5">
+              {dates.map((d) => (
+                <Badge key={d} variant="outline" className="text-xs">
+                  {format(new Date(d + 'T00:00:00'), 'EEE d MMM', { locale: th })}
+                </Badge>
+              ))}
             </div>
-          )}
-        </div>
+            <p className="text-xs text-gray-500">แต่ละวันเป็นคำขอแยกกัน</p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="pc_note">หมายเหตุ (ไม่บังคับ)</Label>
