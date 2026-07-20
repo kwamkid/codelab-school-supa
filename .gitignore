@@ -66,6 +66,7 @@ tbc.md
 # Working notes (local only)
 learning.md
 rules.md
+devplan.md
 
 # Local DB backups (contain private data — never commit)
 backup/
