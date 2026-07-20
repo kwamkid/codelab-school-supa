@@ -39,6 +39,7 @@ interface Kid { id: string; nickname: string }
 export interface Practice {
   id: string
   kid_id: string
+  parent_id: string | null // null/ไม่ตรง viewer = ของบ้านอื่นหรือแอดมินเพิ่ม (ดูได้ แก้ไม่ได้)
   practice_date: string // YYYY-MM-DD
   start_time: string | null
   end_time: string | null
@@ -49,6 +50,7 @@ export interface Practice {
 interface Props {
   kids: Kid[]
   initialPractices: Practice[]
+  viewerParentId: string | null
   onSubmit: (body: {
     kid_id: string
     practice_date: string
@@ -82,7 +84,7 @@ interface LastUsed {
   note: string
 }
 
-export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onDelete }: Props) {
+export function PracticeCalendar({ kids, initialPractices, viewerParentId, onSubmit, onEdit, onDelete }: Props) {
   const [practices, setPractices] = useState<Practice[]>(initialPractices)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [kidFilter, setKidFilter] = useState<string>('all') // kid id
@@ -369,6 +371,7 @@ export function PracticeCalendar({ kids, initialPractices, onSubmit, onEdit, onD
         <DetailModal
           practice={viewing}
           kidName={kidName(viewing.kid_id)}
+          isMine={!!viewerParentId && viewing.parent_id === viewerParentId}
           onClose={() => setViewing(null)}
           onEdit={onEdit}
           onDelete={onDelete}
@@ -510,6 +513,7 @@ function ProposeModal({
 function DetailModal({
   practice,
   kidName,
+  isMine,
   onClose,
   onEdit,
   onDelete,
@@ -518,13 +522,14 @@ function DetailModal({
 }: {
   practice: Practice
   kidName: string
+  isMine: boolean // ของบ้านอื่น/แอดมินเพิ่ม = ดูได้อย่างเดียว (server ก็กัน ownership อีกชั้น)
   onClose: () => void
   onEdit: Props['onEdit']
   onDelete: Props['onDelete']
   onUpdated: (p: Practice) => void
   onDeleted: (id: string) => void
 }) {
-  const editable = practice.status === 'proposed'
+  const editable = practice.status === 'proposed' && isMine
   const [mode, setMode] = useState<'view' | 'edit'>('view')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [start, setStart] = useState(hhmm(practice.start_time) || '09:00')

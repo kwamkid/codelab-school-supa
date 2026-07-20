@@ -16,6 +16,7 @@ interface SummaryData {
   team: { id: string; team_number: string; name: string | null; level: string }
   kids: { id: string; nickname: string }[]
   parentDisplayName: string | null
+  parentId: string | null
   practices: any[]
 }
 
@@ -63,6 +64,7 @@ function ProposePracticeInner({ slug }: { slug: string }) {
           <PracticeCalendar
             kids={data.kids}
             initialPractices={data.practices}
+            viewerParentId={data.parentId}
             onSubmit={submit}
             onEdit={editPractice}
             onDelete={deletePractice}

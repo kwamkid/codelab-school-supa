@@ -58,14 +58,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     }
 
     if (kind === 'practice') {
+      // ทั้งทีมเห็นตารางซ้อมร่วมกัน (ผู้ปกครองคนอื่น + ที่แอดมินเพิ่ม) — เดิมกรอง
+      // parent_id ทำให้ "อีกบ้านกรอกแล้วแต่ปฏิทินเราว่าง". แก้/ลบยังทำได้เฉพาะ
+      // ของตัวเอง (PATCH/DELETE เช็ค ownership ฝั่ง server อยู่แล้ว) — ส่ง
+      // parentId กลับไปให้ UI ซ่อนปุ่มของแถวที่ไม่ใช่ของเรา
       const { data: practices } = await db
         .from('practices')
         .select('*')
         .eq('team_id', team.id)
-        .eq('parent_id', parent.id)
         .order('practice_date', { ascending: false })
         .order('created_at', { ascending: false })
-      return NextResponse.json({ ...base, practices: practices || [] })
+      return NextResponse.json({ ...base, parentId: parent.id, practices: practices || [] })
     }
 
     // kind === 'event': events whose event_levels include this team's level.
