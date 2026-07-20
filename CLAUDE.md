@@ -167,6 +167,9 @@ types/
 - Super admin can edit all class fields regardless of status (`getEditableFields(classData, isSuperAdmin)`)
 - When super admin changes schedule fields → `regenerateClassSchedules()` auto-regenerates future schedules
 - Rooms use soft delete (`is_active = false`), never hard delete
+- Class **names are NOT unique** — cron `update-class-status` appends ` (จบแล้ว)` to the name when marking a class completed (idempotent; 204 old classes backfilled 2026-07-20, originals in DB table `backup_class_names_20260719`)
+- "ลายกคลาส" (shift) records `classes.last_shift_date` → class detail shows an amber banner + "ยกเลิกการเลื่อน" (`undoShiftClassFromSession`) valid until that date passes or a shifted session gets checked; regenerates from the shift date inclusive so original dates come back exactly
+- Teacher avatars resolve via RPCs `get_active_teachers_with_avatar` / `get_teacher_with_avatar` (profile_image → linked admin_user's Google avatar) — a plain `.from('teachers')` read has empty profile_image for everyone; `getTeachers`/`getActiveTeachers`/`getTeacher` all use the RPCs
 - Dashboard uses RPC `get_daily_timetable(p_date, p_branch_id)` for single-query data loading
 - Do NOT change existing `.toISOString()` patterns in services — they work correctly with the current data flow
 
@@ -224,6 +227,14 @@ types/
 - **Notification logs view = Reports menu → "Notification Logs" (`/reports/notification-logs`)**, NOT under Settings.
 - LIFF parent "Teacher Feedback" page `/liff/feedback` reads via server route `POST /api/liff/feedback` (service role, avoids LIFF RLS issues), shows feedback text + photos. `lib/services/feedback.ts` was rewritten Firebase→Supabase.
 
+## Multi-recipient LINE Noti (พ่อ+แม่) + Secondary LIFF Accounts (Jul 2026)
+- ตาราง `parent_line_recipients`: ผู้รับ LINE เพิ่มเติมของครอบครัว (invite token → ตอบรับ). `parents.line_user_id` ยังเป็นผู้รับหลัก. RLS service-role only, whitelisted ใน ALLOWED_TABLES.
+- **กติกา: sender LINE ตัวใหม่ทุกตัวต้อง fan-out ผ่าน `getParentLineIds(parentId, primaryLineId)`** (`lib/supabase/services/line-notifications.ts`) — ห้ามส่งหา `parents.line_user_id` ตรง ๆ. Fan-out แล้ว: class-reminder (cron+RPC), makeup, feedback (ผ่าน `line-queue.ts` — สร้าง payload เองไม่ได้ใช้ sendFeedbackNotification), schedule-change, payment-reminder. Trial/event ส่งหาคนทำรายการคนเดียว (by design). หมายเหตุ: `sendPaymentReminder`/`sendScheduleChangeNotification` ยังไม่มี caller (เขียนเตรียมไว้ ไม่เคยส่งจริง). Log แยกรายผู้รับใน notification_logs (คนที่ 2+ ติดป้าย "ผู้รับเพิ่มเติม").
+- เชิญ: LIFF โปรไฟล์ (shareTargetPicker → line.me/R/share → clipboard) หรือหน้าแอดมินผู้ปกครอง (`components/parents/line-recipients-card.tsx` — copy link + QR; ปุ่มแชร์ desktop ใช้ไม่ได้ ถูกถอดแล้ว). ตอบรับผ่าน `/liff?recipientInvite=<token>` — หน้า home ต้อง accept ให้เสร็จ**ก่อน**โหลดข้อมูล (เคยแข่งกันแล้วแว้บ "ยังไม่ได้ลงทะเบียน"), กดลิงก์ซ้ำ = เข้าแอปเงียบ ๆ (ลิงก์คือทางเข้าเดียวของผู้ถูกเชิญ).
+- **Account รอง** ใช้ portal ได้เต็ม (ดูตาราง/feedback/แจ้งลา) ผ่าน `resolveFamilyLineId()`/`getParentByLine()` fallback ใน `liff-data.ts` — RPC เดิมไม่ถูกแก้. โปรไฟล์ read-only (`viewerIsSecondary` จาก `/api/liff/profile`): ซ่อนแก้ไข/เพิ่มนักเรียน/จัดการผู้รับ. จัดการผู้รับ = account หลัก + แอดมินเท่านั้น.
+- **LINE push ไม่ถึงคนที่ยังไม่เพิ่มเพื่อน OA** — หน้า home มีแบนเนอร์ชวนแอด (`liff.getFriendship()` + `/api/liff/oa-info` ดึง add-friend URL จาก bot/info, cache 1 ชม.).
+- **LIFF id ต้องมาจาก `lib/line/liff-id.ts`** (env `NEXT_PUBLIC_LIFF_ID` ไม่ได้ตั้งทั้ง local/Vercel — fallback hardcode `2007575627-GmKBZJdo`) — สร้าง URL จาก env ตรง ๆ เคยได้ลิงก์เชิญพัง `liff.line.me/?...` มาแล้ว.
+
 ## Auth / Login
 - **Google-only login.** Email/password form is hidden behind `SHOW_PASSWORD_LOGIN = false` in `app/(public)/login/page.tsx` (flip to re-enable). To fully disable, also turn off Email provider in Supabase Auth.
 - `useSupabaseAuth`: `signInWithGoogle` (PKCE, redirectTo `/login`), membership guard `enforceAccess` signs out + bounces non-members/inactive. Invite flow at `/invite/[token]`.
@@ -234,13 +245,16 @@ types/
 - Deleted: `lib/services/line-notifications.ts` (dead Firebase). The working notifier is `lib/supabase/services/line-notifications.ts` (server-side, `createServiceClient`); client code must enqueue/use API routes, not import it directly.
 
 ## Dashboard Timetable (Time×Room grid)
+- Dashboard also shows upcoming-birthday alerts (RPC `get_upcoming_birthdays`, migration `20260718_upcoming_birthdays_rpc`).
 - `components/dashboard/daily-timetable.tsx` — full-width table (`w-full`, room cols `min-w-[150px]`); each cell: subject + `(sessionNumber/totalSessions)` inline, de-emphasised class code, teacher avatar (2-char fallback). makeup/trial show student name in the count slot. Dark-mode variants added.
 - `components/dashboard/class-detail-dialog.tsx` — compact date `formatThaiShortDate` ("6 มิ.ย. 69 HH:MM - HH:MM"); change teacher in-place (`change-teacher-dialog.tsx` exports `ChangeTeacherPanel`): per-session via `actualTeacherId` (`updateClassSchedule`) or whole-class via `changeClassResources` from this session onward; warns (not blocks) on teacher conflict via `checkAvailability`.
 
 ## Shared UI conventions
 - `components/ui/tooltip.tsx` — Radix tooltip. Use `<Tooltip label="...">{trigger}</Tooltip>` for ALL hover tooltips (NOT html `title`). `TooltipProvider` is in root `app/layout.tsx`. Pass `label=""` to render children with no tooltip (used for sidebar nav: tooltip only when collapsed). Trigger must forward ref — wrap non-forwarding components (e.g. `MenuLink`) in a `<span>`.
 - `Button` size `sm` is `text-sm` (default size stays `text-base`).
-- `DateRangePicker` (`mode="single"`) supports `withStepper` → `‹ [picker] ›` prev/next-day buttons.
+- `DateRangePicker` (`mode="single"`) supports `withStepper` → `‹ [picker] ›` prev/next-day buttons; `mode="multiple"` = multi-date selection (used by VEX add-practice).
+- `StatusFilterTabs` — shared status-card filter row (ชำระแล้ว/รอชำระ/ยกเลิก/ทั้งหมด style); trial, makeup, and VEX practice pages use it — don't hand-roll status cards.
+- `AutocompleteInput` supports `clearOnSelect` (multi-pick mode: picking clears the input, keeps focus for the next search) + `freeInput={false}` to only accept dropdown picks.
 - Sidebar (`app/(admin)/layout.tsx`): desktop-collapsible to an icon rail (`sidebarCollapsed`, persisted in localStorage); toggle button lives in the top bar.
 
 ## LIFF Parent Portal (Jun 2026 redesign)
@@ -254,3 +268,10 @@ Bottom-tab mobile app for parents. Lives in route group `app/liff/(portal)/` (UR
 - **Client cache** `lib/line/liff-cache.ts`: in-memory (module scope) so switching tabs shows last data instantly then revalidates silently — pages init state from cache and only show the loader when there's no data yet (never `setLoading(true)` on revalidate).
 - **Conventions:** never show class **codes** to parents — show `subjectName` (class `name` is the code, e.g. `VEXIQ1-2026MAY-SUN-MOR2`). Student name → shared `components/ui/student-badge.tsx`. One full-screen loader everywhere: `Loading`/`PageLoading` (logo + "กำลังโหลด...", size `lg`, `z-[60]` so it covers the bottom nav). Parent name is `display_name` (editable) vs `line_display_name` (real LINE name) — shown separately on profile.
 - **Gotchas:** `enrollments` has TWO FKs to `classes` (`class_id` + `transferred_from`) → PostgREST `classes(*)` embed is ambiguous, must hint `classes!enrollments_class_id_fkey(*)`. Light theme had `--secondary/--muted/--accent` set to dark navy → outline/ghost buttons flashed dark on press; fixed with a scoped `.liff-theme` override (in `globals.css`, applied on `app/liff/layout.tsx`) — also softens borders for a frame-light look. Marking a session "present" auto-removes its makeup (present = attended), so the dashboard makeup alert is data-driven (0 → hidden).
+
+## VEX Team Module
+- Admin `/vexteam` — sidebar submenu ทีม / การแข่งขัน (`/vexteam/events`) / ตารางซ้อม (`/vexteam/practices`), role super_admin+branch_admin, branch-scoped. Badge คำขอซ้อมค้างอนุมัติ poll `/api/admin/vex/practices?status=proposed` ทุก 2 นาที (+ event `vex-practices-changed`).
+- ข้อมูลอยู่ใน **Postgres schema แยก `vex.*`** (ไม่ใช่ public) — types/labels ที่ `lib/vex/types.ts`, levels: iq_elem/iq_ms/v5_ms/v5_hs (v5_uni ยังอยู่ใน DB enum แต่ตัดจาก UI). Helpers ใน `lib/vex/`: api, audit (vex.audit_log), notify (LINE), tokens, public-team, team-session, liff-context, event-timeline. API routes ใต้ `app/api/admin/vex/*` (staff) + public team routes.
+- **Team portal `/team` = LIFF app ตัวที่ 2** (`NEXT_PUBLIC_VEX_LIFF_ID` = `2007575627-H1S0B2mi`, endpoint `/team`) — `app/team/` มี layout + LiffUpgradeGate (`?li=1` marker) + line-gate + team-bottom-nav; `externalBrowserLogin=false` (ดู memory: liff-login-redirect-traps). ลิงก์ทีม resolve ด้วย **secret token เท่านั้น** — team number ใน slug เป็นแค่ cosmetic (เปลี่ยนชื่อทีมแล้วลิงก์เก่าไม่พัง).
+- ตารางซ้อม: ผู้ปกครองเสนอเวลาจากหน้า team → สถานะ proposed → แอดมิน อนุมัติ/แก้เวลา+อนุมัติ ("บันทึก + อนุมัติ") → LINE noti; แอดมินเพิ่มซ้อมเอง = auto-approved (`add-practice-dialog.tsx` — ค้นเด็ก, multi-date, ทั้งทีม). การแข่งขันมี RSVP → admin roster page (ทีม×นักเรียน matrix + CSV export).
+- รายงาน `/reports/vex-team` — โรงเรียน/อายุ/คอร์สที่เคยเรียนของเด็กในทีม, single RPC (migration `20260718_vex_team_report_rpc`).

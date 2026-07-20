@@ -5,7 +5,7 @@
 
 import { createServiceClient } from '../server';
 import { getLineSettings } from './line-settings';
-import { sendMakeupNotification } from './line-notifications';
+import { sendMakeupNotification, getParentLineIds } from './line-notifications';
 import { logNotification } from '@/lib/services/notification-logger';
 
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
@@ -59,20 +59,29 @@ export async function processLineQueue(limit = 100): Promise<ProcessResult> {
           if (!built) {
             outcome = 'noop';
           } else {
-            outcome = await pushLine(token, built.to, built.messages);
-            await logNotification({
-              type: 'feedback',
-              recipientType: 'parent',
-              lineUserId: built.to,
-              studentId: built.meta.studentId,
-              studentName: built.meta.studentName,
-              classId: built.meta.classId,
-              className: built.meta.className,
-              scheduleId: built.meta.scheduleId,
-              messagePreview: built.meta.messagePreview,
-              status: outcome === 'sent' ? 'success' : 'failed',
-              errorMessage: outcome === 'sent' ? undefined : outcome.error,
-            });
+            // fan-out: ผู้รับหลัก + ผู้รับเพิ่มเติมของครอบครัว (log แยกรายคน)
+            const lineIds = await getParentLineIds(undefined, built.to);
+            let anySent = false;
+            let lastError = 'no recipients';
+            for (const to of lineIds) {
+              const result = await pushLine(token, to, built.messages);
+              if (result === 'sent') anySent = true;
+              else lastError = result.error;
+              await logNotification({
+                type: 'feedback',
+                recipientType: 'parent',
+                lineUserId: to,
+                studentId: built.meta.studentId,
+                studentName: built.meta.studentName,
+                classId: built.meta.classId,
+                className: built.meta.className,
+                scheduleId: built.meta.scheduleId,
+                messagePreview: built.meta.messagePreview,
+                status: result === 'sent' ? 'success' : 'failed',
+                errorMessage: result === 'sent' ? undefined : result.error,
+              });
+            }
+            outcome = anySent ? 'sent' : { error: lastError };
           }
         }
       } else if (row.type === 'makeup') {

@@ -1829,8 +1829,33 @@ export async function shiftClassFromSession(
   console.log(
     `[shiftClassFromSession] class=${classId} cancelled ${target ? 1 : 0}, rebooked ${result.created}, conflicts ${conflicts}`
   );
+
+  // แจ้งผู้ปกครองทุกคนในคลาสว่าตารางเลื่อน (fire-and-forget — noti ล่มไม่บล็อกการเลื่อน)
+  notifyScheduleChange(classId, 'rescheduled', sessionDate, rows[0]?.date);
+
   void reason; void by; // reason/by reserved for future audit note
   return { cancelled: 1, created: result.created, newEndDate: result.newEndDate, conflicts };
+}
+
+// ยิงแจ้งเตือนเปลี่ยนตารางแบบไม่รอผล — ผ่าน API (ส่ง LINE ได้เฉพาะ server)
+function notifyScheduleChange(
+  classId: string,
+  changeType: 'cancelled' | 'rescheduled',
+  originalDate: string,
+  newDate?: string
+) {
+  (async () => {
+    try {
+      const { authFetch } = await import('@/lib/auth-fetch');
+      await authFetch('/api/admin/notifications/schedule-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classId, changeType, originalDate, newDate }),
+      });
+    } catch (e) {
+      console.warn('[notifyScheduleChange] failed (non-fatal):', e);
+    }
+  })();
 }
 
 // Undo the most recent "ลายกคลาส" shift: regenerate the remaining sessions from
@@ -1854,6 +1879,13 @@ export async function undoShiftClassFromSession(
     (s) => s.status === 'completed' && getLocalDateString(s.sessionDate) >= shiftDate
   );
   if (touched) throw new Error('มีคาบหลังวันเลื่อนถูกเช็คชื่อไปแล้ว ไม่สามารถยกเลิกได้');
+
+  // วันที่คลาสถูกเลื่อนไปไว้ (คาบ scheduled แรกตั้งแต่ shiftDate) — ใช้บอกผู้ปกครองว่า
+  // "วันเดิม" ของการเลื่อนกลับคือวันไหน
+  const movedFirstDate = schedules
+    .filter((s) => s.status === 'scheduled' && getLocalDateString(s.sessionDate) >= shiftDate)
+    .map((s) => getLocalDateString(s.sessionDate))
+    .sort()[0];
 
   // keptBefore = genFrom = shiftDate → the cancelled session itself is re-created.
   const rows = await computeDefaultRows(cls, schedules, shiftDate, shiftDate);
@@ -1889,6 +1921,12 @@ export async function undoShiftClassFromSession(
   console.log(
     `[undoShiftClassFromSession] class=${classId} restored from ${shiftDate}, rebooked ${result.created}, conflicts ${conflicts}`
   );
+
+  // แจ้งผู้ปกครอง: ตารางเลื่อนกลับมาเรียนวันเดิม
+  if (movedFirstDate && movedFirstDate !== shiftDate) {
+    notifyScheduleChange(classId, 'rescheduled', movedFirstDate, shiftDate);
+  }
+
   return { restoredDate: shiftDate, created: result.created, newEndDate: result.newEndDate, conflicts };
 }
 

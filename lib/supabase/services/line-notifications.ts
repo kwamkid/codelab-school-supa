@@ -722,13 +722,16 @@ export async function sendScheduleChangeNotification(
   }
 }
 
-// แจ้งเตือนการชำระเงิน
+// แจ้งเตือนการชำระเงิน — dueDate ไม่บังคับ (ระบบยังไม่มี "กำหนดชำระ" ต่อ enrollment;
+// cron รายสัปดาห์ส่งแบบยอดค้างอย่างเดียว). refs ใช้ผูก log กับ student/class
+// เพื่อให้ cron เช็คกันส่งซ้ำในสัปดาห์เดียวกันได้
 export async function sendPaymentReminder(
   parentLineId: string,
   studentName: string,
   className: string,
   amount: number,
-  dueDate: Date
+  dueDate?: Date,
+  refs?: { studentId?: string; classId?: string }
 ): Promise<boolean> {
   try {
     console.log(`\n[sendPaymentReminder] Sending to parent...`)
@@ -737,9 +740,9 @@ export async function sendPaymentReminder(
       `💰 แจ้งเตือนการชำระเงิน\n\n` +
       `นักเรียน: ${studentName}\n` +
       `คลาส: ${className}\n` +
-      `จำนวนเงิน: ${amount.toLocaleString()} บาท\n` +
-      `กำหนดชำระ: ${formatDate(dueDate, 'long')}\n\n` +
-      `กรุณาชำระเงินภายในวันที่กำหนด`
+      `ยอดค้างชำระ: ${amount.toLocaleString()} บาท\n` +
+      (dueDate ? `กำหนดชำระ: ${formatDate(dueDate, 'long')}\n` : '') +
+      `\nกรุณาติดต่อสาขาเพื่อชำระค่าเรียน หากชำระแล้วต้องขออภัยและไม่ต้องดำเนินการใด ๆ ครับ`
 
     // ส่งถึงผู้รับทุกคนของครอบครัว + log รายคน
     const lineIds = await getParentLineIds(undefined, parentLineId)
@@ -753,7 +756,9 @@ export async function sendPaymentReminder(
         recipientType: 'parent',
         recipientName: `${studentName}'s parent${i > 0 ? ' (ผู้รับเพิ่มเติม)' : ''}`,
         lineUserId: lineId,
+        studentId: refs?.studentId,
         studentName: studentName,
+        classId: refs?.classId,
         className: className,
         messagePreview: message,
         status: result.success ? 'success' : 'failed',

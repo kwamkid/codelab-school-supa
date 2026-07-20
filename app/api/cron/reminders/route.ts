@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { sendClassReminderFromRow, sendMakeupNotification, sendTrialConfirmation, type ClassReminderRow } from '@/lib/supabase/services/line-notifications'
+import { sendClassReminderFromRow, sendMakeupNotification, sendTrialConfirmation, sendPaymentReminder, type ClassReminderRow } from '@/lib/supabase/services/line-notifications'
 import { getEventsForReminder, sendEventReminder } from '@/lib/supabase/services/events'
 
 export const dynamic = 'force-dynamic'
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
       makeupReminders: 0,
       trialReminders: 0,
       eventReminders: 0,
+      paymentReminders: 0,
       errors: [] as string[]
     }
 
@@ -203,6 +204,83 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
+    // 5. Payment Reminders (ทวงค่าเรียน) — สัปดาห์ละครั้ง เฉพาะวันจันทร์ (เวลาไทย)
+    // ============================================
+    console.log('\n--- Part 5: Payment Reminders (weekly, Monday) ---')
+
+    const bkkWeekday = now.toLocaleDateString('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' })
+    if (bkkWeekday !== 'Mon') {
+      console.log(`Not Monday in Bangkok (${bkkWeekday}) — skip payment reminders`)
+    } else {
+      // enrollment ที่ยังเรียนอยู่ + ค้างชำระ ของคลาสที่ยังไม่จบ
+      const { data: unpaid, error: unpaidError } = await supabase
+        .from('enrollments')
+        .select(`
+          id, final_price, paid_amount, payment_status,
+          students (id, name, nickname, parents (id, line_user_id)),
+          classes (id, name, status, subjects (name))
+        `)
+        .eq('status', 'active')
+        .in('payment_status', ['pending', 'partial'])
+
+      if (unpaidError) {
+        console.error('Error fetching unpaid enrollments:', unpaidError)
+        results.errors.push(`Payment reminder query error: ${unpaidError.message}`)
+      }
+
+      // กันส่งซ้ำ: ข้ามถ้าเพิ่งทวง enrollment นี้ไปใน 6 วันที่ผ่านมา
+      const sixDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString()
+
+      console.log(`Found ${unpaid?.length || 0} unpaid active enrollments`)
+
+      for (const enr of (unpaid || []) as any[]) {
+        try {
+          const cls = enr.classes
+          const student = enr.students
+          const parent = student?.parents
+          if (!cls || !['published', 'started'].includes(cls.status)) continue
+          if (!parent?.line_user_id) continue
+
+          const outstanding = Number(enr.final_price || 0) - Number(enr.paid_amount || 0)
+          if (outstanding <= 0) continue
+
+          const { count } = await supabase
+            .from('notification_logs')
+            .select('id', { count: 'exact', head: true })
+            .eq('type', 'payment-reminder')
+            .eq('student_id', student.id)
+            .eq('class_id', cls.id)
+            .gte('created_at', sixDaysAgo)
+          if ((count || 0) > 0) {
+            console.log(`  - Skip (already reminded this week): ${student.nickname || student.name}`)
+            continue
+          }
+
+          // ผู้ปกครองไม่ควรเห็นรหัสคลาส → ใช้ชื่อวิชา
+          const displayName = (cls.subjects as any)?.name || cls.name
+          const success = await sendPaymentReminder(
+            parent.line_user_id,
+            student.nickname || student.name,
+            displayName,
+            outstanding,
+            undefined,
+            { studentId: student.id, classId: cls.id }
+          )
+          if (success) {
+            results.paymentReminders++
+            totalSent++
+            console.log(`  ✓ Sent payment reminder: ${student.nickname || student.name} ค้าง ${outstanding}`)
+          } else {
+            console.log(`  ✗ Failed payment reminder for student ${student.id}`)
+          }
+        } catch (error) {
+          console.error('  ! Payment reminder error:', error)
+          results.errors.push(`Payment reminder error: ${error}`)
+        }
+      }
+    }
+
+    // ============================================
     // Summary
     // ============================================
     console.log('\n=== Combined reminder cron job completed ===')
@@ -212,6 +290,7 @@ export async function GET(request: NextRequest) {
       makeupReminders: results.makeupReminders,
       trialReminders: results.trialReminders,
       eventReminders: results.eventReminders,
+      paymentReminders: results.paymentReminders,
       errors: results.errors.length
     })
 
