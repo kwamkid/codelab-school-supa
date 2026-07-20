@@ -227,6 +227,9 @@ export async function getProfileData(lineUserId: string) {
     parent: data?.parent ?? null,
     students: data?.students ?? [],
     preferredBranch: data?.preferredBranch ?? null,
+    // account รอง (ผู้รับแจ้งเตือนที่ถูกเชิญ) — หน้า UI ใช้ซ่อนสิทธิ์จัดการ
+    // (แก้โปรไฟล์/เพิ่มนักเรียน/จัดการผู้รับ) และแสดงชื่อ LINE ของตัวเอง
+    viewerIsSecondary: familyLineId !== lineUserId,
   };
 }
 

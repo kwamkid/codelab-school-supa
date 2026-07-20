@@ -14,8 +14,8 @@ export async function POST(request: NextRequest) {
     const user = await resolveLiffUser(request, body);
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
-    const { hasParent, parent, students, preferredBranch } = await getProfileData(user.lineUserId);
-    return NextResponse.json({ success: true, hasParent, parent, students, preferredBranch });
+    const { hasParent, parent, students, preferredBranch, viewerIsSecondary } = await getProfileData(user.lineUserId);
+    return NextResponse.json({ success: true, hasParent, parent, students, preferredBranch, viewerIsSecondary });
   } catch (error: any) {
     console.error('[liff/profile] Error:', error);
     return NextResponse.json({ success: false, error: error?.message || 'failed' }, { status: 500 });

@@ -55,6 +55,8 @@ function ProfileContent() {
   const [parentId, setParentId] = useState<string | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [hasParent, setHasParent] = useState<boolean | null>(null)
+  // account รอง (ผู้รับแจ้งเตือนที่ถูกเชิญ) — ดูข้อมูลครอบครัวได้ แต่ไม่มีสิทธิ์จัดการ
+  const [isSecondary, setIsSecondary] = useState(false)
   
   // Delete confirmation state
   const [deleteStudentData, setDeleteStudentData] = useState<Student | null>(null)
@@ -182,7 +184,9 @@ function ProfileContent() {
         setHasParent(true)
         setPreferredBranch((data.preferredBranch as Branch) || null)
         setStudents((data.students || []) as Student[])
-        loadRecipients(lineUserId)
+        setIsSecondary(!!data.viewerIsSecondary)
+        // จัดการผู้รับแจ้งเตือนได้เฉพาะ account หลัก (API ก็กันไว้อีกชั้น)
+        if (!data.viewerIsSecondary) loadRecipients(lineUserId)
       } else {
         setHasParent(false)
       }
@@ -460,7 +464,7 @@ function ProfileContent() {
                 <User className="h-5 w-5" />
                 ข้อมูลผู้ปกครอง
               </CardTitle>
-              {parentId && (
+              {parentId && !isSecondary && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -473,14 +477,23 @@ function ProfileContent() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
+              {/* account รอง: บอกชัดว่ากำลังดูข้อมูลครอบครัวในฐานะผู้รับแจ้งเตือน */}
+              {isSecondary && (
+                <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-base text-blue-800">
+                  คุณ ({profile?.displayName || 'LINE นี้'}) เป็น<b>ผู้รับการแจ้งเตือน</b>ของครอบครัวนี้
+                  — ดูตารางเรียน/แจ้งลาได้ แต่แก้ไขข้อมูลไม่ได้
+                </div>
+              )}
               <div className="space-y-0.5">
-                <p className="text-sm text-muted-foreground">ชื่อ-นามสกุล</p>
+                <p className="text-sm text-muted-foreground">ชื่อ-นามสกุล{isSecondary ? ' (ผู้ปกครองหลัก)' : ''}</p>
                 <h3 className="font-semibold text-lg">
-                  {parentData?.displayName || <span className="text-red-500 text-base font-normal">ยังไม่ได้ระบุ — แตะแก้ไขเพื่อเพิ่ม</span>}
+                  {parentData?.displayName || (isSecondary
+                    ? <span className="text-muted-foreground text-base font-normal">ยังไม่ได้ระบุ</span>
+                    : <span className="text-red-500 text-base font-normal">ยังไม่ได้ระบุ — แตะแก้ไขเพื่อเพิ่ม</span>)}
                 </h3>
-                {(parentData?.lineDisplayName || profile?.displayName) && (
+                {(isSecondary ? profile?.displayName : (parentData?.lineDisplayName || profile?.displayName)) && (
                   <p className="text-base text-muted-foreground">
-                    ชื่อ LINE: {parentData?.lineDisplayName || profile?.displayName}
+                    ชื่อ LINE{isSecondary ? 'ของคุณ' : ''}: {isSecondary ? profile?.displayName : (parentData?.lineDisplayName || profile?.displayName)}
                   </p>
                 )}
               </div>
@@ -537,7 +550,8 @@ function ProfileContent() {
           </CardContent>
         </Card>
 
-        {/* ผู้รับแจ้งเตือน LINE เพิ่มเติม (พ่อ/แม่คนที่ 2) */}
+        {/* ผู้รับแจ้งเตือน LINE เพิ่มเติม (พ่อ/แม่คนที่ 2) — จัดการได้เฉพาะ account หลัก */}
+        {!isSecondary && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -648,6 +662,7 @@ function ProfileContent() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Students Card */}
         <Card className="border-0 shadow-sm">
@@ -657,7 +672,7 @@ function ProfileContent() {
                 <Users className="h-5 w-5" />
                 รายชื่อนักเรียน ({students.length} คน)
               </CardTitle>
-              {parentId && (
+              {parentId && !isSecondary && (
                 <Button
                   size="sm"
                   onClick={() => navigateTo(`/liff/profile/${parentId}/students/new`)}
@@ -713,6 +728,7 @@ function ProfileContent() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {!isSecondary && (
                         <Button
                           size="icon"
                           variant="ghost"
@@ -722,6 +738,8 @@ function ProfileContent() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
+                        )}
+                        {!isSecondary && (
                         <Button
                           size="icon"
                           variant="ghost"
@@ -731,6 +749,7 @@ function ProfileContent() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
+                        )}
                       </div>
                     </div>
                   </div>

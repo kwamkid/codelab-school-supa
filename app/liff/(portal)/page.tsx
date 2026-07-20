@@ -40,54 +40,61 @@ interface HomeSummary {
 
 function Dashboard() {
   const router = useRouter()
-  const { profile, isLoading: liffLoading } = useLiff()
+  const { liff, profile, isLoading: liffLoading } = useLiff()
   const cacheKey = profile?.userId ? `home:${profile.userId}` : null
   const cached = cacheKey ? getLiffCache<HomeSummary>(cacheKey) : undefined
   const [loading, setLoading] = useState(!cached)
   const [data, setData] = useState<HomeSummary | null>(cached ?? null)
   const [goingProfile, setGoingProfile] = useState(false)
-  const [inviteHandled, setInviteHandled] = useState(false)
 
-  // ตอบรับคำเชิญ "ผู้รับการแจ้งเตือนเพิ่มเติม" — ลิงก์เชิญเปิดมาที่หน้านี้พร้อม
-  // ?recipientInvite=<token> (บางเคส LIFF ห่อไว้ใน liff.state) ผู้กดลิงก์คือผู้รับใหม่
-  // ทำงานได้แม้ยังไม่ลงทะเบียนเป็นผู้ปกครองเอง
-  useEffect(() => {
-    if (liffLoading || !profile?.userId || inviteHandled) return
+  // token คำเชิญ "ผู้รับการแจ้งเตือนเพิ่มเติม" จากลิงก์เชิญ — อ่านครั้งเดียวตอน mount
+  // (บางเคส LIFF ห่อ query ไว้ใน liff.state)
+  const [inviteToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
     const params = new URLSearchParams(window.location.search)
     let token = params.get('recipientInvite')
     if (!token) {
       const state = params.get('liff.state')
       if (state) token = new URLSearchParams(state.replace(/^\?/, '')).get('recipientInvite')
     }
-    if (!token) return
-    setInviteHandled(true)
+    return token
+  })
+  // มีคำเชิญ → ต้องตอบรับให้เสร็จก่อนค่อยโหลดข้อมูล ไม่งั้นหน้าจะโหลดแข่งกันแล้ว
+  // แว้บเป็น "ยังไม่ได้ลงทะเบียน" ทั้งที่ตอบรับสำเร็จ (ต้อง refresh ถึงเห็นข้อมูลลูก)
+  const [invitePending, setInvitePending] = useState<boolean>(() => !!inviteToken)
+
+  // ตอบรับคำเชิญ — ผู้กดลิงก์คือผู้รับใหม่ ทำงานได้แม้ยังไม่ลงทะเบียนเป็นผู้ปกครองเอง
+  useEffect(() => {
+    if (!inviteToken || liffLoading || !profile?.userId) return
     ;(async () => {
       try {
         const res = await liffFetch('/api/liff/recipients', {
           lineUserId: profile.userId,
           action: 'accept',
-          token,
+          token: inviteToken,
           displayName: profile.displayName,
           pictureUrl: (profile as any).pictureUrl,
         })
-        toast.success(
-          res?.alreadyAccepted
-            ? 'คุณรับการแจ้งเตือนของครอบครัวนี้อยู่แล้ว'
-            : '🎉 ตอบรับสำเร็จ! การแจ้งเตือนของบุตรหลานจะส่งมาที่ LINE นี้ด้วย',
-          { duration: 6000 }
-        )
+        // กดลิงก์เดิมซ้ำ (ตอบรับไปแล้ว) = ผปค.ใช้ลิงก์เป็นทางเข้าแอป — พาเข้าหน้า
+        // ข้อมูลลูกเงียบ ๆ ไม่ต้องเด้งข้อความเหมือนทำอะไรผิด
+        if (!res?.alreadyAccepted) {
+          toast.success('🎉 ตอบรับสำเร็จ! การแจ้งเตือนของบุตรหลานจะส่งมาที่ LINE นี้ด้วย', { duration: 6000 })
+        }
       } catch (e: any) {
         toast.error(e?.message || 'ตอบรับคำเชิญไม่สำเร็จ', { duration: 6000 })
       } finally {
         const url = new URL(window.location.href)
         url.searchParams.delete('recipientInvite')
         window.history.replaceState({}, '', url.toString())
+        setInvitePending(false) // ปลดล็อกให้ effect โหลดข้อมูลทำงาน (เห็นข้อมูลลูกทันที ไม่ต้อง refresh)
       }
     })()
-  }, [liffLoading, profile, inviteHandled])
+    // ยิงครั้งเดียวต่อ token — profile.userId นิ่งแล้วตอน liffLoading จบ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteToken, liffLoading, profile?.userId])
 
   useEffect(() => {
-    if (liffLoading || !profile?.userId) return
+    if (liffLoading || !profile?.userId || invitePending) return
     let active = true
     ;(async () => {
       try {
@@ -105,9 +112,29 @@ function Dashboard() {
       }
     })()
     return () => { active = false }
-  }, [liffLoading, profile?.userId])
+  }, [liffLoading, profile?.userId, invitePending])
 
-  if (liffLoading || loading) return <Loading fullScreen size="lg" />
+  // ยังไม่ได้เพิ่มเพื่อน OA → LINE push ไม่ถึง — ชวนเพิ่มเพื่อน (โดยเฉพาะ account รอง
+  // ที่เข้ามาจากลิงก์เชิญ ยังไม่เคยแอด OA และไม่มี rich menu เป็นทางเข้า)
+  const [addFriendUrl, setAddFriendUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (liffLoading || invitePending || !data?.hasParent || !liff) return
+    let active = true
+    ;(async () => {
+      try {
+        const friendship = await (liff as any).getFriendship?.()
+        if (!friendship || friendship.friendFlag) return
+        const res = await fetch('/api/liff/oa-info')
+        const info = await res.json().catch(() => null)
+        if (active && info?.success && info.addFriendUrl) setAddFriendUrl(info.addFriendUrl)
+      } catch {
+        // getFriendship ใช้ได้เฉพาะเมื่อ channel ผูกกับ OA — ถ้าไม่ได้ก็ข้าม ไม่ต้องเด้งอะไร
+      }
+    })()
+    return () => { active = false }
+  }, [liffLoading, invitePending, data?.hasParent, liff])
+
+  if (liffLoading || loading || invitePending) return <Loading fullScreen size="lg" />
 
   // Logged in but not registered yet
   if (data && data.hasParent === false) {
@@ -158,6 +185,31 @@ function Dashboard() {
       </div>
 
       <div className="p-4 space-y-4">
+        {/* ยังไม่ได้เพิ่มเพื่อน OA → แจ้งเตือนทาง LINE จะส่งไม่ถึง */}
+        {addFriendUrl && (
+          <Card className="border-2 border-green-300 bg-green-50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-green-500 text-white shrink-0">
+                <MessageSquare className="h-6 w-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold">เพิ่มเพื่อน CodeLab School</p>
+                <p className="text-sm text-gray-600">เพื่อรับการแจ้งเตือนตารางเรียนทาง LINE</p>
+              </div>
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 shrink-0"
+                onClick={() => {
+                  if (liff?.openWindow) liff.openWindow({ url: addFriendUrl, external: true })
+                  else window.open(addFriendUrl, '_blank')
+                }}
+              >
+                เพิ่มเพื่อน
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Makeup alert */}
         {data && data.pendingMakeupCount > 0 && (
           <Card
