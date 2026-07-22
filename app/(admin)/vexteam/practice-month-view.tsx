@@ -4,7 +4,7 @@
 // and status-filtered by the parent). Each practice is a chip coloured by status;
 // tapping a day shows its list.
 
-import { useState, useMemo, type ReactNode } from 'react'
+import { useState, useMemo, useRef, type ReactNode } from 'react'
 import {
   startOfMonth,
   endOfMonth,
@@ -37,9 +37,9 @@ export interface CalendarPractice {
 }
 
 const STATUS_META: Record<PracticeStatus, { label: string; chip: string; dot: string }> = {
-  proposed: { label: 'รออนุมัติ', chip: 'bg-amber-100 text-amber-800 border-amber-200', dot: 'bg-amber-400' },
-  approved: { label: 'อนุมัติแล้ว', chip: 'bg-green-100 text-green-700 border-green-200', dot: 'bg-green-500' },
-  rejected: { label: 'ไม่อนุมัติ', chip: 'bg-red-100 text-red-600 border-red-200', dot: 'bg-red-400' },
+  proposed: { label: 'รออนุมัติ', chip: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-900', dot: 'bg-amber-400' },
+  approved: { label: 'อนุมัติแล้ว', chip: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-950/60 dark:text-green-300 dark:border-green-900', dot: 'bg-green-500' },
+  rejected: { label: 'ไม่อนุมัติ', chip: 'bg-red-100 text-red-600 border-red-200 dark:bg-red-950/60 dark:text-red-300 dark:border-red-900', dot: 'bg-red-400' },
 }
 const WEEKDAYS = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.']
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '')
@@ -57,6 +57,20 @@ function NamesPopover({
   content: ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  // ปิดแบบหน่วงเวลา + นับ hover บนตัว popover ด้วย — ถ้ากล่องเด้งขึ้นมาทับ
+  // ตำแหน่งเมาส์ เบราว์เซอร์จะยิง mouseleave ที่การ์ดทันที (อาการ "โชว์แว้บแล้วหาย")
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const openNow = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+    setOpen(true)
+  }
+  const scheduleClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => setOpen(false), 150)
+  }
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -69,8 +83,8 @@ function NamesPopover({
             e.stopPropagation()
             setOpen((v) => !v)
           }}
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
+          onMouseEnter={openNow}
+          onMouseLeave={scheduleClose}
         >
           {trigger}
         </div>
@@ -79,6 +93,8 @@ function NamesPopover({
         side="top"
         className="w-auto max-w-64 p-2.5 text-sm space-y-1"
         onClick={(e) => e.stopPropagation()}
+        onMouseEnter={openNow}
+        onMouseLeave={scheduleClose}
         // popover นี้เปิดจาก hover — ไม่ต้องย้าย focus เข้ากล่อง (กัน focus ring)
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
@@ -137,7 +153,7 @@ export function PracticeMonthView({
         <button
           type="button"
           onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-          className="h-9 w-9 inline-flex items-center justify-center rounded-md border bg-white text-gray-600 hover:bg-gray-50"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-md border bg-white text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
           aria-label="เดือนก่อนหน้า"
         >
           <ChevronLeft className="h-5 w-5" />
@@ -146,7 +162,7 @@ export function PracticeMonthView({
         <button
           type="button"
           onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-          className="h-9 w-9 inline-flex items-center justify-center rounded-md border bg-white text-gray-600 hover:bg-gray-50"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-md border bg-white text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
           aria-label="เดือนถัดไป"
         >
           <ChevronRight className="h-5 w-5" />
@@ -177,16 +193,18 @@ export function PracticeMonthView({
                   'min-h-[72px] p-1 transition-colors',
                   !isLastRow && 'border-b',
                   !isLastCol && 'border-r',
-                  !inMonth && 'bg-gray-50/60',
+                  // bg-gray-50/60 (opacity variant) ไม่โดน .dark override ใน globals →
+                  // ต้องใส่ dark: เอง ไม่งั้นเป็นก้อนเทาสว่างจ้าใน dark mode
+                  !inMonth && 'bg-gray-50/60 dark:bg-white/[0.04]',
                   items.length ? 'cursor-pointer hover:bg-primary/5' : '',
-                  isToday && 'bg-amber-50/60'
+                  isToday && 'bg-amber-50/60 dark:bg-amber-950/25'
                 )}
               >
                 <div className="flex items-center justify-between">
                   <span
                     className={cn(
                       'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full',
-                      !inMonth && 'text-gray-300',
+                      !inMonth && 'text-gray-300 dark:text-gray-600',
                       isToday && 'bg-primary text-white'
                     )}
                   >

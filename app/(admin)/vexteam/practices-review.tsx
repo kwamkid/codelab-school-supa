@@ -49,9 +49,9 @@ interface TeamOption {
 }
 
 const STATUS_META: Record<PracticeStatus, { label: string; chip: string }> = {
-  proposed: { label: 'รออนุมัติ', chip: 'bg-amber-100 text-amber-800' },
-  approved: { label: 'อนุมัติแล้ว', chip: 'bg-green-100 text-green-700' },
-  rejected: { label: 'ไม่อนุมัติ', chip: 'bg-red-100 text-red-600' },
+  proposed: { label: 'รออนุมัติ', chip: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' },
+  approved: { label: 'อนุมัติแล้ว', chip: 'bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300' },
+  rejected: { label: 'ไม่อนุมัติ', chip: 'bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-300' },
 }
 
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
