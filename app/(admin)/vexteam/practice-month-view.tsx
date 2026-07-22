@@ -79,6 +79,8 @@ function NamesPopover({
         side="top"
         className="w-auto max-w-64 p-2.5 text-sm space-y-1"
         onClick={(e) => e.stopPropagation()}
+        // popover นี้เปิดจาก hover — ไม่ต้องย้าย focus เข้ากล่อง (กัน focus ring)
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {content}
       </PopoverContent>
