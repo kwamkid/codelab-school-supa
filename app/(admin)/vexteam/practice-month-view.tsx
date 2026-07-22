@@ -4,7 +4,7 @@
 // and status-filtered by the parent). Each practice is a chip coloured by status;
 // tapping a day shows its list.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import {
   startOfMonth,
   endOfMonth,
@@ -22,6 +22,7 @@ import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { StudentBadge } from '@/components/ui/student-badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { PracticeStatus } from '@/lib/vex/types'
 
 export interface CalendarPractice {
@@ -42,6 +43,37 @@ const STATUS_META: Record<PracticeStatus, { label: string; chip: string; dot: st
 }
 const WEEKDAYS = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.']
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '')
+
+// "+N" ที่กดดูรายชื่อที่ถูกซ่อนได้ — มือถือแตะเปิด/ปิด, เดสก์ท็อป hover ขึ้นทันที
+// stopPropagation กันไปโดน onClick ของช่องวัน (ซึ่งเปิด day detail)
+function MoreNamesPopover({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full text-[10px] text-gray-400 hover:text-gray-600 text-center"
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpen((v) => !v)
+          }}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+        >
+          {label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        className="w-auto max-w-64 p-2.5 text-sm space-y-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 export function PracticeMonthView({
   practices,
@@ -176,11 +208,27 @@ export function PracticeMonthView({
                             {g.kids.slice(0, 3).map((k) => (
                               <div key={k.id} className="truncate">{k.kidNickname || '-'}</div>
                             ))}
-                            {g.kids.length > 3 && <div className="text-gray-500">+{g.kids.length - 3}</div>}
+                            {g.kids.length > 3 && (
+                              <MoreNamesPopover label={`+${g.kids.length - 3}`}>
+                                <div className="font-semibold">{g.teamNumber}</div>
+                                {g.kids.slice(3).map((k) => (
+                                  <div key={k.id}>{k.kidNickname || '-'}</div>
+                                ))}
+                              </MoreNamesPopover>
+                            )}
                           </div>
                         ))}
                         {hiddenKids > 0 && (
-                          <div className="text-[10px] text-gray-400 text-center">+{hiddenKids}</div>
+                          <MoreNamesPopover label={`+${hiddenKids}`}>
+                            {groups.slice(2).map((g) => (
+                              <div key={g.key}>
+                                <div className="font-semibold">{g.teamNumber}</div>
+                                {g.kids.map((k) => (
+                                  <div key={k.id}>{k.kidNickname || '-'}</div>
+                                ))}
+                              </div>
+                            ))}
+                          </MoreNamesPopover>
                         )}
                       </div>
                     )
@@ -197,7 +245,14 @@ export function PracticeMonthView({
                       </div>
                     ))}
                     {items.length > 3 && (
-                      <div className="text-[10px] text-gray-400 text-center">+{items.length - 3}</div>
+                      <MoreNamesPopover label={`+${items.length - 3}`}>
+                        {items.slice(3).map((p) => (
+                          <div key={p.id}>
+                            {p.kidNickname || '-'}
+                            <span className="text-gray-400 ml-1">{hhmm(p.start_time)}</span>
+                          </div>
+                        ))}
+                      </MoreNamesPopover>
                     )}
                   </div>
                 )}
