@@ -34,6 +34,8 @@ export interface PracticeForNotify {
   start_time: string | null
   end_time: string | null
   kid_id: string
+  /** เหตุผลที่ไม่อนุมัติ — แนบท้ายข้อความ kind 'rejected' */
+  reject_reason?: string | null
 }
 
 /**
@@ -90,7 +92,11 @@ export async function notifyParentPractice(
     if (kind === 'approved') {
       text = `✅ คำขอซ้อม${who}ได้รับการอนุมัติแล้ว\n📅 ${when}`
     } else if (kind === 'rejected') {
-      text = `❌ คำขอซ้อม${who}ไม่ได้รับการอนุมัติ\n📅 ${when}\nกรุณาติดต่อแอดมินหรือเสนอวันใหม่`
+      const reason = (practice.reject_reason || '').trim()
+      text =
+        `❌ คำขอซ้อม${who}ไม่ได้รับการอนุมัติ\n📅 ${when}` +
+        (reason ? `\n📝 เหตุผล: ${reason}` : '') +
+        `\nกรุณาติดต่อแอดมินหรือเสนอวันใหม่`
     } else if (kind === 'scheduled') {
       // Admin-created practice (not a reply to a parent request)
       if (allDates && allDates.length > 1) {

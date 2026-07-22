@@ -74,7 +74,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Meta (Facebook / Instagram)</strong> — for page messaging, notifications, and engagement tracking</li>
             <li><strong>LINE Messaging API</strong> — for sending notifications and chat with parents</li>
             <li><strong>Supabase</strong> — for secure data storage</li>
-            <li><strong>Firebase (Google)</strong> — for user authentication</li>
+            <li><strong>Google (OAuth via Supabase Auth)</strong> — for user authentication</li>
           </ul>
           <p className="mt-2">
             Each of these services has its own privacy policy. We only share the minimum data
@@ -102,7 +102,7 @@ export default function PrivacyPolicyPage() {
             <li>Encryption of data in transit (HTTPS/TLS) and at rest</li>
             <li>Role-based access controls for administrative users</li>
             <li>Regular security reviews and monitoring</li>
-            <li>Secure authentication via Firebase with multi-factor support</li>
+            <li>Secure authentication via Google OAuth (Supabase Auth)</li>
           </ul>
         </section>
 

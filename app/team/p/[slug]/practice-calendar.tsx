@@ -45,6 +45,7 @@ export interface Practice {
   end_time: string | null
   note: string | null
   status: PracticeStatus
+  reject_reason?: string | null // เหตุผลจากแอดมินเมื่อไม่อนุมัติ
 }
 
 interface Props {
@@ -623,6 +624,12 @@ function DetailModal({
           <span className="text-gray-500">สถานะ</span>
           <Badge className={STATUS_META[practice.status].chip}>{STATUS_META[practice.status].label}</Badge>
         </div>
+
+        {practice.status === 'rejected' && practice.reject_reason && (
+          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+            เหตุผลที่ไม่อนุมัติ: {practice.reject_reason}
+          </div>
+        )}
 
         {!editable && (
           <p className="text-xs text-gray-400">คำขอนี้ถูกตรวจแล้ว จึงแก้ไข/ยกเลิกไม่ได้</p>

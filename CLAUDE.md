@@ -240,9 +240,10 @@ types/
 - `useSupabaseAuth`: `signInWithGoogle` (PKCE, redirectTo `/login`), membership guard `enforceAccess` signs out + bounces non-members/inactive. Invite flow at `/invite/[token]`.
 - `admin_users.teacher_id` links a login → `teachers` profile; exposed as `adminUser.teacherId`.
 
-## Known Firebase leftovers (tech debt — migrate to Supabase, do NOT bulk-delete; still imported)
-- `hooks/useSettings.ts` (Firestore `onSnapshot`), `lib/services/liff-schedule.ts`, `lib/services/link-tokens.ts`, `lib/services/data-cleaning.ts`, `lib/services/factory-reset.ts` still contain Firebase code but are imported by live features — migrate individually.
-- Deleted: `lib/services/line-notifications.ts` (dead Firebase). The working notifier is `lib/supabase/services/line-notifications.ts` (server-side, `createServiceClient`); client code must enqueue/use API routes, not import it directly.
+## Firebase: fully removed (2026-07-20)
+- No firebase dependency in package.json; all former leftovers migrated to Supabase (link-tokens/data-cleaning/factory-reset/useSettings 2026-07-06) or deleted (auth/action page, teacher-migration page, add-rights-dialog 2026-07-20).
+- Intentional compat shims that STAY: `user.uid` alias in `useSupabaseAuth`, Firestore-Timestamp handling in `lib/utils.ts` formatDate, BranchContext clearing old non-UUID localStorage ids.
+- The working notifier is `lib/supabase/services/line-notifications.ts` (server-side, `createServiceClient`); client code must enqueue/use API routes, not import it directly.
 
 ## Dashboard Timetable (Time×Room grid)
 - Dashboard also shows upcoming-birthday alerts (RPC `get_upcoming_birthdays`, migration `20260718_upcoming_birthdays_rpc`).

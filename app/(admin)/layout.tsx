@@ -757,11 +757,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       ]
     },
     // --- VEX Team (bottom-most, below settings) ---
+    // ครูดูตารางซ้อม/การแข่งขันได้ (view-only) — จัดการทีม/อนุมัติคำขอ เป็นของแอดมิน
     {
       name: 'VEX Team',
       icon: Trophy,
       iconColor: 'text-red-600',
-      requiredRole: ['super_admin', 'branch_admin'],
+      requiredRole: ['super_admin', 'branch_admin', 'teacher'],
       subItems: [
         {
           name: 'ทีม',
@@ -775,11 +776,18 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           href: '/vexteam/events',
           icon: CalendarDays,
           iconColor: 'text-red-500',
-          requiredRole: ['super_admin', 'branch_admin']
+          requiredRole: ['super_admin', 'branch_admin', 'teacher']
         },
         {
           name: 'ตารางซ้อม',
           href: '/vexteam/practices',
+          icon: CalendarClock,
+          iconColor: 'text-red-500',
+          requiredRole: ['super_admin', 'branch_admin', 'teacher']
+        },
+        {
+          name: 'คำขอซ้อม',
+          href: '/vexteam/practices/requests',
           icon: CalendarClock,
           iconColor: 'text-red-500',
           badge: vexPendingCount > 0 ? vexPendingCount : undefined,

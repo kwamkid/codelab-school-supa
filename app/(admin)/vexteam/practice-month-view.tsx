@@ -47,11 +47,14 @@ export function PracticeMonthView({
   practices,
   onReview,
   busyId,
+  groupByTeam = false,
 }: {
   practices: CalendarPractice[]
   /** Approve/reject a proposed practice from the day list. */
   onReview?: (id: string, status: 'approved' | 'rejected') => void
   busyId?: string | null
+  /** true = ก้อนละทีม (หัวก้อน = เบอร์ทีม + รายชื่อเด็ก); false = chip ละคน (ใช้ตอนกรองทีมเดียว) */
+  groupByTeam?: boolean
 }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
@@ -73,7 +76,13 @@ export function PracticeMonthView({
     practices.filter((p) => isSameDay(new Date(p.practice_date + 'T00:00:00'), date))
 
   const selectedItems = useMemo(
-    () => (selectedDay ? practices.filter((p) => p.practice_date === selectedDay) : []),
+    () =>
+      selectedDay
+        ? practices
+            .filter((p) => p.practice_date === selectedDay)
+            // ทีมเดียวกันอยู่ติดกันใน day list (สอดคล้องกับก้อน group บนปฏิทิน)
+            .sort((a, b) => (a.teamNumber || '').localeCompare(b.teamNumber || '') || (a.start_time || '').localeCompare(b.start_time || ''))
+        : [],
     [selectedDay, practices]
   )
 
@@ -139,20 +148,59 @@ export function PracticeMonthView({
                     {format(day, 'd')}
                   </span>
                 </div>
-                <div className="space-y-0.5 mt-0.5">
-                  {items.slice(0, 3).map((p) => (
-                    <div
-                      key={p.id}
-                      className={cn('text-[10px] leading-tight px-1 py-0.5 rounded border truncate', STATUS_META[p.status].chip)}
-                      title={`${p.kidNickname || ''} ${hhmm(p.start_time)}`}
-                    >
-                      {p.kidNickname || '-'}
-                    </div>
-                  ))}
-                  {items.length > 3 && (
-                    <div className="text-[10px] text-gray-400 text-center">+{items.length - 3}</div>
-                  )}
-                </div>
+                {groupByTeam ? (
+                  // ก้อนละทีม: หัวก้อน = เบอร์ทีม, ข้างในรายชื่อเด็ก (สี = สถานะ;
+                  // ทีมเดียวกันแต่คนละสถานะแยกเป็นคนละก้อน)
+                  (() => {
+                    const groups: { key: string; teamNumber: string; status: PracticeStatus; kids: CalendarPractice[] }[] = []
+                    for (const p of items) {
+                      const key = `${p.teamNumber || '-'}|${p.status}`
+                      let g = groups.find((x) => x.key === key)
+                      if (!g) {
+                        g = { key, teamNumber: p.teamNumber || '-', status: p.status, kids: [] }
+                        groups.push(g)
+                      }
+                      g.kids.push(p)
+                    }
+                    const shown = groups.slice(0, 2)
+                    const hiddenKids = groups.slice(2).reduce((s, g) => s + g.kids.length, 0)
+                    return (
+                      <div className="space-y-0.5 mt-0.5">
+                        {shown.map((g) => (
+                          <div
+                            key={g.key}
+                            className={cn('text-[10px] leading-tight px-1 py-0.5 rounded border', STATUS_META[g.status].chip)}
+                            title={`${g.teamNumber} — ${g.kids.map((k) => k.kidNickname).join(', ')}`}
+                          >
+                            <div className="font-semibold truncate">{g.teamNumber}</div>
+                            {g.kids.slice(0, 3).map((k) => (
+                              <div key={k.id} className="truncate">{k.kidNickname || '-'}</div>
+                            ))}
+                            {g.kids.length > 3 && <div className="text-gray-500">+{g.kids.length - 3}</div>}
+                          </div>
+                        ))}
+                        {hiddenKids > 0 && (
+                          <div className="text-[10px] text-gray-400 text-center">+{hiddenKids}</div>
+                        )}
+                      </div>
+                    )
+                  })()
+                ) : (
+                  <div className="space-y-0.5 mt-0.5">
+                    {items.slice(0, 3).map((p) => (
+                      <div
+                        key={p.id}
+                        className={cn('text-[10px] leading-tight px-1 py-0.5 rounded border truncate', STATUS_META[p.status].chip)}
+                        title={`${p.kidNickname || ''} ${hhmm(p.start_time)}`}
+                      >
+                        {p.kidNickname || '-'}
+                      </div>
+                    ))}
+                    {items.length > 3 && (
+                      <div className="text-[10px] text-gray-400 text-center">+{items.length - 3}</div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

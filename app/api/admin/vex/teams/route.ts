@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { vexDb } from '@/lib/vex/supabase'
-import { requireAdmin } from '@/lib/vex/api'
+import { requireAdmin, requireViewer } from '@/lib/vex/api'
 import { newTeamToken, linkSlug } from '@/lib/vex/tokens'
 import { logAudit } from '@/lib/vex/audit'
 import { LEVELS } from '@/lib/vex/types'
@@ -21,7 +21,7 @@ const createSchema = z.object({
 })
 
 export async function GET(request: Request) {
-  const admin = await requireAdmin(request)
+  const admin = await requireViewer(request)
   if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status })
 
   try {

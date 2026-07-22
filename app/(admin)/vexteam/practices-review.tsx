@@ -17,6 +17,7 @@ import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-f
 import { useBranch } from '@/contexts/BranchContext'
 import { cn } from '@/lib/utils'
 import { PracticeMonthView } from './practice-month-view'
+import { RejectPracticeDialog } from './reject-practice-dialog'
 import { SectionLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Check, X, CalendarClock, RotateCcw, Clock } from 'lucide-react'
@@ -32,6 +33,8 @@ interface PracticeRow {
   note: string | null
   status: PracticeStatus
   edited_by_admin: boolean
+  created_at: string | null // เวลาที่ส่งคำขอเข้ามา
+  reject_reason: string | null
   kidNickname: string | null
   teamNumber: string | null
   teamName: string | null
@@ -58,6 +61,18 @@ function splitDate(dateStr: string) {
 }
 function hhmm(t: string | null) {
   return t ? t.slice(0, 5) : ''
+}
+
+// "ส่งคำขอเมื่อ" — timestamptz → เวลาไทยแบบสั้น (20 ก.ค. 14:51)
+function requestedAt(ts: string | null) {
+  if (!ts) return null
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return null
+  const { day, month, year } = splitDate(
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  )
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return `${day} ${month} ${year} ${hm} น.`
 }
 
 export function PracticesReview({
@@ -175,12 +190,17 @@ export function PracticesReview({
     }
   }
 
-  const review = (id: string, status: PracticeStatus) =>
-    patch(
-      id,
-      { status },
-      status === 'approved' ? 'อนุมัติแล้ว' : status === 'rejected' ? 'ปฏิเสธแล้ว' : 'ย้อนกลับเป็นรออนุมัติ'
-    )
+  const [rejectTarget, setRejectTarget] = useState<PracticeRow | null>(null)
+
+  const review = (id: string, status: PracticeStatus) => {
+    // ไม่อนุมัติต้องกรอกเหตุผลก่อน (dialog) — สถานะอื่น patch ตรง
+    if (status === 'rejected') {
+      const row = all.find((r) => r.id === id)
+      if (row) setRejectTarget(row)
+      return
+    }
+    return patch(id, { status }, status === 'approved' ? 'อนุมัติแล้ว' : 'ย้อนกลับเป็นรออนุมัติ')
+  }
 
   return (
     <div className="space-y-4">
@@ -293,6 +313,16 @@ export function PracticesReview({
                             )}
                           </div>
                           {p.note && <div className="text-xs text-gray-500 mt-1 truncate">{p.note}</div>}
+                          {requestedAt(p.created_at) && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              ส่งคำขอเมื่อ {requestedAt(p.created_at)}
+                            </div>
+                          )}
+                          {p.status === 'rejected' && p.reject_reason && (
+                            <div className="text-xs text-red-500 mt-1">
+                              เหตุผลที่ไม่อนุมัติ: {p.reject_reason}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -355,6 +385,29 @@ export function PracticesReview({
           })}
         </div>
       )}
+
+      <RejectPracticeDialog
+        open={!!rejectTarget}
+        summary={
+          rejectTarget
+            ? `${rejectTarget.kidNickname || '-'} (${rejectTarget.teamNumber || '-'}) — ${(() => {
+                const d = splitDate(rejectTarget.practice_date)
+                return `${d.day} ${d.month} ${d.year}`
+              })()} ${hhmm(rejectTarget.start_time)}${rejectTarget.end_time ? `-${hhmm(rejectTarget.end_time)}` : ''}`
+            : null
+        }
+        busy={!!rejectTarget && busyId === rejectTarget.id}
+        onCancel={() => setRejectTarget(null)}
+        onConfirm={async (reason) => {
+          if (!rejectTarget) return
+          const updated = await patch(
+            rejectTarget.id,
+            { status: 'rejected', reject_reason: reason },
+            'ปฏิเสธแล้ว (แจ้งเหตุผลให้ผู้ปกครองแล้ว)'
+          )
+          if (updated) setRejectTarget(null)
+        }}
+      />
     </div>
   )
 }

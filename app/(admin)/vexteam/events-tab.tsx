@@ -33,6 +33,7 @@ import {
   type TimelineEvent,
 } from '@/lib/vex/event-timeline'
 import { CreateEventForm, type EditableEvent } from './create-event-form'
+import { useAuth } from '@/hooks/useAuth'
 
 interface EventRow {
   id: string
@@ -45,6 +46,9 @@ interface EventRow {
 }
 
 export function EventsTab() {
+  const { adminUser } = useAuth()
+  // ครู (viewer) ดูได้อย่างเดียว — สร้าง/แก้/ลบ เป็นของแอดมิน
+  const canManage = adminUser?.role === 'super_admin' || adminUser?.role === 'branch_admin'
   const [events, setEvents] = useState<EventRow[]>([])
   const [loading, setLoading] = useState(true)
   const [programFilter, setProgramFilter] = useState<Program | 'all'>('all')
@@ -141,27 +145,31 @@ export function EventsTab() {
               <Users className="h-4 w-4" />
               รายชื่อ
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-500 hover:text-primary"
-              onClick={() => {
-                setEditEvent(ev)
-                setEditOpen(true)
-              }}
-              aria-label="แก้ไข"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-500 hover:text-red-600"
-              onClick={() => setDeleteEvent(ev)}
-              aria-label="ลบ"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {canManage && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-gray-500 hover:text-primary"
+                  onClick={() => {
+                    setEditEvent(ev)
+                    setEditOpen(true)
+                  }}
+                  aria-label="แก้ไข"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-gray-500 hover:text-red-600"
+                  onClick={() => setDeleteEvent(ev)}
+                  aria-label="ลบ"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
           <div className="flex flex-wrap justify-end gap-1.5">
             {(ev.levels || []).map((lv) => (
@@ -212,7 +220,7 @@ export function EventsTab() {
             </button>
           ))}
         </div>
-        <CreateEventForm onSaved={loadEvents} />
+        {canManage && <CreateEventForm onSaved={loadEvents} />}
       </div>
 
       {events.length === 0 ? (

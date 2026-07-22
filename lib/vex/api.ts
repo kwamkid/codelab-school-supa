@@ -6,6 +6,8 @@ import { restSelect } from '@/lib/supabase/rest'
 
 /** Roles allowed to manage VEX teams. Teachers are excluded (per project decision). */
 const VEX_ADMIN_ROLES = ['super_admin', 'branch_admin'] as const
+/** Roles allowed to VIEW VEX data (ตารางซ้อม/การแข่งขัน) — teachers included (2026-07-20). */
+const VEX_VIEWER_ROLES = ['super_admin', 'branch_admin', 'teacher'] as const
 
 export interface VexAdmin {
   ok: boolean
@@ -46,6 +48,22 @@ export async function requireAdmin(request: Request): Promise<VexAdmin> {
   }
 
   return { ok: true, adminId: staff.adminId, authUserId: staff.authUserId, role: staff.role, name }
+}
+
+/**
+ * Read-only access for any active staff member incl. teachers — use on GET
+ * endpoints that back view pages (practices calendar, events list, teams list
+ * for the filter dropdown). Mutations must keep requireAdmin.
+ */
+export async function requireViewer(request: Request): Promise<VexAdmin> {
+  const staff = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!staff.ok) {
+    return { ok: false, status: staff.status ?? 401, error: staff.error }
+  }
+  if (!staff.role || !VEX_VIEWER_ROLES.includes(staff.role as any)) {
+    return { ok: false, status: 403, error: 'Forbidden' }
+  }
+  return { ok: true, adminId: staff.adminId, authUserId: staff.authUserId, role: staff.role }
 }
 
 export interface VexParent {

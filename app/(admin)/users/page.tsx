@@ -59,7 +59,6 @@ import { getBranches } from '@/lib/services/branches';
 import { Branch } from '@/types/models';
 import { toast } from 'sonner';
 import UserFormDialog from '@/components/users/user-form-dialog';
-import AddRightsDialog from '@/components/users/add-rights-dialog';
 import CreateInviteDialog from '@/components/users/create-invite-dialog';
 import { formatDate, cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -84,7 +83,6 @@ export default function UsersPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteRole, setInviteRole] = useState<'super_admin' | 'branch_admin' | 'teacher'>('branch_admin');
-  const [showAddRightsDialog, setShowAddRightsDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<AdminUser | null>(null);
   const [deleteUserTarget, setDeleteUserTarget] = useState<AdminUser | null>(null);
@@ -595,14 +593,6 @@ export default function UsersPage() {
           if (!open) setEditingUser(null);
         }}
         user={editingUser}
-        branches={branches}
-        onSuccess={loadData}
-      />
-
-      {/* Add Rights Dialog */}
-      <AddRightsDialog
-        open={showAddRightsDialog}
-        onOpenChange={setShowAddRightsDialog}
         branches={branches}
         onSuccess={loadData}
       />

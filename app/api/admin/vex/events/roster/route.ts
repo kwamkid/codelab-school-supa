@@ -5,14 +5,14 @@
 
 import { NextResponse } from 'next/server'
 import { vexDb } from '@/lib/vex/supabase'
-import { requireAdmin } from '@/lib/vex/api'
+import { requireViewer } from '@/lib/vex/api'
 import { restSelect } from '@/lib/supabase/rest'
 import type { Level } from '@/lib/vex/types'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  const admin = await requireAdmin(request)
+  const admin = await requireViewer(request)
   if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status })
 
   try {

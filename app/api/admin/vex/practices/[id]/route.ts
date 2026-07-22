@@ -20,6 +20,7 @@ const patchSchema = z.object({
   start_time: z.string().regex(timeRe).nullable().optional(),
   end_time: z.string().regex(timeRe).nullable().optional(),
   note: z.string().trim().max(500).nullable().optional(),
+  reject_reason: z.string().trim().max(500).optional(),
 })
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -70,6 +71,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       patch.status = parsed.data.status
       patch.reviewed_by = admin.adminId
       patch.reviewed_at = new Date().toISOString()
+      if (parsed.data.status === 'rejected') {
+        // ไม่อนุมัติต้องมีเหตุผลเสมอ — แนบไปกับ noti และแสดงให้ผู้ปกครอง
+        const reason = (parsed.data.reject_reason || '').trim()
+        if (!reason) {
+          return NextResponse.json({ error: 'กรุณาระบุเหตุผลที่ไม่อนุมัติ' }, { status: 400 })
+        }
+        patch.reject_reason = reason
+      } else {
+        // กลับเป็นอนุมัติ/รออนุมัติ → ล้างเหตุผลเก่าทิ้ง
+        patch.reject_reason = null
+      }
     }
 
     const nextStart = patch.start_time !== undefined ? patch.start_time : before.start_time
