@@ -143,8 +143,16 @@ function ScheduleContent() {
     try {
       setIsSubmitting(true)
       
-      // Get the schedule ID from the event ID (format: classId-scheduleId-studentId)
-      const [classId, scheduleId] = selectedEvent.id.split('-')
+      // ใช้ ids ตรงจาก extendedProps — event.id เป็น UUID 3 ตัวต่อกันด้วย '-'
+      // การ split('-') ได้เศษ UUID (บั๊กเดิม: ลาแล้ว 404 ไม่พบข้อมูลการลงทะเบียน)
+      // fallback: ประกอบ UUID จาก 5 กลุ่มต่อตัว เผื่อ event เก่าจาก cache ยังไม่มี props
+      let classId = selectedEvent.extendedProps.classId as string | undefined
+      let scheduleId = selectedEvent.extendedProps.scheduleId as string | undefined
+      if (!classId || !scheduleId) {
+        const parts = selectedEvent.id.split('-')
+        classId = parts.slice(0, 5).join('-')
+        scheduleId = parts.slice(5, 10).join('-')
+      }
       
       console.log('[LIFF] Submitting leave request:', {
         classId,

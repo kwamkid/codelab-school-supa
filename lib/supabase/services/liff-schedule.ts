@@ -93,6 +93,10 @@ export async function getParentScheduleEvents(
         backgroundColor, borderColor, textColor,
         extendedProps: {
           type: 'class',
+          // ids ตรง ๆ สำหรับ leave-request — ห้ามแกะจาก event.id (UUID มี dash,
+          // split('-') ได้เศษ id → requestLeave 404 "ไม่พบข้อมูลการลงทะเบียน")
+          classId: s.classId,
+          scheduleId: s.scheduleId,
           studentId: s.studentId,
           studentName: s.studentName,
           studentNickname: s.studentNickname,

@@ -26,6 +26,9 @@ export interface ScheduleEvent {
   textColor?: string;
   extendedProps: {
     type: 'class' | 'makeup' | 'trial';
+    // ids สำหรับ leave-request (event.id เป็น UUID ต่อกัน แกะด้วย split('-') ไม่ได้)
+    classId?: string;
+    scheduleId?: string;
     studentId: string;
     studentName: string;
     studentNickname?: string;
@@ -96,8 +99,15 @@ export default function ScheduleCalendar({
     try {
       setIsSubmitting(true);
       
-      // Get the schedule ID from the event ID (format: classId-scheduleId-studentId)
-      const [classId, scheduleId] = selectedEvent.id.split('-');
+      // ใช้ ids ตรงจาก extendedProps — event.id เป็น UUID 3 ตัวต่อกันด้วย '-'
+      // การ split('-') ได้เศษ UUID (ลาแล้ว 404) fallback: ประกอบ UUID 5 กลุ่มต่อตัว
+      let classId = selectedEvent.extendedProps.classId;
+      let scheduleId = selectedEvent.extendedProps.scheduleId;
+      if (!classId || !scheduleId) {
+        const parts = selectedEvent.id.split('-');
+        classId = parts.slice(0, 5).join('-');
+        scheduleId = parts.slice(5, 10).join('-');
+      }
       
       // Call API to create makeup request
       const response = await fetch('/api/liff/leave-request', {
