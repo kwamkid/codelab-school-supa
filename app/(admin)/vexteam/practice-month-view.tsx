@@ -63,7 +63,8 @@ function NamesPopover({
         <div
           role="button"
           tabIndex={0}
-          className={triggerClassName}
+          // outline-none: กันวงฟ้า focus ring ของเบราว์เซอร์ตอนแตะ/คลิกการ์ด
+          className={cn('outline-none focus:outline-none focus-visible:outline-none', triggerClassName)}
           onClick={(e) => {
             e.stopPropagation()
             setOpen((v) => !v)
