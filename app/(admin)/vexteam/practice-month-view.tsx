@@ -44,16 +44,26 @@ const STATUS_META: Record<PracticeStatus, { label: string; chip: string; dot: st
 const WEEKDAYS = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.']
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '')
 
-// "+N" ที่กดดูรายชื่อที่ถูกซ่อนได้ — มือถือแตะเปิด/ปิด, เดสก์ท็อป hover ขึ้นทันที
+// Popover รายชื่อ — trigger ได้ทั้ง "ทั้งการ์ดทีม" และปุ่ม "+N":
+// เดสก์ท็อป hover ขึ้นทันที, มือถือแตะเปิด/ปิด.
 // stopPropagation กันไปโดน onClick ของช่องวัน (ซึ่งเปิด day detail)
-function MoreNamesPopover({ label, children }: { label: string; children: ReactNode }) {
+function NamesPopover({
+  trigger,
+  triggerClassName,
+  content,
+}: {
+  trigger: ReactNode
+  triggerClassName?: string
+  content: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="w-full text-[10px] text-gray-400 hover:text-gray-600 text-center"
+        <div
+          role="button"
+          tabIndex={0}
+          className={triggerClassName}
           onClick={(e) => {
             e.stopPropagation()
             setOpen((v) => !v)
@@ -61,15 +71,15 @@ function MoreNamesPopover({ label, children }: { label: string; children: ReactN
           onMouseEnter={() => setOpen(true)}
           onMouseLeave={() => setOpen(false)}
         >
-          {label}
-        </button>
+          {trigger}
+        </div>
       </PopoverTrigger>
       <PopoverContent
         side="top"
         className="w-auto max-w-64 p-2.5 text-sm space-y-1"
         onClick={(e) => e.stopPropagation()}
       >
-        {children}
+        {content}
       </PopoverContent>
     </Popover>
   )
@@ -199,36 +209,52 @@ export function PracticeMonthView({
                     return (
                       <div className="space-y-0.5 mt-0.5">
                         {shown.map((g) => (
-                          <div
+                          // hover/แตะทั้งการ์ดทีม → popover รายชื่อครบทุกคนของทีมนั้น
+                          <NamesPopover
                             key={g.key}
-                            className={cn('text-[10px] leading-tight px-1 py-0.5 rounded border', STATUS_META[g.status].chip)}
-                            title={`${g.teamNumber} — ${g.kids.map((k) => k.kidNickname).join(', ')}`}
-                          >
-                            <div className="font-semibold truncate">{g.teamNumber}</div>
-                            {g.kids.slice(0, 3).map((k) => (
-                              <div key={k.id} className="truncate">{k.kidNickname || '-'}</div>
-                            ))}
-                            {g.kids.length > 3 && (
-                              <MoreNamesPopover label={`+${g.kids.length - 3}`}>
-                                <div className="font-semibold">{g.teamNumber}</div>
-                                {g.kids.slice(3).map((k) => (
-                                  <div key={k.id}>{k.kidNickname || '-'}</div>
-                                ))}
-                              </MoreNamesPopover>
+                            triggerClassName={cn(
+                              'text-[10px] leading-tight px-1 py-0.5 rounded border cursor-pointer',
+                              STATUS_META[g.status].chip
                             )}
-                          </div>
+                            trigger={
+                              <>
+                                <div className="font-semibold truncate">{g.teamNumber}</div>
+                                {g.kids.slice(0, 3).map((k) => (
+                                  <div key={k.id} className="truncate">{k.kidNickname || '-'}</div>
+                                ))}
+                                {g.kids.length > 3 && <div className="text-gray-500">+{g.kids.length - 3}</div>}
+                              </>
+                            }
+                            content={
+                              <>
+                                <div className="font-semibold">{g.teamNumber} ({g.kids.length} คน)</div>
+                                {g.kids.map((k) => (
+                                  <div key={k.id}>
+                                    {k.kidNickname || '-'}
+                                    <span className="text-gray-400 ml-1.5">{hhmm(k.start_time)}{k.end_time ? `-${hhmm(k.end_time)}` : ''}</span>
+                                  </div>
+                                ))}
+                              </>
+                            }
+                          />
                         ))}
                         {hiddenKids > 0 && (
-                          <MoreNamesPopover label={`+${hiddenKids}`}>
-                            {groups.slice(2).map((g) => (
-                              <div key={g.key}>
-                                <div className="font-semibold">{g.teamNumber}</div>
-                                {g.kids.map((k) => (
-                                  <div key={k.id}>{k.kidNickname || '-'}</div>
+                          <NamesPopover
+                            triggerClassName="w-full text-[10px] text-gray-400 hover:text-gray-600 text-center cursor-pointer"
+                            trigger={<>+{hiddenKids}</>}
+                            content={
+                              <>
+                                {groups.slice(2).map((g) => (
+                                  <div key={g.key}>
+                                    <div className="font-semibold">{g.teamNumber}</div>
+                                    {g.kids.map((k) => (
+                                      <div key={k.id}>{k.kidNickname || '-'}</div>
+                                    ))}
+                                  </div>
                                 ))}
-                              </div>
-                            ))}
-                          </MoreNamesPopover>
+                              </>
+                            }
+                          />
                         )}
                       </div>
                     )
@@ -236,23 +262,36 @@ export function PracticeMonthView({
                 ) : (
                   <div className="space-y-0.5 mt-0.5">
                     {items.slice(0, 3).map((p) => (
-                      <div
+                      <NamesPopover
                         key={p.id}
-                        className={cn('text-[10px] leading-tight px-1 py-0.5 rounded border truncate', STATUS_META[p.status].chip)}
-                        title={`${p.kidNickname || ''} ${hhmm(p.start_time)}`}
-                      >
-                        {p.kidNickname || '-'}
-                      </div>
+                        triggerClassName={cn(
+                          'text-[10px] leading-tight px-1 py-0.5 rounded border truncate cursor-pointer',
+                          STATUS_META[p.status].chip
+                        )}
+                        trigger={<>{p.kidNickname || '-'}</>}
+                        content={
+                          <div>
+                            {p.kidNickname || '-'}
+                            <span className="text-gray-400 ml-1.5">{hhmm(p.start_time)}{p.end_time ? `-${hhmm(p.end_time)}` : ''}</span>
+                          </div>
+                        }
+                      />
                     ))}
                     {items.length > 3 && (
-                      <MoreNamesPopover label={`+${items.length - 3}`}>
-                        {items.slice(3).map((p) => (
-                          <div key={p.id}>
-                            {p.kidNickname || '-'}
-                            <span className="text-gray-400 ml-1">{hhmm(p.start_time)}</span>
-                          </div>
-                        ))}
-                      </MoreNamesPopover>
+                      <NamesPopover
+                        triggerClassName="w-full text-[10px] text-gray-400 hover:text-gray-600 text-center cursor-pointer"
+                        trigger={<>+{items.length - 3}</>}
+                        content={
+                          <>
+                            {items.slice(3).map((p) => (
+                              <div key={p.id}>
+                                {p.kidNickname || '-'}
+                                <span className="text-gray-400 ml-1">{hhmm(p.start_time)}</span>
+                              </div>
+                            ))}
+                          </>
+                        }
+                      />
                     )}
                   </div>
                 )}
