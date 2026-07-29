@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { TimeRangePicker } from '@/components/ui/time-range-picker'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-filter-tabs'
@@ -300,13 +301,16 @@ export function PracticesReview({
                           practice={p}
                           busy={busyId === p.id}
                           onCancel={() => setEditingId(null)}
-                          onSave={async (start, end, approve) => {
+                          onSave={async (date, start, end, approve) => {
                             const body: any = { start_time: start || null, end_time: end || null }
+                            // ส่ง practice_date เฉพาะตอนเปลี่ยนจริง — ส่งค่าเดิมไปเฉย ๆ
+                            // จะโดน mark edited_by_admin ทั้งที่ไม่ได้แก้
+                            if (date !== p.practice_date) body.practice_date = date
                             if (approve) body.status = 'approved'
                             const updated = await patch(
                               p.id,
                               body,
-                              approve ? 'ปรับเวลา + อนุมัติแล้ว (แจ้งผู้ปกครองแล้ว)' : 'ปรับเวลาแล้ว (แจ้งผู้ปกครองแล้ว)'
+                              approve ? 'ปรับวัน/เวลา + อนุมัติแล้ว (แจ้งผู้ปกครองแล้ว)' : 'ปรับวัน/เวลาแล้ว (แจ้งผู้ปกครองแล้ว)'
                             )
                             if (updated) setEditingId(null)
                           }}
@@ -353,7 +357,7 @@ export function PracticesReview({
                         disabled={busyId === p.id}
                         className="gap-1"
                       >
-                        <Clock className="h-4 w-4" /> ปรับเวลา
+                        <Clock className="h-4 w-4" /> ปรับวัน/เวลา
                       </Button>
                       {p.status === 'proposed' ? (
                         <>
@@ -425,8 +429,8 @@ export function PracticesReview({
   )
 }
 
-// Inline edit-time form (start/end only; date stays fixed). `approve` on save
-// commits the new time AND approves in one step.
+// Inline edit form (date + start/end time). `approve` on save commits the new
+// date/time AND approves in one step.
 function EditTimeForm({
   practice,
   busy,
@@ -435,13 +439,18 @@ function EditTimeForm({
 }: {
   practice: PracticeRow
   busy: boolean
-  onSave: (start: string, end: string, approve: boolean) => void
+  onSave: (date: string, start: string, end: string, approve: boolean) => void
   onCancel: () => void
 }) {
+  const [date, setDate] = useState<string | undefined>(practice.practice_date)
   const [start, setStart] = useState(hhmm(practice.start_time) || '09:00')
   const [end, setEnd] = useState(hhmm(practice.end_time) || '12:00')
 
   const validate = () => {
+    if (!date) {
+      toast.error('กรุณาเลือกวันซ้อม')
+      return false
+    }
     if (start && end && end <= start) {
       toast.error('เวลาสิ้นสุดต้องหลังเวลาเริ่ม')
       return false
@@ -451,6 +460,9 @@ function EditTimeForm({
 
   return (
     <div className="space-y-2">
+      <div className="max-w-xs">
+        <DateRangePicker mode="single" value={date} onChange={setDate} />
+      </div>
       <TimeRangePicker
         startTime={start}
         endTime={end}
@@ -465,15 +477,15 @@ function EditTimeForm({
         <Button
           size="sm"
           variant="outline"
-          onClick={() => validate() && onSave(start, end, false)}
+          onClick={() => validate() && onSave(date!, start, end, false)}
           disabled={busy}
         >
-          บันทึกเวลา
+          บันทึก
         </Button>
         {practice.status === 'proposed' && (
           <Button
             size="sm"
-            onClick={() => validate() && onSave(start, end, true)}
+            onClick={() => validate() && onSave(date!, start, end, true)}
             disabled={busy}
             className="gap-1 bg-green-600 hover:bg-green-700"
           >

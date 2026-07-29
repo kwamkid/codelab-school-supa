@@ -112,7 +112,7 @@ export async function notifyParentPractice(
         text = `🗓️ แอดมินนัดวันซ้อม${who}\n📅 ${when}`
       }
     } else {
-      text = `✏️ แอดมินปรับเวลาซ้อม${who}ให้ใหม่\n📅 ${when}`
+      text = `✏️ แอดมินปรับวัน/เวลาซ้อม${who}ให้ใหม่\n📅 ${when}`
     }
 
     const supabase = createServiceClient()
