@@ -556,32 +556,6 @@ export async function sendTrialConfirmation(
 
     console.log('[sendTrialConfirmation] All data collected, preparing to send...')
 
-    // ส่งข้อความแบบ Flex Message
-    const result = await sendLineMessage(booking.parent_line_id, '', undefined, {
-      useFlexMessage: true,
-      flexTemplate: type === 'reminder' ? 'trialReminder' : 'trialConfirmation',
-      flexData: {
-        studentName: trial.student_name,
-        subjectName: subject?.name || 'ไม่ระบุ',
-        date: formatDate(new Date(trial.scheduled_date), 'long'),
-        startTime: formatTime(trial.start_time),
-        endTime: formatTime(trial.end_time),
-        location: branch?.name || 'ไม่ระบุ',
-        roomName: room?.name || trial.room_name || 'ไม่ระบุ',
-        contactPhone: branch?.phone || '081-234-5678'
-      },
-      altText:
-        type === 'reminder'
-          ? `แจ้งเตือนทดลองเรียนพรุ่งนี้ - น้อง${trial.student_name}`
-          : `ยืนยันการทดลองเรียน - น้อง${trial.student_name}`
-    })
-
-    if (result.success) {
-      console.log('[sendTrialConfirmation] Successfully sent trial confirmation')
-    } else {
-      console.log('[sendTrialConfirmation] Failed to send trial confirmation:', result.error)
-    }
-
     // Build detailed message preview
     const headerText = type === 'reminder' ? '⏰ แจ้งเตือนทดลองเรียนพรุ่งนี้' : '✅ ยืนยันการทดลองเรียน'
     const messagePreview = [
@@ -595,21 +569,47 @@ export async function sendTrialConfirmation(
       `📞 ติดต่อ: ${branch?.phone || '081-234-5678'}`
     ].join('\n')
 
-    // Log notification
-    await logNotification({
-      type: type === 'reminder' ? 'trial-reminder' : 'trial-confirmation',
-      recipientType: 'parent',
-      recipientId: booking.id,
-      recipientName: `${trial.student_name}'s parent`,
-      lineUserId: booking.parent_line_id,
-      studentName: trial.student_name,
-      messagePreview: messagePreview,
-      status: result.success ? 'success' : 'failed',
-      errorMessage: result.error,
-      sentAt: new Date()
-    })
+    // Fan-out: ถ้าคนจองมี parents record จะส่งถึงผู้รับเพิ่มเติมของครอบครัวด้วย —
+    // คนจองใหม่ที่ยังไม่มี parents row ได้ [parent_line_id] ตัวเดียว (พฤติกรรมเดิม)
+    const lineIds = await getParentLineIds(undefined, booking.parent_line_id)
+    let anySuccess = false
+    for (const [i, lineId] of lineIds.entries()) {
+      const result = await sendLineMessage(lineId, '', undefined, {
+        useFlexMessage: true,
+        flexTemplate: type === 'reminder' ? 'trialReminder' : 'trialConfirmation',
+        flexData: {
+          studentName: trial.student_name,
+          subjectName: subject?.name || 'ไม่ระบุ',
+          date: formatDate(new Date(trial.scheduled_date), 'long'),
+          startTime: formatTime(trial.start_time),
+          endTime: formatTime(trial.end_time),
+          location: branch?.name || 'ไม่ระบุ',
+          roomName: room?.name || trial.room_name || 'ไม่ระบุ',
+          contactPhone: branch?.phone || '081-234-5678'
+        },
+        altText:
+          type === 'reminder'
+            ? `แจ้งเตือนทดลองเรียนพรุ่งนี้ - น้อง${trial.student_name}`
+            : `ยืนยันการทดลองเรียน - น้อง${trial.student_name}`
+      })
+      anySuccess = anySuccess || !!result.success
 
-    return result.success
+      await logNotification({
+        type: type === 'reminder' ? 'trial-reminder' : 'trial-confirmation',
+        recipientType: 'parent',
+        recipientId: booking.id,
+        recipientName: `${trial.student_name}'s parent${i > 0 ? ' (ผู้รับเพิ่มเติม)' : ''}`,
+        lineUserId: lineId,
+        studentName: trial.student_name,
+        messagePreview: messagePreview,
+        status: result.success ? 'success' : 'failed',
+        errorMessage: result.error,
+        sentAt: new Date()
+      })
+    }
+
+    console.log(`[sendTrialConfirmation] Sent to ${lineIds.length} recipient(s), anySuccess=${anySuccess}`)
+    return anySuccess
   } catch (error) {
     console.error('[sendTrialConfirmation] Error:', error)
     return false

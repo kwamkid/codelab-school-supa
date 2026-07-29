@@ -1,13 +1,17 @@
 // lib/vex/notify.ts
-// Notify the parent who submitted a VEX practice request when an admin approves
-// it or edits its time. Uses the existing LINE outbox (public.line_notification_queue,
-// type:'custom' → payload.to + payload.messages). This is the ONE place VEX code
-// touches a public.* table with a WRITE — a queue row, not VEX data — and it's a
-// deliberate, isolated exception to reach the shared LINE notifier.
+// Notify the family of a VEX practice request when an admin approves it or edits
+// its time. Fans out to EVERY family LINE recipient (primary + accepted
+// parent_line_recipients) via getParentLineIds — per the CLAUDE.md rule that no
+// sender may push to parents.line_user_id directly. Uses the existing LINE outbox
+// (public.line_notification_queue, type:'custom' → payload.to + payload.messages,
+// one queue row per recipient). This is the ONE place VEX code touches a public.*
+// table with a WRITE — queue rows, not VEX data — and it's a deliberate, isolated
+// exception to reach the shared LINE notifier.
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { restSelect } from '@/lib/supabase/rest'
 import { vexDb } from '@/lib/vex/supabase'
+import { getParentLineIds } from '@/lib/supabase/services/line-notifications'
 
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 
@@ -76,14 +80,16 @@ export async function notifyParentPractice(
 
     if (!parentId) return
 
-    // Resolve the parent's LINE userId (needed as the push target).
+    // Fan-out targets: primary LINE id + every accepted extra recipient of the
+    // family (พ่อ+แม่). Works even when the primary hasn't linked LINE but an
+    // extra recipient has.
     const rows = await restSelect<{ line_user_id: string | null }>('parents', {
       id: `eq.${parentId}`,
       select: 'line_user_id',
       limit: '1',
     })
-    const lineUserId = rows?.[0]?.line_user_id
-    if (!lineUserId) return // parent not linked to LINE → nothing to send
+    const lineIds = await getParentLineIds(parentId, rows?.[0]?.line_user_id ?? null)
+    if (lineIds.length === 0) return // nobody in the family is linked to LINE
 
     const who = kidNickname ? `ของ ${kidNickname} ` : ''
     const when = `${thaiDate(practice.practice_date)} เวลา ${timeRange(practice.start_time, practice.end_time)}`
@@ -110,11 +116,13 @@ export async function notifyParentPractice(
     }
 
     const supabase = createServiceClient()
-    const { error } = await supabase.from('line_notification_queue' as any).insert({
-      type: 'custom',
-      status: 'pending',
-      payload: { to: lineUserId, messages: [{ type: 'text', text }] },
-    })
+    const { error } = await supabase.from('line_notification_queue' as any).insert(
+      lineIds.map((to) => ({
+        type: 'custom',
+        status: 'pending',
+        payload: { to, messages: [{ type: 'text', text }] },
+      }))
+    )
     if (error) {
       console.error('[vex notify] enqueue failed:', error.message)
       return

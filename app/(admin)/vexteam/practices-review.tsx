@@ -35,6 +35,8 @@ interface PracticeRow {
   edited_by_admin: boolean
   created_at: string | null // เวลาที่ส่งคำขอเข้ามา
   reject_reason: string | null
+  submitterType?: 'parent' | 'admin'
+  submitterName?: string | null // ชื่อคนส่งคำขอ (ผู้ปกครองลงแทนกันได้ — ต้องรู้ว่าใครลง)
   kidNickname: string | null
   teamNumber: string | null
   teamName: string | null
@@ -61,6 +63,19 @@ function splitDate(dateStr: string) {
 }
 function hhmm(t: string | null) {
   return t ? t.slice(0, 5) : ''
+}
+
+// "ส่งคำขอโดย {ใคร} เมื่อ {เวลา}" — ผู้ปกครองลงแทนกันได้ เลยต้องบอกชื่อคนส่งเสมอ
+function submitterLine(p: PracticeRow): string | null {
+  const at = requestedAt(p.created_at)
+  if (p.submitterType === 'admin') {
+    const who = p.submitterName ? `แอดมิน ${p.submitterName}` : 'แอดมิน'
+    return at ? `เพิ่มโดย${who} เมื่อ ${at}` : `เพิ่มโดย${who}`
+  }
+  if (p.submitterName) {
+    return at ? `ส่งคำขอโดย ${p.submitterName} เมื่อ ${at}` : `ส่งคำขอโดย ${p.submitterName}`
+  }
+  return at ? `ส่งคำขอเมื่อ ${at}` : null
 }
 
 // "ส่งคำขอเมื่อ" — timestamptz → เวลาไทยแบบสั้น (20 ก.ค. 14:51)
@@ -313,10 +328,8 @@ export function PracticesReview({
                             )}
                           </div>
                           {p.note && <div className="text-xs text-gray-500 mt-1 truncate">{p.note}</div>}
-                          {requestedAt(p.created_at) && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              ส่งคำขอเมื่อ {requestedAt(p.created_at)}
-                            </div>
+                          {submitterLine(p) && (
+                            <div className="text-xs text-gray-400 mt-1">{submitterLine(p)}</div>
                           )}
                           {p.status === 'rejected' && p.reject_reason && (
                             <div className="text-xs text-red-500 mt-1">

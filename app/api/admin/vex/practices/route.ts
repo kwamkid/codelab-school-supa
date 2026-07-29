@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { vexDb } from '@/lib/vex/supabase'
+import { restSelect } from '@/lib/supabase/rest'
 import { requireAdmin, requireViewer } from '@/lib/vex/api'
 import { logAudit } from '@/lib/vex/audit'
 import { notifyParentPractice } from '@/lib/vex/notify'
@@ -158,12 +159,42 @@ export async function GET(request: Request) {
     const kidMap = new Map<string, any>((kidsRes.data || []).map((k: any) => [k.id, k]))
     const teamMap = new Map<string, any>((teamsRes.data || []).map((t: any) => [t.id, t]))
 
+    // Submitter label: parent_id = the family that actually submitted (parents can
+    // submit for another family's kid), null parent_id = admin-scheduled → reviewed_by.
+    // Both live in public.* (vexDb is scoped to the vex schema) → restSelect.
+    const parentIds = Array.from(new Set(rows.map((p: any) => p.parent_id).filter(Boolean)))
+    const adminIds = Array.from(
+      new Set(rows.filter((p: any) => !p.parent_id && p.reviewed_by).map((p: any) => p.reviewed_by))
+    )
+    const [submitterParents, submitterAdmins] = await Promise.all([
+      parentIds.length
+        ? restSelect<{ id: string; display_name: string | null; line_display_name: string | null }>('parents', {
+            id: `in.(${parentIds.join(',')})`,
+            select: 'id,display_name,line_display_name',
+          }).catch(() => [])
+        : Promise.resolve([]),
+      adminIds.length
+        ? restSelect<{ id: string; display_name: string | null }>('admin_users', {
+            id: `in.(${adminIds.join(',')})`,
+            select: 'id,display_name',
+          }).catch(() => [])
+        : Promise.resolve([]),
+    ])
+    const parentNameMap = new Map<string, string | null>()
+    for (const p of submitterParents) parentNameMap.set(p.id, p.display_name || p.line_display_name || null)
+    const adminNameMap = new Map<string, string | null>()
+    for (const a of submitterAdmins) adminNameMap.set(a.id, a.display_name || null)
+
     const enriched = rows.map((p: any) => ({
       ...p,
       kidNickname: kidMap.get(p.kid_id)?.nickname ?? null,
       teamNumber: teamMap.get(p.team_id)?.team_number ?? null,
       teamName: teamMap.get(p.team_id)?.name ?? null,
       branch_id: teamMap.get(p.team_id)?.branch_id ?? null,
+      submitterType: p.parent_id ? 'parent' : 'admin',
+      submitterName: p.parent_id
+        ? parentNameMap.get(p.parent_id) ?? null
+        : adminNameMap.get(p.reviewed_by) ?? null,
     }))
 
     return NextResponse.json({ practices: enriched })

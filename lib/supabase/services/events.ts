@@ -671,13 +671,20 @@ export async function sendEventReminder(
   const e = event as any
   if (!r.line_user_id) return false
 
-  const { sendLineMessage } = await import('./line-notifications')
+  const { sendLineMessage, getParentLineIds } = await import('./line-notifications')
 
   const message = `🔔 เตือนงาน: ${e.name}` +
     (r.schedule_time ? `\n📅 ${r.schedule_time}` : '') +
     (r.attendee_count ? `\n👥 ผู้เข้าร่วม: ${r.attendee_count} คน` : '') +
     `\n\nดูรายละเอียดเพิ่มเติม:\n${process.env.NEXT_PUBLIC_APP_URL || ''}/liff/my-events`
 
-  const result = await sendLineMessage(r.line_user_id, message)
-  return result.success
+  // Fan-out: ผู้ลงทะเบียนที่มี parents record → ส่งถึงผู้รับเพิ่มเติมของครอบครัวด้วย;
+  // ไม่มี record → ได้ [line_user_id] ตัวเดียว (พฤติกรรมเดิม)
+  const lineIds = await getParentLineIds(undefined, r.line_user_id)
+  let anySuccess = false
+  for (const lineId of lineIds) {
+    const result = await sendLineMessage(lineId, message)
+    anySuccess = anySuccess || !!result.success
+  }
+  return anySuccess
 }
