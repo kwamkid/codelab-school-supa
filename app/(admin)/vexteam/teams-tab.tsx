@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { TeacherBadge } from '@/components/ui/teacher-badge'
 import { PageLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import {
@@ -45,6 +46,9 @@ interface TeamRow {
   level: Level
   branch_id: string | null
   branchName?: string | null
+  coach_teacher_id?: string | null
+  coachName?: string | null
+  coachImage?: string | null
   eventLink: string | null
   practiceLink: string | null
   kids: KidRow[]
@@ -235,6 +239,17 @@ export function TeamsTab() {
                           {t.name && <span className="text-gray-500">— {t.name}</span>}
                           {!selectedBranchId && t.branchName && (
                             <Badge variant="outline" className="text-[10px] text-gray-500">{t.branchName}</Badge>
+                          )}
+                        </div>
+                        {/* ครูผู้ดูแลทีม — โชว์เสมอ เพื่อให้เห็นทีมที่ยังไม่ได้ระบุครู */}
+                        <div className="mt-1 flex items-center gap-1.5 text-sm">
+                          {t.coachName ? (
+                            <>
+                              <span className="text-gray-500">ครูผู้ดูแล:</span>
+                              <TeacherBadge name={t.coachName} imageUrl={t.coachImage} size="sm" />
+                            </>
+                          ) : (
+                            <span className="text-amber-600">ยังไม่ได้ระบุครูผู้ดูแล</span>
                           )}
                         </div>
                       </div>

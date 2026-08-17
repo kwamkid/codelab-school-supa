@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { SearchInput } from '@/components/ui/search-input'
 import { LevelBadge } from '@/components/vex/level-badge'
 import { useBranch } from '@/contexts/BranchContext'
+import { useAuth } from '@/hooks/useAuth'
 import { LEVEL_LABELS, LEVEL_META, LEVELS, PROGRAM_LOGO, type Level, type Program } from '@/lib/vex/types'
 import { thaiDateRange, localTodayStr } from '@/lib/vex/event-timeline'
 import { cn } from '@/lib/utils'
@@ -46,7 +47,11 @@ interface RosterTeam {
   branchId: string | null
   kids: RosterKid[]
 }
-interface RosterRsvp { eventId: string; kidId: string; status: 'go' | 'no'; updatedAt: string | null }
+type RsvpStatus = 'pend' | 'go' | 'no'
+interface RosterRsvp { eventId: string; kidId: string; status: RsvpStatus; updatedAt: string | null }
+
+// คลิกช่องเพื่อวนสถานะ (เหมือนฝั่งผู้ปกครองใน /team) — ยังไม่ตอบ → ไป → ไม่ไป
+const NEXT_STATUS: Record<RsvpStatus, RsvpStatus> = { pend: 'go', go: 'no', no: 'pend' }
 
 const isPast = (e: RosterEvent, today: string) => {
   const last = e.dateEnd || e.dateStart
@@ -57,11 +62,15 @@ function RosterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedBranchId } = useBranch()
+  const { adminUser } = useAuth()
+  // ครูดูได้อย่างเดียว — แก้ RSVP แทนผู้ปกครองเป็นสิทธิ์แอดมิน (เหมือน events-tab)
+  const canManage = adminUser?.role === 'super_admin' || adminUser?.role === 'branch_admin'
 
   const [events, setEvents] = useState<RosterEvent[]>([])
   const [teams, setTeams] = useState<RosterTeam[]>([])
   const [rsvps, setRsvps] = useState<RosterRsvp[]>([])
   const [loading, setLoading] = useState(true)
+  const [savingCell, setSavingCell] = useState<string | null>(null)
 
   const [programFilter, setProgramFilter] = useState<Program | 'all'>('all')
   const [eventFilter, setEventFilter] = useState<string>(searchParams.get('event') || 'all')
@@ -204,22 +213,69 @@ function RosterContent() {
     URL.revokeObjectURL(link.href)
   }
 
+  // แอดมินกดแทนผู้ปกครองได้ (บางบ้านแจ้งทางแชทแต่ไม่กดในระบบ) — optimistic + rollback
+  const cycleRsvp = async (kidId: string, ev: RosterEvent) => {
+    const key = `${kidId}:${ev.id}`
+    if (!canManage || savingCell) return
+    const next = NEXT_STATUS[rsvpMap.get(key)?.status || 'pend']
+    const snapshot = rsvps
+    setSavingCell(key)
+    setRsvps((old) => [
+      ...old.filter((r) => !(r.kidId === kidId && r.eventId === ev.id)),
+      { eventId: ev.id, kidId, status: next, updatedAt: null },
+    ])
+    try {
+      const res = await authFetch('/api/admin/vex/events/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: ev.id, kid_id: kidId, status: next }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setRsvps(snapshot)
+        toast.error(data.error || 'บันทึกไม่สำเร็จ')
+      }
+    } catch {
+      setRsvps(snapshot)
+      toast.error('เกิดข้อผิดพลาด')
+    } finally {
+      setSavingCell(null)
+    }
+  }
+
   const statusCell = (kidId: string, ev: RosterEvent, applicable: boolean) => {
     if (!applicable) return <span className="text-gray-300">–</span>
-    const status = rsvpMap.get(`${kidId}:${ev.id}`)?.status || 'pend'
-    if (status === 'go')
-      return (
+    const key = `${kidId}:${ev.id}`
+    const status = rsvpMap.get(key)?.status || 'pend'
+    const mark =
+      status === 'go' ? (
         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-100">
           <Check className="h-4 w-4 text-green-700" />
         </span>
-      )
-    if (status === 'no')
-      return (
+      ) : status === 'no' ? (
         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100">
           <X className="h-4 w-4 text-red-600" />
         </span>
+      ) : (
+        <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
       )
-    return <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
+
+    if (!canManage) return mark
+    return (
+      <button
+        type="button"
+        onClick={() => cycleRsvp(kidId, ev)}
+        disabled={!!savingCell}
+        aria-label="เปลี่ยนสถานะเข้าแข่งขัน"
+        className={cn(
+          'inline-flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-gray-100',
+          savingCell === key && 'opacity-50',
+          savingCell && savingCell !== key && 'cursor-not-allowed'
+        )}
+      >
+        {mark}
+      </button>
+    )
   }
 
   if (loading) return <PageLoading />
@@ -359,6 +415,9 @@ function RosterContent() {
           <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
           ยังไม่ตอบ
         </span>
+        {canManage && (
+          <span className="text-gray-400">• คลิกที่ช่องเพื่อแก้แทนผู้ปกครองได้ (ยังไม่ตอบ → ไป → ไม่ไป)</span>
+        )}
       </div>
 
       {visibleTeams.length === 0 ? (

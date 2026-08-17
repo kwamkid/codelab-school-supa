@@ -114,6 +114,39 @@ export async function processLineQueue(limit = 100): Promise<ProcessResult> {
   return { processed: rows.length, sent, failed };
 }
 
+/**
+ * ใส่ LINE message objects ลงคิว — แถวละผู้รับ — แล้วพยายามส่งทันที (cron รายชั่วโมง
+ * เป็นตาข่ายรอง ไม่มีทางหาย). `messages` ส่งตรงเข้า LINE push API จึงใส่ได้ทั้ง
+ * text / image / flex. ใช้โดยทุก sender ที่ประกอบข้อความเอง.
+ */
+export async function enqueueLineMessages(lineUserIds: string[], messages: any[]): Promise<void> {
+  const targets = Array.from(new Set(lineUserIds.filter(Boolean)))
+  if (targets.length === 0 || messages.length === 0) return
+
+  const supabase = createServiceClient() as any
+  const { error } = await supabase.from('line_notification_queue').insert(
+    targets.map((to) => ({
+      type: 'custom',
+      status: 'pending',
+      payload: { to, messages },
+    }))
+  )
+  if (error) {
+    console.error('[enqueueLineMessages] enqueue failed:', error.message)
+    return
+  }
+  try {
+    await processLineQueue()
+  } catch (e) {
+    console.error('[enqueueLineMessages] immediate process failed (cron will retry):', e)
+  }
+}
+
+/** ข้อความ text ล้วน (shortcut ของ enqueueLineMessages) */
+export async function enqueueLineText(lineUserIds: string[], text: string): Promise<void> {
+  await enqueueLineMessages(lineUserIds, [{ type: 'text', text }])
+}
+
 // Push a LINE message payload; returns 'sent' or { error }
 async function pushLine(token: string, to: string, messages: any[]): Promise<'sent' | { error: string }> {
   const res = await fetch(LINE_PUSH_URL, {

@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { vexDb } from '@/lib/vex/supabase'
+import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, requireViewer } from '@/lib/vex/api'
 import { newTeamToken, linkSlug } from '@/lib/vex/tokens'
 import { logAudit } from '@/lib/vex/audit'
@@ -18,6 +19,8 @@ const createSchema = z.object({
   name: z.string().trim().max(120).optional(),
   level: z.enum(LEVELS as [string, ...string[]]),
   branch_id: z.string().uuid(),
+  /** ครูผู้ดูแลทีม (public.teachers.id) — ไม่บังคับตอนสร้าง */
+  coach_teacher_id: z.string().uuid().nullable().optional(),
 })
 
 export async function GET(request: Request) {
@@ -90,11 +93,34 @@ export async function GET(request: Request) {
       for (const b of branches || []) branchName.set(b.id, b.name)
     }
 
+    // ครูผู้ดูแล — อ่านผ่าน RPC get_active_teachers_with_avatar เพราะรูปครูมาจาก
+    // profile_image หรือ Google avatar ของ admin_user ที่ผูกไว้ (อ่าน teachers ตรง ๆ
+    // ได้ profile_image ว่างทุกคน). RPC คืนเฉพาะครูที่ยังใช้งานอยู่ — ครูที่ถูกปิด
+    // ใช้งาน (ลาออก) จึงหลุดออกไปเอง แล้วทีมจะขึ้น "ยังไม่ได้ระบุครูผู้ดูแล"
+    // เพื่อเตือนให้ตั้งครูใหม่ แทนที่จะโชว์ชื่อคนที่ไม่อยู่แล้ว
+    const coachIds = Array.from(new Set(teamRows.map((t: any) => t.coach_teacher_id).filter(Boolean)))
+    const coachInfo = new Map<string, { name: string; image: string | null }>()
+    if (coachIds.length) {
+      try {
+        const svc = createServiceClient()
+        const { data: withAvatar } = await (svc.rpc as any)('get_active_teachers_with_avatar')
+        for (const c of (withAvatar || []) as any[]) {
+          if (coachIds.includes(c.id)) {
+            coachInfo.set(c.id, { name: c.nickname || c.name, image: c.profile_image || null })
+          }
+        }
+      } catch (e) {
+        console.error('[vex teams] coach avatar RPC failed:', e)
+      }
+    }
+
     const teams = teamRows.map((t: any) => ({
       ...t,
       eventLink: t.event_token ? linkSlug(t.team_number, t.event_token) : null,
       practiceLink: t.practice_token ? linkSlug(t.team_number, t.practice_token) : null,
       branchName: t.branch_id ? branchName.get(t.branch_id) ?? null : null,
+      coachName: t.coach_teacher_id ? coachInfo.get(t.coach_teacher_id)?.name ?? null : null,
+      coachImage: t.coach_teacher_id ? coachInfo.get(t.coach_teacher_id)?.image ?? null : null,
       kids: kidsByTeam.get(t.id) || [],
     }))
     return NextResponse.json({ teams })
@@ -119,7 +145,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid input' }, { status: 400 })
   }
-  const { team_number, name, level, branch_id } = parsed.data
+  const { team_number, name, level, branch_id, coach_teacher_id } = parsed.data
 
   const db = vexDb()
 
@@ -147,7 +173,16 @@ export async function POST(request: Request) {
 
     const { data: created, error } = await db
       .from('teams')
-      .insert({ team_number, name: name || null, level, branch_id, event_token, practice_token, slug })
+      .insert({
+        team_number,
+        name: name || null,
+        level,
+        branch_id,
+        coach_teacher_id: coach_teacher_id || null,
+        event_token,
+        practice_token,
+        slug,
+      })
       .select('*')
       .single()
     if (error) {

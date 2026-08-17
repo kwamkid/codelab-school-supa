@@ -8,10 +8,11 @@
 // table with a WRITE — queue rows, not VEX data — and it's a deliberate, isolated
 // exception to reach the shared LINE notifier.
 
-import { createServiceClient } from '@/lib/supabase/server'
 import { restSelect } from '@/lib/supabase/rest'
+import { enqueueLineText } from '@/lib/supabase/services/line-queue'
 import { vexDb } from '@/lib/vex/supabase'
 import { getParentLineIds } from '@/lib/supabase/services/line-notifications'
+import { isLineUserId } from '@/lib/line/line-user-id'
 
 const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 
@@ -115,27 +116,145 @@ export async function notifyParentPractice(
       text = `✏️ แอดมินปรับวัน/เวลาซ้อม${who}ให้ใหม่\n📅 ${when}`
     }
 
-    const supabase = createServiceClient()
-    const { error } = await supabase.from('line_notification_queue' as any).insert(
-      lineIds.map((to) => ({
-        type: 'custom',
-        status: 'pending',
-        payload: { to, messages: [{ type: 'text', text }] },
-      }))
-    )
-    if (error) {
-      console.error('[vex notify] enqueue failed:', error.message)
-      return
-    }
-
-    // Best-effort immediate send (the hourly cron is the safety net).
-    try {
-      const { processLineQueue } = await import('@/lib/supabase/services/line-queue')
-      await processLineQueue()
-    } catch (e) {
-      console.error('[vex notify] immediate process failed (cron will retry):', e)
-    }
+    await enqueueLineText(lineIds, text)
   } catch (e) {
     console.error('[vex notify] unexpected error:', e)
+  }
+}
+
+// ————— ฝั่งครูผู้ดูแลทีม —————
+// ครูรับ noti ได้ก็ต่อเมื่อผูก LINE แล้วจริง ๆ (teachers.line_user_id เป็น userId
+// รูปแบบ U+32hex — คอลัมน์นี้มีของเก่าที่เป็นอีเมล/LINE ID พิมพ์มือปนอยู่ ห้ามเชื่อ
+// ความ truthy ดู lib/line/line-user-id.ts)
+
+interface CoachTarget {
+  lineUserId: string
+  label: string
+}
+
+/** ครูผู้ดูแลของทีมเหล่านี้ที่ผูก LINE แล้ว → teamId → ครู */
+async function coachesForTeams(teamIds: string[]): Promise<Map<string, CoachTarget>> {
+  const result = new Map<string, CoachTarget>()
+  if (teamIds.length === 0) return result
+  try {
+    const { data: teams } = await vexDb()
+      .from('teams')
+      .select('id, team_number, coach_teacher_id')
+      .in('id', teamIds)
+    const rows = (teams || []).filter((t: any) => t.coach_teacher_id)
+    if (rows.length === 0) return result
+
+    // is_active เท่านั้น — ครูที่ลาออก/ถูกปิดใช้งานต้องไม่ได้รับแจ้งเตือนต่อ
+    const coachIds = Array.from(new Set(rows.map((t: any) => t.coach_teacher_id)))
+    const teachers = await restSelect<{
+      id: string
+      name: string
+      nickname: string | null
+      line_user_id: string | null
+    }>('teachers', {
+      id: `in.(${coachIds.join(',')})`,
+      is_active: 'eq.true',
+      select: 'id,name,nickname,line_user_id',
+    })
+
+    const byId = new Map(
+      (teachers || [])
+        .filter((t) => isLineUserId(t.line_user_id))
+        .map((t) => [t.id, { lineUserId: t.line_user_id as string, label: t.nickname || t.name }])
+    )
+    for (const t of rows) {
+      const coach = byId.get(t.coach_teacher_id)
+      if (coach) result.set(t.id, coach)
+    }
+  } catch (e) {
+    console.error('[vex notify] coach lookup failed:', e)
+  }
+  return result
+}
+
+/** แจ้งครูผู้ดูแลทันทีที่แอดมินอนุมัติ/นัดวันซ้อม ว่าจะมีเด็กเข้ามา */
+export async function notifyCoachPractice(
+  practice: { team_id: string; practice_date: string; start_time: string | null; end_time: string | null },
+  kidNickname?: string | null,
+  /** นัดหลายวันรวดเดียว (แอดมินเพิ่มซ้อม) — รวมเป็นข้อความเดียว */
+  allDates?: string[]
+): Promise<void> {
+  try {
+    const coach = (await coachesForTeams([practice.team_id])).get(practice.team_id)
+    if (!coach) return // ยังไม่ได้ระบุครู หรือครูยังไม่ผูก LINE
+
+    const teamRes = await vexDb().from('teams').select('team_number').eq('id', practice.team_id).maybeSingle()
+    const teamNumber = teamRes.data?.team_number || '-'
+    const who = kidNickname || 'นักเรียน'
+    const dates =
+      allDates && allDates.length > 1
+        ? allDates.map(thaiDate).join(', ')
+        : thaiDate(practice.practice_date)
+
+    const text =
+      `🤖 มีนักเรียนเข้าซ้อม (ทีม ${teamNumber})\n` +
+      `👦 ${who}\n` +
+      `📅 ${dates}\n` +
+      `⏰ ${timeRange(practice.start_time, practice.end_time)}`
+    await enqueueLineText([coach.lineUserId], text)
+  } catch (e) {
+    console.error('[vex notify] notifyCoachPractice failed:', e)
+  }
+}
+
+/**
+ * เตือนครูล่วงหน้า: สรุปว่าวันที่ `dateStr` มีเด็กทีมไหนมาซ้อมบ้าง — ข้อความเดียว
+ * ต่อครู 1 คน (รวมทุกทีมที่เขาดูแล). เรียกจาก cron รายวัน.
+ */
+export async function sendCoachPracticeReminders(dateStr: string): Promise<{ coaches: number }> {
+  try {
+    const db = vexDb()
+    const { data: practices } = await db
+      .from('practices')
+      .select('id, team_id, kid_id, start_time, end_time')
+      .eq('practice_date', dateStr)
+      .eq('status', 'approved')
+    const rows = practices || []
+    if (rows.length === 0) return { coaches: 0 }
+
+    const teamIds: string[] = Array.from(new Set(rows.map((p: any) => p.team_id as string)))
+    const coaches = await coachesForTeams(teamIds)
+    if (coaches.size === 0) return { coaches: 0 }
+
+    const kidIds: string[] = Array.from(new Set(rows.map((p: any) => p.kid_id as string)))
+    const [{ data: teams }, { data: kids }] = await Promise.all([
+      db.from('teams').select('id, team_number').in('id', teamIds),
+      db.from('kids').select('id, nickname').in('id', kidIds),
+    ])
+    const teamNumber = new Map<string, string>()
+    for (const t of (teams || []) as any[]) teamNumber.set(t.id, t.team_number)
+    const kidNickname = new Map<string, string>()
+    for (const k of (kids || []) as any[]) kidNickname.set(k.id, k.nickname)
+
+    // ครู → ทีม → รายชื่อเด็ก+เวลา
+    const byCoach = new Map<string, { target: CoachTarget; teams: Map<string, string[]> }>()
+    for (const p of rows as any[]) {
+      const coach = coaches.get(p.team_id)
+      if (!coach) continue
+      const entry = byCoach.get(coach.lineUserId) || { target: coach, teams: new Map<string, string[]>() }
+      const label = teamNumber.get(p.team_id) || '-'
+      const list = entry.teams.get(label) || []
+      list.push(`${kidNickname.get(p.kid_id) || '-'} (${timeRange(p.start_time, p.end_time)})`)
+      entry.teams.set(label, list)
+      byCoach.set(coach.lineUserId, entry)
+    }
+
+    for (const [lineUserId, entry] of byCoach) {
+      const body = Array.from(entry.teams.entries())
+        .map(([team, kidsList]) => `▸ ทีม ${team}\n   ${kidsList.join('\n   ')}`)
+        .join('\n')
+      const text = `🔔 พรุ่งนี้มีนักเรียนเข้าซ้อม\n📅 ${thaiDate(dateStr)}\n\n${body}`
+      await enqueueLineText([lineUserId], text)
+    }
+
+    return { coaches: byCoach.size }
+  } catch (e) {
+    console.error('[vex notify] sendCoachPracticeReminders failed:', e)
+    return { coaches: 0 }
   }
 }

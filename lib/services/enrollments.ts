@@ -892,8 +892,11 @@ export async function getAvailableClassesForTransfer(
 
     const subjectMap = new Map(subjects.map(s => [s.id, s]));
 
+    // จบแล้ว/ยกเลิก ย้ายเข้าไปไม่ได้อยู่แล้ว — ตัดออกให้รายการสั้นลง
+    // (draft/published/started ยังเลือกได้เหมือนเดิม)
     const availableClasses = allClasses.filter(cls => {
       if (cls.id === currentClassId) return false;
+      if (cls.status === 'completed' || cls.status === 'cancelled') return false;
       return true;
     });
 

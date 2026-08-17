@@ -9,6 +9,7 @@ import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/ui/page-header'
 import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { SectionLoading } from '@/components/ui/loading'
 import { CalendarDays } from 'lucide-react'
 import { useBranch } from '@/contexts/BranchContext'
@@ -21,6 +22,7 @@ import type { PracticeStatus } from '@/lib/vex/types'
 interface PracticeRow extends CalendarPractice {
   team_id: string
   branch_id: string | null
+  coachTeacherId?: string | null
 }
 
 export default function VexPracticeSchedulePage() {
@@ -33,6 +35,8 @@ export default function VexPracticeSchedulePage() {
   const [teams, setTeams] = useState<{ id: string; team_number: string; name: string | null; branch_id: string | null }[]>([])
   const [loading, setLoading] = useState(true)
   const [teamFilter, setTeamFilter] = useState<string>('all')
+  // ครูเปิดหน้านี้ → ตั้งต้นที่ "เฉพาะทีมของฉัน" (จุดประสงค์หลักคือครูดูว่าวันไหนมีเด็กตัวเองมา)
+  const [onlyMine, setOnlyMine] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<PracticeRow | null>(null)
 
@@ -69,12 +73,24 @@ export default function VexPracticeSchedulePage() {
     return () => window.removeEventListener('vex-practices-changed', onChanged)
   }, [load])
 
-  // Scope: top-bar branch → team filter
+  // ครูที่ผูกกับ teachers row — ใช้เช็คว่าทีมไหนเป็นทีมของตัวเอง
+  // (ต้องใช้ adminUser.teacherId ไม่ใช่ adminUser.id — คนละค่า)
+  const myTeacherId = adminUser?.teacherId || null
+
+  // ครูเข้ามาครั้งแรก → ติ๊ก "เฉพาะทีมของฉัน" ให้เลย ถ้ามีทีมที่ดูแลอยู่จริง
+  useEffect(() => {
+    if (adminUser?.role === 'teacher' && myTeacherId && all.some((r) => r.coachTeacherId === myTeacherId)) {
+      setOnlyMine(true)
+    }
+  }, [adminUser?.role, myTeacherId, all])
+
+  // Scope: top-bar branch → ทีมของฉัน → team filter
   const visible = useMemo(() => {
     let list = selectedBranchId ? all.filter((r) => r.branch_id === selectedBranchId) : all
+    if (onlyMine && myTeacherId) list = list.filter((r) => r.coachTeacherId === myTeacherId)
     if (teamFilter !== 'all') list = list.filter((r) => r.team_id === teamFilter)
     return list
-  }, [all, selectedBranchId, teamFilter])
+  }, [all, selectedBranchId, teamFilter, onlyMine, myTeacherId])
 
   const teamOptions = useMemo<FormSelectOption[]>(() => {
     const scoped = selectedBranchId ? teams.filter((t) => t.branch_id === selectedBranchId) : teams
@@ -136,13 +152,21 @@ export default function VexPracticeSchedulePage() {
       />
 
       <div className="space-y-4">
-        <div className="w-full sm:w-80">
-          <FormSelect
-            options={teamOptions}
-            value={teamFilter}
-            onValueChange={setTeamFilter}
-            placeholder="เลือกทีม"
-          />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="w-full sm:w-80">
+            <FormSelect
+              options={teamOptions}
+              value={teamFilter}
+              onValueChange={setTeamFilter}
+              placeholder="เลือกทีม"
+            />
+          </div>
+          {myTeacherId && (
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none shrink-0">
+              <Checkbox checked={onlyMine} onCheckedChange={(v) => setOnlyMine(v === true)} />
+              เฉพาะทีมที่ฉันดูแล
+            </label>
+          )}
         </div>
 
         {loading ? (

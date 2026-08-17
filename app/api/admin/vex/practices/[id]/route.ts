@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { vexDb } from '@/lib/vex/supabase'
 import { requireAdmin } from '@/lib/vex/api'
 import { logAudit } from '@/lib/vex/audit'
-import { notifyParentPractice } from '@/lib/vex/notify'
+import { notifyParentPractice, notifyCoachPractice } from '@/lib/vex/notify'
 
 export const dynamic = 'force-dynamic'
 
@@ -126,6 +126,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (kind) {
       const { data: kid } = await db.from('kids').select('nickname').eq('id', updated.kid_id).maybeSingle()
       await notifyParentPractice(updated, kind, kid?.nickname ?? null)
+      // อนุมัติแล้ว → บอกครูผู้ดูแลทีมด้วยว่าจะมีเด็กเข้ามา (เงียบถ้าทีมยังไม่มีครู
+      // หรือครูยังไม่ผูก LINE)
+      if (kind === 'approved') {
+        await notifyCoachPractice(updated, kid?.nickname ?? null)
+      }
     }
 
     return NextResponse.json({ practice: updated })

@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getLineSettings } from '@/lib/supabase/services/line-settings'
+import { createServiceClient } from '@/lib/supabase/server'
 import { createTeamSession, TEAM_SESSION_COOKIE, TEAM_SESSION_MAX_AGE } from '@/lib/vex/team-session'
 
 export const dynamic = 'force-dynamic'
@@ -33,14 +34,28 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state')
   const error = searchParams.get('error')
 
-  // Decode state → { r: returnPath, n: nonce }
+  // Decode state → { r: returnPath, n: nonce, p?: purpose, t?: teacherId }
+  // Two purposes share this callback:
+  //   (default)      /team parent portal login → mints a team session cookie
+  //   'teacher_link' logged-in teacher linking LINE → writes teachers.line_user_id
   let ret = '/team'
   let nonce = ''
+  let teacherLinkId: string | null = null
   try {
     if (state) {
       const parsed = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'))
-      if (typeof parsed?.r === 'string' && parsed.r.startsWith('/team')) ret = parsed.r
       if (typeof parsed?.n === 'string') nonce = parsed.n
+      if (parsed?.p === 'teacher_link' && typeof parsed?.t === 'string') {
+        teacherLinkId = parsed.t
+        // Admin-side return path (state is minted server-side in
+        // /api/teacher/line-link, which already clamped it).
+        ret =
+          typeof parsed.r === 'string' && parsed.r.startsWith('/') && !parsed.r.startsWith('//')
+            ? parsed.r
+            : '/teacher'
+      } else if (typeof parsed?.r === 'string' && parsed.r.startsWith('/team')) {
+        ret = parsed.r
+      }
     }
   } catch {
     // fall through with defaults
@@ -93,6 +108,34 @@ export async function GET(request: NextRequest) {
     const profile = await profileRes.json()
     if (!profile?.userId) {
       return NextResponse.redirect(`${base}${ret}?line_error=no_user`)
+    }
+
+    // Teacher linking: store the userId on the teachers row and go back to the
+    // admin app. No team session cookie — this is staff, not a parent portal login.
+    if (teacherLinkId) {
+      const svc = createServiceClient()
+      // One LINE account may only back one teacher (otherwise noti would be ambiguous).
+      const { data: clash } = await svc
+        .from('teachers')
+        .select('id')
+        .eq('line_user_id', profile.userId)
+        .neq('id', teacherLinkId)
+        .limit(1)
+        .maybeSingle()
+      if (clash) {
+        return NextResponse.redirect(`${base}${ret}?line_error=already_linked_to_other_teacher`)
+      }
+      const { error: linkError } = await svc
+        .from('teachers')
+        .update({ line_user_id: profile.userId })
+        .eq('id', teacherLinkId)
+      if (linkError) {
+        console.error('[line-callback] teacher link failed:', linkError.message)
+        return NextResponse.redirect(`${base}${ret}?line_error=link_failed`)
+      }
+      const linked = NextResponse.redirect(`${base}${ret}?line_linked=1`)
+      linked.cookies.set('vex_line_state', '', { path: '/', maxAge: 0 })
+      return linked
     }
 
     const res = NextResponse.redirect(`${base}${ret}`)

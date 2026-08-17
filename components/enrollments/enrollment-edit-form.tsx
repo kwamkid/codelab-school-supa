@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,7 @@ import { getStudent, getParent } from '@/lib/services/parents';
 import { getClass } from '@/lib/services/classes';
 import { getBranch } from '@/lib/services/branches';
 import { getSubject } from '@/lib/services/subjects';
+import SubjectSearchSelect from '@/components/ui/subject-search-select';
 import { getTeacher } from '@/lib/services/teachers';
 import { toast } from 'sonner';
 import { SectionLoading } from '@/components/ui/loading';
@@ -105,6 +106,8 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
   const [transferring, setTransferring] = useState(false);
   const [transferHistory, setTransferHistory] = useState<any[]>([]);
   const [showOnlyEligible, setShowOnlyEligible] = useState(true);
+  // กรองตามวิชาก่อนเลือกคลาส — รายการคลาสยาวมาก หาคลาสเป้าหมายเจอเร็วขึ้น
+  const [transferSubjectId, setTransferSubjectId] = useState('');
 
   useEffect(() => {
     loadRelatedData();
@@ -251,6 +254,15 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
     return cls;
   };
 
+  // วิชาที่มีคลาสให้ย้ายจริง — derive จากคลาสที่โหลดมาแล้ว (ไม่ต้องยิง getSubjects ซ้ำ)
+  const transferSubjects = useMemo(() => {
+    const map = new Map<string, Subject>();
+    [...allClasses, ...eligibleClasses].forEach((c) => {
+      if (c.subject) map.set(c.subject.id, c.subject);
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  }, [allClasses, eligibleClasses]);
+
   if (loading) {
     return <SectionLoading text="กำลังโหลดข้อมูล..." />;
   }
@@ -265,8 +277,12 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
 
   const isActive = enrollment.status === 'active';
 
-  // Filter classes based on tab selection
-  const displayClasses = showOnlyEligible ? eligibleClasses : allClasses;
+  // Filter classes based on tab selection + the subject filter
+  const matchesSubject = (cls: Class & { subject?: Subject }) =>
+    !transferSubjectId || (cls.subject?.id ?? cls.subjectId) === transferSubjectId;
+  const eligibleFiltered = eligibleClasses.filter(matchesSubject);
+  const allFiltered = allClasses.filter(matchesSubject);
+  const displayClasses = showOnlyEligible ? eligibleFiltered : allFiltered;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -359,22 +375,36 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
                 </DialogHeader>
                 
                 <div className="flex-1 overflow-y-auto space-y-4 py-4">
+                  {/* เลือกวิชาก่อน แล้วค่อยเลือกคลาส — ตัวเลขบนแท็บนับตามวิชาที่เลือก */}
+                  <SubjectSearchSelect
+                    subjects={transferSubjects}
+                    value={transferSubjectId}
+                    onValueChange={(v) => {
+                      setTransferSubjectId(v);
+                      setSelectedNewClassId('');
+                    }}
+                    label="กรองตามวิชา"
+                    placeholder="ค้นหาวิชา... (ว่าง = ทุกวิชา)"
+                  />
+
                   <Tabs defaultValue="eligible" onValueChange={(value) => setShowOnlyEligible(value === 'eligible')}>
                     <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="eligible">
-                        คลาสที่เหมาะกับอายุ ({eligibleClasses.length})
+                        คลาสที่เหมาะกับอายุ ({eligibleFiltered.length})
                       </TabsTrigger>
                       <TabsTrigger value="all">
-                        คลาสทั้งหมด ({allClasses.length})
+                        คลาสทั้งหมด ({allFiltered.length})
                       </TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="eligible" className="mt-4">
-                      {eligibleClasses.length === 0 ? (
+                      {eligibleFiltered.length === 0 ? (
                         <Alert>
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            ไม่พบคลาสที่เหมาะสมกับช่วงอายุของนักเรียน
+                            {transferSubjectId
+                              ? 'ไม่พบคลาสของวิชานี้ที่เหมาะกับช่วงอายุ — ลองดูแท็บ “คลาสทั้งหมด” หรือเปลี่ยนวิชา'
+                              : 'ไม่พบคลาสที่เหมาะสมกับช่วงอายุของนักเรียน'}
                           </AlertDescription>
                         </Alert>
                       ) : null}
@@ -385,7 +415,9 @@ export default function EnrollmentEditForm({ enrollment }: EnrollmentEditFormPro
                         <Alert className="mb-4">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            แสดงคลาสทั้งหมด รวมถึงคลาสที่อาจไม่เหมาะกับช่วงอายุของนักเรียน
+                            {allFiltered.length === 0
+                              ? 'ไม่พบคลาสของวิชานี้ — ลองเปลี่ยนวิชาหรือล้างตัวกรอง'
+                              : 'แสดงคลาสทั้งหมด รวมถึงคลาสที่อาจไม่เหมาะกับช่วงอายุของนักเรียน'}
                           </AlertDescription>
                         </Alert>
                       )}

@@ -34,6 +34,8 @@ export interface CalendarPractice {
   status: PracticeStatus
   kidNickname: string | null
   teamNumber: string | null
+  /** ครูผู้ดูแลทีม — โชว์ใน popover เพื่อให้รู้ว่าวันนั้นใครรับผิดชอบ */
+  coachName?: string | null
 }
 
 const STATUS_META: Record<PracticeStatus, { label: string; chip: string; dot: string }> = {
@@ -249,6 +251,9 @@ export function PracticeMonthView({
                             content={
                               <>
                                 <div className="font-semibold">{g.teamNumber} ({g.kids.length} คน)</div>
+                                {g.kids[0]?.coachName && (
+                                  <div className="text-gray-500 mb-1">ครู{g.kids[0].coachName}</div>
+                                )}
                                 {g.kids.map((k) => (
                                   <div key={k.id}>
                                     {k.kidNickname || '-'}

@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getBranches } from '@/lib/services/branches'
+import { getActiveTeachers } from '@/lib/services/teachers'
+import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 
@@ -26,6 +28,7 @@ interface EditableTeam {
   name: string | null
   level: Level
   branch_id: string | null
+  coach_teacher_id?: string | null
 }
 
 interface Props {
@@ -41,6 +44,9 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
   const [level, setLevel] = useState<Level>(team.level)
   const [branchId, setBranchId] = useState<string>(team.branch_id || '')
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
+  // ครูผู้ดูแลทีม — 'none' = ยังไม่ระบุ (ส่ง null ให้ API เพื่อล้างครูออก)
+  const [coachId, setCoachId] = useState<string>(team.coach_teacher_id || 'none')
+  const [coachOptions, setCoachOptions] = useState<FormSelectOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
 
@@ -51,8 +57,17 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
       setName(team.name || '')
       setLevel(team.level)
       setBranchId(team.branch_id || '')
+      setCoachId(team.coach_teacher_id || 'none')
       getBranches()
         .then((list) => setBranches(list.map((b: any) => ({ id: b.id, name: b.name }))))
+        .catch(() => {})
+      getActiveTeachers()
+        .then((list) =>
+          setCoachOptions([
+            { value: 'none', label: '— ยังไม่ระบุ —' },
+            ...list.map((t) => ({ value: t.id, label: t.nickname || t.name })),
+          ])
+        )
         .catch(() => {})
     }
   }, [open, team])
@@ -67,7 +82,13 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
       const res = await authFetch(`/api/admin/vex/teams/${team.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ team_number: teamNumber.trim(), name: name.trim() || null, level, branch_id: branchId }),
+        body: JSON.stringify({
+          team_number: teamNumber.trim(),
+          name: name.trim() || null,
+          level,
+          branch_id: branchId,
+          coach_teacher_id: coachId === 'none' ? null : coachId,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -136,6 +157,16 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>ครูผู้ดูแลทีม</Label>
+            <FormSelect
+              value={coachId}
+              onValueChange={setCoachId}
+              options={coachOptions}
+              placeholder="เลือกครู"
+              searchPlaceholder="ค้นหาครู..."
+            />
           </div>
         </div>
         <DialogFooter>

@@ -11,7 +11,7 @@ import { vexDb } from '@/lib/vex/supabase'
 import { restSelect } from '@/lib/supabase/rest'
 import { requireAdmin, requireViewer } from '@/lib/vex/api'
 import { logAudit } from '@/lib/vex/audit'
-import { notifyParentPractice } from '@/lib/vex/notify'
+import { notifyParentPractice, notifyCoachPractice } from '@/lib/vex/notify'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,12 +109,10 @@ export async function POST(request: Request) {
     }
     for (const [kidId, practices] of createdByKid) {
       const kid = kids.find((k: any) => k.id === kidId)
-      await notifyParentPractice(
-        practices[0] as any,
-        'scheduled',
-        kid?.nickname ?? null,
-        practices.map((p) => p.practice_date)
-      )
+      const dates = practices.map((p) => p.practice_date)
+      await notifyParentPractice(practices[0] as any, 'scheduled', kid?.nickname ?? null, dates)
+      // แอดมินนัดเอง = อนุมัติทันที → ครูผู้ดูแลควรรู้ด้วย
+      await notifyCoachPractice(practices[0] as any, kid?.nickname ?? null, dates)
     }
 
     return NextResponse.json({
@@ -154,7 +152,9 @@ export async function GET(request: Request) {
 
     const [kidsRes, teamsRes] = await Promise.all([
       kidIds.length ? db.from('kids').select('id, nickname').in('id', kidIds) : Promise.resolve({ data: [] }),
-      teamIds.length ? db.from('teams').select('id, team_number, name, branch_id').in('id', teamIds) : Promise.resolve({ data: [] }),
+      teamIds.length
+        ? db.from('teams').select('id, team_number, name, branch_id, coach_teacher_id').in('id', teamIds)
+        : Promise.resolve({ data: [] }),
     ])
     const kidMap = new Map<string, any>((kidsRes.data || []).map((k: any) => [k.id, k]))
     const teamMap = new Map<string, any>((teamsRes.data || []).map((t: any) => [t.id, t]))
@@ -180,6 +180,21 @@ export async function GET(request: Request) {
           }).catch(() => [])
         : Promise.resolve([]),
     ])
+    // ครูผู้ดูแลของแต่ละทีม — ตารางซ้อมโชว์ว่าวันนั้นครูคนไหนรับผิดชอบ
+    const coachIds = Array.from(
+      new Set(Array.from(teamMap.values()).map((t: any) => t.coach_teacher_id).filter(Boolean))
+    )
+    const coachNameMap = new Map<string, string>()
+    if (coachIds.length) {
+      // ครูที่ปิดใช้งานแล้วไม่ต้องขึ้น — ทีมนั้นถือว่ายังไม่มีครูดูแล
+      const coaches = await restSelect<{ id: string; name: string; nickname: string | null }>('teachers', {
+        id: `in.(${coachIds.join(',')})`,
+        is_active: 'eq.true',
+        select: 'id,name,nickname',
+      }).catch(() => [])
+      for (const c of coaches) coachNameMap.set(c.id, c.nickname || c.name)
+    }
+
     const parentNameMap = new Map<string, string | null>()
     for (const p of submitterParents) parentNameMap.set(p.id, p.display_name || p.line_display_name || null)
     const adminNameMap = new Map<string, string | null>()
@@ -191,6 +206,10 @@ export async function GET(request: Request) {
       teamNumber: teamMap.get(p.team_id)?.team_number ?? null,
       teamName: teamMap.get(p.team_id)?.name ?? null,
       branch_id: teamMap.get(p.team_id)?.branch_id ?? null,
+      coachTeacherId: teamMap.get(p.team_id)?.coach_teacher_id ?? null,
+      coachName: teamMap.get(p.team_id)?.coach_teacher_id
+        ? coachNameMap.get(teamMap.get(p.team_id).coach_teacher_id) ?? null
+        : null,
       submitterType: p.parent_id ? 'parent' : 'admin',
       submitterName: p.parent_id
         ? parentNameMap.get(p.parent_id) ?? null

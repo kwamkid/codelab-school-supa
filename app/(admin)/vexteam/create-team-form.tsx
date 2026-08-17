@@ -7,7 +7,9 @@ import { useState, useRef, useEffect } from 'react'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { getBranches } from '@/lib/services/branches'
+import { getActiveTeachers } from '@/lib/services/teachers'
 import { useBranch } from '@/contexts/BranchContext'
+import { FormSelect, type FormSelectOption } from '@/components/ui/form-select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,10 +34,13 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
   const [level, setLevel] = useState<Level>('iq_elem')
   const [branchId, setBranchId] = useState<string>('')
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
+  // ครูผู้ดูแลทีม (คนหลัก 1 คน) — 'none' = ยังไม่ระบุ (Radix Select ไม่รับ value="")
+  const [coachId, setCoachId] = useState<string>('none')
+  const [coachOptions, setCoachOptions] = useState<FormSelectOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
 
-  // Load branches once the dialog opens; default to the top-bar branch.
+  // Load branches + teachers once the dialog opens; default to the top-bar branch.
   useEffect(() => {
     if (!open) return
     getBranches()
@@ -43,6 +48,14 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
         setBranches(list.map((b: any) => ({ id: b.id, name: b.name })))
         if (!branchId) setBranchId(selectedBranchId || list[0]?.id || '')
       })
+      .catch(() => {})
+    getActiveTeachers()
+      .then((list) =>
+        setCoachOptions([
+          { value: 'none', label: '— ยังไม่ระบุ —' },
+          ...list.map((t) => ({ value: t.id, label: t.nickname || t.name })),
+        ])
+      )
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -52,6 +65,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
     setName('')
     setLevel('iq_elem')
     setBranchId(selectedBranchId || '')
+    setCoachId('none')
   }
 
   const submit = async () => {
@@ -70,7 +84,13 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
       const res = await authFetch('/api/admin/vex/teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ team_number: teamNumber.trim(), name: name.trim() || undefined, level, branch_id: branchId }),
+        body: JSON.stringify({
+          team_number: teamNumber.trim(),
+          name: name.trim() || undefined,
+          level,
+          branch_id: branchId,
+          coach_teacher_id: coachId === 'none' ? null : coachId,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -143,6 +163,16 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>ครูผู้ดูแลทีม</Label>
+            <FormSelect
+              value={coachId}
+              onValueChange={setCoachId}
+              options={coachOptions}
+              placeholder="เลือกครู"
+              searchPlaceholder="ค้นหาครู..."
+            />
           </div>
         </div>
         <DialogFooter>

@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
       trialReminders: 0,
       eventReminders: 0,
       paymentReminders: 0,
+      vexCoachReminders: 0,
+      teacherDigests: 0,
       errors: [] as string[]
     }
 
@@ -281,6 +283,36 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
+    // 6. VEX Coach Reminders (ครูผู้ดูแลทีม — พรุ่งนี้มีใครมาซ้อม)
+    // ============================================
+    console.log('\n--- Part 6: VEX Coach Practice Reminders ---')
+    try {
+      const { sendCoachPracticeReminders } = await import('@/lib/vex/notify')
+      const coachResult = await sendCoachPracticeReminders(tomorrowStr)
+      results.vexCoachReminders = coachResult.coaches
+      totalSent += coachResult.coaches
+      console.log(`  ✓ Notified ${coachResult.coaches} coach(es)`)
+    } catch (error) {
+      console.error('  ! VEX coach reminder error:', error)
+      results.errors.push(`VEX coach reminder error: ${error}`)
+    }
+
+    // ============================================
+    // 7. Teacher Daily Digest (ครูทุกคน — พรุ่งนี้สอนคลาสไหน ใครลา)
+    // ============================================
+    console.log('\n--- Part 7: Teacher Daily Teaching Digest ---')
+    try {
+      const { sendTeacherDailyDigest } = await import('@/lib/supabase/services/teacher-digest')
+      const digest = await sendTeacherDailyDigest(tomorrowStr)
+      results.teacherDigests = digest.teachers
+      totalSent += digest.teachers
+      console.log(`  ✓ Sent teaching digest to ${digest.teachers} teacher(s)`)
+    } catch (error) {
+      console.error('  ! Teacher digest error:', error)
+      results.errors.push(`Teacher digest error: ${error}`)
+    }
+
+    // ============================================
     // Summary
     // ============================================
     console.log('\n=== Combined reminder cron job completed ===')
@@ -291,6 +323,8 @@ export async function GET(request: NextRequest) {
       trialReminders: results.trialReminders,
       eventReminders: results.eventReminders,
       paymentReminders: results.paymentReminders,
+      vexCoachReminders: results.vexCoachReminders,
+      teacherDigests: results.teacherDigests,
       errors: results.errors.length
     })
 

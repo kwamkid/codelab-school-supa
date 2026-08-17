@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useBranch } from '@/contexts/BranchContext';
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AttendanceDialog } from '@/components/attendance/attendance-dialog';
+import { TeacherLineLinkCard } from '@/components/teacher/line-link-card';
 import {
   Dialog,
   DialogContent,
@@ -289,6 +290,10 @@ export default function TeacherHomePage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <Suspense fallback={null}>
+        <TeacherLineLinkCard returnPath="/teacher" />
+      </Suspense>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
