@@ -70,6 +70,8 @@ import { Badge } from '@/components/ui/badge';
 import { Notification } from '@/types/models';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { PrioritySection } from '@/components/layout/priority-section';
+import { TeacherLineGate } from '@/components/teacher/line-gate';
+import { useTeacherLineStatus } from '@/components/teacher/use-line-status';
 
 // Navigation types
 interface NavigationItem {
@@ -148,6 +150,8 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
   const { selectedBranchId } = useBranch();
   const router = useRouter();
   const pathname = usePathname();
+  // เช็คเฉพาะบัญชีครู — แอดมินไม่ต้องผูก LINE
+  const lineStatus = useTeacherLineStatus(adminUser?.role === 'teacher');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Desktop: collapse sidebar to an icon rail (persisted)
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
@@ -866,6 +870,21 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           </Button>
         </div>
       </div>
+    );
+  }
+
+  // ครูต้องเชื่อม LINE ก่อนใช้งาน — บังคับเต็มจอ (เจ้าของสั่ง "บังคับเลย").
+  // รอ lineStatus.loading ให้จบก่อน ไม่งั้นจอกระพริบเป็น gate ทุกครั้งที่โหลด.
+  // เช็คไม่ได้ (เน็ตล่ม/API พัง) → applicable=false → ไม่บังคับ เข้าระบบได้ตามปกติ
+  if (adminUser.role === 'teacher' && !lineStatus.loading && lineStatus.applicable && !lineStatus.linked) {
+    return (
+      <Suspense fallback={null}>
+        <TeacherLineGate
+          teacherName={adminUser.displayName}
+          currentPath={pathname}
+          onSignOut={() => signOut()}
+        />
+      </Suspense>
     );
   }
 

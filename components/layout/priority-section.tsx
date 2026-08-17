@@ -113,7 +113,8 @@ export function PriorityAlert({
 export function PrioritySection({ pathname }: { pathname: string }) {
   return (
     <div className="space-y-3 mb-4 empty:hidden">
-      {/* ครูที่ยังไม่ผูก LINE (ซ่อนเองเมื่อผูกแล้ว / ไม่ใช่บัญชีครู) */}
+      {/* ครูที่เพิ่งผูก LINE เสร็จ → การ์ดชวนเพิ่มเพื่อน OA (ถ้ายังไม่ผูกเลยจะโดน
+          หน้าบังคับ components/teacher/line-gate.tsx จับไปก่อนถึงตรงนี้) */}
       <TeacherLineLinkCard returnPath={pathname} />
 
       {/* ── เพิ่มประกาศด่วนใหม่ตรงนี้ (ดูตัวอย่างในหัวไฟล์) ── */}
