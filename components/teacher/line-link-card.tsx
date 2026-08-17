@@ -100,32 +100,25 @@ export function TeacherLineStatus({ returnPath = '/profile' }: { returnPath?: st
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        <div className="h-5 w-5 bg-green-500 rounded flex items-center justify-center text-white text-xs font-bold">
-          L
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-500">การแจ้งเตือนทาง LINE</p>
-          <p className="font-medium text-green-700 dark:text-green-400">เชื่อมต่อแล้ว</p>
-        </div>
-        <Button variant="ghost" onClick={unlink} disabled={busy} className="text-gray-500">
-          ยกเลิกการเชื่อม
-        </Button>
+    <div className="flex items-center gap-3">
+      <div className="h-5 w-5 bg-green-500 rounded flex items-center justify-center text-white text-xs font-bold">
+        L
       </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-gray-500">การแจ้งเตือนทาง LINE</p>
+        <p className="font-medium text-green-700 dark:text-green-400">เชื่อมต่อแล้ว</p>
+      </div>
+      {/* ทางกลับสำหรับคนที่เชื่อมบัญชีก่อนเพิ่มเพื่อน — วางไว้เฉย ๆ ไม่เตือน */}
       {addFriendUrl && (
-        <p className="text-base text-gray-500 pl-8">
-          ยังไม่ได้เพิ่ม LINE ทางการของโรงเรียนเป็นเพื่อน? ข้อความจะส่งไม่ถึง —{' '}
-          <a
-            href={addFriendUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-green-700 dark:text-green-400 font-medium underline underline-offset-2"
-          >
+        <Button asChild variant="outline">
+          <a href={addFriendUrl} target="_blank" rel="noreferrer">
             เพิ่มเพื่อน
           </a>
-        </p>
+        </Button>
       )}
+      <Button variant="ghost" onClick={unlink} disabled={busy} className="text-gray-500">
+        ยกเลิกการเชื่อม
+      </Button>
     </div>
   )
 }
