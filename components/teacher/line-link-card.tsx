@@ -51,6 +51,16 @@ export function TeacherLineStatus({ returnPath = '/profile' }: { returnPath?: st
   const { loading, applicable, linked, refresh } = useTeacherLineStatus(true)
   const { starting, startLink } = useStartLink(returnPath)
   const [busy, setBusy] = useState(false)
+  const [addFriendUrl, setAddFriendUrl] = useState<string | null>(null)
+
+  // ลิงก์เพิ่มเพื่อน OA — ต้องมีไว้เสมอแม้ผูกแล้ว เพราะเช็คไม่ได้ว่าเพิ่มเพื่อนหรือยัง
+  // และถ้าครูเผลอเชื่อมบัญชีก่อนเพิ่มเพื่อน หน้าบังคับจะหายไป เหลือที่นี่ที่เดียว
+  useEffect(() => {
+    fetch('/api/liff/oa-info')
+      .then((r) => r.json())
+      .then((info) => info?.addFriendUrl && setAddFriendUrl(info.addFriendUrl))
+      .catch(() => {})
+  }, [])
 
   const unlink = async () => {
     if (busy) return
@@ -90,17 +100,32 @@ export function TeacherLineStatus({ returnPath = '/profile' }: { returnPath?: st
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="h-5 w-5 bg-green-500 rounded flex items-center justify-center text-white text-xs font-bold">
-        L
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        <div className="h-5 w-5 bg-green-500 rounded flex items-center justify-center text-white text-xs font-bold">
+          L
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-500">การแจ้งเตือนทาง LINE</p>
+          <p className="font-medium text-green-700 dark:text-green-400">เชื่อมต่อแล้ว</p>
+        </div>
+        <Button variant="ghost" onClick={unlink} disabled={busy} className="text-gray-500">
+          ยกเลิกการเชื่อม
+        </Button>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-500">การแจ้งเตือนทาง LINE</p>
-        <p className="font-medium text-green-700 dark:text-green-400">เชื่อมต่อแล้ว</p>
-      </div>
-      <Button variant="ghost" onClick={unlink} disabled={busy} className="text-gray-500">
-        ยกเลิกการเชื่อม
-      </Button>
+      {addFriendUrl && (
+        <p className="text-base text-gray-500 pl-8">
+          ยังไม่ได้เพิ่ม LINE ทางการของโรงเรียนเป็นเพื่อน? ข้อความจะส่งไม่ถึง —{' '}
+          <a
+            href={addFriendUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-green-700 dark:text-green-400 font-medium underline underline-offset-2"
+          >
+            เพิ่มเพื่อน
+          </a>
+        </p>
+      )}
     </div>
   )
 }
