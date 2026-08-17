@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server'
 import { requireStaff, bearer } from '@/lib/server/admin-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { isLineUserId } from '@/lib/line/line-user-id'
+import { checkOaFriendship } from '@/lib/line/friendship'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,10 +48,13 @@ export async function GET(request: Request) {
     .eq('id', resolved.teacherId)
     .maybeSingle()
 
-  return NextResponse.json({
-    applicable: true,
-    linked: isLineUserId(teacher?.line_user_id),
-  })
+  const linked = isLineUserId(teacher?.line_user_id)
+  // เพิ่ม OA เป็นเพื่อนแล้วหรือยัง — เช็คได้ก็ต่อเมื่อผูกบัญชีแล้ว (ต้องมี userId)
+  // 'unknown' → ส่ง friend: null ให้ฝั่ง UI ถือว่าผ่าน ไม่บล็อก
+  const friendship = linked ? await checkOaFriendship(teacher!.line_user_id as string) : null
+  const friend = friendship === 'friend' ? true : friendship === 'not_friend' ? false : null
+
+  return NextResponse.json({ applicable: true, linked, friend })
 }
 
 export async function DELETE(request: Request) {

@@ -1,14 +1,16 @@
 'use client'
 
-// หน้าบังคับ: ครูต้องเชื่อม LINE ก่อนถึงจะใช้งานระบบได้
+// หน้าบังคับ: ครูต้องเชื่อม LINE + เพิ่ม OA เป็นเพื่อน ก่อนถึงจะใช้งานระบบได้
 // (เจ้าของสั่ง "บังคับเลย" — แบนเนอร์เตือนเฉย ๆ ครูข้ามได้เรื่อย ๆ)
 //
-// จบทั้ง 2 ขั้นในหน้าเดียว: เพิ่ม OA เป็นเพื่อน (ไม่งั้น push ไม่ถึง) แล้วเชื่อมบัญชี
-// จงใจไม่มีการ์ดตามหลังหลังผูกเสร็จ — ครูทำครบตั้งแต่ตรงนี้ ระบบจะได้ไม่ต้อง
-// เตือนซ้ำไปเรื่อย ๆ ทั้งที่เช็คไม่ได้ว่าเพิ่มเพื่อนแล้วจริงไหม
+// ทำทีละขั้นตามลำดับ ไม่ใช่โชว์พร้อมกัน:
+//   ขั้น 1 เชื่อมบัญชี → ได้ LINE userId
+//   ขั้น 2 เพิ่มเพื่อน  → พอมี userId แล้วระบบ "เช็คได้จริง" ว่าเป็นเพื่อนหรือยัง
+//                        (GET /v2/bot/profile — ดู lib/line/friendship.ts)
+// สลับลำดับแบบนี้เพราะขั้น 2 ตรวจสอบไม่ได้ถ้ายังไม่รู้ว่าเป็น userId ไหน
+// จึงเป็นทางเดียวที่ "บังคับ" ให้เพิ่มเพื่อนได้จริงแทนที่จะเชื่อใจว่ากดแล้ว
 //
-// แสดงแทนทั้งหน้าเมื่อ role=teacher + มี teachers row + ยังไม่ผูก LINE
-// มีปุ่มออกจากระบบเสมอ เพื่อไม่ให้ติดกับถ้ามีปัญหากับ LINE
+// เช็ค friendship ไม่ได้ (LINE ล่ม/ไม่มี token) → ปล่อยผ่าน ไม่ล็อกครูออกจากงาน
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -16,7 +18,18 @@ import { QRCodeSVG } from 'qrcode.react'
 import { toast } from 'sonner'
 import { authFetch } from '@/lib/auth-fetch'
 import { Button } from '@/components/ui/button'
-import { MessageCircle, CalendarDays, Users, LogOut, Loader2, UserPlus, Link2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  MessageCircle,
+  CalendarDays,
+  Users,
+  LogOut,
+  Loader2,
+  UserPlus,
+  Link2,
+  Check,
+  RefreshCw,
+} from 'lucide-react'
 
 const LINE_ERROR_TEXT: Record<string, string> = {
   already_linked_to_other_teacher: 'บัญชี LINE นี้ถูกผูกกับครูคนอื่นแล้ว กรุณาใช้บัญชีอื่นหรือแจ้งแอดมิน',
@@ -26,21 +39,50 @@ const LINE_ERROR_TEXT: Record<string, string> = {
   bad_state: 'ลิงก์หมดอายุ กรุณาลองใหม่',
 }
 
+function StepHeader({ n, title, done }: { n: number; title: string; done?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={cn(
+          'h-7 w-7 shrink-0 rounded-full text-white text-base font-bold flex items-center justify-center',
+          done ? 'bg-green-600' : 'bg-gray-800 dark:bg-gray-600'
+        )}
+      >
+        {done ? <Check className="h-4 w-4" /> : n}
+      </span>
+      <h2
+        className={cn(
+          'text-lg font-semibold',
+          done ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'
+        )}
+      >
+        {title}
+      </h2>
+    </div>
+  )
+}
+
 export function TeacherLineGate({
   teacherName,
   currentPath,
+  linked,
   onSignOut,
+  onRecheck,
 }: {
   teacherName?: string | null
   currentPath: string
+  /** ผ่านขั้น 1 แล้วหรือยัง */
+  linked: boolean
   onSignOut: () => void
+  /** เช็คสถานะใหม่หลังกดเพิ่มเพื่อน */
+  onRecheck: () => Promise<void>
 }) {
   const searchParams = useSearchParams()
   const [starting, setStarting] = useState(false)
+  const [rechecking, setRechecking] = useState(false)
   const [addFriendUrl, setAddFriendUrl] = useState<string | null>(null)
   const [oaName, setOaName] = useState<string | null>(null)
 
-  // เด้งกลับมาพร้อม error (ผูกไม่สำเร็จ) → บอกสาเหตุ
   useEffect(() => {
     const err = searchParams.get('line_error')
     if (err) toast.error(LINE_ERROR_TEXT[err] || 'เชื่อมต่อ LINE ไม่สำเร็จ')
@@ -48,6 +90,7 @@ export function TeacherLineGate({
 
   // ลิงก์เพิ่มเพื่อน OA (route นี้ไม่ต้อง auth, cache 1 ชม.ฝั่งเซิร์ฟเวอร์)
   useEffect(() => {
+    if (!linked) return
     fetch('/api/liff/oa-info')
       .then((r) => r.json())
       .then((info) => {
@@ -55,7 +98,7 @@ export function TeacherLineGate({
         if (info?.displayName) setOaName(info.displayName)
       })
       .catch(() => {})
-  }, [])
+  }, [linked])
 
   const startLink = async () => {
     if (starting) return
@@ -76,6 +119,18 @@ export function TeacherLineGate({
     } catch {
       toast.error('เกิดข้อผิดพลาด')
       setStarting(false)
+    }
+  }
+
+  const recheck = async () => {
+    if (rechecking) return
+    setRechecking(true)
+    try {
+      await onRecheck()
+      // ยังอยู่หน้านี้ = ยังไม่เป็นเพื่อน (ถ้าเป็นแล้ว layout จะพาเข้าระบบเอง)
+      toast.info('ยังไม่พบว่าเพิ่มเพื่อนแล้ว — ลองเพิ่มเพื่อนแล้วกดตรวจสอบอีกครั้ง')
+    } finally {
+      setRechecking(false)
     }
   }
 
@@ -111,71 +166,95 @@ export function TeacherLineGate({
             </div>
           </div>
 
-          {/* ขั้น 1 — เพิ่มเพื่อน OA (ข้ามขั้นนี้แล้ว LINE จะ push ไม่ถึงเลย) */}
-          <div className="mt-6 rounded-xl border-2 border-green-200 dark:border-green-900 p-4">
-            <div className="flex items-center gap-2">
-              <span className="h-7 w-7 shrink-0 rounded-full bg-green-600 text-white text-base font-bold flex items-center justify-center">
-                1
-              </span>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                เพิ่ม {oaName || 'LINE ทางการของโรงเรียน'} เป็นเพื่อน
-              </h2>
-            </div>
-            <p className="mt-1.5 text-base text-gray-600 dark:text-gray-400">
-              ถ้ายังไม่เป็นเพื่อนกัน ระบบจะส่งข้อความหาคุณไม่ได้เลย
-            </p>
-
-            <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-              {addFriendUrl && (
-                <div className="shrink-0 rounded-lg bg-white p-2 border">
-                  <QRCodeSVG value={addFriendUrl} size={120} />
-                </div>
-              )}
-              <div className="flex-1 w-full">
-                <p className="text-base text-gray-600 dark:text-gray-400 mb-2">
-                  สแกน QR ด้วยมือถือ หรือกดปุ่มนี้ถ้าเปิดบนเครื่องที่มี LINE อยู่แล้ว
+          {/* ขั้น 1 — เชื่อมบัญชี */}
+          <div
+            className={cn(
+              'mt-6 rounded-xl border-2 p-4',
+              linked
+                ? 'border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20'
+                : 'border-green-200 dark:border-green-900'
+            )}
+          >
+            <StepHeader n={1} title="เชื่อมบัญชี LINE ของคุณ" done={linked} />
+            {!linked && (
+              <>
+                <p className="mt-1.5 text-base text-gray-600 dark:text-gray-400">
+                  เพื่อให้ระบบรู้ว่าต้องส่งตารางสอนของครูคนไหนไปหาใคร
                 </p>
                 <Button
-                  asChild
-                  disabled={!addFriendUrl}
-                  className="w-full h-12 text-base bg-green-600 hover:bg-green-700"
+                  onClick={startLink}
+                  disabled={starting}
+                  className="mt-4 w-full h-12 text-base bg-green-600 hover:bg-green-700"
                 >
-                  <a href={addFriendUrl || '#'} target="_blank" rel="noreferrer">
-                    <UserPlus className="h-5 w-5 mr-2" /> เพิ่มเพื่อน
-                  </a>
+                  {starting ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" /> กำลังเปิด LINE...
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="h-5 w-5 mr-2" /> เชื่อมบัญชี LINE
+                    </>
+                  )}
                 </Button>
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
-          {/* ขั้น 2 — ผูกบัญชี */}
-          <div className="mt-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center gap-2">
-              <span className="h-7 w-7 shrink-0 rounded-full bg-gray-800 dark:bg-gray-600 text-white text-base font-bold flex items-center justify-center">
-                2
-              </span>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                เชื่อมบัญชี LINE ของคุณ
-              </h2>
-            </div>
+          {/* ขั้น 2 — เพิ่มเพื่อน (ปลดล็อกหลังผูกแล้ว เพราะต้องมี userId ถึงตรวจสอบได้) */}
+          <div
+            className={cn(
+              'mt-4 rounded-xl border-2 p-4',
+              linked ? 'border-green-200 dark:border-green-900' : 'border-gray-200 dark:border-gray-800 opacity-50'
+            )}
+          >
+            <StepHeader n={2} title={`เพิ่ม ${oaName || 'LINE ทางการของโรงเรียน'} เป็นเพื่อน`} />
             <p className="mt-1.5 text-base text-gray-600 dark:text-gray-400">
-              เพื่อให้ระบบรู้ว่าต้องส่งตารางสอนของครูคนไหนไปหาใคร
+              {linked
+                ? 'ถ้ายังไม่เป็นเพื่อนกัน ระบบจะส่งข้อความหาคุณไม่ได้เลย'
+                : 'ทำขั้นที่ 1 ให้เสร็จก่อน'}
             </p>
-            <Button
-              onClick={startLink}
-              disabled={starting}
-              className="mt-4 w-full h-12 text-base bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
-            >
-              {starting ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" /> กำลังเปิด LINE...
-                </>
-              ) : (
-                <>
-                  <Link2 className="h-5 w-5 mr-2" /> เชื่อมบัญชี LINE
-                </>
-              )}
-            </Button>
+
+            {linked && (
+              <>
+                <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
+                  {addFriendUrl && (
+                    <div className="shrink-0 rounded-lg bg-white p-2 border">
+                      <QRCodeSVG value={addFriendUrl} size={120} />
+                    </div>
+                  )}
+                  <div className="flex-1 w-full">
+                    <p className="text-base text-gray-600 dark:text-gray-400 mb-2">
+                      สแกน QR ด้วยมือถือ หรือกดปุ่มนี้ถ้าเปิดบนเครื่องที่มี LINE อยู่แล้ว
+                    </p>
+                    <Button
+                      asChild
+                      disabled={!addFriendUrl}
+                      className="w-full h-12 text-base bg-green-600 hover:bg-green-700"
+                    >
+                      <a href={addFriendUrl || '#'} target="_blank" rel="noreferrer">
+                        <UserPlus className="h-5 w-5 mr-2" /> เพิ่มเพื่อน
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={recheck}
+                  disabled={rechecking}
+                  className="mt-3 w-full h-11 text-base"
+                >
+                  {rechecking ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" /> กำลังตรวจสอบ...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-5 w-5 mr-2" /> เพิ่มเพื่อนแล้ว — ตรวจสอบ
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </div>
 
           <p className="mt-4 text-sm text-center text-gray-500">

@@ -14,6 +14,8 @@ export interface TeacherLineStatusState {
   loading: boolean
   applicable: boolean
   linked: boolean
+  /** เพิ่ม OA เป็นเพื่อนแล้ว? null = เช็คไม่ได้/ยังไม่ผูก → ถือว่าผ่าน ห้ามบล็อก */
+  friend: boolean | null
   refresh: () => Promise<void>
 }
 
@@ -21,6 +23,7 @@ export function useTeacherLineStatus(enabled = true): TeacherLineStatusState {
   const [loading, setLoading] = useState(true)
   const [applicable, setApplicable] = useState(false)
   const [linked, setLinked] = useState(false)
+  const [friend, setFriend] = useState<boolean | null>(null)
 
   const refresh = useCallback(async () => {
     if (!enabled) {
@@ -32,10 +35,12 @@ export function useTeacherLineStatus(enabled = true): TeacherLineStatusState {
       const data = await res.json()
       setApplicable(!!data.applicable)
       setLinked(!!data.linked)
+      setFriend(data.friend === true ? true : data.friend === false ? false : null)
     } catch {
       // เช็คไม่ได้ → ถือว่าไม่ต้องบังคับ ดีกว่าล็อกครูออกจากระบบเพราะเน็ตสะดุด
       setApplicable(false)
       setLinked(false)
+      setFriend(null)
     } finally {
       setLoading(false)
     }
@@ -45,5 +50,5 @@ export function useTeacherLineStatus(enabled = true): TeacherLineStatusState {
     refresh()
   }, [refresh])
 
-  return { loading, applicable, linked, refresh }
+  return { loading, applicable, linked, friend, refresh }
 }

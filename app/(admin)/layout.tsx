@@ -873,16 +873,23 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
     );
   }
 
-  // ครูต้องเชื่อม LINE ก่อนใช้งาน — บังคับเต็มจอ (เจ้าของสั่ง "บังคับเลย").
+  // ครูต้องเชื่อม LINE + เพิ่ม OA เป็นเพื่อน ก่อนใช้งาน — บังคับเต็มจอ.
   // รอ lineStatus.loading ให้จบก่อน ไม่งั้นจอกระพริบเป็น gate ทุกครั้งที่โหลด.
-  // เช็คไม่ได้ (เน็ตล่ม/API พัง) → applicable=false → ไม่บังคับ เข้าระบบได้ตามปกติ
-  if (adminUser.role === 'teacher' && !lineStatus.loading && lineStatus.applicable && !lineStatus.linked) {
+  // friend === null = เช็คไม่ได้/LINE ล่ม → ปล่อยผ่าน (บล็อกเฉพาะ false ที่ยืนยันแล้ว)
+  if (
+    adminUser.role === 'teacher' &&
+    !lineStatus.loading &&
+    lineStatus.applicable &&
+    (!lineStatus.linked || lineStatus.friend === false)
+  ) {
     return (
       <Suspense fallback={null}>
         <TeacherLineGate
           teacherName={adminUser.displayName}
           currentPath={pathname}
+          linked={lineStatus.linked}
           onSignOut={() => signOut()}
+          onRecheck={lineStatus.refresh}
         />
       </Suspense>
     );

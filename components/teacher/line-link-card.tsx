@@ -48,7 +48,7 @@ function useStartLink(returnPath: string) {
  * ยังไม่ผูกโชว์ปุ่มเชื่อม (ปกติจะไม่เกิด เพราะโดนหน้าบังคับจับไปก่อน)
  */
 export function TeacherLineStatus({ returnPath = '/profile' }: { returnPath?: string }) {
-  const { loading, applicable, linked, refresh } = useTeacherLineStatus(true)
+  const { loading, applicable, linked, friend, refresh } = useTeacherLineStatus(true)
   const { starting, startLink } = useStartLink(returnPath)
   const [busy, setBusy] = useState(false)
   const [addFriendUrl, setAddFriendUrl] = useState<string | null>(null)
@@ -108,8 +108,9 @@ export function TeacherLineStatus({ returnPath = '/profile' }: { returnPath?: st
         <p className="text-sm text-gray-500">การแจ้งเตือนทาง LINE</p>
         <p className="font-medium text-green-700 dark:text-green-400">เชื่อมต่อแล้ว</p>
       </div>
-      {/* ทางกลับสำหรับคนที่เชื่อมบัญชีก่อนเพิ่มเพื่อน — วางไว้เฉย ๆ ไม่เตือน */}
-      {addFriendUrl && (
+      {/* โชว์เฉพาะตอนที่ยืนยันได้ว่ายังไม่เป็นเพื่อน (friend === false) —
+          เป็นเพื่อนแล้ว/เช็คไม่ได้ ก็ไม่ต้องมีปุ่มนี้มากวน */}
+      {friend === false && addFriendUrl && (
         <Button asChild variant="outline">
           <a href={addFriendUrl} target="_blank" rel="noreferrer">
             เพิ่มเพื่อน
