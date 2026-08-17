@@ -6,7 +6,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   User,
@@ -28,6 +27,7 @@ import { getBranches } from '@/lib/services/branches';
 import { getSubjects } from '@/lib/services/subjects';
 import { Teacher, Branch, Subject } from '@/types/models';
 import { formatDate, formatCurrency } from '@/lib/utils';
+import { TeacherLineStatus } from '@/components/teacher/line-link-card';
 import Link from 'next/link';
 
 export default function ProfilePage() {
@@ -49,8 +49,10 @@ export default function ProfilePage() {
       setLoading(true);
       
       // ถ้าเป็น teacher โหลดข้อมูล teacher
-      if (adminUser?.role === 'teacher') {
-        const teacherData = await getTeacher(user!.uid);
+      // ต้องใช้ adminUser.teacherId (= teachers.id) — user.uid คือ auth user id
+      // คนละค่ากัน ทำให้หน้านี้ขึ้น "ไม่พบข้อมูลครู" กับครูทุกคน
+      if (adminUser?.role === 'teacher' && adminUser.teacherId) {
+        const teacherData = await getTeacher(adminUser.teacherId);
         if (teacherData) {
           setTeacher(teacherData);
         }
@@ -339,17 +341,9 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {teacher!.lineUserId && (
-            <div className="flex items-center gap-3">
-              <div className="h-5 w-5 bg-green-500 rounded flex items-center justify-center text-white text-xs font-bold">
-                L
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">LINE ID</p>
-                <p className="font-medium">{teacher!.lineUserId}</p>
-              </div>
-            </div>
-          )}
+          {/* สถานะเชื่อม LINE (+ ปุ่มผูก/ยกเลิก) — แทนที่ช่อง "LINE ID" เดิมที่อ่านจาก
+              teacher.lineUserId ซึ่งไม่มีอยู่ใน type จึงไม่เคยแสดงผล */}
+          <TeacherLineStatus returnPath="/profile" />
         </CardContent>
       </Card>
 

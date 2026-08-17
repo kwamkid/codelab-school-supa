@@ -94,6 +94,12 @@ export function TeacherLineLinkCard({ returnPath = '/teacher' }: { returnPath?: 
 
   if (!applicable || linked !== false) return null
 
+  return <LinkPrompt returnPath={returnPath} />
+}
+
+/** แถบชวนผูก (ใช้ทั้งในแบนเนอร์และหน้าโปรไฟล์) */
+function LinkPrompt({ returnPath }: { returnPath: string }) {
+
   return (
     <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900">
       <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -101,7 +107,7 @@ export function TeacherLineLinkCard({ returnPath = '/teacher' }: { returnPath?: 
         <div className="flex-1 min-w-0">
           <div className="font-medium text-amber-900 dark:text-amber-300">ยังไม่ได้เชื่อม LINE</div>
           <p className="text-sm text-amber-800 dark:text-amber-400 mt-0.5">
-            เชื่อมครั้งเดียว แล้วรับแจ้งเตือนตารางซ้อมของทีมที่คุณดูแลทาง LINE
+            เชื่อมครั้งเดียว แล้วรับแจ้งเตือนตารางสอนและตารางซ้อมทาง LINE
           </p>
         </div>
         <Button
@@ -115,5 +121,66 @@ export function TeacherLineLinkCard({ returnPath = '/teacher' }: { returnPath?: 
         </Button>
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * แถวสถานะ LINE สำหรับหน้าโปรไฟล์ครู — ผูกแล้วโชว์สถานะ + ปุ่มยกเลิก,
+ * ยังไม่ผูกโชว์การ์ดชวนผูก (ตัวเดียวกับแบนเนอร์)
+ */
+export function TeacherLineStatus({ returnPath = '/profile' }: { returnPath?: string }) {
+  const [linked, setLinked] = useState<boolean | null>(null)
+  const [applicable, setApplicable] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/teacher/line-status')
+      const data = await res.json()
+      setApplicable(!!data.applicable)
+      setLinked(!!data.linked)
+    } catch {
+      setLinked(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  if (!applicable || linked === null) return null
+  if (!linked) return <LinkPrompt returnPath={returnPath} />
+
+  const unlink = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const res = await fetch('/api/teacher/line-status', { method: 'DELETE' })
+      if (!res.ok) {
+        toast.error('ยกเลิกการเชื่อมไม่สำเร็จ')
+        return
+      }
+      toast.success('ยกเลิกการเชื่อม LINE แล้ว')
+      setLinked(false)
+    } catch {
+      toast.error('เกิดข้อผิดพลาด')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-5 w-5 bg-green-500 rounded flex items-center justify-center text-white text-xs font-bold">
+        L
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-gray-500">การแจ้งเตือนทาง LINE</p>
+        <p className="font-medium text-green-700 dark:text-green-400">เชื่อมต่อแล้ว</p>
+      </div>
+      <Button variant="ghost" size="sm" onClick={unlink} disabled={busy} className="text-gray-500">
+        ยกเลิกการเชื่อม
+      </Button>
+    </div>
   )
 }

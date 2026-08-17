@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, ReactNode } from 'react';
+import { useEffect, useState, useMemo, Suspense, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -69,6 +69,7 @@ import { getClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Notification } from '@/types/models';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { TeacherLineLinkCard } from '@/components/teacher/line-link-card';
 
 // Navigation types
 interface NavigationItem {
@@ -1279,6 +1280,11 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           {/* Page content */}
           <main className="h-[calc(100%-4rem)] overflow-y-auto overflow-x-hidden overscroll-contain">
             <div className="p-4 md:p-6 pb-12">
+              {/* ครูที่ยังไม่ผูก LINE เห็นแถบชวนผูกทุกหน้า (ผูกแล้วหายไปเอง).
+                  วางในนี้ไม่ใช่ข้าง <main> เพราะ main คิดความสูงจาก h-4rem ของ header */}
+              <Suspense fallback={null}>
+                <TeacherLineLinkCard returnPath={pathname} />
+              </Suspense>
               {children}
             </div>
           </main>
