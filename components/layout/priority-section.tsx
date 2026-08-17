@@ -27,7 +27,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { AlertTriangle, Info, Megaphone, X } from 'lucide-react'
-import { TeacherLineLinkCard } from '@/components/teacher/line-link-card'
 
 type PriorityVariant = 'urgent' | 'warning' | 'info'
 
@@ -36,19 +35,19 @@ const VARIANT_STYLE: Record<PriorityVariant, { card: string; title: string; body
     card: 'border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900',
     title: 'text-red-900 dark:text-red-300',
     body: 'text-red-800 dark:text-red-400',
-    icon: <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 hidden sm:block" />,
+    icon: <AlertTriangle className="h-6 w-6 text-red-600 shrink-0 hidden sm:block" />,
   },
   warning: {
     card: 'border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900',
     title: 'text-amber-900 dark:text-amber-300',
     body: 'text-amber-800 dark:text-amber-400',
-    icon: <Megaphone className="h-5 w-5 text-amber-600 shrink-0 hidden sm:block" />,
+    icon: <Megaphone className="h-6 w-6 text-amber-600 shrink-0 hidden sm:block" />,
   },
   info: {
     card: 'border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900',
     title: 'text-blue-900 dark:text-blue-300',
     body: 'text-blue-800 dark:text-blue-400',
-    icon: <Info className="h-5 w-5 text-blue-600 shrink-0 hidden sm:block" />,
+    icon: <Info className="h-6 w-6 text-blue-600 shrink-0 hidden sm:block" />,
   },
 }
 
@@ -81,12 +80,12 @@ export function PriorityAlert({
       <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
         {style.icon}
         <div className="flex-1 min-w-0">
-          <div className={cn('font-medium', style.title)}>{title}</div>
-          {description && <p className={cn('text-sm mt-0.5', style.body)}>{description}</p>}
+          <div className={cn('text-lg font-semibold', style.title)}>{title}</div>
+          {description && <p className={cn('text-base mt-0.5', style.body)}>{description}</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {action && (
-            <Button asChild size="sm" variant="outline">
+            <Button asChild variant="outline">
               <a href={action.href}>{action.label}</a>
             </Button>
           )}
@@ -100,7 +99,7 @@ export function PriorityAlert({
                 setDismissed(true)
               }}
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </Button>
           )}
         </div>
@@ -110,14 +109,12 @@ export function PriorityAlert({
 }
 
 /** รายการประกาศทั้งหมด — เรียงจากด่วนสุดลงมา */
-export function PrioritySection({ pathname }: { pathname: string }) {
+export function PrioritySection({ pathname: _pathname }: { pathname: string }) {
   return (
     <div className="space-y-3 mb-4 empty:hidden">
-      {/* ครูที่เพิ่งผูก LINE เสร็จ → การ์ดชวนเพิ่มเพื่อน OA (ถ้ายังไม่ผูกเลยจะโดน
-          หน้าบังคับ components/teacher/line-gate.tsx จับไปก่อนถึงตรงนี้) */}
-      <TeacherLineLinkCard returnPath={pathname} />
-
-      {/* ── เพิ่มประกาศด่วนใหม่ตรงนี้ (ดูตัวอย่างในหัวไฟล์) ── */}
+      {/* ── เพิ่มประกาศด่วนใหม่ตรงนี้ (ดูตัวอย่างในหัวไฟล์) ──
+          หมายเหตุ: การชวนครูเชื่อม LINE ไม่ได้อยู่ที่นี่ — เป็นหน้าบังคับเต็มจอ
+          ตั้งแต่เข้าระบบ (components/teacher/line-gate.tsx) */}
     </div>
   )
 }
