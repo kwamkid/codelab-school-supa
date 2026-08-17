@@ -1,59 +1,60 @@
 // app/api/teacher/line-link/route.ts
-// Start the LINE web-login (OAuth) flow for a LOGGED-IN teacher so we can store
-// their real LINE userId on teachers.line_user_id and push notifications to them.
+// POST { returnPath } → { authorizeUrl } : start linking the logged-in teacher's
+// LINE account. The client then does window.location.href = authorizeUrl.
 //
-// Identity comes from the Supabase session cookie (the teacher is already logged
-// into the admin app), so the browser never gets to say which teacher it is —
-// state only carries the teacher id we resolved server-side.
+// Why POST-then-redirect instead of a plain <a href>: this app keeps its Supabase
+// session in localStorage (not cookies), so a browser-navigated GET carries no
+// identity. Going through authFetch lets us verify the teacher server-side with
+// the same Bearer token every other protected route uses, and only THEN mint the
+// LINE authorize URL — the browser never gets to claim which teacher it is.
 //
-// Reuses the /api/auth/callback/line callback (already registered in the LINE
-// console for every domain); the callback branches on state.p === 'teacher_link'.
+// The CSRF nonce rides back as a Set-Cookie on this response; the shared callback
+// /api/auth/callback/line checks it and branches on state.p === 'teacher_link'.
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { getLineSettings } from '@/lib/supabase/services/line-settings'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-function baseUrl(request: NextRequest): string {
+function baseUrl(request: Request): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL ||
     (request.headers.get('x-forwarded-proto') || 'https') + '://' + request.headers.get('host')
   )
 }
 
-export async function GET(request: NextRequest) {
-  const base = baseUrl(request)
-  const { searchParams } = new URL(request.url)
-  const ret = searchParams.get('return') || '/teacher'
-  // Internal paths only (no protocol-relative "//evil.com") — prevents open-redirect.
-  const safeReturn = ret.startsWith('/') && !ret.startsWith('//') ? ret : '/teacher'
+export async function POST(request: Request) {
+  const staff = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!staff.ok) {
+    return NextResponse.json({ error: staff.error }, { status: staff.status ?? 401 })
+  }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.redirect(`${base}/login`)
-
-  // auth user → admin_users → the linked teachers row (teacher_id, not admin id)
   const svc = createServiceClient()
   const { data: adminUser } = await svc
     .from('admin_users')
-    .select('id, teacher_id, is_active')
-    .eq('auth_user_id', user.id)
+    .select('teacher_id')
+    .eq('id', staff.adminId!)
     .maybeSingle()
-  if (!adminUser?.is_active) {
-    return NextResponse.redirect(`${base}${safeReturn}?line_error=forbidden`)
+  if (!adminUser?.teacher_id) {
+    return NextResponse.json({ error: 'บัญชีนี้ยังไม่ได้เชื่อมกับข้อมูลครู' }, { status: 404 })
   }
-  if (!adminUser.teacher_id) {
-    // Staff account with no teachers row — nothing to attach the LINE id to.
-    return NextResponse.redirect(`${base}${safeReturn}?line_error=no_teacher_profile`)
+
+  let body: any = {}
+  try {
+    body = await request.json()
+  } catch {
+    // no body → default return path
   }
+  const ret = typeof body?.returnPath === 'string' ? body.returnPath : '/teacher'
+  // Internal paths only (no protocol-relative "//evil.com") — prevents open-redirect.
+  const safeReturn = ret.startsWith('/') && !ret.startsWith('//') ? ret : '/teacher'
 
   const settings = await getLineSettings()
   if (!settings.loginChannelId || !settings.loginChannelSecret) {
-    return NextResponse.redirect(`${base}${safeReturn}?line_error=not_configured`)
+    return NextResponse.json({ error: 'ยังไม่ได้ตั้งค่า LINE Login ในระบบ' }, { status: 500 })
   }
 
   const nonce = crypto.randomBytes(16).toString('hex')
@@ -64,11 +65,11 @@ export async function GET(request: NextRequest) {
   const authorizeUrl = new URL('https://access.line.me/oauth2/v2.1/authorize')
   authorizeUrl.searchParams.set('response_type', 'code')
   authorizeUrl.searchParams.set('client_id', settings.loginChannelId)
-  authorizeUrl.searchParams.set('redirect_uri', `${base}/api/auth/callback/line`)
+  authorizeUrl.searchParams.set('redirect_uri', `${baseUrl(request)}/api/auth/callback/line`)
   authorizeUrl.searchParams.set('state', state)
   authorizeUrl.searchParams.set('scope', 'profile openid')
 
-  const res = NextResponse.redirect(authorizeUrl.toString())
+  const res = NextResponse.json({ authorizeUrl: authorizeUrl.toString() })
   res.cookies.set('vex_line_state', nonce, {
     httpOnly: true,
     secure: true,

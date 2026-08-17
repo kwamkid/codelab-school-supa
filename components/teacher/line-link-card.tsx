@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { authFetch } from '@/lib/auth-fetch'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { MessageCircle, X } from 'lucide-react'
@@ -34,7 +35,7 @@ export function TeacherLineLinkCard({ returnPath = '/teacher' }: { returnPath?: 
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/teacher/line-status')
+      const res = await authFetch('/api/teacher/line-status')
       const data = await res.json()
       setApplicable(!!data.applicable)
       setLinked(!!data.linked)
@@ -99,6 +100,31 @@ export function TeacherLineLinkCard({ returnPath = '/teacher' }: { returnPath?: 
 
 /** แถบชวนผูก (ใช้ทั้งในแบนเนอร์และหน้าโปรไฟล์) */
 function LinkPrompt({ returnPath }: { returnPath: string }) {
+  const [starting, setStarting] = useState(false)
+
+  // ขอ authorize URL ผ่าน authFetch ก่อน (เซิร์ฟเวอร์ยืนยันว่าเป็นครูคนไหนจาก
+  // Bearer token) แล้วค่อยพาไป LINE — navigate ตรง ๆ จะไม่มี token ติดไปด้วย
+  const startLink = async () => {
+    if (starting) return
+    setStarting(true)
+    try {
+      const res = await authFetch('/api/teacher/line-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnPath }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.authorizeUrl) {
+        toast.error(data.error || 'เริ่มเชื่อมต่อ LINE ไม่สำเร็จ')
+        setStarting(false)
+        return
+      }
+      window.location.href = data.authorizeUrl
+    } catch {
+      toast.error('เกิดข้อผิดพลาด')
+      setStarting(false)
+    }
+  }
 
   return (
     <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900">
@@ -113,11 +139,10 @@ function LinkPrompt({ returnPath }: { returnPath: string }) {
         <Button
           size="sm"
           className="shrink-0 bg-green-600 hover:bg-green-700"
-          onClick={() => {
-            window.location.href = `/api/teacher/line-link?return=${encodeURIComponent(returnPath)}`
-          }}
+          onClick={startLink}
+          disabled={starting}
         >
-          เชื่อมต่อ LINE
+          {starting ? 'กำลังเปิด LINE...' : 'เชื่อมต่อ LINE'}
         </Button>
       </CardContent>
     </Card>
@@ -135,7 +160,7 @@ export function TeacherLineStatus({ returnPath = '/profile' }: { returnPath?: st
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/teacher/line-status')
+      const res = await authFetch('/api/teacher/line-status')
       const data = await res.json()
       setApplicable(!!data.applicable)
       setLinked(!!data.linked)
@@ -155,7 +180,7 @@ export function TeacherLineStatus({ returnPath = '/profile' }: { returnPath?: st
     if (busy) return
     setBusy(true)
     try {
-      const res = await fetch('/api/teacher/line-status', { method: 'DELETE' })
+      const res = await authFetch('/api/teacher/line-status', { method: 'DELETE' })
       if (!res.ok) {
         toast.error('ยกเลิกการเชื่อมไม่สำเร็จ')
         return
