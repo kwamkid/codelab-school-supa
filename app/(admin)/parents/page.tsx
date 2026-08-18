@@ -226,7 +226,7 @@ export default function ParentsPage() {
   }, [searchTerm, filterBranch, filterStatus, sort, resetPagination]);
 
   // Filter parents
-  const filteredParents = useMemo(() => {
+  const scopedParents = useMemo(() => {
     let filtered = [...allParentsData];
 
     if (filterBranch !== 'all') {
@@ -252,35 +252,39 @@ export default function ParentsPage() {
       );
     }
 
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(parent => {
-        if (filterStatus === 'active') return parent.enrollmentStatus === 'active';
-        if (filterStatus === 'completed') return parent.enrollmentStatus === 'completed' || parent.enrollmentStatus === 'mixed';
-        if (filterStatus === 'never') return parent.enrollmentStatus === 'never';
-        return true;
-      });
-    }
-
     return filtered;
-  }, [allParentsData, searchTerm, filterBranch, filterStatus]);
+  }, [allParentsData, searchTerm, filterBranch]);
 
-  // Statistics
+  // ตัวเลขบนการ์ดนับจาก scope (สาขา+ค้นหา) ไม่รวมตัวกรองสถานะ — ไม่งั้นพอกดการ์ด
+  // ใบหนึ่ง ใบอื่นจะกลายเป็น 0 หมดจนกดสลับไปมาไม่ได้
   const stats = useMemo(() => {
-    const activeCount = filteredParents.filter(p => p.enrollmentStatus === 'active').length;
-    const completedCount = filteredParents.filter(p => p.enrollmentStatus === 'completed' || p.enrollmentStatus === 'mixed').length;
-    const neverCount = filteredParents.filter(p => p.enrollmentStatus === 'never').length;
-    
+    const activeCount = scopedParents.filter(p => p.enrollmentStatus === 'active').length;
+    const completedCount = scopedParents.filter(p => p.enrollmentStatus === 'completed' || p.enrollmentStatus === 'mixed').length;
+    const neverCount = scopedParents.filter(p => p.enrollmentStatus === 'never').length;
+
     return {
-      totalParents: filteredParents.length,
-      totalStudents: filteredParents.reduce((sum, p) => sum + (p.activeStudentCount || 0), 0),
-      withLineId: filteredParents.filter(p => p.lineUserId).length,
+      totalParents: scopedParents.length,
+      totalStudents: scopedParents.reduce((sum, p) => sum + (p.activeStudentCount || 0), 0),
+      withLineId: scopedParents.filter(p => p.lineUserId).length,
       // ผูก LINE แล้วแต่ยังไม่ได้แอด OA → ระบบส่งแจ้งเตือนไม่ถึงเลย
-      notFriend: filteredParents.filter(p => p.lineUserId && p.lineFriendState === 'not_friend').length,
+      notFriend: scopedParents.filter(p => p.lineUserId && p.lineFriendState === 'not_friend').length,
       activeEnrollment: activeCount,
       completedEnrollment: completedCount,
       neverEnrolled: neverCount
     };
-  }, [filteredParents]);
+  }, [scopedParents]);
+
+  const filteredParents = useMemo(() => {
+    if (filterStatus === 'all') return scopedParents;
+    return scopedParents.filter(parent => {
+      if (filterStatus === 'active') return parent.enrollmentStatus === 'active';
+      if (filterStatus === 'completed') return parent.enrollmentStatus === 'completed' || parent.enrollmentStatus === 'mixed';
+      if (filterStatus === 'never') return parent.enrollmentStatus === 'never';
+      if (filterStatus === 'line_connected') return !!parent.lineUserId;
+      if (filterStatus === 'line_not_friend') return !!parent.lineUserId && parent.lineFriendState === 'not_friend';
+      return true;
+    });
+  }, [scopedParents, filterStatus]);
 
   // Apply column sort, then paginate
   const sortedParents = useMemo(() => {
@@ -389,24 +393,40 @@ export default function ParentsPage() {
         </PermissionGuard>
       </div>
 
-      {/* Summary Cards — full-colour */}
+      {/* Summary Cards — คลิกเพื่อกรอง (กดใบเดิมซ้ำ = ล้างตัวกรอง).
+          ใบที่ไม่มี filter (นักเรียนทั้งหมด) เป็นตัวเลขอย่างเดียว กดไม่ได้ */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         {[
-          { label: filterBranch !== 'all' ? 'ผู้ปกครองในสาขา' : 'ผู้ปกครองทั้งหมด', value: stats.totalParents, Icon: Users, bg: 'bg-gradient-to-br from-gray-700 to-gray-900' },
-          { label: 'นักเรียนทั้งหมด', value: stats.totalStudents, Icon: GraduationCap, bg: 'bg-gradient-to-br from-blue-500 to-blue-600' },
-          { label: 'เชื่อมต่อ LINE', value: stats.withLineId, Icon: Globe, bg: 'bg-gradient-to-br from-emerald-500 to-green-600' },
-          { label: 'ยังไม่แอด LINE OA', value: stats.notFriend, Icon: BellOff, bg: 'bg-gradient-to-br from-red-500 to-red-600' },
-          { label: 'มีลูกกำลังเรียน', value: stats.activeEnrollment, Icon: GraduationCap, bg: 'bg-gradient-to-br from-teal-500 to-teal-600' },
-          { label: 'ยังไม่ลงคอร์ส', value: stats.neverEnrolled, Icon: User, bg: 'bg-gradient-to-br from-slate-400 to-slate-500' },
-        ].map((stat) => (
-          <div key={stat.label} className={cn('rounded-xl p-4 text-white shadow-sm', stat.bg)}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-white/90 leading-tight">{stat.label}</span>
-              <stat.Icon className="h-4 w-4 text-white/80 shrink-0" />
-            </div>
-            <div className="text-2xl font-bold mt-2">{stat.value}</div>
-          </div>
-        ))}
+          { label: filterBranch !== 'all' ? 'ผู้ปกครองในสาขา' : 'ผู้ปกครองทั้งหมด', value: stats.totalParents, Icon: Users, bg: 'bg-gradient-to-br from-gray-700 to-gray-900', filter: 'all' },
+          { label: 'นักเรียนทั้งหมด', value: stats.totalStudents, Icon: GraduationCap, bg: 'bg-gradient-to-br from-blue-500 to-blue-600', filter: null },
+          { label: 'เชื่อมต่อ LINE', value: stats.withLineId, Icon: Globe, bg: 'bg-gradient-to-br from-emerald-500 to-green-600', filter: 'line_connected' },
+          { label: 'ยังไม่แอด LINE OA', value: stats.notFriend, Icon: BellOff, bg: 'bg-gradient-to-br from-red-500 to-red-600', filter: 'line_not_friend' },
+          { label: 'มีลูกกำลังเรียน', value: stats.activeEnrollment, Icon: GraduationCap, bg: 'bg-gradient-to-br from-teal-500 to-teal-600', filter: 'active' },
+          { label: 'ยังไม่ลงคอร์ส', value: stats.neverEnrolled, Icon: User, bg: 'bg-gradient-to-br from-slate-400 to-slate-500', filter: 'never' },
+        ].map((stat) => {
+          const active = !!stat.filter && filterStatus === stat.filter;
+          return (
+            <button
+              key={stat.label}
+              type="button"
+              disabled={!stat.filter}
+              onClick={() => stat.filter && setFilterStatus(active && stat.filter !== 'all' ? 'all' : stat.filter)}
+              aria-pressed={active}
+              className={cn(
+                'rounded-xl p-4 text-white shadow-sm text-left transition',
+                stat.bg,
+                stat.filter ? 'cursor-pointer hover:brightness-110' : 'cursor-default',
+                active && 'ring-4 ring-gray-900/25 dark:ring-white/40'
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-white/90 leading-tight">{stat.label}</span>
+                <stat.Icon className="h-4 w-4 text-white/80 shrink-0" />
+              </div>
+              <div className="text-2xl font-bold mt-2">{stat.value}</div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -439,6 +459,8 @@ export default function ParentsPage() {
             { value: 'active', label: 'มีลูกกำลังเรียน' },
             { value: 'completed', label: 'จบคอร์สแล้ว' },
             { value: 'never', label: 'ยังไม่ลงคอร์ส' },
+            { value: 'line_connected', label: 'เชื่อมต่อ LINE แล้ว' },
+            { value: 'line_not_friend', label: 'ยังไม่แอด LINE OA' },
           ]}
         />
       </div>
