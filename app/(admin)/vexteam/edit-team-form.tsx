@@ -29,6 +29,7 @@ interface EditableTeam {
   level: Level
   branch_id: string | null
   coach_teacher_id?: string | null
+  notebook_url?: string | null
 }
 
 interface Props {
@@ -46,6 +47,7 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
   // ครูผู้ดูแลทีม — 'none' = ยังไม่ระบุ (ส่ง null ให้ API เพื่อล้างครูออก)
   const [coachId, setCoachId] = useState<string>(team.coach_teacher_id || 'none')
+  const [notebookUrl, setNotebookUrl] = useState(team.notebook_url || '')
   const [coachOptions, setCoachOptions] = useState<FormSelectOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
@@ -58,6 +60,7 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
       setLevel(team.level)
       setBranchId(team.branch_id || '')
       setCoachId(team.coach_teacher_id || 'none')
+      setNotebookUrl(team.notebook_url || '')
       getBranches()
         .then((list) => setBranches(list.map((b: any) => ({ id: b.id, name: b.name }))))
         .catch(() => {})
@@ -88,6 +91,7 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
           level,
           branch_id: branchId,
           coach_teacher_id: coachId === 'none' ? null : coachId,
+          notebook_url: notebookUrl.trim() || null,
         }),
       })
       const data = await res.json()
@@ -157,6 +161,15 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit_notebook_url">Engineering Notebook (ไม่บังคับ)</Label>
+            <Input
+              id="edit_notebook_url"
+              placeholder="วางลิงก์ Canva / Google Drive"
+              value={notebookUrl}
+              onChange={(e) => setNotebookUrl(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>ครูผู้ดูแลทีม</Label>

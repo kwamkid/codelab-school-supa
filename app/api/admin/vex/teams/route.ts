@@ -21,6 +21,8 @@ const createSchema = z.object({
   branch_id: z.string().uuid(),
   /** ครูผู้ดูแลทีม (public.teachers.id) — ไม่บังคับตอนสร้าง */
   coach_teacher_id: z.string().uuid().nullable().optional(),
+  /** ลิงก์ Engineering Notebook (Canva/Drive/ฯลฯ) — เปิดได้เท่านั้น ไม่ตรวจว่าเข้าถึงได้จริง */
+  notebook_url: z.string().trim().url().max(1000).nullable().optional().or(z.literal('')),
 })
 
 export async function GET(request: Request) {
@@ -145,7 +147,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid input' }, { status: 400 })
   }
-  const { team_number, name, level, branch_id, coach_teacher_id } = parsed.data
+  const { team_number, name, level, branch_id, coach_teacher_id, notebook_url } = parsed.data
 
   const db = vexDb()
 
@@ -179,6 +181,7 @@ export async function POST(request: Request) {
         level,
         branch_id,
         coach_teacher_id: coach_teacher_id || null,
+        notebook_url: notebook_url || null,
         event_token,
         practice_token,
         slug,

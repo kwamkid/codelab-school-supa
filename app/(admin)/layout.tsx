@@ -774,7 +774,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           href: '/vexteam',
           icon: Users,
           iconColor: 'text-red-500',
-          requiredRole: ['super_admin', 'branch_admin']
+          // ครูเข้าดูได้แบบ view-only (รายชื่อทีม + Engineering Notebook);
+          // ปุ่มสร้าง/แก้/ลบ/ลิงก์ทีม ถูกซ่อนในหน้าเอง
+          requiredRole: ['super_admin', 'branch_admin', 'teacher']
         },
         {
           name: 'การแข่งขัน',

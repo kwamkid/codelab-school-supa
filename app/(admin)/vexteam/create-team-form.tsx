@@ -36,6 +36,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
   // ครูผู้ดูแลทีม (คนหลัก 1 คน) — 'none' = ยังไม่ระบุ (Radix Select ไม่รับ value="")
   const [coachId, setCoachId] = useState<string>('none')
+  const [notebookUrl, setNotebookUrl] = useState('')
   const [coachOptions, setCoachOptions] = useState<FormSelectOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
@@ -66,6 +67,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
     setLevel('iq_elem')
     setBranchId(selectedBranchId || '')
     setCoachId('none')
+    setNotebookUrl('')
   }
 
   const submit = async () => {
@@ -90,6 +92,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
           level,
           branch_id: branchId,
           coach_teacher_id: coachId === 'none' ? null : coachId,
+          notebook_url: notebookUrl.trim() || null,
         }),
       })
       const data = await res.json()
@@ -163,6 +166,15 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notebook_url">Engineering Notebook (ไม่บังคับ)</Label>
+            <Input
+              id="notebook_url"
+              placeholder="วางลิงก์ Canva / Google Drive"
+              value={notebookUrl}
+              onChange={(e) => setNotebookUrl(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>ครูผู้ดูแลทีม</Label>

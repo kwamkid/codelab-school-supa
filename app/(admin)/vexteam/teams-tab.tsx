@@ -23,12 +23,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
-import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle } from 'lucide-react'
+import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle, BookOpen, ExternalLink } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
 import { SearchInput } from '@/components/ui/search-input'
 import { useBranch } from '@/contexts/BranchContext'
+import { useAuth } from '@/hooks/useAuth'
 import { CreateTeamForm } from './create-team-form'
 import { EditTeamForm } from './edit-team-form'
 import { AddStudentsDialog } from './add-students-dialog'
@@ -49,6 +50,7 @@ interface TeamRow {
   coach_teacher_id?: string | null
   coachName?: string | null
   coachImage?: string | null
+  notebook_url?: string | null
   eventLink: string | null
   practiceLink: string | null
   kids: KidRow[]
@@ -89,6 +91,9 @@ function CopyLinkButton({ label, url }: { label: string; url: string }) {
 
 export function TeamsTab() {
   const { selectedBranchId } = useBranch()
+  const { adminUser } = useAuth()
+  // ครูเข้าดูได้อย่างเดียว — สร้าง/แก้/ลบทีม, เพิ่ม-ลบสมาชิก, ลิงก์ทีม เป็นของแอดมิน
+  const canManage = adminUser?.role === 'super_admin' || adminUser?.role === 'branch_admin'
   const [teams, setTeams] = useState<TeamRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -184,7 +189,7 @@ export function TeamsTab() {
           placeholder="ค้นหาชื่อทีม หรือชื่อเด็ก"
           className="w-full sm:max-w-sm"
         />
-        <CreateTeamForm onCreated={loadTeams} />
+        {canManage && <CreateTeamForm onCreated={loadTeams} />}
       </div>
 
       {branchTeams.length === 0 ? (
@@ -242,7 +247,7 @@ export function TeamsTab() {
                           )}
                         </div>
                         {/* ครูผู้ดูแลทีม — โชว์เสมอ เพื่อให้เห็นทีมที่ยังไม่ได้ระบุครู */}
-                        <div className="mt-1 flex items-center gap-1.5 text-sm">
+                        <div className="mt-1 flex items-center gap-1.5 text-sm flex-wrap">
                           {t.coachName ? (
                             <>
                               <span className="text-gray-500">ครูผู้ดูแล:</span>
@@ -251,9 +256,25 @@ export function TeamsTab() {
                           ) : (
                             <span className="text-amber-600">ยังไม่ได้ระบุครูผู้ดูแล</span>
                           )}
+                          {/* Engineering Notebook — เปิดดูได้เลย (ทีมที่ยังไม่ใส่ก็เห็นว่ายังไม่มี) */}
+                          {t.notebook_url ? (
+                            <a
+                              href={t.notebook_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
+                            >
+                              <BookOpen className="h-4 w-4" /> Engineering Notebook
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-gray-400">
+                              <BookOpen className="h-4 w-4" /> ยังไม่มี Notebook
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      <div className={cn('flex items-center gap-2 shrink-0 flex-wrap justify-end', !canManage && 'hidden')}>
                         {/* One link per team — both views share it (bottom tab bar
                             switches; either token resolves the team server-side). */}
                         {(t.practiceLink || t.eventLink) && (
@@ -301,25 +322,29 @@ export function TeamsTab() {
                               className={cn('h-4 w-4', k.hasLine ? 'text-green-500' : 'text-amber-400')}
                             />
                             <span className="vex-kid-name">{k.nickname}</span>
-                            <button
-                              type="button"
-                              onClick={() => setRemoveKid({ team: t, kid: k })}
-                              className="opacity-60 hover:text-red-600 hover:opacity-100"
-                              aria-label={`ลบ ${k.nickname}`}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                            {canManage && (
+                              <button
+                                type="button"
+                                onClick={() => setRemoveKid({ team: t, kid: k })}
+                                className="opacity-60 hover:text-red-600 hover:opacity-100"
+                                aria-label={`ลบ ${k.nickname}`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </span>
                         </Tooltip>
                       ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1 text-primary border-primary/40 hover:bg-primary/5"
-                        onClick={() => setAddToTeam(t)}
-                      >
-                        <UserPlus className="h-3.5 w-3.5" /> เพิ่มสมาชิก
-                      </Button>
+                      {canManage && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 text-primary border-primary/40 hover:bg-primary/5"
+                          onClick={() => setAddToTeam(t)}
+                        >
+                          <UserPlus className="h-3.5 w-3.5" /> เพิ่มสมาชิก
+                        </Button>
+                      )}
                     </div>
                     {t.kids.some((k) => !k.hasLine) && (
                       <p className="text-[11px] text-amber-600">
