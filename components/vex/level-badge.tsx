@@ -29,7 +29,9 @@ export function LevelBadge({ level, className, logoHeight = 18 }: LevelBadgeProp
         src={PROGRAM_LOGO[meta.program]}
         alt={meta.program === 'iq' ? 'VEX IQ' : 'VEX V5'}
         style={{ height: logoHeight, width: 'auto' }}
-        className="object-contain"
+        // shrink-0: in tight flex cells the logo would otherwise be squeezed
+        // (fixed height + auto width) and bleed over the text next to it
+        className="object-contain shrink-0"
       />
       <span className="text-xs font-bold tracking-wide text-gray-700">{meta.short}</span>
     </span>

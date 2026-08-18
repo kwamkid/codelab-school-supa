@@ -7,7 +7,6 @@
 // แอดมินแก้ลิงก์ได้ทันทีในตาราง (รวบรวมลิงก์จากหลายทีมรวดเดียว) — ครูดูอย่างเดียว
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/ui/page-header'
@@ -26,7 +25,7 @@ import { useBranch } from '@/contexts/BranchContext'
 import { useAuth } from '@/hooks/useAuth'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { cn } from '@/lib/utils'
-import { BookOpen, Copy, ExternalLink, FileCheck2, Check, Loader2, ArrowLeft } from 'lucide-react'
+import { BookOpen, Copy, ExternalLink, FileCheck2, Check, Loader2, Pencil, X } from 'lucide-react'
 
 interface TeamRow {
   id: string
@@ -48,7 +47,7 @@ function CopyButton({ url, label }: { url: string; label: string }) {
     <Tooltip label={`คัดลอก${label}`}>
       <Button
         variant="outline"
-        size="sm"
+        size="icon"
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(url)
@@ -59,7 +58,7 @@ function CopyButton({ url, label }: { url: string; label: string }) {
             toast.error('คัดลอกไม่สำเร็จ')
           }
         }}
-        className="gap-1 shrink-0"
+        className="shrink-0"
       >
         {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
       </Button>
@@ -67,7 +66,21 @@ function CopyButton({ url, label }: { url: string; label: string }) {
   )
 }
 
-/** ช่องลิงก์ 1 ช่อง — แอดมินแก้ได้ในตาราง, ครูเห็นเป็นลิงก์อย่างเดียว */
+/** โดเมนสั้น ๆ ไว้โชว์แทน URL ยาว ๆ (ตัวเต็มอยู่ใน tooltip) */
+function prettyUrl(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+/**
+ * ช่องลิงก์ 1 ช่อง
+ * - มีลิงก์แล้ว → ปุ่ม คัดลอก / เปิด / แก้ (ไม่กินความกว้างตาราง)
+ * - ยังไม่มี (หรือกดแก้) → ช่องกรอก + ปุ่มบันทึก
+ * - ครู → ลิงก์ + ปุ่มคัดลอก อย่างเดียว
+ */
 function LinkCell({
   url,
   placeholder,
@@ -85,60 +98,89 @@ function LinkCell({
   saving: boolean
   onSave: (value: string) => void
 }) {
+  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(url || '')
-  useEffect(() => setDraft(url || ''), [url])
+  useEffect(() => {
+    setDraft(url || '')
+    setEditing(false)
+  }, [url])
   const dirty = draft.trim() !== (url || '')
 
-  if (!canManage) {
-    return url ? (
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className={cn('inline-flex items-center gap-1 hover:underline break-all', color)}
-      >
-        เปิดดู <ExternalLink className="h-3 w-3 shrink-0" />
-      </a>
-    ) : (
-      <span className="text-base text-gray-400">{emptyText}</span>
+  if (url && (!canManage || !editing)) {
+    return (
+      <div className="flex items-center gap-1">
+        <CopyButton url={url} label="ลิงก์" />
+        <Tooltip label="เปิดในแท็บใหม่">
+          <Button asChild variant="outline" size="icon" className="shrink-0">
+            <a href={url} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+        </Tooltip>
+        {canManage && (
+          <Tooltip label="แก้ไขลิงก์">
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setEditing(true)}>
+              <Pencil className="h-4 w-4 text-gray-400" />
+            </Button>
+          </Tooltip>
+        )}
+        <Tooltip label={url}>
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className={cn('truncate text-sm hover:underline', color)}
+          >
+            {prettyUrl(url)}
+          </a>
+        </Tooltip>
+      </div>
     )
   }
 
+  if (!canManage) return <span className="text-base text-gray-400">{emptyText}</span>
+
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       <Input
         value={draft}
         placeholder={placeholder}
+        autoFocus={editing}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && dirty) onSave(draft.trim())
+          if (e.key === 'Escape') {
+            setDraft(url || '')
+            setEditing(false)
+          }
         }}
         className="h-10 min-w-0 text-base"
       />
-      {dirty ? (
-        <Button size="sm" onClick={() => onSave(draft.trim())} disabled={saving} className="shrink-0">
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'บันทึก'}
+      <Tooltip label="บันทึก">
+        <Button size="icon" onClick={() => onSave(draft.trim())} disabled={!dirty || saving} className="shrink-0">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
         </Button>
-      ) : (
-        url && (
-          <>
-            <CopyButton url={url} label="ลิงก์" />
-            <Tooltip label="เปิดในแท็บใหม่">
-              <Button asChild variant="outline" size="sm" className="shrink-0">
-                <a href={url} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </Button>
-            </Tooltip>
-          </>
-        )
+      </Tooltip>
+      {editing && (
+        <Tooltip label="ยกเลิก">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            onClick={() => {
+              setDraft(url || '')
+              setEditing(false)
+            }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </Tooltip>
       )}
     </div>
   )
 }
 
 export default function VexNotebooksPage() {
-  const router = useRouter()
   const { selectedBranchId } = useBranch()
   const { adminUser } = useAuth()
   const canManage = adminUser?.role === 'super_admin' || adminUser?.role === 'branch_admin'
@@ -238,16 +280,12 @@ export default function VexNotebooksPage() {
 
   return (
     <div className="p-4 sm:p-6 text-base">
-      <Button variant="ghost" onClick={() => router.push('/vexteam')} className="mb-4">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        กลับ
-      </Button>
-
       <PageHeader
         title="EN Submit"
         icon={FileCheck2}
         iconColor="text-red-600"
         description="รวมลิงก์ Engineering Notebook ของทุกทีม — คัดลอกลิงก์ PDF ไปวางในฟอร์มส่งได้เลย"
+        backHref="/vexteam"
       />
 
       <div className="space-y-4">
@@ -294,22 +332,22 @@ export default function VexNotebooksPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead sortKey="team" currentSort={sort} onSort={toggleSort} className="min-w-[130px] text-base">
+                  <SortableTableHead sortKey="team" currentSort={sort} onSort={toggleSort} className="w-[150px] text-base">
                     เลขทีม
                   </SortableTableHead>
-                  <SortableTableHead sortKey="name" currentSort={sort} onSort={toggleSort} className="min-w-[140px] text-base">
+                  <SortableTableHead sortKey="name" currentSort={sort} onSort={toggleSort} className="w-[150px] text-base">
                     ชื่อทีม
                   </SortableTableHead>
-                  <SortableTableHead sortKey="members" currentSort={sort} onSort={toggleSort} className="min-w-[180px] text-base">
+                  <SortableTableHead sortKey="members" currentSort={sort} onSort={toggleSort} className="w-[200px] text-base">
                     สมาชิกทีม
                   </SortableTableHead>
-                  <TableHead className="min-w-[150px] text-base">ครูผู้ดูแล</TableHead>
-                  <TableHead className="min-w-[280px] text-base">
+                  <TableHead className="w-[130px] text-base">ครูผู้ดูแล</TableHead>
+                  <TableHead className="min-w-[190px] text-base">
                     <span className="inline-flex items-center gap-1 text-blue-600">
                       <BookOpen className="h-4 w-4" /> ฉบับกำลังทำ
                     </span>
                   </TableHead>
-                  <TableHead className="min-w-[280px] text-base">
+                  <TableHead className="min-w-[190px] text-base">
                     <span className="inline-flex items-center gap-1 text-green-700">
                       <FileCheck2 className="h-4 w-4" /> ฉบับส่ง (PDF)
                     </span>
@@ -320,14 +358,13 @@ export default function VexNotebooksPage() {
                 {rows.map((t) => (
                   <TableRow key={t.id} className={cn(!t.notebook_submit_url && 'bg-amber-50/40')}>
                     <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <LevelBadge level={t.level} logoHeight={22} className="border-0 bg-transparent px-0 py-0" />
-                        <div className="min-w-0">
-                          <div className="text-xl font-bold leading-tight">{t.team_number}</div>
-                          {!selectedBranchId && t.branchName && (
-                            <div className="text-sm text-gray-400">{t.branchName}</div>
-                          )}
-                        </div>
+                      {/* เลขทีมบรรทัดบน / ระดับ+สาขาบรรทัดล่าง — กันโลโก้ VEX ชนตัวเลข */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xl font-bold leading-none">{t.team_number}</span>
+                        <span className="flex items-center gap-2 text-sm text-gray-400">
+                          <LevelBadge level={t.level} logoHeight={15} className="border-0 bg-transparent px-0 py-0" />
+                          {!selectedBranchId && t.branchName}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -337,12 +374,12 @@ export default function VexNotebooksPage() {
                         <span className="text-base text-gray-400">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-normal">
                       {t.kids?.length ? (
-                        <span className="text-base">
-                          <span className="text-gray-400">{t.kids.length} คน · </span>
-                          {t.kids.map((k) => k.nickname).join(', ')}
-                        </span>
+                        <div className="text-base">
+                          <span className="text-gray-400">{t.kids.length} คน</span>{' '}
+                          <span className="text-gray-700">{t.kids.map((k) => k.nickname).join(', ')}</span>
+                        </div>
                       ) : (
                         <span className="text-base text-gray-400">ยังไม่มีสมาชิก</span>
                       )}

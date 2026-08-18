@@ -5,7 +5,7 @@
 // by default. Reached from the events page ("รายชื่อ" per event preselects it).
 
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/ui/page-header'
@@ -22,7 +22,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { LEVEL_LABELS, LEVEL_META, LEVELS, PROGRAM_LOGO, type Level, type Program } from '@/lib/vex/types'
 import { thaiDateRange, localTodayStr } from '@/lib/vex/event-timeline'
 import { cn } from '@/lib/utils'
-import { ArrowLeft, Check, ClipboardList, Download, Globe, X } from 'lucide-react'
+import { Check, ClipboardList, Download, Globe, X } from 'lucide-react'
 
 interface RosterEvent {
   id: string
@@ -59,7 +59,6 @@ const isPast = (e: RosterEvent, today: string) => {
 }
 
 function RosterContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedBranchId } = useBranch()
   const { adminUser } = useAuth()
@@ -282,16 +281,12 @@ function RosterContent() {
 
   return (
     <div className="p-4 sm:p-6 text-base">
-      <Button variant="ghost" onClick={() => router.push('/vexteam/events')} className="mb-4">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        กลับ
-      </Button>
-
       <PageHeader
         title="รายชื่อเข้าแข่งขัน"
         icon={ClipboardList}
         iconColor="text-red-600"
         description="ภาพรวมการยืนยันเข้าแข่งขันของแต่ละงาน แยกตามทีมและนักเรียน"
+        backHref="/vexteam/events"
       />
 
       {/* Filters */}
