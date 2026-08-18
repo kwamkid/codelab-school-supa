@@ -23,6 +23,9 @@ interface ParentRow {
   preferred_branch_id: string | null;
   created_at: string;
   last_login_at: string;
+  // แคชสถานะ "แอด LINE OA แล้วหรือยัง" (ดู lib/supabase/services/line-friendship-scan.ts)
+  line_friend_state?: string | null;
+  line_friend_checked_at?: string | null;
 }
 
 // Map database row to Parent model
@@ -35,6 +38,7 @@ function mapToParent(row: ParentRow): Parent {
     lineUserId: row.line_user_id || undefined,
     lineDisplayName: row.line_display_name || undefined,
     pictureUrl: row.picture_url || undefined,
+    lineFriendState: (row.line_friend_state as Parent['lineFriendState']) || undefined,
     email: row.email || undefined,
     address: hasAddress ? {
       houseNumber: row.address_house_number || '',
@@ -895,6 +899,8 @@ export async function getParentsWithStudentsAndEnrollments(): Promise<(Parent & 
       displayName: row.display_name,
       phone: row.phone,
       lineUserId: row.line_user_id || undefined,
+      // แอด LINE OA แล้วหรือยัง (แคชจาก line-friendship-scan) — หน้ารายชื่อใช้ติดป้ายเตือน
+      lineFriendState: row.line_friend_state || undefined,
       email: row.email || undefined,
       pictureUrl: row.picture_url || undefined,
       preferredBranchId: row.preferred_branch_id || undefined,

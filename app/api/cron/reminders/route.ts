@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
       paymentReminders: 0,
       vexCoachReminders: 0,
       teacherDigests: 0,
+      friendshipScan: null as null | { checked: number; friends: number; notFriends: number; unknown: number },
       errors: [] as string[]
     }
 
@@ -313,6 +314,20 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
+    // 8. LINE friendship scan (ผู้ปกครองคนไหนยังไม่แอด OA → ส่ง noti ไม่ถึง)
+    // ============================================
+    console.log('\n--- Part 8: LINE Friendship Scan ---')
+    try {
+      const { scanParentFriendship } = await import('@/lib/supabase/services/line-friendship-scan')
+      const scan = await scanParentFriendship()
+      results.friendshipScan = scan
+      console.log(`  ✓ Checked ${scan.checked} — not friends: ${scan.notFriends}`)
+    } catch (error) {
+      console.error('  ! Friendship scan error:', error)
+      results.errors.push(`Friendship scan error: ${error}`)
+    }
+
+    // ============================================
     // Summary
     // ============================================
     console.log('\n=== Combined reminder cron job completed ===')
@@ -325,6 +340,7 @@ export async function GET(request: NextRequest) {
       paymentReminders: results.paymentReminders,
       vexCoachReminders: results.vexCoachReminders,
       teacherDigests: results.teacherDigests,
+      friendshipScan: results.friendshipScan,
       errors: results.errors.length
     })
 

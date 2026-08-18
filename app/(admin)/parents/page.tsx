@@ -29,11 +29,15 @@ import {
   School,
   GraduationCap,
   Globe,
+  BellOff,
   Trash2,
   Loader2,
+  RefreshCw,
   CornerDownRight
 } from 'lucide-react';
 import { LineIcon } from '@/components/ui/line-icon';
+import { Tooltip } from '@/components/ui/tooltip';
+import { authFetch } from '@/lib/auth-fetch';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import {
@@ -92,6 +96,7 @@ export default function ParentsPage() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [viewParentId, setViewParentId] = useState<string | null>(null);
   const { sort, toggle: toggleSort, sortRows } = useSortableTable();
+  const [scanning, setScanning] = useState(false);
   const [deletingParentId, setDeletingParentId] = useState<string | null>(null);
   const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -143,6 +148,27 @@ export default function ParentsPage() {
     new Map(classes.map(c => [c.id, c])), 
     [classes]
   );
+
+  // ถาม LINE ทีละคนว่าแอด OA แล้วหรือยัง แล้วเก็บผลลง parents.line_friend_state
+  // (cron รายวันก็ทำให้อยู่ ปุ่มนี้ไว้เช็คสดหลังตามผู้ปกครองให้แอด)
+  const scanFriendship = async () => {
+    if (scanning) return;
+    setScanning(true);
+    try {
+      const res = await authFetch('/api/admin/line/friendship-scan', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'ตรวจสอบไม่สำเร็จ');
+        return;
+      }
+      toast.success(`ตรวจสอบ ${data.checked} คน — ยังไม่แอด ${data.notFriends} คน`);
+      queryClient.invalidateQueries({ queryKey: ['parents-with-students-enrollments'] });
+    } catch {
+      toast.error('เกิดข้อผิดพลาด');
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const getBranchName = (branchId: string) => branchesMap.get(branchId)?.name || 'Unknown';
   const getClassInfo = (classId: string) => classesMap.get(classId);
@@ -248,6 +274,8 @@ export default function ParentsPage() {
       totalParents: filteredParents.length,
       totalStudents: filteredParents.reduce((sum, p) => sum + (p.activeStudentCount || 0), 0),
       withLineId: filteredParents.filter(p => p.lineUserId).length,
+      // ผูก LINE แล้วแต่ยังไม่ได้แอด OA → ระบบส่งแจ้งเตือนไม่ถึงเลย
+      notFriend: filteredParents.filter(p => p.lineUserId && p.lineFriendState === 'not_friend').length,
       activeEnrollment: activeCount,
       completedEnrollment: completedCount,
       neverEnrolled: neverCount
@@ -339,12 +367,25 @@ export default function ParentsPage() {
           </p>
         </div>
         <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
-          <Link href="/parents/new">
-            <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
-              <Plus className="h-4 w-4 mr-2" />
-              เพิ่มผู้ปกครองใหม่
-            </ActionButton>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={scanFriendship} disabled={scanning}>
+              {scanning ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> กำลังตรวจสอบ...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" /> ตรวจสอบสถานะ LINE
+                </>
+              )}
+            </Button>
+            <Link href="/parents/new">
+              <ActionButton action="create" className="bg-red-500 hover:bg-red-600">
+                <Plus className="h-4 w-4 mr-2" />
+                เพิ่มผู้ปกครองใหม่
+              </ActionButton>
+            </Link>
+          </div>
         </PermissionGuard>
       </div>
 
@@ -354,8 +395,8 @@ export default function ParentsPage() {
           { label: filterBranch !== 'all' ? 'ผู้ปกครองในสาขา' : 'ผู้ปกครองทั้งหมด', value: stats.totalParents, Icon: Users, bg: 'bg-gradient-to-br from-gray-700 to-gray-900' },
           { label: 'นักเรียนทั้งหมด', value: stats.totalStudents, Icon: GraduationCap, bg: 'bg-gradient-to-br from-blue-500 to-blue-600' },
           { label: 'เชื่อมต่อ LINE', value: stats.withLineId, Icon: Globe, bg: 'bg-gradient-to-br from-emerald-500 to-green-600' },
+          { label: 'ยังไม่แอด LINE OA', value: stats.notFriend, Icon: BellOff, bg: 'bg-gradient-to-br from-red-500 to-red-600' },
           { label: 'มีลูกกำลังเรียน', value: stats.activeEnrollment, Icon: GraduationCap, bg: 'bg-gradient-to-br from-teal-500 to-teal-600' },
-          { label: 'จบคอร์สแล้ว', value: stats.completedEnrollment, Icon: School, bg: 'bg-gradient-to-br from-orange-500 to-orange-600' },
           { label: 'ยังไม่ลงคอร์ส', value: stats.neverEnrolled, Icon: User, bg: 'bg-gradient-to-br from-slate-400 to-slate-500' },
         ].map((stat) => (
           <div key={stat.label} className={cn('rounded-xl p-4 text-white shadow-sm', stat.bg)}>
@@ -513,11 +554,23 @@ export default function ParentsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <LineIcon
-                              connected={!!parent.lineUserId}
-                              className="h-5 w-5 mx-auto"
-                              aria-label={parent.lineUserId ? 'เชื่อมต่อ LINE แล้ว' : 'ยังไม่เชื่อมต่อ LINE'}
-                            />
+                            {parent.lineUserId && parent.lineFriendState === 'not_friend' ? (
+                              // ผูก LINE แล้วก็จริง แต่ไม่ได้แอด OA → push ไม่ถึง ต้องเห็นชัด
+                              <Tooltip label="ผูก LINE แล้ว แต่ยังไม่ได้เพิ่ม LINE ทางการเป็นเพื่อน — ระบบส่งแจ้งเตือนไม่ถึง">
+                                <span className="inline-flex flex-col items-center gap-0.5">
+                                  <LineIcon connected className="h-5 w-5" />
+                                  <span className="text-xs font-medium text-red-600 whitespace-nowrap">
+                                    ยังไม่แอด
+                                  </span>
+                                </span>
+                              </Tooltip>
+                            ) : (
+                              <LineIcon
+                                connected={!!parent.lineUserId}
+                                className="h-5 w-5 mx-auto"
+                                aria-label={parent.lineUserId ? 'เชื่อมต่อ LINE แล้ว' : 'ยังไม่เชื่อมต่อ LINE'}
+                              />
+                            )}
                           </TableCell>
                           <TableCell>
                             {loadingBranches ? (

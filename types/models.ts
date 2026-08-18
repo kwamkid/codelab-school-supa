@@ -2,6 +2,8 @@
 export interface Parent {
   id: string;
   lineUserId?: string;
+  /** แอด LINE OA เป็นเพื่อนแล้วหรือยัง — null/undefined = ยังไม่เคยตรวจ */
+  lineFriendState?: 'friend' | 'not_friend' | 'unknown';
   displayName: string;
   lineDisplayName?: string;
   pictureUrl?: string;
