@@ -62,7 +62,6 @@ export async function GET(request: NextRequest) {
       trialReminders: 0,
       eventReminders: 0,
       paymentReminders: 0,
-      vexCoachReminders: 0,
       teacherDigests: 0,
       friendshipScan: null as null | { checked: number; friends: number; notFriends: number; unknown: number },
       errors: [] as string[]
@@ -284,24 +283,9 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
-    // 6. VEX Coach Reminders (ครูผู้ดูแลทีม — พรุ่งนี้มีใครมาซ้อม)
+    // 6. Teacher Daily Digest (ครูทุกคน — พรุ่งนี้มีคลาส/ชดเชย/ทดลองเรียน/ซ้อม อะไรบ้าง)
     // ============================================
-    console.log('\n--- Part 6: VEX Coach Practice Reminders ---')
-    try {
-      const { sendCoachPracticeReminders } = await import('@/lib/vex/notify')
-      const coachResult = await sendCoachPracticeReminders(tomorrowStr)
-      results.vexCoachReminders = coachResult.coaches
-      totalSent += coachResult.coaches
-      console.log(`  ✓ Notified ${coachResult.coaches} coach(es)`)
-    } catch (error) {
-      console.error('  ! VEX coach reminder error:', error)
-      results.errors.push(`VEX coach reminder error: ${error}`)
-    }
-
-    // ============================================
-    // 7. Teacher Daily Digest (ครูทุกคน — พรุ่งนี้สอนคลาสไหน ใครลา)
-    // ============================================
-    console.log('\n--- Part 7: Teacher Daily Teaching Digest ---')
+    console.log('\n--- Part 6: Teacher Daily Digest ---')
     try {
       const { sendTeacherDailyDigest } = await import('@/lib/supabase/services/teacher-digest')
       const digest = await sendTeacherDailyDigest(tomorrowStr)
@@ -314,9 +298,9 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
-    // 8. LINE friendship scan (ผู้ปกครองคนไหนยังไม่แอด OA → ส่ง noti ไม่ถึง)
+    // 7. LINE friendship scan (ผู้ปกครองคนไหนยังไม่แอด OA → ส่ง noti ไม่ถึง)
     // ============================================
-    console.log('\n--- Part 8: LINE Friendship Scan ---')
+    console.log('\n--- Part 7: LINE Friendship Scan ---')
     try {
       const { scanParentFriendship } = await import('@/lib/supabase/services/line-friendship-scan')
       const scan = await scanParentFriendship()
@@ -338,7 +322,6 @@ export async function GET(request: NextRequest) {
       trialReminders: results.trialReminders,
       eventReminders: results.eventReminders,
       paymentReminders: results.paymentReminders,
-      vexCoachReminders: results.vexCoachReminders,
       teacherDigests: results.teacherDigests,
       friendshipScan: results.friendshipScan,
       errors: results.errors.length

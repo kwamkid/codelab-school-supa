@@ -202,59 +202,6 @@ export async function notifyCoachPractice(
   }
 }
 
-/**
- * เตือนครูล่วงหน้า: สรุปว่าวันที่ `dateStr` มีเด็กทีมไหนมาซ้อมบ้าง — ข้อความเดียว
- * ต่อครู 1 คน (รวมทุกทีมที่เขาดูแล). เรียกจาก cron รายวัน.
- */
-export async function sendCoachPracticeReminders(dateStr: string): Promise<{ coaches: number }> {
-  try {
-    const db = vexDb()
-    const { data: practices } = await db
-      .from('practices')
-      .select('id, team_id, kid_id, start_time, end_time')
-      .eq('practice_date', dateStr)
-      .eq('status', 'approved')
-    const rows = practices || []
-    if (rows.length === 0) return { coaches: 0 }
-
-    const teamIds: string[] = Array.from(new Set(rows.map((p: any) => p.team_id as string)))
-    const coaches = await coachesForTeams(teamIds)
-    if (coaches.size === 0) return { coaches: 0 }
-
-    const kidIds: string[] = Array.from(new Set(rows.map((p: any) => p.kid_id as string)))
-    const [{ data: teams }, { data: kids }] = await Promise.all([
-      db.from('teams').select('id, team_number').in('id', teamIds),
-      db.from('kids').select('id, nickname').in('id', kidIds),
-    ])
-    const teamNumber = new Map<string, string>()
-    for (const t of (teams || []) as any[]) teamNumber.set(t.id, t.team_number)
-    const kidNickname = new Map<string, string>()
-    for (const k of (kids || []) as any[]) kidNickname.set(k.id, k.nickname)
-
-    // ครู → ทีม → รายชื่อเด็ก+เวลา
-    const byCoach = new Map<string, { target: CoachTarget; teams: Map<string, string[]> }>()
-    for (const p of rows as any[]) {
-      const coach = coaches.get(p.team_id)
-      if (!coach) continue
-      const entry = byCoach.get(coach.lineUserId) || { target: coach, teams: new Map<string, string[]>() }
-      const label = teamNumber.get(p.team_id) || '-'
-      const list = entry.teams.get(label) || []
-      list.push(`${kidNickname.get(p.kid_id) || '-'} (${timeRange(p.start_time, p.end_time)})`)
-      entry.teams.set(label, list)
-      byCoach.set(coach.lineUserId, entry)
-    }
-
-    for (const [lineUserId, entry] of byCoach) {
-      const body = Array.from(entry.teams.entries())
-        .map(([team, kidsList]) => `▸ ทีม ${team}\n   ${kidsList.join('\n   ')}`)
-        .join('\n')
-      const text = `🔔 พรุ่งนี้มีนักเรียนเข้าซ้อม\n📅 ${thaiDate(dateStr)}\n\n${body}`
-      await enqueueLineText([lineUserId], text)
-    }
-
-    return { coaches: byCoach.size }
-  } catch (e) {
-    console.error('[vex notify] sendCoachPracticeReminders failed:', e)
-    return { coaches: 0 }
-  }
-}
+// หมายเหตุ: การเตือนล่วงหน้า 1 วันเรื่องซ้อม ย้ายไปรวมอยู่ในสรุปตารางพรุ่งนี้
+// ของครูแล้ว (lib/supabase/services/teacher-digest.ts + RPC get_teacher_daily_digest)
+// เพื่อให้ครูได้ข้อความเดียวจบ — ที่นี่เหลือเฉพาะการแจ้งทันทีตอนอนุมัติ/นัดซ้อม

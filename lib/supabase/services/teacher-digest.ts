@@ -1,10 +1,12 @@
 // lib/supabase/services/teacher-digest.ts
-// สรุปตารางสอนวันพรุ่งนี้ส่งให้ครูทาง LINE — คลาสไหน กี่โมง ที่ไหน และใครลา.
-// ข้อมูลทั้งหมดมาจาก RPC get_teacher_daily_digest ครั้งเดียว (migration
-// 20260818_teacher_daily_digest_rpc) ซึ่งกรองมาให้แล้วว่าเป็นครูที่ยังใช้งานอยู่
-// และผูก LINE จริง → ไม่ต้องเช็คซ้ำฝั่ง TS.
+// สรุป "พรุ่งนี้ครูมีอะไรบ้าง" ส่งทาง LINE เป็น Flex ใบเดียว ครอบคลุม 4 ประเภท:
+// คลาสปกติ (+ ใครลา) / เรียนชดเชย / ทดลองเรียน / ซ้อม VEX ของทีมที่ดูแล
 //
-// ครูที่พรุ่งนี้ไม่มีคลาส จะไม่อยู่ในผลลัพธ์เลย = ไม่ได้รับข้อความ (ไม่รบกวน).
+// ข้อมูลมาจาก RPC get_teacher_daily_digest ครั้งเดียว (migration
+// 20260818_teacher_digest_add_makeup_trial) ซึ่งกรองมาให้แล้วว่าเป็นครูที่ยัง
+// ใช้งานอยู่และผูก LINE จริง → ไม่ต้องเช็คซ้ำฝั่ง TS
+//
+// ครูที่พรุ่งนี้ไม่มีอะไรเลย จะไม่อยู่ในผลลัพธ์ = ไม่ได้รับข้อความ (ไม่รบกวน)
 
 import { createServiceClient } from '../server'
 import { enqueueLineMessages } from './line-queue'
@@ -21,7 +23,10 @@ function hhmm(t: string | null | undefined): string {
   return t ? t.slice(0, 5) : ''
 }
 
+type DigestType = 'class' | 'makeup' | 'trial' | 'practice'
+
 interface DigestClass {
+  type: DigestType
   startTime: string | null
   endTime: string | null
   className: string | null
@@ -32,6 +37,8 @@ interface DigestClass {
   roomName: string | null
   studentCount: number
   leaveNames: string[]
+  /** ชื่อนักเรียน — ชดเชย/ทดลองเรียน = 1 คน, ซ้อม = รายชื่อทั้งทีม */
+  studentName: string | null
 }
 
 interface DigestTeacher {
@@ -44,37 +51,54 @@ interface DigestTeacher {
 const BRAND = '#f05a5a' // เดียวกับ flex classReminder ที่ส่งให้ผู้ปกครอง
 const LEAVE_COLOR = '#e67e22'
 
-function sessionLabel(c: DigestClass): string {
-  if (!c.sessionNumber) return ''
-  return `ครั้งที่ ${c.sessionNumber}${c.totalSessions ? `/${c.totalSessions}` : ''}`
+// ป้ายกำกับประเภท — คลาสปกติไม่ต้องมีป้าย (เป็นค่าเริ่มต้นอยู่แล้ว)
+const TYPE_META: Record<DigestType, { label: string; color: string } | null> = {
+  class: null,
+  makeup: { label: 'ชดเชย', color: '#9333EA' },
+  trial: { label: 'ทดลองเรียน', color: '#F97316' },
+  practice: { label: 'ซ้อม VEX', color: '#2563EB' },
+}
+
+function titleOf(c: DigestClass): string {
+  // ซ้อมใช้ชื่อทีมเป็นหัวข้อ (className = "ทีม 2989B"), ที่เหลือใช้ชื่อวิชา
+  const base = c.type === 'practice' ? c.className : c.subjectName || c.className
+  const session = c.sessionNumber ? ` (ครั้งที่ ${c.sessionNumber}${c.totalSessions ? `/${c.totalSessions}` : ''})` : ''
+  return `${base || '-'}${session}`
 }
 
 function placeLabel(c: DigestClass): string {
   return [c.branchName, c.roomName ? `ห้อง ${c.roomName}` : null].filter(Boolean).join(' · ')
 }
 
-function headcountLabel(c: DigestClass): string {
-  const leaves = c.leaveNames?.length || 0
-  return leaves
-    ? `👥 มาเรียน ${Math.max(0, c.studentCount - leaves)}/${c.studentCount} คน`
-    : `👥 นักเรียน ${c.studentCount} คน`
+/** บรรทัดคน: คลาสปกติบอกจำนวน (หักคนลา), ที่เหลือบอกชื่อ */
+function peopleLabel(c: DigestClass): string {
+  if (c.type === 'class') {
+    const leaves = c.leaveNames?.length || 0
+    return leaves
+      ? `👥 มาเรียน ${Math.max(0, c.studentCount - leaves)}/${c.studentCount} คน`
+      : `👥 นักเรียน ${c.studentCount} คน`
+  }
+  if (c.type === 'practice') {
+    return `👥 ${c.studentCount} คน: ${c.studentName || '-'}`
+  }
+  return `👦 ${c.studentName || '-'}`
 }
 
 /** ข้อความสำรอง (altText + เครื่องที่แสดง flex ไม่ได้) */
-function formatClassText(c: DigestClass): string {
-  const session = sessionLabel(c)
+function formatItemText(c: DigestClass): string {
+  const meta = TYPE_META[c.type]
   const place = placeLabel(c)
   return (
-    `▸ ${hhmm(c.startTime)}-${hhmm(c.endTime)} ${c.subjectName || c.className || ''}${session ? ` (${session})` : ''}` +
+    `▸ ${hhmm(c.startTime)}-${hhmm(c.endTime)}${meta ? ` [${meta.label}]` : ''} ${titleOf(c)}` +
     (place ? `\n   📍 ${place}` : '') +
-    `\n   ${headcountLabel(c)}` +
+    `\n   ${peopleLabel(c)}` +
     (c.leaveNames?.length ? `\n   🙋 ลา: ${c.leaveNames.join(', ')}` : '')
   )
 }
 
-/** การ์ด 1 คลาสใน body ของ bubble */
-function classBlock(c: DigestClass) {
-  const session = sessionLabel(c)
+/** การ์ด 1 รายการใน body ของ bubble */
+function itemBlock(c: DigestClass) {
+  const meta = TYPE_META[c.type]
   const place = placeLabel(c)
   const contents: any[] = [
     {
@@ -86,17 +110,17 @@ function classBlock(c: DigestClass) {
           text: `${hhmm(c.startTime)}-${hhmm(c.endTime)}`,
           size: 'sm',
           weight: 'bold',
-          color: BRAND,
+          color: meta?.color || BRAND,
           flex: 0,
         },
-        ...(session
-          ? [{ type: 'text', text: session, size: 'xs', color: '#999999', align: 'end' }]
+        ...(meta
+          ? [{ type: 'text', text: meta.label, size: 'xs', color: meta.color, align: 'end', weight: 'bold' }]
           : []),
       ],
     },
     {
       type: 'text',
-      text: c.subjectName || c.className || '-',
+      text: titleOf(c),
       size: 'md',
       weight: 'bold',
       color: '#111111',
@@ -108,7 +132,7 @@ function classBlock(c: DigestClass) {
   if (place) {
     contents.push({ type: 'text', text: `📍 ${place}`, size: 'xs', color: '#666666', wrap: true, margin: 'xs' })
   }
-  contents.push({ type: 'text', text: headcountLabel(c), size: 'xs', color: '#666666', margin: 'xs' })
+  contents.push({ type: 'text', text: peopleLabel(c), size: 'xs', color: '#666666', wrap: true, margin: 'xs' })
   if (c.leaveNames?.length) {
     contents.push({
       type: 'text',
@@ -123,13 +147,18 @@ function classBlock(c: DigestClass) {
   return { type: 'box', layout: 'vertical', contents }
 }
 
-/** Flex bubble ตารางสอนทั้งวันของครู 1 คน */
-function buildDigestFlex(dateStr: string, classes: DigestClass[]) {
+function buildDigestFlex(dateStr: string, items: DigestClass[]) {
   const blocks: any[] = []
-  classes.forEach((c, i) => {
+  items.forEach((c, i) => {
     if (i > 0) blocks.push({ type: 'separator', margin: 'lg' })
-    blocks.push({ ...classBlock(c), margin: i > 0 ? 'lg' : 'none' })
+    blocks.push({ ...itemBlock(c), margin: i > 0 ? 'lg' : 'none' })
   })
+
+  const practices = items.filter((c) => c.type === 'practice').length
+  const classes = items.length - practices
+  const summary = [classes ? `${classes} คลาส` : null, practices ? `ซ้อม ${practices} ทีม` : null]
+    .filter(Boolean)
+    .join(' · ')
 
   return {
     type: 'bubble',
@@ -138,37 +167,24 @@ function buildDigestFlex(dateStr: string, classes: DigestClass[]) {
       type: 'box',
       layout: 'vertical',
       contents: [
-        { type: 'text', text: '🔔 ตารางสอนพรุ่งนี้', weight: 'bold', size: 'md', color: '#ffffff' },
+        { type: 'text', text: '🔔 ตารางพรุ่งนี้', weight: 'bold', size: 'md', color: '#ffffff' },
         { type: 'text', text: thaiDate(dateStr), size: 'sm', color: '#ffffff', margin: 'xs' },
       ],
       backgroundColor: BRAND,
       paddingAll: '15px',
     },
-    body: {
-      type: 'box',
-      layout: 'vertical',
-      contents: blocks,
-      paddingAll: '16px',
-    },
+    body: { type: 'box', layout: 'vertical', contents: blocks, paddingAll: '16px' },
     footer: {
       type: 'box',
       layout: 'vertical',
-      contents: [
-        {
-          type: 'text',
-          text: `รวม ${classes.length} คลาส`,
-          size: 'xs',
-          color: '#999999',
-          align: 'center',
-        },
-      ],
+      contents: [{ type: 'text', text: summary || '-', size: 'xs', color: '#999999', align: 'center' }],
       paddingAll: '10px',
     },
   }
 }
 
 /**
- * ส่งสรุปตารางสอนของวันที่ `dateStr` ให้ครูทุกคนที่มีคลาสวันนั้น (1 ข้อความ/ครู).
+ * ส่งสรุปของวันที่ `dateStr` ให้ครูทุกคนที่มีงานวันนั้น (1 ข้อความ/ครู).
  * เรียกจาก cron รายวันด้วยวันที่ของ "พรุ่งนี้".
  */
 export async function sendTeacherDailyDigest(dateStr: string): Promise<{ teachers: number }> {
@@ -183,14 +199,13 @@ export async function sendTeacherDailyDigest(dateStr: string): Promise<{ teacher
     const rows = (data || []) as DigestTeacher[]
     let sent = 0
     for (const t of rows) {
-      const classes = t.classes || []
-      if (classes.length === 0) continue
-      const altText =
-        `🔔 ตารางสอนพรุ่งนี้ ${thaiDate(dateStr)}\n\n` + classes.map(formatClassText).join('\n\n')
+      const items = t.classes || []
+      if (items.length === 0) continue
+      const altText = `🔔 ตารางพรุ่งนี้ ${thaiDate(dateStr)}\n\n` + items.map(formatItemText).join('\n\n')
       await enqueueLineMessages(
         [t.line_user_id],
         // altText ตัดที่ 400 ตัว — LINE ปฏิเสธทั้งข้อความถ้ายาวเกิน
-        [{ type: 'flex', altText: altText.slice(0, 400), contents: buildDigestFlex(dateStr, classes) }]
+        [{ type: 'flex', altText: altText.slice(0, 400), contents: buildDigestFlex(dateStr, items) }]
       )
       sent++
     }
