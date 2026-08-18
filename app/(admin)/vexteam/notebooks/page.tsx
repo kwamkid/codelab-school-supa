@@ -238,16 +238,16 @@ export default function VexNotebooksPage() {
 
   return (
     <div className="p-4 sm:p-6 text-base">
+      <Button variant="ghost" onClick={() => router.push('/vexteam')} className="mb-4">
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        กลับ
+      </Button>
+
       <PageHeader
         title="EN Submit"
         icon={FileCheck2}
         iconColor="text-red-600"
         description="รวมลิงก์ Engineering Notebook ของทุกทีม — คัดลอกลิงก์ PDF ไปวางในฟอร์มส่งได้เลย"
-        action={
-          <Button variant="outline" onClick={() => router.push('/vexteam')}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> กลับไปหน้าทีม
-          </Button>
-        }
       />
 
       <div className="space-y-4">

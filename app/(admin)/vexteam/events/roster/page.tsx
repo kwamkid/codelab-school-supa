@@ -282,16 +282,16 @@ function RosterContent() {
 
   return (
     <div className="p-4 sm:p-6 text-base">
+      <Button variant="ghost" onClick={() => router.push('/vexteam/events')} className="mb-4">
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        กลับ
+      </Button>
+
       <PageHeader
         title="รายชื่อเข้าแข่งขัน"
         icon={ClipboardList}
         iconColor="text-red-600"
         description="ภาพรวมการยืนยันเข้าแข่งขันของแต่ละงาน แยกตามทีมและนักเรียน"
-        action={
-          <Button variant="outline" onClick={() => router.push('/vexteam/events')}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> กิจกรรมการแข่งขัน
-          </Button>
-        }
       />
 
       {/* Filters */}
