@@ -51,7 +51,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Trophy,
-  FileCheck2,
   LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -777,14 +776,6 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           iconColor: 'text-red-500',
           // ครูเข้าดูได้แบบ view-only (รายชื่อทีม + Engineering Notebook);
           // ปุ่มสร้าง/แก้/ลบ/ลิงก์ทีม ถูกซ่อนในหน้าเอง
-          requiredRole: ['super_admin', 'branch_admin', 'teacher']
-        },
-        {
-          name: 'EN Submit',
-          href: '/vexteam/notebooks',
-          icon: FileCheck2,
-          iconColor: 'text-red-500',
-          // ครูดูได้ (view-only) — รวมลิงก์ Engineering Notebook ของทุกทีม
           requiredRole: ['super_admin', 'branch_admin', 'teacher']
         },
         {

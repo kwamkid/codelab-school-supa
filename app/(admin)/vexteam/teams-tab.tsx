@@ -4,6 +4,7 @@
 // card shows kids + the two public-link copy buttons.
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
@@ -23,7 +24,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
-import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle, BookOpen, ExternalLink, FileCheck2 } from 'lucide-react'
+import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle, BookOpen, ExternalLink, FileCheck2, Check } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
@@ -67,6 +68,32 @@ function publicUrl(kind: 'e' | 'p', slug: string) {
   if (vexLiffId) return `https://liff.line.me/${vexLiffId}/${kind}/${slug}?li=1`
   if (typeof window === 'undefined') return `/team/${kind}/${slug}`
   return `${window.location.origin}/team/${kind}/${slug}`
+}
+
+/** ปุ่มคัดลอกไอคอนล้วน — ใช้ข้างลิงก์ Notebook (ติ๊กถูกสั้น ๆ ให้รู้ว่าคัดลอกแล้ว) */
+function CopyIconButton({ url, label }: { url: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <Tooltip label={`คัดลอก${label}`}>
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(url)
+            setCopied(true)
+            toast.success(`คัดลอก${label}แล้ว`)
+            setTimeout(() => setCopied(false), 1500)
+          } catch {
+            toast.error('คัดลอกไม่สำเร็จ')
+          }
+        }}
+        className="text-gray-400 hover:text-gray-700 transition"
+        aria-label={`คัดลอก${label}`}
+      >
+        {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+      </button>
+    </Tooltip>
+  )
 }
 
 function CopyLinkButton({ label, url }: { label: string; url: string }) {
@@ -190,7 +217,15 @@ export function TeamsTab() {
           placeholder="ค้นหาชื่อทีม หรือชื่อเด็ก"
           className="w-full sm:max-w-sm"
         />
-        {canManage && <CreateTeamForm onCreated={loadTeams} />}
+        <div className="flex items-center gap-2">
+          {/* รวมลิงก์ Notebook ทุกทีมไว้ copy ตอนกรอกฟอร์มส่ง (ครูก็เปิดดูได้) */}
+          <Button asChild variant="outline">
+            <Link href="/vexteam/notebooks">
+              <FileCheck2 className="h-4 w-4 mr-2" /> EN Submit
+            </Link>
+          </Button>
+          {canManage && <CreateTeamForm onCreated={loadTeams} />}
+        </div>
       </div>
 
       {branchTeams.length === 0 ? (
@@ -260,30 +295,36 @@ export function TeamsTab() {
                           {/* Engineering Notebook 2 เล่ม: ฉบับกำลังทำ (Canva/Slides)
                               กับฉบับส่งจริง (PDF) — ทีมที่ยังไม่ใส่ก็เห็นว่ายังไม่มี */}
                           {t.notebook_url ? (
-                            <a
-                              href={t.notebook_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
-                            >
-                              <BookOpen className="h-4 w-4" /> Notebook (กำลังทำ)
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
+                            <span className="inline-flex items-center gap-1">
+                              <a
+                                href={t.notebook_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
+                              >
+                                <BookOpen className="h-4 w-4" /> Notebook (กำลังทำ)
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                              <CopyIconButton url={t.notebook_url} label="ลิงก์เล่มกำลังทำ" />
+                            </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-gray-400">
                               <BookOpen className="h-4 w-4" /> ยังไม่มีเล่มกำลังทำ
                             </span>
                           )}
                           {t.notebook_submit_url ? (
-                            <a
-                              href={t.notebook_submit_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-green-700 hover:text-green-800 hover:underline"
-                            >
-                              <FileCheck2 className="h-4 w-4" /> ฉบับส่ง (PDF)
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
+                            <span className="inline-flex items-center gap-1">
+                              <a
+                                href={t.notebook_submit_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-green-700 hover:text-green-800 hover:underline"
+                              >
+                                <FileCheck2 className="h-4 w-4" /> ฉบับส่ง (PDF)
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                              <CopyIconButton url={t.notebook_submit_url} label="ลิงก์ PDF" />
+                            </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-gray-400">
                               <FileCheck2 className="h-4 w-4" /> ยังไม่ส่ง PDF

@@ -97,7 +97,7 @@ function LinkCell({
         เปิดดู <ExternalLink className="h-3 w-3 shrink-0" />
       </a>
     ) : (
-      <span className="text-gray-400">{emptyText}</span>
+      <span className="text-base text-gray-400">{emptyText}</span>
     )
   }
 
@@ -110,7 +110,7 @@ function LinkCell({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && dirty) onSave(draft.trim())
         }}
-        className="h-9 min-w-0"
+        className="h-10 min-w-0 text-base"
       />
       {dirty ? (
         <Button size="sm" onClick={() => onSave(draft.trim())} disabled={saving} className="shrink-0">
@@ -274,14 +274,14 @@ export default function VexNotebooksPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[150px]">ทีม</TableHead>
-                  <TableHead className="min-w-[130px]">ครูผู้ดูแล</TableHead>
-                  <TableHead className="min-w-[260px]">
+                  <TableHead className="min-w-[190px] text-base">ทีม</TableHead>
+                  <TableHead className="min-w-[150px] text-base">ครูผู้ดูแล</TableHead>
+                  <TableHead className="min-w-[280px] text-base">
                     <span className="inline-flex items-center gap-1 text-blue-600">
                       <BookOpen className="h-4 w-4" /> ฉบับกำลังทำ
                     </span>
                   </TableHead>
-                  <TableHead className="min-w-[260px]">
+                  <TableHead className="min-w-[280px] text-base">
                     <span className="inline-flex items-center gap-1 text-green-700">
                       <FileCheck2 className="h-4 w-4" /> ฉบับส่ง (PDF)
                     </span>
@@ -292,22 +292,22 @@ export default function VexNotebooksPage() {
                 {rows.map((t) => (
                   <TableRow key={t.id} className={cn(!t.notebook_submit_url && 'bg-amber-50/40')}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <LevelBadge level={t.level} logoHeight={16} className="border-0 bg-transparent px-0 py-0" />
+                      <div className="flex items-center gap-2.5">
+                        <LevelBadge level={t.level} logoHeight={22} className="border-0 bg-transparent px-0 py-0" />
                         <div className="min-w-0">
-                          <div className="font-semibold">{t.team_number}</div>
-                          {t.name && <div className="text-gray-500 truncate">{t.name}</div>}
+                          <div className="text-xl font-bold leading-tight">{t.team_number}</div>
+                          {t.name && <div className="text-base text-gray-600 truncate">{t.name}</div>}
                           {!selectedBranchId && t.branchName && (
-                            <div className="text-xs text-gray-400">{t.branchName}</div>
+                            <div className="text-sm text-gray-400">{t.branchName}</div>
                           )}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       {t.coachName ? (
-                        <TeacherBadge name={t.coachName} imageUrl={t.coachImage} size="sm" />
+                        <TeacherBadge name={t.coachName} imageUrl={t.coachImage} size="md" />
                       ) : (
-                        <span className="text-amber-600">ยังไม่ระบุ</span>
+                        <span className="text-base text-amber-600">ยังไม่ระบุ</span>
                       )}
                     </TableCell>
                     <TableCell>
