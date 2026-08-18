@@ -30,6 +30,7 @@ interface EditableTeam {
   branch_id: string | null
   coach_teacher_id?: string | null
   notebook_url?: string | null
+  notebook_submit_url?: string | null
 }
 
 interface Props {
@@ -48,6 +49,7 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
   // ครูผู้ดูแลทีม — 'none' = ยังไม่ระบุ (ส่ง null ให้ API เพื่อล้างครูออก)
   const [coachId, setCoachId] = useState<string>(team.coach_teacher_id || 'none')
   const [notebookUrl, setNotebookUrl] = useState(team.notebook_url || '')
+  const [notebookSubmitUrl, setNotebookSubmitUrl] = useState(team.notebook_submit_url || '')
   const [coachOptions, setCoachOptions] = useState<FormSelectOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
@@ -61,6 +63,7 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
       setBranchId(team.branch_id || '')
       setCoachId(team.coach_teacher_id || 'none')
       setNotebookUrl(team.notebook_url || '')
+      setNotebookSubmitUrl(team.notebook_submit_url || '')
       getBranches()
         .then((list) => setBranches(list.map((b: any) => ({ id: b.id, name: b.name }))))
         .catch(() => {})
@@ -92,6 +95,7 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
           branch_id: branchId,
           coach_teacher_id: coachId === 'none' ? null : coachId,
           notebook_url: notebookUrl.trim() || null,
+          notebook_submit_url: notebookSubmitUrl.trim() || null,
         }),
       })
       const data = await res.json()
@@ -163,12 +167,21 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit_notebook_url">Engineering Notebook (ไม่บังคับ)</Label>
+            <Label htmlFor="edit_notebook_url">Engineering Notebook — ฉบับกำลังทำ (ไม่บังคับ)</Label>
             <Input
               id="edit_notebook_url"
-              placeholder="วางลิงก์ Canva / Google Drive"
+              placeholder="ลิงก์ Canva / Google Slides"
               value={notebookUrl}
               onChange={(e) => setNotebookUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit_notebook_submit_url">Engineering Notebook — ฉบับส่ง PDF (ไม่บังคับ)</Label>
+            <Input
+              id="edit_notebook_submit_url"
+              placeholder="ลิงก์ PDF บน Google Drive"
+              value={notebookSubmitUrl}
+              onChange={(e) => setNotebookSubmitUrl(e.target.value)}
             />
           </div>
           <div className="space-y-2">

@@ -37,6 +37,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
   // ครูผู้ดูแลทีม (คนหลัก 1 คน) — 'none' = ยังไม่ระบุ (Radix Select ไม่รับ value="")
   const [coachId, setCoachId] = useState<string>('none')
   const [notebookUrl, setNotebookUrl] = useState('')
+  const [notebookSubmitUrl, setNotebookSubmitUrl] = useState('')
   const [coachOptions, setCoachOptions] = useState<FormSelectOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
@@ -68,6 +69,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
     setBranchId(selectedBranchId || '')
     setCoachId('none')
     setNotebookUrl('')
+    setNotebookSubmitUrl('')
   }
 
   const submit = async () => {
@@ -93,6 +95,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
           branch_id: branchId,
           coach_teacher_id: coachId === 'none' ? null : coachId,
           notebook_url: notebookUrl.trim() || null,
+          notebook_submit_url: notebookSubmitUrl.trim() || null,
         }),
       })
       const data = await res.json()
@@ -168,12 +171,21 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="notebook_url">Engineering Notebook (ไม่บังคับ)</Label>
+            <Label htmlFor="notebook_url">Engineering Notebook — ฉบับกำลังทำ (ไม่บังคับ)</Label>
             <Input
               id="notebook_url"
-              placeholder="วางลิงก์ Canva / Google Drive"
+              placeholder="ลิงก์ Canva / Google Slides"
               value={notebookUrl}
               onChange={(e) => setNotebookUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notebook_submit_url">Engineering Notebook — ฉบับส่ง PDF (ไม่บังคับ)</Label>
+            <Input
+              id="notebook_submit_url"
+              placeholder="ลิงก์ PDF บน Google Drive"
+              value={notebookSubmitUrl}
+              onChange={(e) => setNotebookSubmitUrl(e.target.value)}
             />
           </div>
           <div className="space-y-2">

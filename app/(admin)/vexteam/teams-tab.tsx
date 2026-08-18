@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
-import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle, BookOpen, ExternalLink } from 'lucide-react'
+import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle, BookOpen, ExternalLink, FileCheck2 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
@@ -51,6 +51,7 @@ interface TeamRow {
   coachName?: string | null
   coachImage?: string | null
   notebook_url?: string | null
+  notebook_submit_url?: string | null
   eventLink: string | null
   practiceLink: string | null
   kids: KidRow[]
@@ -256,7 +257,8 @@ export function TeamsTab() {
                           ) : (
                             <span className="text-amber-600">ยังไม่ได้ระบุครูผู้ดูแล</span>
                           )}
-                          {/* Engineering Notebook — เปิดดูได้เลย (ทีมที่ยังไม่ใส่ก็เห็นว่ายังไม่มี) */}
+                          {/* Engineering Notebook 2 เล่ม: ฉบับกำลังทำ (Canva/Slides)
+                              กับฉบับส่งจริง (PDF) — ทีมที่ยังไม่ใส่ก็เห็นว่ายังไม่มี */}
                           {t.notebook_url ? (
                             <a
                               href={t.notebook_url}
@@ -264,12 +266,27 @@ export function TeamsTab() {
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
                             >
-                              <BookOpen className="h-4 w-4" /> Engineering Notebook
+                              <BookOpen className="h-4 w-4" /> Notebook (กำลังทำ)
                               <ExternalLink className="h-3 w-3" />
                             </a>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-gray-400">
-                              <BookOpen className="h-4 w-4" /> ยังไม่มี Notebook
+                              <BookOpen className="h-4 w-4" /> ยังไม่มีเล่มกำลังทำ
+                            </span>
+                          )}
+                          {t.notebook_submit_url ? (
+                            <a
+                              href={t.notebook_submit_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-green-700 hover:text-green-800 hover:underline"
+                            >
+                              <FileCheck2 className="h-4 w-4" /> ฉบับส่ง (PDF)
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-gray-400">
+                              <FileCheck2 className="h-4 w-4" /> ยังไม่ส่ง PDF
                             </span>
                           )}
                         </div>

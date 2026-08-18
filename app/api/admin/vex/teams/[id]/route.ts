@@ -20,8 +20,10 @@ const updateSchema = z.object({
   branch_id: z.string().uuid().optional(),
   /** ครูผู้ดูแลทีม — ส่ง null เพื่อล้างครูออก */
   coach_teacher_id: z.string().uuid().nullable().optional(),
-  /** ลิงก์ Engineering Notebook — ส่ง '' หรือ null เพื่อล้าง */
+  /** Engineering Notebook ฉบับกำลังทำ — ส่ง '' หรือ null เพื่อล้าง */
   notebook_url: z.string().trim().url().max(1000).nullable().optional().or(z.literal('')),
+  /** Engineering Notebook ฉบับส่งจริง (PDF) */
+  notebook_submit_url: z.string().trim().url().max(1000).nullable().optional().or(z.literal('')),
 })
 
 /** Attach the two public link slugs to a team row for the response. */
@@ -123,6 +125,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (parsed.data.branch_id !== undefined) patch.branch_id = parsed.data.branch_id
     if (parsed.data.coach_teacher_id !== undefined) patch.coach_teacher_id = parsed.data.coach_teacher_id || null
     if (parsed.data.notebook_url !== undefined) patch.notebook_url = parsed.data.notebook_url || null
+    if (parsed.data.notebook_submit_url !== undefined) patch.notebook_submit_url = parsed.data.notebook_submit_url || null
     // Keep slug in sync when the team_number changes (slug = number-event_token).
     if (parsed.data.team_number !== undefined && before.event_token) {
       patch.slug = linkSlug(nextNumber, before.event_token)
