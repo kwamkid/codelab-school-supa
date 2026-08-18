@@ -7,6 +7,7 @@
 // แอดมินแก้ลิงก์ได้ทันทีในตาราง (รวบรวมลิงก์จากหลายทีมรวดเดียว) — ครูดูอย่างเดียว
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/ui/page-header'
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { SearchInput } from '@/components/ui/search-input'
 import { StatusFilterTabs, type StatusFilterTab } from '@/components/ui/status-filter-tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SortableTableHead, useSortableTable } from '@/components/ui/sortable-table-head'
 import { PageLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -24,7 +26,7 @@ import { useBranch } from '@/contexts/BranchContext'
 import { useAuth } from '@/hooks/useAuth'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { cn } from '@/lib/utils'
-import { BookOpen, Copy, ExternalLink, FileCheck2, Check, Loader2 } from 'lucide-react'
+import { BookOpen, Copy, ExternalLink, FileCheck2, Check, Loader2, ArrowLeft } from 'lucide-react'
 
 interface TeamRow {
   id: string
@@ -37,6 +39,7 @@ interface TeamRow {
   coachImage?: string | null
   notebook_url?: string | null
   notebook_submit_url?: string | null
+  kids?: { id: string; nickname: string }[]
 }
 
 function CopyButton({ url, label }: { url: string; label: string }) {
@@ -135,6 +138,7 @@ function LinkCell({
 }
 
 export default function VexNotebooksPage() {
+  const router = useRouter()
   const { selectedBranchId } = useBranch()
   const { adminUser } = useAuth()
   const canManage = adminUser?.role === 'super_admin' || adminUser?.role === 'branch_admin'
@@ -145,6 +149,8 @@ export default function VexNotebooksPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'submitted' | 'pending'>('all')
   const [levelFilter, setLevelFilter] = useState<Level | 'all'>('all')
   const [savingId, setSavingId] = useState<string | null>(null)
+  // เรียงได้ตามเลขทีม/ชื่อทีม (ค่าเริ่มต้น = เรียงตามระดับ→เลขทีม)
+  const { sort, toggle: toggleSort, sortRows } = useSortableTable()
 
   const load = useCallback(async () => {
     try {
@@ -208,10 +214,19 @@ export default function VexNotebooksPage() {
   )
 
   const rows = useMemo(() => {
-    if (statusFilter === 'submitted') return scoped.filter((t) => !!t.notebook_submit_url)
-    if (statusFilter === 'pending') return scoped.filter((t) => !t.notebook_submit_url)
-    return scoped
-  }, [scoped, statusFilter])
+    const byStatus =
+      statusFilter === 'submitted'
+        ? scoped.filter((t) => !!t.notebook_submit_url)
+        : statusFilter === 'pending'
+          ? scoped.filter((t) => !t.notebook_submit_url)
+          : scoped
+    return sortRows(byStatus, (t, key) => {
+      if (key === 'team') return t.team_number
+      if (key === 'name') return t.name || ''
+      if (key === 'members') return t.kids?.length ?? 0
+      return ''
+    })
+  }, [scoped, statusFilter, sortRows])
 
   const tabs: StatusFilterTab[] = [
     { value: 'pending', label: 'ยังไม่ส่ง PDF', count: counts.pending, activeBg: 'bg-amber-500', inactiveBg: 'bg-amber-50', inactiveLabel: 'text-amber-700', inactiveCount: 'text-amber-700', always: true },
@@ -228,6 +243,11 @@ export default function VexNotebooksPage() {
         icon={FileCheck2}
         iconColor="text-red-600"
         description="รวมลิงก์ Engineering Notebook ของทุกทีม — คัดลอกลิงก์ PDF ไปวางในฟอร์มส่งได้เลย"
+        action={
+          <Button variant="outline" onClick={() => router.push('/vexteam')}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> กลับไปหน้าทีม
+          </Button>
+        }
       />
 
       <div className="space-y-4">
@@ -274,7 +294,15 @@ export default function VexNotebooksPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[190px] text-base">ทีม</TableHead>
+                  <SortableTableHead sortKey="team" currentSort={sort} onSort={toggleSort} className="min-w-[130px] text-base">
+                    เลขทีม
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="name" currentSort={sort} onSort={toggleSort} className="min-w-[140px] text-base">
+                    ชื่อทีม
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="members" currentSort={sort} onSort={toggleSort} className="min-w-[180px] text-base">
+                    สมาชิกทีม
+                  </SortableTableHead>
                   <TableHead className="min-w-[150px] text-base">ครูผู้ดูแล</TableHead>
                   <TableHead className="min-w-[280px] text-base">
                     <span className="inline-flex items-center gap-1 text-blue-600">
@@ -296,12 +324,28 @@ export default function VexNotebooksPage() {
                         <LevelBadge level={t.level} logoHeight={22} className="border-0 bg-transparent px-0 py-0" />
                         <div className="min-w-0">
                           <div className="text-xl font-bold leading-tight">{t.team_number}</div>
-                          {t.name && <div className="text-base text-gray-600 truncate">{t.name}</div>}
                           {!selectedBranchId && t.branchName && (
                             <div className="text-sm text-gray-400">{t.branchName}</div>
                           )}
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {t.name ? (
+                        <span className="text-lg font-semibold">{t.name}</span>
+                      ) : (
+                        <span className="text-base text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {t.kids?.length ? (
+                        <span className="text-base">
+                          <span className="text-gray-400">{t.kids.length} คน · </span>
+                          {t.kids.map((k) => k.nickname).join(', ')}
+                        </span>
+                      ) : (
+                        <span className="text-base text-gray-400">ยังไม่มีสมาชิก</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {t.coachName ? (
