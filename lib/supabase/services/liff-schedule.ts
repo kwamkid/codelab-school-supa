@@ -110,6 +110,8 @@ export async function getParentScheduleEvents(
           sessionNumber: s.sessionNumber,
           status: effectiveStatus,
           hasMakeupRequest: s.hasMakeup,
+          makeupId: s.makeupId || undefined,
+          makeupRequestedVia: s.makeupRequestedVia || null,
           makeupScheduled: s.makeupStatus === 'scheduled' && !!s.makeupDate,
           makeupDate: s.makeupDate || undefined,
           makeupTime: s.makeupStartTime && s.makeupEndTime ? `${s.makeupStartTime} - ${s.makeupEndTime}` : undefined,

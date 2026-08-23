@@ -44,6 +44,7 @@ function ScheduleContent() {
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false)
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState('list')
 
@@ -200,6 +201,33 @@ function ScheduleContent() {
     } catch (error) {
       console.error('[LIFF] Error submitting leave request:', error)
       toast.error(error instanceof Error ? error.message : 'ไม่สามารถบันทึกการลาได้')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // ยกเลิกการลา — ทำได้จากคาบนั้นในปฏิทินเลย ไม่ต้องไปหาในหน้าลาและชดเชย
+  const handleCancelLeave = async () => {
+    if (!selectedEvent) return
+    const props = selectedEvent.extendedProps
+    if (!props.makeupId) return
+
+    setIsSubmitting(true)
+    try {
+      await liffFetch('/api/liff/cancel-leave', {
+        lineUserId: profile?.userId,
+        makeupId: props.makeupId,
+        studentId: props.studentId,
+        classId: props.classId,
+        scheduleId: props.scheduleId,
+      })
+      toast.success('ยกเลิกการลาแล้ว', { description: 'นักเรียนกลับมาเรียนตามปกติในคาบนี้' })
+      setDialogOpen(false)
+      setConfirmCancelOpen(false)
+      setSelectedEvent(null)
+      if (forceRefresh) setTimeout(() => forceRefresh(), 1000)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'ไม่สามารถยกเลิกการลาได้')
     } finally {
       setIsSubmitting(false)
     }
@@ -472,11 +500,27 @@ function ScheduleContent() {
                   <Badge className="w-full justify-center bg-red-600 hover:bg-red-700">
                     ลาเรียน
                   </Badge>
-                  <p className="text-xs text-center text-muted-foreground mt-2">
+                  <p className="text-base text-center text-muted-foreground mt-2">
                     {selectedEvent.extendedProps.makeupScheduled 
                       ? `นัดเรียนชดเชย: ${new Date(selectedEvent.extendedProps.makeupDate!).toLocaleDateString('th-TH')} เวลา ${selectedEvent.extendedProps.makeupTime}`
                       : 'รอเจ้าหน้าที่นัดเรียนชดเชย'}
                   </p>
+
+                  {/* ยกเลิกการลาได้เอง ถ้าเป็นใบที่แจ้งผ่านแอปเอง + ยังไม่ถูกนัดชดเชย
+                      + ยังไม่ถึงวันเรียน (เงื่อนไขเดียวกับฝั่ง server) */}
+                  {selectedEvent.extendedProps.status === 'leave-requested' &&
+                   !selectedEvent.extendedProps.makeupScheduled &&
+                   selectedEvent.extendedProps.makeupId &&
+                   selectedEvent.extendedProps.makeupRequestedVia === 'liff' &&
+                   new Date(selectedEvent.start) > new Date() && (
+                    <Button
+                      className="w-full mt-3"
+                      variant="outline"
+                      onClick={() => setConfirmCancelOpen(true)}
+                    >
+                      ยกเลิกการลา (กลับมาเรียนตามปกติ)
+                    </Button>
+                  )}
                 </div>
               )}
               
@@ -559,10 +603,64 @@ function ScheduleContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
+      {/* Confirm Cancel-Leave Dialog */}
+      <AlertDialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+        <AlertDialogContent className="max-w-[320px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              ยกเลิกการลา
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-2 text-base text-muted-foreground">
+            {selectedEvent && (
+              <>
+                <div>ยกเลิกการลาของ:</div>
+                <div className="bg-gray-50 p-3 rounded-md space-y-1 text-foreground">
+                  <p className="font-medium">
+                    {selectedEvent.extendedProps.studentNickname || selectedEvent.extendedProps.studentName}
+                  </p>
+                  <p className="text-base">
+                    คลาส: {selectedEvent.extendedProps.subjectName || selectedEvent.extendedProps.className}
+                    {selectedEvent.extendedProps.sessionNumber && (
+                      <span className="text-muted-foreground"> (ครั้งที่ {selectedEvent.extendedProps.sessionNumber})</span>
+                    )}
+                  </p>
+                  <p className="text-base">
+                    วันที่: {selectedEvent.start.toLocaleDateString('th-TH', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </p>
+                </div>
+                <div className="text-base text-muted-foreground mt-3">
+                  นักเรียนจะกลับมาเรียนตามปกติในคาบนี้ และได้สิทธิ์ลาคืน 1 ครั้ง
+                </div>
+              </>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>ปิด</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelLeave} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  กำลังยกเลิก...
+                </>
+              ) : (
+                'ยืนยันยกเลิกการลา'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Loading Overlay */}
       {isSubmitting && (
-        <PageLoading text="กำลังบันทึกการลาเรียน..." />
+        <PageLoading text="กำลังบันทึก..." />
       )}
     </div>
   )

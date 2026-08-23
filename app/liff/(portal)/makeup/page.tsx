@@ -373,17 +373,16 @@ function MakeupContent() {
                             {canCancel && (
                               <Button
                                 size="sm"
-                                variant="destructive"
-                                className="h-6 px-2 text-xs"
+                                variant="outline"
                                 onClick={() => handleCancelLeave(makeup)}
                                 disabled={cancellingId === makeup.id}
                               >
                                 {cancellingId === makeup.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <>
-                                    <X className="h-3 w-3 mr-1" />
-                                    ยกเลิก
+                                    <X className="h-4 w-4 mr-1" />
+                                    ยกเลิกการลา
                                   </>
                                 )}
                               </Button>

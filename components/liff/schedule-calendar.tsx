@@ -49,6 +49,10 @@ export interface ScheduleEvent {
     makeupScheduled?: boolean;
     makeupDate?: string;
     makeupTime?: string;
+    /** id ของใบลา — ใช้กดยกเลิกการลาจากปฏิทินได้เลย */
+    makeupId?: string;
+    /** 'liff' = ครอบครัวแจ้งเอง → ยกเลิกเองได้; ของแอดมิน/ระบบ ต้องให้แอดมินจัดการ */
+    makeupRequestedVia?: string | null;
   };
 }
 
