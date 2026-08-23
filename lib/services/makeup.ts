@@ -37,6 +37,10 @@ export function dbRowToMakeupClass(row: any): MakeupClass {
 
     requestDate: row.request_date ? new Date(row.request_date) : new Date(),
     requestedBy: row.requested_by,
+    requestedVia: row.requested_via ?? null,
+    requestedByName: row.requested_by_name ?? null,
+    requestedByRole: row.requested_by_role ?? null,
+    requestedByLineId: row.requested_by_line_id ?? null,
     reason: row.reason,
     status: row.status,
     notes: row.notes,

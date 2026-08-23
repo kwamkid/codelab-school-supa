@@ -74,6 +74,67 @@ export async function resolveFamilyLineId(supabase: any, lineUserId: string): Pr
   return parent?.line_user_id || lineUserId;
 }
 
+// แถวผู้รับเพิ่มเติมของ LINE id นี้ (null ถ้าเป็นผู้ปกครองหลัก)
+async function getRecipientByLine(supabase: any, lineUserId: string) {
+  const { data } = await supabase
+    .from('parent_line_recipients')
+    .select('*')
+    .eq('line_user_id', lineUserId)
+    .eq('is_active', true)
+    .not('accepted_at', 'is', null)
+    .maybeSingle();
+  return data || null;
+}
+
+// บันทึกว่าใครทำอะไรผ่าน portal — best effort, ห้ามให้ log พังแล้วรายการหลักพังตาม
+async function logLiffActivity(
+  supabase: any,
+  viewer: ViewerContext,
+  action: string,
+  extra?: { studentId?: string; targetId?: string; detail?: any }
+) {
+  try {
+    await supabase.from('liff_activity_log').insert({
+      parent_id: viewer.parent?.id ?? null,
+      actor_line_id: viewer.actorLineId,
+      actor_name: viewer.actorName,
+      actor_role: viewer.isSecondary ? 'secondary' : 'primary',
+      action,
+      student_id: extra?.studentId ?? null,
+      target_id: extra?.targetId ?? null,
+      detail: extra?.detail ?? null,
+    });
+  } catch (e) {
+    console.error('[liff-data] activity log failed:', action, e);
+  }
+}
+
+export interface ViewerContext {
+  parent: any;
+  /** true = ผู้รับเพิ่มเติม (พ่อ/ย่า/พี่) ที่ถูกเชิญเข้ามา, false = ผู้ปกครองหลัก */
+  isSecondary: boolean;
+  recipient: any | null;
+  /** ชื่อที่ใช้บันทึกว่า "ใครเป็นคนทำรายการนี้" */
+  actorName: string;
+  actorLineId: string;
+}
+
+// ใครกำลังใช้ portal อยู่ — ใช้ตอนบันทึก transaction ว่าใครเป็นคนกด
+// (พ่อกับแม่ผูกครอบครัวเดียวกัน แต่คนละ LINE id → ต้องแยกให้ออก)
+export async function getViewerContext(
+  supabase: any,
+  lineUserId: string
+): Promise<ViewerContext | null> {
+  const parent = await getParentByLine(supabase, lineUserId);
+  if (!parent) return null;
+  const isSecondary = parent.line_user_id !== lineUserId;
+  const recipient = isSecondary ? await getRecipientByLine(supabase, lineUserId) : null;
+  const actorName = isSecondary
+    ? recipient?.full_name || recipient?.display_name || recipient?.label || 'ผู้รับเพิ่มเติม'
+    : parent.display_name || parent.line_display_name || 'ผู้ปกครอง';
+  return { parent, isSecondary, recipient, actorName, actorLineId: lineUserId };
+}
+
 async function getActiveStudents(supabase: any, parentId: string) {
   const { data } = await supabase
     .from('students')
@@ -152,10 +213,12 @@ export async function getMakeupData(lineUserId: string) {
       // catch-up, class pause, sickness, teacher-caused — flagged countsTowardQuota=false.
       const quotaCounting = nonCancelled.filter((m) => m.countsTowardQuota !== false);
       // Informational breakdown (not used for quota):
-      const selfRequested = nonCancelled.filter(
-        (m) => m.requestedBy === 'parent-liff' || m.reason?.includes('ลาผ่านระบบ LIFF')
-      ).length;
-      const systemGenerated = nonCancelled.filter((m) => m.requestedBy !== 'parent-liff' && !m.reason?.includes('ลาผ่านระบบ LIFF')).length;
+      // แจ้งเองผ่าน portal vs ระบบ/แอดมินสร้างให้ — เดิมเทียบ requestedBy === 'parent-liff'
+      // ซึ่งเก็บลง DB ไม่ได้เลย (คอลัมน์เป็น uuid) จึงนับเป็น 0 ตลอด
+      const isSelfRequested = (m: any) =>
+        m.requestedVia === 'liff' || m.reason?.includes('ลาผ่านระบบ LIFF');
+      const selfRequested = nonCancelled.filter(isSelfRequested).length;
+      const systemGenerated = nonCancelled.filter((m: any) => !isSelfRequested(m)).length;
       const absences = absenceMap.get(`${student.id}-${enr.classId}`) || 0;
       const makeupsWithDetails = classMakeups
         .map((m) => ({ ...m, className: enr.className, subjectName: enr.subjectName, subjectColor: enr.subjectColor }))
@@ -218,19 +281,64 @@ export async function getFeedbackData(lineUserId: string) {
 
 export async function getProfileData(lineUserId: string) {
   const supabase = createServiceClient() as any;
-  const familyLineId = await resolveFamilyLineId(supabase, lineUserId);
+  const viewer = await getViewerContext(supabase, lineUserId);
+  const familyLineId = viewer?.parent?.line_user_id || lineUserId;
   // Single round-trip; returns camelCase parent + students + preferred branch.
   const { data, error } = await supabase.rpc('get_liff_profile', { p_line_user_id: familyLineId });
   if (error) throw error;
+  const rec = viewer?.recipient;
   return {
     hasParent: data?.hasParent ?? false,
     parent: data?.parent ?? null,
     students: data?.students ?? [],
     preferredBranch: data?.preferredBranch ?? null,
     // account รอง (ผู้รับแจ้งเตือนที่ถูกเชิญ) — หน้า UI ใช้ซ่อนสิทธิ์จัดการ
-    // (แก้โปรไฟล์/เพิ่มนักเรียน/จัดการผู้รับ) และแสดงชื่อ LINE ของตัวเอง
-    viewerIsSecondary: familyLineId !== lineUserId,
+    // ข้อมูลครอบครัว (แก้โปรไฟล์หลัก/เพิ่มนักเรียน/จัดการผู้รับ)
+    viewerIsSecondary: !!viewer?.isSecondary,
+    // ข้อมูลติดต่อของ "ตัวผู้รับเอง" — เขาแก้ของตัวเองได้ (ชื่อจริง/เบอร์/อีเมล)
+    viewerRecipient: rec
+      ? {
+          id: rec.id,
+          label: rec.label ?? null,
+          fullName: rec.full_name ?? null,
+          phone: rec.phone ?? null,
+          email: rec.email ?? null,
+          displayName: rec.display_name ?? null,
+          pictureUrl: rec.picture_url ?? null,
+          // ยังไม่ได้กรอกเบอร์ = ทางโรงเรียนติดต่อกลับไม่ได้ → หน้า UI ขึ้นเตือน
+          needsContactInfo: !rec.phone,
+        }
+      : null,
   };
+}
+
+// ผู้รับเพิ่มเติมแก้ข้อมูลติดต่อ "ของตัวเอง" (ไม่แตะข้อมูลครอบครัว)
+export async function updateRecipientSelf(
+  lineUserId: string,
+  data: { fullName?: string; phone?: string; email?: string; label?: string }
+) {
+  const supabase = createServiceClient() as any;
+  const viewer = await getViewerContext(supabase, lineUserId);
+  if (!viewer?.recipient) throw new Error('ไม่มีสิทธิ์แก้ไขข้อมูลนี้');
+
+  const update: any = { updated_at: new Date().toISOString() };
+  if (data.fullName !== undefined) update.full_name = data.fullName.trim() || null;
+  if (data.phone !== undefined) update.phone = data.phone.trim() || null;
+  if (data.email !== undefined) update.email = data.email.trim() || null;
+  if (data.label !== undefined) update.label = data.label.trim() || null;
+
+  const { error } = await supabase
+    .from('parent_line_recipients')
+    .update(update)
+    .eq('id', viewer.recipient.id)
+    .eq('line_user_id', lineUserId); // แก้ได้เฉพาะแถวของตัวเอง
+  if (error) throw error;
+
+  await logLiffActivity(supabase, viewer, 'recipient.update', {
+    targetId: viewer.recipient.id,
+    detail: { fields: Object.keys(update).filter((k) => k !== 'updated_at') },
+  });
+  return { ok: true };
 }
 
 export async function updateParentProfile(
@@ -240,8 +348,10 @@ export async function updateParentProfile(
 ) {
   const supabase = createServiceClient() as any;
   // Ownership check: the parent record must belong to the verified LINE user.
-  const parent = await getParentByLine(supabase, lineUserId);
-  if (!parent || parent.id !== parentId) {
+  // ผู้รับเพิ่มเติมแก้โปรไฟล์ครอบครัวไม่ได้ — ให้แก้ของตัวเองผ่าน updateRecipientSelf
+  const viewer = await getViewerContext(supabase, lineUserId);
+  const parent = viewer?.parent;
+  if (!viewer || !parent || parent.id !== parentId || viewer.isSecondary) {
     throw new Error('ไม่มีสิทธิ์แก้ไขข้อมูลนี้');
   }
 
@@ -256,24 +366,30 @@ export async function updateParentProfile(
 
   const { error } = await supabase.from('parents').update(update).eq('id', parentId);
   if (error) throw error;
+  await logLiffActivity(supabase, viewer, 'profile.update', {
+    targetId: parentId,
+    detail: { fields: Object.keys(update) },
+  });
   return { ok: true };
 }
 
 // ---- leave request / cancel ----------------------------------------------
 
 // Confirm the student belongs to the verified parent before mutating.
+// คืน viewer context ด้วย — ผู้รับเพิ่มเติมทำรายการได้เหมือนผู้ปกครองหลัก
+// แต่ต้องรู้ว่าเป็นใครเพื่อบันทึกลง transaction
 async function assertStudentOwnedByLine(supabase: any, lineUserId: string, studentId: string) {
-  const parent = await getParentByLine(supabase, lineUserId);
-  if (!parent) throw new Error('ไม่พบข้อมูลผู้ปกครอง');
+  const viewer = await getViewerContext(supabase, lineUserId);
+  if (!viewer) throw new Error('ไม่พบข้อมูลผู้ปกครอง');
   const { data: student } = await supabase
     .from('students')
     .select('id, parent_id')
     .eq('id', studentId)
     .single();
-  if (!student || student.parent_id !== parent.id) {
+  if (!student || student.parent_id !== viewer.parent.id) {
     throw new Error('ไม่มีสิทธิ์ดำเนินการกับนักเรียนคนนี้');
   }
-  return parent;
+  return viewer;
 }
 
 export async function requestLeave(
@@ -286,7 +402,8 @@ export async function requestLeave(
     return { ok: false, status: 400, message: 'ข้อมูลไม่ครบถ้วน' };
   }
 
-  const parent = await assertStudentOwnedByLine(supabase, lineUserId, studentId);
+  const viewer = await assertStudentOwnedByLine(supabase, lineUserId, studentId);
+  const parent = viewer.parent;
 
   const { data: enrollment } = await supabase
     .from('enrollments')
@@ -345,24 +462,72 @@ export async function requestLeave(
     };
   }
 
+  // Denormalized columns the admin lists read (student/class/branch/parent names).
+  // The admin-side createMakeupRequest fills these too — keep both paths identical
+  // so a LIFF leave doesn't show up as a blank row in the admin makeup list.
+  const [{ data: student }, { data: classData }] = await Promise.all([
+    supabase.from('students').select('id, name, nickname').eq('id', studentId).single(),
+    supabase.from('classes').select('id, name, code, subject_id, branch_id').eq('id', classId).single(),
+  ]);
+  const [{ data: subject }, { data: branch }] = await Promise.all([
+    classData?.subject_id
+      ? supabase.from('subjects').select('name').eq('id', classData.subject_id).single()
+      : Promise.resolve({ data: null }),
+    classData?.branch_id
+      ? supabase.from('branches').select('name').eq('id', classData.branch_id).single()
+      : Promise.resolve({ data: null }),
+  ]);
+
   const { data: makeupResult, error: makeupError } = await supabase
     .from('makeup_classes')
     .insert({
       type: type || 'scheduled',
       original_class_id: classId,
       original_schedule_id: scheduleId,
+      original_session_number: schedule.session_number || 0,
+      original_session_date: schedule.session_date,
+
+      class_name: classData?.name || null,
+      class_code: classData?.code || null,
+      subject_id: classData?.subject_id || null,
+      subject_name: subject?.name || null,
+
       student_id: studentId,
+      student_name: student?.name || null,
+      student_nickname: student?.nickname || null,
+
       parent_id: parent.id,
-      requested_by: 'parent-liff',
+      parent_name: parent.display_name || parent.line_display_name || null,
+      parent_phone: parent.phone || null,
+      parent_line_user_id: parent.line_user_id || null,
+
+      branch_id: classData?.branch_id || null,
+      branch_name: branch?.name || null,
+
+      request_date: new Date().toISOString(),
+      // requested_by is a uuid column — the old code wrote the string 'parent-liff'
+      // here, which made every LIFF leave fail with a 500. Channel + actor now live
+      // in requested_via / requested_by_* instead.
+      requested_by: parent.id,
+      requested_via: 'liff',
+      requested_by_line_id: viewer.actorLineId,
+      requested_by_name: viewer.actorName,
+      requested_by_role: viewer.isSecondary ? 'secondary' : 'primary',
       reason: reason || 'ลาผ่านระบบ LIFF',
       status: 'pending',
       counts_toward_quota: true, // a LIFF leave is a real leave → consumes quota
-      original_session_number: schedule.session_number || 0,
-      original_session_date: schedule.session_date,
     })
     .select('id')
     .single();
   if (makeupError) throw makeupError;
+
+  await logLiffActivity(supabase, viewer, 'leave.request', {
+    studentId,
+    targetId: makeupResult.id,
+    detail: { classId, scheduleId, reason: reason || null, sessionDate: schedule.session_date },
+  });
+
+  const attendanceNote = `ลาผ่านระบบ LIFF (โดย ${viewer.actorName}${viewer.isSecondary ? ' — ผู้รับเพิ่มเติม' : ''})`;
 
   // Mark attendance as 'leave' (best effort). NOTE: attendance.checked_by is a
   // uuid FK — it cannot hold the string 'parent-liff' (that silently errored
@@ -378,14 +543,14 @@ export async function requestLeave(
     if (existingAtt) {
       await supabase
         .from('attendance')
-        .update({ status: 'leave', note: 'ลาผ่านระบบ LIFF', checked_at: new Date().toISOString(), checked_by: null })
+        .update({ status: 'leave', note: attendanceNote, checked_at: new Date().toISOString(), checked_by: null })
         .eq('id', existingAtt.id);
     } else {
       await supabase.from('attendance').insert({
         schedule_id: scheduleId,
         student_id: studentId,
         status: 'leave',
-        note: 'ลาผ่านระบบ LIFF',
+        note: attendanceNote,
         checked_at: new Date().toISOString(),
         checked_by: null,
       });
@@ -413,7 +578,7 @@ export async function cancelLeave(
     return { ok: false, status: 400, message: 'ข้อมูลไม่ครบถ้วน' };
   }
 
-  await assertStudentOwnedByLine(supabase, lineUserId, studentId);
+  const viewer = await assertStudentOwnedByLine(supabase, lineUserId, studentId);
 
   const { data: makeup } = await supabase.from('makeup_classes').select('*').eq('id', makeupId).single();
   if (!makeup) return { ok: false, status: 404, message: 'ไม่พบข้อมูลการลา' };
@@ -425,6 +590,18 @@ export async function cancelLeave(
   if (originalDate < new Date()) {
     return { ok: false, status: 400, message: 'ไม่สามารถยกเลิกการลาย้อนหลังได้' };
   }
+
+  // แถว makeup ถูกลบทิ้ง → log คือร่องรอยเดียวที่เหลือว่าใครเป็นคนยกเลิก
+  await logLiffActivity(supabase, viewer, 'leave.cancel', {
+    studentId,
+    targetId: makeupId,
+    detail: {
+      classId: makeup.original_class_id,
+      scheduleId,
+      sessionDate: makeup.original_session_date,
+      reason: makeup.reason,
+    },
+  });
 
   const { error: deleteError } = await supabase.from('makeup_classes').delete().eq('id', makeupId);
   if (deleteError) throw deleteError;

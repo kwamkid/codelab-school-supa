@@ -55,8 +55,22 @@ function ProfileContent() {
   const [parentId, setParentId] = useState<string | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [hasParent, setHasParent] = useState<boolean | null>(null)
-  // account รอง (ผู้รับแจ้งเตือนที่ถูกเชิญ) — ดูข้อมูลครอบครัวได้ แต่ไม่มีสิทธิ์จัดการ
+  // account รอง (ผู้รับแจ้งเตือนที่ถูกเชิญ) — ใช้ portal ได้เหมือนผู้ปกครองหลัก
+  // (ดูตาราง/แจ้งลา/ดู feedback) แต่ข้อมูลครอบครัวยังยึดของผู้ปกครองหลัก
   const [isSecondary, setIsSecondary] = useState(false)
+  // ข้อมูลติดต่อของตัวผู้รับเอง — เขาแก้ของตัวเองได้
+  const [viewerRecipient, setViewerRecipient] = useState<{
+    id: string
+    label: string | null
+    fullName: string | null
+    phone: string | null
+    email: string | null
+    displayName: string | null
+    needsContactInfo: boolean
+  } | null>(null)
+  const [editingSelf, setEditingSelf] = useState(false)
+  const [savingSelf, setSavingSelf] = useState(false)
+  const [selfForm, setSelfForm] = useState({ fullName: '', phone: '', email: '', label: '' })
   
   // Delete confirmation state
   const [deleteStudentData, setDeleteStudentData] = useState<Student | null>(null)
@@ -70,6 +84,42 @@ function ProfileContent() {
   const [inviteLabel, setInviteLabel] = useState('')
   const [creatingInvite, setCreatingInvite] = useState(false)
   const [removingRecipientId, setRemovingRecipientId] = useState<string | null>(null)
+
+  // ผู้รับเพิ่มเติมบันทึกข้อมูลติดต่อของตัวเอง (ชื่อจริง/เบอร์/อีเมล/ความสัมพันธ์)
+  const saveSelfInfo = async () => {
+    if (!profile?.userId) return
+    if (!selfForm.phone.trim()) {
+      toast.error('กรุณากรอกเบอร์โทรศัพท์')
+      return
+    }
+    setSavingSelf(true)
+    try {
+      const res = await liffFetch('/api/liff/profile-update', {
+        lineUserId: profile.userId,
+        scope: 'recipient',
+        data: selfForm,
+      })
+      if (!res?.success) throw new Error(res?.error || 'บันทึกไม่สำเร็จ')
+      toast.success('บันทึกข้อมูลของคุณแล้ว')
+      setEditingSelf(false)
+      setViewerRecipient((prev) =>
+        prev
+          ? {
+              ...prev,
+              fullName: selfForm.fullName || null,
+              phone: selfForm.phone || null,
+              email: selfForm.email || null,
+              label: selfForm.label || null,
+              needsContactInfo: !selfForm.phone,
+            }
+          : prev
+      )
+    } catch (e: any) {
+      toast.error(e?.message || 'เกิดข้อผิดพลาด')
+    } finally {
+      setSavingSelf(false)
+    }
+  }
 
   const loadRecipients = async (lineUserId: string) => {
     try {
@@ -185,6 +235,17 @@ function ProfileContent() {
         setPreferredBranch((data.preferredBranch as Branch) || null)
         setStudents((data.students || []) as Student[])
         setIsSecondary(!!data.viewerIsSecondary)
+        setViewerRecipient(data.viewerRecipient || null)
+        if (data.viewerRecipient) {
+          setSelfForm({
+            fullName: data.viewerRecipient.fullName || '',
+            phone: data.viewerRecipient.phone || '',
+            email: data.viewerRecipient.email || '',
+            label: data.viewerRecipient.label || '',
+          })
+          // ยังไม่เคยกรอกเบอร์ → เปิดฟอร์มให้เลย ไม่ต้องให้หาเอง
+          if (data.viewerRecipient.needsContactInfo) setEditingSelf(true)
+        }
         // จัดการผู้รับแจ้งเตือนได้เฉพาะ account หลัก (API ก็กันไว้อีกชั้น)
         if (!data.viewerIsSecondary) loadRecipients(lineUserId)
       } else {
@@ -456,6 +517,129 @@ function ProfileContent() {
       </div>
 
       <div className="p-4 space-y-4">
+        {/* ข้อมูลของผู้ปกครองร่วม (account รอง) — เก็บเบอร์/อีเมลของเขาเองไว้ด้วย
+            ทางโรงเรียนจะได้ติดต่อได้ ไม่ใช่มีแต่ชื่อ LINE */}
+        {isSecondary && viewerRecipient && (
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  ข้อมูลของคุณ
+                </CardTitle>
+                {!editingSelf && (
+                  <Button variant="ghost" size="sm" onClick={() => setEditingSelf(true)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {viewerRecipient.needsContactInfo && !editingSelf && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-base text-amber-800">
+                  ยังไม่ได้กรอกเบอร์ติดต่อของคุณ — กรอกไว้เพื่อให้ทางโรงเรียนติดต่อกลับได้
+                </div>
+              )}
+
+              {editingSelf ? (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">ชื่อ-นามสกุลของคุณ</p>
+                    <Input
+                      value={selfForm.fullName}
+                      onChange={(e) => setSelfForm({ ...selfForm, fullName: e.target.value })}
+                      placeholder="เช่น สมชาย ใจดี"
+                      className="text-base"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">ความเกี่ยวข้องกับนักเรียน</p>
+                    <Input
+                      value={selfForm.label}
+                      onChange={(e) => setSelfForm({ ...selfForm, label: e.target.value })}
+                      placeholder="เช่น คุณพ่อ / คุณย่า"
+                      className="text-base"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">เบอร์โทรศัพท์ *</p>
+                    <Input
+                      value={selfForm.phone}
+                      onChange={(e) => setSelfForm({ ...selfForm, phone: e.target.value })}
+                      placeholder="08xxxxxxxx"
+                      inputMode="tel"
+                      className="text-base"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">อีเมล</p>
+                    <Input
+                      value={selfForm.email}
+                      onChange={(e) => setSelfForm({ ...selfForm, email: e.target.value })}
+                      placeholder="you@example.com"
+                      inputMode="email"
+                      className="text-base"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Button onClick={saveSelfInfo} disabled={savingSelf} className="flex-1">
+                      {savingSelf ? <Loader2 className="h-4 w-4 animate-spin" /> : 'บันทึก'}
+                    </Button>
+                    {!viewerRecipient.needsContactInfo && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setEditingSelf(false)
+                          setSelfForm({
+                            fullName: viewerRecipient.fullName || '',
+                            phone: viewerRecipient.phone || '',
+                            email: viewerRecipient.email || '',
+                            label: viewerRecipient.label || '',
+                          })
+                        }}
+                      >
+                        ยกเลิก
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2 text-base">
+                  <div className="space-y-0.5">
+                    <h3 className="font-semibold text-lg">
+                      {viewerRecipient.fullName || (
+                        <span className="text-muted-foreground text-base font-normal">ยังไม่ได้ระบุชื่อ</span>
+                      )}
+                      {viewerRecipient.label && (
+                        <span className="ml-2 text-base font-normal text-muted-foreground">
+                          ({viewerRecipient.label})
+                        </span>
+                      )}
+                    </h3>
+                    {viewerRecipient.displayName && (
+                      <p className="text-base text-muted-foreground">
+                        ชื่อ LINE ของคุณ: {viewerRecipient.displayName}
+                      </p>
+                    )}
+                  </div>
+                  {viewerRecipient.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span>โทร: {viewerRecipient.phone}</span>
+                    </div>
+                  )}
+                  {viewerRecipient.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="break-all">{viewerRecipient.email}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Parent Profile Card */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
@@ -477,11 +661,12 @@ function ProfileContent() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {/* account รอง: บอกชัดว่ากำลังดูข้อมูลครอบครัวในฐานะผู้รับแจ้งเตือน */}
+              {/* account รอง: ดู/แจ้งลาได้เหมือนผู้ปกครองหลัก แต่แก้ข้อมูลครอบครัวไม่ได้ */}
               {isSecondary && (
                 <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-base text-blue-800">
-                  คุณ ({profile?.displayName || 'LINE นี้'}) เป็น<b>ผู้รับการแจ้งเตือน</b>ของครอบครัวนี้
-                  — ดูตารางเรียน/แจ้งลาได้ แต่แก้ไขข้อมูลไม่ได้
+                  คุณ ({viewerRecipient?.fullName || profile?.displayName || 'LINE นี้'}) เป็น
+                  <b>ผู้ปกครองร่วม</b>ของครอบครัวนี้ — ดูตารางเรียน แจ้งลา และดูผลการเรียนได้
+                  เหมือนผู้ปกครองหลัก (ข้อมูลครอบครัวด้านล่างแก้ไขได้จากบัญชีหลักเท่านั้น)
                 </div>
               )}
               <div className="space-y-0.5">

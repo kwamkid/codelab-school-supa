@@ -329,9 +329,14 @@ function MakeupContent() {
                   const now = new Date()
                   const originalDate = makeup.originalSessionDate?.toDate ? 
                     makeup.originalSessionDate.toDate() : new Date(makeup.originalSessionDate)
-                  const canCancel = makeup.status === 'pending' && 
+                  // ลาที่ครอบครัวแจ้งเองผ่าน portal เท่านั้นที่ยกเลิกเองได้
+                  // (ของแอดมิน/ระบบ ต้องให้แอดมินจัดการ) — ผู้รับเพิ่มเติมยกเลิกของ
+                  // คนในบ้านได้เหมือนกัน เพราะเป็นครอบครัวเดียวกัน
+                  const selfRequested =
+                    makeup.requestedVia === 'liff' || makeup.reason?.includes('ลาผ่านระบบ LIFF')
+                  const canCancel = makeup.status === 'pending' &&
                                    originalDate > now &&
-                                   makeup.requestedBy === 'parent-liff'
+                                   selfRequested
                   
                   return (
                     <Card key={makeup.id} className="border-0 shadow-sm">
@@ -397,10 +402,13 @@ function MakeupContent() {
                             <span>เหตุผล: {makeup.reason}</span>
                           </div>
 
-                          {makeup.requestedBy === 'parent-liff' && makeup.type === 'scheduled' && (
+                          {selfRequested && makeup.type === 'scheduled' && (
                             <div className="flex items-center gap-2 text-blue-600">
                               <Info className="h-4 w-4" />
-                              <span className="text-xs">ลาผ่านระบบ (นับใน quota)</span>
+                              <span className="text-base">
+                                ลาผ่านระบบ (นับใน quota)
+                                {makeup.requestedByName ? ` · แจ้งโดย ${makeup.requestedByName}` : ''}
+                              </span>
                             </div>
                           )}
                           

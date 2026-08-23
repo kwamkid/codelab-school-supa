@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     if (action === 'list') {
       const { data: rows } = await (supabase as any)
         .from('parent_line_recipients')
-        .select('id, label, line_user_id, display_name, picture_url, invite_token, invite_expires_at, accepted_at')
+        .select('id, label, line_user_id, display_name, picture_url, full_name, phone, email, invite_token, invite_expires_at, accepted_at')
         .eq('parent_id', parent.id)
         .eq('is_active', true)
         .order('created_at', { ascending: true });
@@ -123,6 +123,9 @@ export async function POST(request: NextRequest) {
           label: r.label,
           displayName: r.display_name,
           pictureUrl: r.picture_url,
+          fullName: r.full_name,
+          phone: r.phone,
+          email: r.email,
           accepted: !!r.accepted_at,
           // token ส่งกลับเฉพาะแถวที่ยังรอตอบรับ — ให้กดแชร์ลิงก์เชิญซ้ำได้
           inviteUrl: !r.accepted_at && r.invite_token ? parentLiffUrl(`?recipientInvite=${r.invite_token}`) : null,

@@ -23,6 +23,9 @@ interface RecipientRow {
   line_user_id: string | null;
   display_name: string | null;
   picture_url: string | null;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
   invite_token: string | null;
   invite_expires_at: string | null;
   accepted_at: string | null;
@@ -130,8 +133,9 @@ export function LineRecipientsCard({ parentId }: { parentId: string }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-gray-500">
-          แจ้งเตือน LINE (คลาส/ชดเชย/feedback ฯลฯ) จะส่งถึงผู้ปกครองหลัก และทุกคนในรายการนี้
+        <p className="text-base text-gray-500">
+          ทุกคนในรายการนี้ได้รับแจ้งเตือน LINE เหมือนผู้ปกครองหลัก และใช้ portal ได้เต็ม
+          (ดูตารางเรียน แจ้งลา ดูผลการเรียน) — ข้อมูลนักเรียนยังยึดของผู้ปกครองหลัก
         </p>
 
         {loading ? (
@@ -154,11 +158,24 @@ export function LineRecipientsCard({ parentId }: { parentId: string }) {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">
-                        {r.display_name || r.label || 'รอตอบรับคำเชิญ'}
+                        {r.full_name || r.display_name || r.label || 'รอตอบรับคำเชิญ'}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        {r.accepted_at ? (r.label || 'รับการแจ้งเตือนแล้ว') : 'รอกดตอบรับ (ลิงก์อายุ 3 วัน)'}
+                      <p className="text-sm text-gray-500 truncate">
+                        {r.accepted_at
+                          ? [r.label, r.full_name && r.display_name ? `LINE: ${r.display_name}` : null]
+                              .filter(Boolean)
+                              .join(' · ') || 'รับการแจ้งเตือนแล้ว'
+                          : 'รอกดตอบรับ (ลิงก์อายุ 3 วัน)'}
                       </p>
+                      {/* เบอร์/อีเมลที่ผู้รับกรอกเองในหน้า portal — ติดต่อกลับได้ */}
+                      {(r.phone || r.email) && (
+                        <p className="text-sm text-gray-600 truncate">
+                          {[r.phone, r.email].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                      {r.accepted_at && !r.phone && (
+                        <p className="text-sm text-amber-600">ยังไม่ได้กรอกเบอร์ติดต่อ</p>
+                      )}
                     </div>
                     {!r.accepted_at && (
                       <>

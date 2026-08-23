@@ -618,6 +618,12 @@ export interface MakeupClass {
   // Request Info
   requestDate: Date;
   requestedBy: string;
+  /** ช่องทางที่แจ้ง: liff (ผู้ปกครองแจ้งเอง) | admin | attendance */
+  requestedVia?: 'liff' | 'admin' | 'attendance' | null;
+  /** ชื่อคนที่กดแจ้ง ณ ตอนนั้น — พ่อ/แม่/ผู้รับเพิ่มเติมคนไหน */
+  requestedByName?: string | null;
+  requestedByRole?: 'primary' | 'secondary' | null;
+  requestedByLineId?: string | null;
   reason: string;
   status: 'pending' | 'scheduled' | 'completed' | 'cancelled';
   // Whether this makeup consumes the student's leave quota. Defaults to true;

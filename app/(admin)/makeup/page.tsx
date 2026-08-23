@@ -503,6 +503,14 @@ export default function MakeupPage() {
                       </div>
                     )}
 
+                    {/* ใครเป็นคนแจ้ง — พ่อ/แม่/ผู้รับเพิ่มเติมคนไหนกดลาผ่าน portal */}
+                    {makeup.requestedVia === 'liff' && makeup.requestedByName && (
+                      <p className="text-sm text-gray-400">
+                        แจ้งโดย {makeup.requestedByName}
+                        {makeup.requestedByRole === 'secondary' ? ' (ผู้ปกครองร่วม)' : ''}
+                      </p>
+                    )}
+
                     {/* Branch (when viewing all branches) */}
                     {isAllBranches && (
                       <p className="text-base text-gray-400">{makeup.branchName}</p>
@@ -649,6 +657,12 @@ export default function MakeupPage() {
                                   {makeup.reason}
                                 </p>
                               </div>
+                              {makeup.requestedVia === 'liff' && makeup.requestedByName && (
+                                <p className="text-sm text-gray-400 truncate">
+                                  แจ้งโดย {makeup.requestedByName}
+                                  {makeup.requestedByRole === 'secondary' ? ' (ผู้ปกครองร่วม)' : ''}
+                                </p>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="whitespace-nowrap align-top">
