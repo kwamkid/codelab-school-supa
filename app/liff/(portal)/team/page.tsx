@@ -21,7 +21,8 @@ import { PracticeCalendar, type Practice } from '@/components/vex/practice-calen
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LEVEL_LABELS } from '@/lib/vex/types'
 import { toast } from 'sonner'
-import { cn, googleCalendarUrl } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { openEventInCalendar, openPracticeInCalendar } from '@/lib/calendar-link'
 import { BookOpen, FileCheck2, ExternalLink, Check, X, CalendarPlus } from 'lucide-react'
 
 interface TeamEvent {
@@ -168,26 +169,29 @@ export default function TeamPage() {
     [call]
   )
 
-  // เปิดปฏิทินของเครื่องให้ได้มากที่สุดตามแพลตฟอร์ม:
-  //   iOS/iPadOS → ไฟล์ .ics (Safari เด้งหน้า "เพิ่มลงปฏิทิน" ของแอป Calendar เลย)
-  //   ที่เหลือ    → ลิงก์ Google Calendar (แอนดรอยด์ส่วนใหญ่มีแอปนี้ กดแล้วเข้าแอปตรง)
-  // ทั้งคู่ต้องเปิดเบราว์เซอร์ภายนอก — ใน webview ของ LINE ดาวน์โหลดไฟล์ไม่ทำงาน
-  const addToCalendar = (e: TeamEvent) => {
-    const isApple = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)
-    const url = isApple
-      ? `${window.location.origin}/api/calendar/vex-event?id=${e.id}`
-      : googleCalendarUrl({
-          title: `[VEX] ${e.name}`,
-          startDate: e.dateStart,
-          endDate: e.dateEnd,
-          location: e.place,
-          details: member
-            ? `ทีม ${member.team.teamNumber}${member.team.name ? ` — ${member.team.name}` : ''}`
-            : undefined,
-        })
-    if (liff?.isInClient?.()) liff.openWindow({ url, external: true })
-    else window.open(url, '_blank')
-  }
+  // เลือกวิธีเปิดปฏิทินตามเครื่อง + เด้งออกเบราว์เซอร์ภายนอก → lib/calendar-link
+  const addToCalendar = (e: TeamEvent) =>
+    openEventInCalendar(liff, {
+      id: e.id,
+      name: e.name,
+      dateStart: e.dateStart,
+      dateEnd: e.dateEnd,
+      place: e.place,
+      details: member
+        ? `ทีม ${member.team.teamNumber}${member.team.name ? ` — ${member.team.name}` : ''}`
+        : undefined,
+    })
+
+  // วันซ้อมที่อนุมัติแล้ว — กดจากกล่องรายละเอียดในปฏิทิน
+  const addPracticeToCalendar = (p: Practice, kidName: string) =>
+    openPracticeInCalendar(liff, {
+      id: p.id,
+      date: p.practice_date,
+      startTime: p.start_time,
+      endTime: p.end_time,
+      title: `ซ้อม VEX ทีม ${member?.team.teamNumber || ''}${kidName ? ` — ${kidName}` : ''}`.trim(),
+      note: p.note,
+    })
 
   const setRsvp = async (eventId: string, status: 'go' | 'no') => {
     if (!member) return
@@ -291,6 +295,7 @@ export default function TeamPage() {
           onSubmit={submitPractice}
           onEdit={editPractice}
           onDelete={deletePractice}
+          onAddToCalendar={addPracticeToCalendar}
         />
         </div>
       )}

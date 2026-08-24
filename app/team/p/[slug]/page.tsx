@@ -11,6 +11,8 @@ import { LineGate } from '../../line-gate'
 import { TeamHeader } from '../../team-header'
 import { useTeamAuth } from '../../use-team-auth'
 import { PracticeCalendar } from '@/components/vex/practice-calendar'
+import { openPracticeInCalendar } from '@/lib/calendar-link'
+import { useLiff } from '@/components/liff/liff-provider'
 
 interface SummaryData {
   team: { id: string; team_number: string; name: string | null; level: string }
@@ -22,6 +24,7 @@ interface SummaryData {
 
 function ProposePracticeInner({ slug }: { slug: string }) {
   const { data, loading, gate, call } = useTeamAuth<SummaryData>(slug, 'practice')
+  const { liff } = useLiff()
 
   const submit = async (body: {
     kid_id: string

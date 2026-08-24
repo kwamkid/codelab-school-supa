@@ -26,7 +26,7 @@ import {
 } from 'date-fns'
 import { th } from 'date-fns/locale'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, X, Plus, Pencil, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Plus, Pencil, Trash2, CalendarPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,6 +73,8 @@ interface Props {
     body: { start_time?: string; end_time?: string; note?: string | null; practice_date?: string }
   ) => Promise<Practice>
   onDelete: (id: string) => Promise<void>
+  /** กด "บันทึกลงปฏิทิน" ในรายละเอียดวันซ้อมที่อนุมัติแล้ว (ไม่ส่ง = ไม่แสดงปุ่ม) */
+  onAddToCalendar?: (practice: Practice, kidName: string) => void
 }
 
 const STATUS_META: Record<PracticeStatus, { label: string; chip: string; dot: string }> = {
@@ -102,6 +104,7 @@ export function PracticeCalendar({
   onSubmit,
   onEdit,
   onDelete,
+  onAddToCalendar,
 }: Props) {
   const formKids = proposableKids && proposableKids.length > 0 ? proposableKids : kids
   const [practices, setPractices] = useState<Practice[]>(initialPractices)
@@ -412,6 +415,7 @@ export function PracticeCalendar({
         <DetailModal
           practice={viewing}
           kidName={kidName(viewing.kid_id)}
+          onAddToCalendar={onAddToCalendar}
           isMine={!!viewerParentId && viewing.parent_id === viewerParentId}
           onClose={() => setViewing(null)}
           onEdit={onEdit}
@@ -563,6 +567,7 @@ function DetailModal({
   onDelete,
   onUpdated,
   onDeleted,
+  onAddToCalendar,
 }: {
   practice: Practice
   kidName: string
@@ -572,6 +577,7 @@ function DetailModal({
   onDelete: Props['onDelete']
   onUpdated: (p: Practice) => void
   onDeleted: (id: string) => void
+  onAddToCalendar?: Props['onAddToCalendar']
 }) {
   const editable = practice.status === 'proposed' && isMine
   const [mode, setMode] = useState<'view' | 'edit'>('view')
@@ -643,6 +649,16 @@ function DetailModal({
                 <div className="text-gray-500 mb-1">หมายเหตุ</div>
                 <div className="bg-gray-50 rounded-lg p-2 text-sm">{practice.note}</div>
               </div>
+            )}
+            {practice.status === 'approved' && onAddToCalendar && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => onAddToCalendar(practice, kidName)}
+              >
+                <CalendarPlus className="h-4 w-4 mr-1" />
+                บันทึกลงปฏิทิน
+              </Button>
             )}
           </>
         ) : (
