@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, MessageSquare, Calendar, User, School } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
-import { StudentBadge } from '@/components/ui/student-badge'
+import { StudentBadge, StudentChips } from '@/components/ui/student-badge'
 import { TeacherBadge } from '@/components/ui/teacher-badge'
 import { PageLoading } from '@/components/ui/loading'
 import { Skeleton, SkeletonRows, LiffPageHeader } from '@/components/ui/skeleton'
@@ -110,31 +110,20 @@ function FeedbackContent() {
       </div>
 
       <div className="p-3 space-y-3">
-        {/* Student Selector */}
+        {/* เลือกลูก — ชิปสีประจำตัว (StudentChips ตัวเดียวกับหน้าตารางเรียน/หน้าทีม) */}
         {students.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            <Button
-              variant={!selectedStudentId ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => { setSelectedStudentId(''); setSelectedSubject('all') }}
-              className="whitespace-nowrap"
-            >
-              ทุกคน
-            </Button>
-            {students.map((student) => (
-              <Button
-                key={student.id}
-                variant={selectedStudentId === student.id ? "default" : "outline"}
-                size="sm"
-                // Reset the subject filter — the new student's courses differ,
-                // and a stale subject would show an empty list.
-                onClick={() => { setSelectedStudentId(student.id); setSelectedSubject('all') }}
-                className="whitespace-nowrap"
-              >
-                {student.nickname || student.name}
-              </Button>
-            ))}
-          </div>
+          <StudentChips
+            options={students.map((student: any) => ({
+              id: student.id,
+              name: student.nickname || student.name,
+            }))}
+            value={selectedStudentId}
+            // Reset the subject filter — the new student's courses differ,
+            // and a stale subject would show an empty list.
+            onChange={(id) => { setSelectedStudentId(id); setSelectedSubject('all') }}
+            allLabel="ทุกคน"
+            className="pb-2"
+          />
         )}
 
         {/* Subject Filter — scrolls horizontally so 3+ course names don't squeeze */}

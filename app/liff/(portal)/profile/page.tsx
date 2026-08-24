@@ -28,6 +28,7 @@ import {
   Share2
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { StudentBadge } from '@/components/ui/student-badge'
 import { useLiff } from '@/components/liff/liff-provider'
 import { deleteStudent as deleteStudentService } from '@/lib/services/parents'
 import { liffFetch } from '@/lib/line/liff-fetch'
@@ -892,9 +893,9 @@ function ProfileContent() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-base">
-                          {student.nickname || student.name}
-                        </p>
+                        {/* ชื่อลูกใช้ป้ายสีประจำตัว — สีเดียวกับที่เห็นในตารางเรียน/
+                            Feedback/ทีม จะได้โยงกันออกว่าใครเป็นใคร */}
+                        <StudentBadge name={student.nickname || student.name} size="md" />
                         <div className="text-base text-muted-foreground space-y-1 mt-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span>{student.gradeLevel || 'ไม่ระบุชั้นเรียน'}</span>

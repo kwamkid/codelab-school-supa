@@ -13,6 +13,7 @@ import { ChevronLeft, Loader2, Calendar, CalendarOff, AlertCircle, CheckCircle, 
 import { useLiff } from '@/components/liff/liff-provider'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
+import { StudentChips } from '@/components/ui/student-badge'
 import { PageLoading } from '@/components/ui/loading'
 import { formatDate, formatTime, getDayName } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -204,20 +205,17 @@ function MakeupContent() {
       </div>
 
       <div className="p-3 space-y-3">
+        {/* เลือกลูก — ชิปสีประจำตัว (StudentChips ตัวเดียวกับหน้าอื่นในแอป) */}
         {students.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {students.map((student) => (
-              <Button
-                key={student.id}
-                variant={selectedStudentId === student.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleStudentChange(student.id)}
-                className="whitespace-nowrap"
-              >
-                {student.nickname || student.name}
-              </Button>
-            ))}
-          </div>
+          <StudentChips
+            options={students.map((student: any) => ({
+              id: student.id,
+              name: student.nickname || student.name,
+            }))}
+            value={selectedStudentId}
+            onChange={handleStudentChange}
+            className="pb-2"
+          />
         )}
 
         {selectedStudentData && Object.keys(selectedStudentData.classes).length > 0 && (
