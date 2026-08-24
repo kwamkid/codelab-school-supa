@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Calendar, MessageSquare, Loader2 } from 'lucide-react'
+import { Home, Calendar, MessageSquare, Trophy, Loader2 } from 'lucide-react'
+import { useLiff } from '@/components/liff/liff-provider'
+import { liffFetch } from '@/lib/line/liff-fetch'
+import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { cn } from '@/lib/utils'
 
 const TABS = [
@@ -11,16 +14,50 @@ const TABS = [
   { label: 'Feedback', icon: MessageSquare, path: '/liff/feedback', match: (p: string) => p.startsWith('/liff/feedback') },
 ]
 
+// แท็บทีมโผล่เฉพาะบ้านที่มีลูกอยู่ทีม VEX — บ้านทั่วไปไม่เห็นอะไรเลย
+const TEAM_TAB = {
+  label: 'ทีม',
+  icon: Trophy,
+  path: '/liff/team',
+  match: (p: string) => p.startsWith('/liff/team'),
+}
+const HAS_TEAM_KEY = 'has-team'
+
 export function BottomNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const { profile } = useLiff()
   const [, startTransition] = useTransition()
+  // เช็คครั้งเดียวต่อ session (cache) — ไม่ยิงทุกครั้งที่สลับแท็บ
+  const [hasTeam, setHasTeam] = useState<boolean>(() => !!getLiffCache<boolean>(HAS_TEAM_KEY))
   // The tab the user just tapped — used to show selected + spinner immediately,
   // before the new route/data finishes loading (so a tap always feels responsive).
   const [pendingPath, setPendingPath] = useState<string | null>(null)
 
   // Clear the pending state once we've actually arrived on that route.
   useEffect(() => { setPendingPath(null) }, [pathname])
+
+  useEffect(() => {
+    if (!profile?.userId) return
+    let active = true
+    ;(async () => {
+      try {
+        const res = await liffFetch('/api/liff/team', {
+          lineUserId: profile.userId,
+          action: 'has-team',
+        })
+        if (!active) return
+        const value = !!res?.hasTeam
+        setHasTeam(value)
+        setLiffCache(HAS_TEAM_KEY, value)
+      } catch {
+        // เช็คไม่ได้ = ไม่โชว์แท็บ (ไม่ทำให้ nav พัง)
+      }
+    })()
+    return () => { active = false }
+  }, [profile?.userId])
+
+  const tabs = hasTeam ? [...TABS, TEAM_TAB] : TABS
 
   const go = (path: string) => {
     if (path === pathname) return
@@ -33,8 +70,8 @@ export function BottomNav() {
       className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-200 shadow-[0_-1px_8px_rgba(0,0,0,0.04)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="mx-auto max-w-md grid grid-cols-3">
-        {TABS.map((tab) => {
+      <div className={cn('mx-auto max-w-md grid', hasTeam ? 'grid-cols-4' : 'grid-cols-3')}>
+        {tabs.map((tab) => {
           const isPending = pendingPath === tab.path
           const active = isPending || (!pendingPath && tab.match(pathname))
           const Icon = tab.icon
