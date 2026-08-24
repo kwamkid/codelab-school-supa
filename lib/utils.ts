@@ -408,3 +408,49 @@ export function convertGoogleDriveUrl(url: string): string {
   
   return url;
 }
+
+// ---- เพิ่มกิจกรรมลงปฏิทินของผู้ใช้ ----------------------------------------
+// LIFF อยู่ในเบราว์เซอร์ในแอป LINE — ดาวน์โหลดไฟล์ .ics มักไม่ทำงาน จึงใช้ลิงก์
+// สร้างกิจกรรมของ Google Calendar แทน (เปิดในเบราว์เซอร์นอก/แอปปฏิทินได้เลย)
+export function googleCalendarUrl(input: {
+  title: string
+  /** YYYY-MM-DD */
+  startDate: string
+  /** YYYY-MM-DD — วันสุดท้าย (รวมวันนั้น); ไม่ใส่ = วันเดียว */
+  endDate?: string | null
+  /** HH:MM — ถ้าไม่ใส่ถือเป็นกิจกรรมทั้งวัน */
+  startTime?: string | null
+  endTime?: string | null
+  location?: string | null
+  details?: string | null
+}): string {
+  const compact = (d: string) => d.replace(/-/g, '')
+  const addDay = (d: string) => {
+    const dt = new Date(d + 'T00:00:00')
+    dt.setDate(dt.getDate() + 1)
+    return dt.toLocaleDateString('sv-SE')
+  }
+
+  let dates: string
+  if (input.startTime) {
+    // มีเวลา → ใส่เป็นเวลาท้องถิ่นไทย (ต่อท้าย ctz ให้ Google ตีความถูก)
+    const s = `${compact(input.startDate)}T${input.startTime.slice(0, 5).replace(':', '')}00`
+    const endD = input.endDate || input.startDate
+    const endT = (input.endTime || input.startTime).slice(0, 5).replace(':', '')
+    dates = `${s}/${compact(endD)}T${endT}00`
+  } else {
+    // ทั้งวัน → วันสิ้นสุดของ Google เป็น exclusive ต้อง +1 วัน
+    const endExclusive = addDay(input.endDate || input.startDate)
+    dates = `${compact(input.startDate)}/${compact(endExclusive)}`
+  }
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: input.title,
+    dates,
+    ctz: 'Asia/Bangkok',
+  })
+  if (input.location) params.set('location', input.location)
+  if (input.details) params.set('details', input.details)
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}

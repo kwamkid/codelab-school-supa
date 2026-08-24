@@ -18,10 +18,11 @@ import { StudentChips } from '@/components/ui/student-badge'
 import { Skeleton, SkeletonChips, SkeletonRows, } from '@/components/ui/skeleton'
 import { LiffPageHeader } from '@/components/liff/page-header'
 import { PracticeCalendar, type Practice } from '@/components/vex/practice-calendar'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LEVEL_LABELS } from '@/lib/vex/types'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import { BookOpen, FileCheck2, ExternalLink, Check, X } from 'lucide-react'
+import { cn, googleCalendarUrl } from '@/lib/utils'
+import { BookOpen, FileCheck2, ExternalLink, Check, X, CalendarPlus } from 'lucide-react'
 
 interface TeamEvent {
   id: string
@@ -73,13 +74,15 @@ function SectionBar({ title }: { title: string }) {
 }
 
 export default function TeamPage() {
-  const { profile, isLoading: liffLoading } = useLiff()
+  const { liff, profile, isLoading: liffLoading } = useLiff()
   const cached = getLiffCache<{ members: Member[]; parentId: string | null }>(CACHE_KEY)
 
   const [members, setMembers] = useState<Member[]>(cached?.members ?? [])
   const [parentId, setParentId] = useState<string | null>(cached?.parentId ?? null)
   const [loading, setLoading] = useState(!cached)
   const [selectedKidId, setSelectedKidId] = useState<string>('')
+  // แท็บในหน้าทีม — ตารางซ้อม / รายการแข่งขัน (ลิงก์ EN อยู่ท้ายหน้าทั้งสองแท็บ)
+  const [tab, setTab] = useState<'practice' | 'events'>('practice')
 
   const load = useCallback(async () => {
     if (!profile?.userId) return
@@ -165,6 +168,19 @@ export default function TeamPage() {
     [call]
   )
 
+  const addToCalendar = (e: TeamEvent) => {
+    const url = googleCalendarUrl({
+      title: `[VEX] ${e.name}`,
+      startDate: e.dateStart,
+      endDate: e.dateEnd,
+      location: e.place,
+      details: member ? `ทีม ${member.team.teamNumber}${member.team.name ? ` — ${member.team.name}` : ''}` : undefined,
+    })
+    // ในแอป LINE ต้องเปิดเบราว์เซอร์ภายนอก ไม่งั้นเปิดปฏิทินไม่ขึ้น
+    if (liff?.isInClient?.()) liff.openWindow({ url, external: true })
+    else window.open(url, '_blank')
+  }
+
   const setRsvp = async (eventId: string, status: 'go' | 'no') => {
     if (!member) return
     // optimistic — แตะแล้วเปลี่ยนทันที ค่อย sync
@@ -246,9 +262,19 @@ export default function TeamPage() {
         )}
       </div>
 
+      {/* แท็บในหน้า — ตารางซ้อม / รายการแข่งขัน */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'practice' | 'events')}>
+        <TabsList className="grid w-full grid-cols-2 rounded-none">
+          <TabsTrigger value="practice">ตารางซ้อม</TabsTrigger>
+          <TabsTrigger value="events">
+            รายการแข่งขัน{member.events.length > 0 ? ` (${member.events.length})` : ''}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* ปฏิทินซ้อม — คอมโพเนนต์เดียวกับ /team (จิ้มวันบนปฏิทินเพื่อเสนอซ้อม) */}
-      <SectionBar title="ตารางซ้อม" />
-      <div className="bg-white px-3 py-3">
+      {tab === 'practice' && (
+        <div className="bg-white px-3 py-3">
         <PracticeCalendar
           key={t.id}
           kids={t.teammates}
@@ -258,44 +284,54 @@ export default function TeamPage() {
           onEdit={editPractice}
           onDelete={deletePractice}
         />
-      </div>
+        </div>
+      )}
 
       {/* การแข่งขัน */}
-      {member.events.length > 0 && (
-        <>
-          <SectionBar title="รายการแข่งขัน" />
-          <div className="bg-white divide-y divide-gray-100">
-            {member.events.map((e) => (
-              <div key={e.id} className="px-4 py-3">
-                <p className="text-base font-medium">{e.name}</p>
-                <p className="text-base text-gray-500">
-                  {thaiDate(e.dateStart)}
-                  {e.dateEnd && e.dateEnd !== e.dateStart ? ` - ${thaiDate(e.dateEnd)}` : ''}
-                  {e.place ? ` · ${e.place}` : ''}
-                </p>
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    variant={e.rsvp === 'go' ? 'default' : 'outline'}
-                    onClick={() => setRsvp(e.id, 'go')}
-                    className="flex-1"
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    ไป
-                  </Button>
-                  <Button
-                    variant={e.rsvp === 'no' ? 'destructive' : 'outline'}
-                    onClick={() => setRsvp(e.id, 'no')}
-                    className="flex-1"
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    ไม่ไป
-                  </Button>
-                </div>
-                {e.rsvp === 'pend' && <p className="text-base text-amber-600 mt-1">ยังไม่ได้ตอบรับ</p>}
+      {tab === 'events' && (
+        <div className="bg-white divide-y divide-gray-100">
+          {member.events.length === 0 && (
+            <p className="px-4 py-8 text-center text-base text-gray-400">
+              ยังไม่มีรายการแข่งขันสำหรับระดับของทีมนี้
+            </p>
+          )}
+          {member.events.map((e) => (
+            <div key={e.id} className="px-4 py-3">
+              <p className="text-base font-medium">{e.name}</p>
+              <p className="text-base text-gray-500">
+                {thaiDate(e.dateStart)}
+                {e.dateEnd && e.dateEnd !== e.dateStart ? ` - ${thaiDate(e.dateEnd)}` : ''}
+                {e.place ? ` · ${e.place}` : ''}
+              </p>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  variant={e.rsvp === 'go' ? 'default' : 'outline'}
+                  onClick={() => setRsvp(e.id, 'go')}
+                  className="flex-1"
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  ไป
+                </Button>
+                <Button
+                  variant={e.rsvp === 'no' ? 'destructive' : 'outline'}
+                  onClick={() => setRsvp(e.id, 'no')}
+                  className="flex-1"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  ไม่ไป
+                </Button>
               </div>
-            ))}
-          </div>
-        </>
+              {e.rsvp === 'pend' && <p className="text-base text-amber-600 mt-1">ยังไม่ได้ตอบรับ</p>}
+              {/* ตอบว่าไปแล้ว → กันลืม ด้วยการบันทึกลงปฏิทินมือถือ */}
+              {e.rsvp === 'go' && (
+                <Button variant="outline" onClick={() => addToCalendar(e)} className="w-full mt-2">
+                  <CalendarPlus className="h-4 w-4 mr-1" />
+                  บันทึกลงปฏิทิน
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Engineering Notebook */}
