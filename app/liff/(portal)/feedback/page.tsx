@@ -10,6 +10,7 @@ import { useLiff } from '@/components/liff/liff-provider'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { TeacherBadge } from '@/components/ui/teacher-badge'
 import { PageLoading } from '@/components/ui/loading'
+import { Skeleton, SkeletonRows, LiffPageHeader } from '@/components/ui/skeleton'
 import { formatDate } from '@/lib/utils'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
@@ -85,7 +86,21 @@ function FeedbackContent() {
     f => selectedSubject === 'all' || f.subjectName === selectedSubject
   )
 
-  if (loading || liffLoading) return <PageLoading />
+  // สลับแท็บมาแล้วยังไม่มีข้อมูล → วาดโครงหน้าไว้ก่อน
+  if (loading || liffLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <LiffPageHeader title="Teacher Feedback" />
+        <div className="p-3 space-y-3">
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-24 rounded-full" />
+            <Skeleton className="h-10 w-24 rounded-full" />
+          </div>
+          <SkeletonRows count={4} className="rounded-lg overflow-hidden" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

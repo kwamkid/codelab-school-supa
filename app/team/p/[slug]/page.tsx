@@ -10,7 +10,7 @@ import { Loading } from '@/components/ui/loading'
 import { LineGate } from '../../line-gate'
 import { TeamHeader } from '../../team-header'
 import { useTeamAuth } from '../../use-team-auth'
-import { PracticeCalendar } from './practice-calendar'
+import { PracticeCalendar } from '@/components/vex/practice-calendar'
 
 interface SummaryData {
   team: { id: string; team_number: string; name: string | null; level: string }

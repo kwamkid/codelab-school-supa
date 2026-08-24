@@ -15,6 +15,8 @@ import { liffFetch } from '@/lib/line/liff-fetch'
 import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { toast } from 'sonner'
 import { PageLoading, SectionLoading } from '@/components/ui/loading'
+import { StudentChips } from '@/components/ui/student-badge'
+import { Skeleton, SkeletonRows, LiffPageHeader } from '@/components/ui/skeleton'
 import { ScheduleEvent } from '@/components/liff/schedule-calendar'
 
 // Import new components
@@ -243,7 +245,19 @@ function ScheduleContent() {
   // Show the full-screen loader only when we truly have nothing to display yet.
   // (Don't gate on authChecked — it resets on every remount and would hide cached data.)
   if (loading && events.length === 0) {
-    return <PageLoading />
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <LiffPageHeader title="ตารางเรียน" />
+        <div className="p-3 space-y-3">
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-20 rounded-full" />
+            <Skeleton className="h-10 w-24 rounded-full" />
+          </div>
+          <Skeleton className="h-12 w-full rounded-md" />
+          <SkeletonRows count={4} className="rounded-lg overflow-hidden" />
+        </div>
+      </div>
+    )
   }
 
   // Get stats for selected student
@@ -260,29 +274,18 @@ function ScheduleContent() {
       </div>
 
       <div className="p-3 space-y-3">
-        {/* Student Selector - Simple buttons */}
+        {/* เลือกลูก — ชิปสีประจำตัวเด็ก (ตัวเดียวกับหน้าทีม/ป้ายชื่อในหน้าหลัก) */}
         {students.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            <Button
-              variant={!selectedStudentId ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedStudentId('')}
-              className="whitespace-nowrap"
-            >
-              ทุกคน
-            </Button>
-            {students.map((data) => (
-              <Button
-                key={data.student.id}
-                variant={selectedStudentId === data.student.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedStudentId(data.student.id)}
-                className="whitespace-nowrap"
-              >
-                {data.student.nickname || data.student.name}
-              </Button>
-            ))}
-          </div>
+          <StudentChips
+            options={students.map((data: any) => ({
+              id: data.student.id,
+              name: data.student.nickname || data.student.name,
+            }))}
+            value={selectedStudentId}
+            onChange={setSelectedStudentId}
+            allLabel="ทุกคน"
+            className="pb-2"
+          />
         )}
 
         {/* Tabs */}

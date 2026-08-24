@@ -139,22 +139,19 @@ export async function getTeamData(lineUserId: string) {
         .filter((x: any) => x.team_id === team.id)
         .map((x: any) => ({ id: x.id, nickname: x.nickname }));
 
+      // รูปแบบเดียวกับที่ PracticeCalendar (คอมโพเนนต์ร่วมกับ /team) ต้องการ
       const teamPractices = practices
         .filter((p: any) => p.team_id === team.id)
         .map((p: any) => ({
           id: p.id,
-          date: p.practice_date,
-          startTime: p.start_time,
-          endTime: p.end_time,
+          kid_id: p.kid_id,
+          parent_id: p.parent_id,
+          practice_date: p.practice_date,
+          start_time: p.start_time,
+          end_time: p.end_time,
           note: p.note,
           status: p.status,
-          rejectReason: p.reject_reason,
-          editedByAdmin: p.edited_by_admin,
-          kidId: p.kid_id,
-          kidNickname: teammates.find((t) => t.id === p.kid_id)?.nickname || '',
-          // แก้/ลบได้เฉพาะคำขอของครอบครัวตัวเอง และต้องยังไม่ถูกตรวจ
-          isMine: p.parent_id === viewer.parent.id,
-          canEdit: p.parent_id === viewer.parent.id && p.status === 'proposed',
+          reject_reason: p.reject_reason,
         }));
 
       const teamEventIds = eventsByLevel.get(team.level) || [];
@@ -195,6 +192,8 @@ export async function getTeamData(lineUserId: string) {
   return {
     hasTeam: members.length > 0,
     viewerIsSecondary: viewer.isSecondary,
+    // ปฏิทินใช้เทียบว่าคำขอไหนเป็นของบ้านเรา (แก้/ลบได้เฉพาะของตัวเอง)
+    parentId: viewer.parent.id,
     members,
   };
 }
@@ -246,7 +245,7 @@ export async function proposePractice(
     )
     .select('*');
   if (error) throw new Error(error.message);
-  return { ok: true, created: (data || []).length };
+  return { ok: true, created: (data || []).length, practices: data || [] };
 }
 
 export async function updatePractice(
@@ -272,9 +271,9 @@ export async function updatePractice(
   }
   if (Object.keys(update).length === 0) return { ok: true };
 
-  const { error } = await db.from('practices').update(update).eq('id', practiceId);
+  const { data, error } = await db.from('practices').update(update).eq('id', practiceId).select('*');
   if (error) throw new Error(error.message);
-  return { ok: true };
+  return { ok: true, practice: (data || [])[0] || null };
 }
 
 export async function deletePractice(lineUserId: string, practiceId: string) {

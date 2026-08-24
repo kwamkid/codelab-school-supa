@@ -13,6 +13,7 @@ import { useLiff } from '@/components/liff/liff-provider'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { Loading } from '@/components/ui/loading'
+import { Skeleton, SkeletonRows } from '@/components/ui/skeleton'
 import { formatDate, getDayName } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -140,7 +141,23 @@ function Dashboard() {
     return () => { active = false }
   }, [liffLoading, invitePending, data?.hasParent, liff])
 
-  if (liffLoading || loading || invitePending) return <Loading fullScreen size="lg" />
+  // ตอบรับคำเชิญยังไม่เสร็จ = ยังบอกไม่ได้ว่าเป็นบ้านไหน → คงจอโหลดเต็มไว้
+  if (invitePending) return <Loading fullScreen size="lg" />
+
+  // เปิดแอป/สลับแท็บมาแล้วยังไม่มีข้อมูล → วาดโครงหน้าหลักไว้ก่อน
+  if (liffLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-primary text-white p-4 pt-6 pb-6">
+          <Skeleton className="h-7 w-40 bg-white/30" />
+        </div>
+        <div className="p-3 space-y-3">
+          <SkeletonRows count={1} className="rounded-lg overflow-hidden" />
+          <SkeletonRows count={2} className="rounded-lg overflow-hidden" />
+        </div>
+      </div>
+    )
+  }
 
   // Logged in but not registered yet
   if (data && data.hasParent === false) {

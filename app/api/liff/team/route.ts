@@ -50,13 +50,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'practice.update') {
-      await updatePractice(user.lineUserId, body.practiceId, {
+      const result = await updatePractice(user.lineUserId, body.practiceId, {
         date: body.date,
         startTime: body.startTime,
         endTime: body.endTime,
         note: body.note,
       });
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, ...result });
     }
 
     if (action === 'practice.delete') {

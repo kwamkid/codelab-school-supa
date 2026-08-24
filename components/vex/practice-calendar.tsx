@@ -1,6 +1,8 @@
 'use client'
 
 // Practice scheduling calendar for parents (ported from codelab-team-scheduler).
+// ใช้ร่วมกัน 2 ที่: /team (ลิงก์ทีมแบบ token) และแท็บ "ทีม" ในแอปผู้ปกครอง
+// (/liff/team) — ฝั่งเรียกใช้เป็นคนต่อ API เอง คอมโพเนนต์นี้ไม่รู้จัก endpoint ไหนเลย
 // Month grid: tap days to SELECT them (multi-select, toggle) → an action bar
 // appears → "เสนอซ้อม" opens one form (kid + start/end time + note) that submits
 // one practice request per selected day. Each proposed practice shows as a chip
