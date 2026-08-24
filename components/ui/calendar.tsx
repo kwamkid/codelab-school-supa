@@ -279,10 +279,10 @@ interface MonthPickerProps {
 }
 
 const MONTH_TRIGGER_CLASS =
-  "h-10 min-w-[190px] inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-800"
+  "h-11 min-w-[190px] inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-800"
 
 const MONTH_STEP_CLASS =
-  "h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-slate-700 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+  "h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-slate-700 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
 
 function MonthPicker({
   value,

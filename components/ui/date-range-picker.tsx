@@ -74,7 +74,7 @@ type DateRangePickerProps =
   | DateRangePickerMultipleProps
 
 const INPUT_CLASS =
-  "w-full h-10 rounded-md border border-input bg-background pl-3 pr-10 py-2.5 text-base ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+  "w-full h-11 rounded-md border border-input bg-background pl-3 pr-10 py-2.5 text-base ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 
 export function DateRangePicker(props: DateRangePickerProps) {
   const { placeholder, className, minDate, maxDate, disabled, popoverDirection } = props
@@ -185,7 +185,7 @@ export function DateRangePicker(props: DateRangePickerProps) {
     const canPrev = !disabled && (!minDate || prevDay >= startOfDay(minDate))
     const canNext = !disabled && (!maxDate || nextDay <= startOfDay(maxDate))
     const stepBtn =
-      "h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-slate-700 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+      "h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-slate-700 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
 
     return (
       <div className={cn("flex items-center gap-1.5", className)}>

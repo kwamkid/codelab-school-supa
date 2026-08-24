@@ -346,7 +346,7 @@ export default function TeamPage() {
       <SectionBar
         title="ตารางซ้อม"
         action={
-          <Button size="sm" onClick={openCreate}>
+          <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />
             ขอวันซ้อม
           </Button>
@@ -387,11 +387,11 @@ export default function TeamPage() {
             </div>
             {p.canEdit && (
               <div className="flex gap-2 mt-2">
-                <Button variant="outline" size="sm" onClick={() => openEdit(p)}>
+                <Button variant="outline" onClick={() => openEdit(p)} className="flex-1">
                   <Pencil className="h-4 w-4 mr-1" />
                   แก้ไข
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setDeleteTarget(p)}>
+                <Button variant="outline" onClick={() => setDeleteTarget(p)} className="flex-1">
                   <Trash2 className="h-4 w-4 mr-1 text-red-500" />
                   ลบ
                 </Button>
@@ -434,17 +434,17 @@ export default function TeamPage() {
                 </p>
                 <div className="flex gap-2 mt-2">
                   <Button
-                    size="sm"
                     variant={e.rsvp === 'go' ? 'default' : 'outline'}
                     onClick={() => setRsvp(e.id, 'go')}
+                    className="flex-1"
                   >
                     <Check className="h-4 w-4 mr-1" />
                     ไป
                   </Button>
                   <Button
-                    size="sm"
                     variant={e.rsvp === 'no' ? 'destructive' : 'outline'}
                     onClick={() => setRsvp(e.id, 'no')}
+                    className="flex-1"
                   >
                     <X className="h-4 w-4 mr-1" />
                     ไม่ไป

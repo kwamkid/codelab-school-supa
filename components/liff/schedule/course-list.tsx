@@ -152,9 +152,9 @@ export default function CourseList({
               </span>
             )}
             {canRequestLeave && (
-              <Button size="sm" variant="outline" onClick={() => onLeaveRequest(event)} className="text-xs h-7">
-                <CalendarOff className="h-3 w-3 mr-1" />
-                ขอลา
+              <Button variant="outline" onClick={() => onLeaveRequest(event)}>
+                <CalendarOff className="h-4 w-4 mr-1" />
+                ขอลาเรียน
               </Button>
             )}
           </div>

@@ -108,7 +108,7 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     return (
       <div
         className={cn(
-          "border-input flex h-10 w-full min-w-0 items-center rounded-md border bg-transparent px-3 text-base shadow-xs transition-[color,box-shadow]",
+          "border-input flex h-11 w-full min-w-0 items-center rounded-md border bg-transparent px-3 text-base shadow-xs transition-[color,box-shadow]",
           "focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]",
           (disabled || readOnly) && "pointer-events-none opacity-50",
           readOnly && "bg-gray-50 opacity-100",

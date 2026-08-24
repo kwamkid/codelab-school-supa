@@ -21,11 +21,13 @@ const buttonVariants = cva(
           "hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
         link: "text-primary underline-offset-4 hover:underline active:opacity-70",
       },
+      // ความสูงคงที่ ไม่ปล่อยให้ padding คำนวณเอง — ตัวหนังสือ 16px ในปุ่มสูง 40px
+      // ดูโดนบีบ (เจ้าของทักเอง) ปุ่มปกติจึงเป็น 44px เท่ากับ input/select
       size: {
-        default: "px-4 py-2",
-        sm: "gap-1.5 px-3 py-1.5 text-sm",
-        lg: "px-6 py-2",
-        icon: "size-9 p-2",
+        default: "h-11 px-5 py-2",
+        sm: "h-9 gap-1.5 px-3.5 text-sm",
+        lg: "h-12 px-7 py-2",
+        icon: "size-11 p-2",
       },
     },
     defaultVariants: {

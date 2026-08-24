@@ -96,9 +96,9 @@ export default function MonthlyCalendar({ events, selectedStudentId, onEventClic
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold">{THAI_MONTHS[month]} {year + 543}</h3>
             <div className="flex gap-1">
-              <Button size="sm" variant="outline" onClick={goPrev} className="h-8 w-8 p-0"><ChevronLeft className="h-4 w-4" /></Button>
-              <Button size="sm" variant="outline" onClick={goToday} className="h-8">วันนี้</Button>
-              <Button size="sm" variant="outline" onClick={goNext} className="h-8 w-8 p-0"><ChevronRight className="h-4 w-4" /></Button>
+              <Button size="icon" variant="outline" onClick={goPrev}><ChevronLeft className="h-5 w-5" /></Button>
+              <Button variant="outline" onClick={goToday}>วันนี้</Button>
+              <Button size="icon" variant="outline" onClick={goNext}><ChevronRight className="h-5 w-5" /></Button>
             </div>
           </div>
 

@@ -162,7 +162,7 @@ function SearchableSelect({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'w-full h-10 justify-between font-normal text-base',
+            'w-full h-11 justify-between font-normal text-base',
             !value && 'text-muted-foreground',
             className
           )}
