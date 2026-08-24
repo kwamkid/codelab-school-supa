@@ -32,9 +32,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TimeRangePicker } from '@/components/ui/time-range-picker'
-import { StudentBadge } from '@/components/ui/student-badge'
+import { StudentBadge, StudentChips } from '@/components/ui/student-badge'
 import type { PracticeStatus } from '@/lib/vex/types'
 
 interface Kid { id: string; nickname: string }
@@ -51,7 +52,13 @@ export interface Practice {
 }
 
 interface Props {
+  /** เด็กทุกคนในทีม — ใช้แสดงชื่อบนปฏิทิน/ตัวกรอง (เห็นของบ้านอื่นด้วย) */
   kids: Kid[]
+  /**
+   * เด็กที่ "เสนอซ้อมให้ได้" — ค่าเริ่มต้นคือทุกคนในทีม (พฤติกรรมเดิมของ /team)
+   * ฝั่งแอปผู้ปกครองส่งเฉพาะลูกตัวเอง เพราะ server กันไม่ให้จองแทนบ้านอื่น
+   */
+  proposableKids?: Kid[]
   initialPractices: Practice[]
   viewerParentId: string | null
   onSubmit: (body: {
@@ -87,14 +94,26 @@ interface LastUsed {
   note: string
 }
 
-export function PracticeCalendar({ kids, initialPractices, viewerParentId, onSubmit, onEdit, onDelete }: Props) {
+export function PracticeCalendar({
+  kids,
+  proposableKids,
+  initialPractices,
+  viewerParentId,
+  onSubmit,
+  onEdit,
+  onDelete,
+}: Props) {
+  const formKids = proposableKids && proposableKids.length > 0 ? proposableKids : kids
   const [practices, setPractices] = useState<Practice[]>(initialPractices)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [kidFilter, setKidFilter] = useState<string>('all') // kid id
+  // แท็บสถานะของรายการเดือนนี้ — ค่าเริ่มต้นเลือกให้เอง: ถ้ามีที่รออนุมัติให้เปิด
+  // แท็บนั้นก่อน (เป็นสิ่งที่ต้องติดตาม) ไม่งั้นเปิดแท็บที่อนุมัติแล้ว
+  const [statusTab, setStatusTab] = useState<PracticeStatus | null>(null)
 
   // Remember the last-entered values so proposing the next day is one tap away.
   const [lastUsed, setLastUsed] = useState<LastUsed>({
-    kidId: kids[0]?.id ?? '',
+    kidId: (proposableKids || kids)[0]?.id ?? '',
     start: '09:00',
     end: '12:00',
     note: '',
@@ -140,6 +159,19 @@ export function PracticeCalendar({ kids, initialPractices, viewerParentId, onSub
         .sort((a, b) => a.practice_date.localeCompare(b.practice_date) || (a.start_time || '').localeCompare(b.start_time || '')),
     [visible, currentDate]
   )
+
+  const byStatus = useMemo(
+    () => ({
+      proposed: monthPractices.filter((p) => p.status === 'proposed'),
+      approved: monthPractices.filter((p) => p.status === 'approved'),
+      rejected: monthPractices.filter((p) => p.status === 'rejected'),
+    }),
+    [monthPractices]
+  )
+  // ยังไม่เคยแตะแท็บเอง → เลือกให้: มีของรออนุมัติเปิดอันนั้น ไม่งั้นอนุมัติแล้ว
+  const activeStatusTab: PracticeStatus =
+    statusTab ?? (byStatus.proposed.length > 0 ? 'proposed' : 'approved')
+  const listPractices = byStatus[activeStatusTab]
 
   // จิ้มวัน = toggle เลือก/ไม่เลือก (เลือกได้หลายวัน ข้ามสัปดาห์/ข้ามเดือนก็ได้)
   const toggleDay = (date: Date) => {
@@ -193,29 +225,16 @@ export function PracticeCalendar({ kids, initialPractices, viewerParentId, onSub
         </button>
       </div>
 
-      {/* Kid filter — pill buttons (matches the LIFF schedule page). */}
+      {/* ตัวกรองเด็ก — ชิปสีประจำตัว (StudentChips ตัวเดียวกับหน้าตารางเรียน/หน้าทีม)
+          แสดงเด็กทุกคนในทีม ผู้ปกครองจะได้เห็นว่าวันไหนมีเพื่อนคนไหนมาซ้อมด้วย */}
       {kids.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <Button
-            variant={kidFilter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setKidFilter('all')}
-            className="whitespace-nowrap"
-          >
-            ทุกคน
-          </Button>
-          {kids.map((k) => (
-            <Button
-              key={k.id}
-              variant={kidFilter === k.id ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setKidFilter(k.id)}
-              className="whitespace-nowrap"
-            >
-              {k.nickname}
-            </Button>
-          ))}
-        </div>
+        <StudentChips
+          options={kids.map((k) => ({ id: k.id, name: k.nickname }))}
+          value={kidFilter === 'all' ? '' : kidFilter}
+          onChange={(id) => setKidFilter(id || 'all')}
+          allLabel="ทุกคน"
+          className="pb-1"
+        />
       )}
 
       {/* แถบสรุปวันที่จิ้มเลือก — โผล่เมื่อเลือกอย่างน้อย 1 วัน */}
@@ -330,11 +349,27 @@ export function PracticeCalendar({ kids, initialPractices, viewerParentId, onSub
       {/* Right column: this month's list (sticks alongside the calendar on desktop) */}
       <div className="lg:sticky lg:top-4">
         <h3 className="font-semibold px-1 mb-2">รายการเดือนนี้ ({monthPractices.length})</h3>
-        {monthPractices.length === 0 ? (
-          <p className="text-center text-gray-500 py-6 text-sm">แตะวันบนปฏิทินเพื่อเสนอวันซ้อม</p>
+
+        {/* แยกตามสถานะเป็นแท็บ — เดิมกองรวมกันจนหาของที่รออนุมัติไม่เจอ */}
+        <Tabs value={activeStatusTab} onValueChange={(v) => setStatusTab(v as PracticeStatus)}>
+          <TabsList className="grid w-full grid-cols-3">
+            {(['proposed', 'approved', 'rejected'] as PracticeStatus[]).map((st) => (
+              <TabsTrigger key={st} value={st} className="text-sm">
+                {STATUS_META[st].label} ({byStatus[st].length})
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {listPractices.length === 0 ? (
+          <p className="text-center text-gray-500 py-6 text-base">
+            {monthPractices.length === 0
+              ? 'แตะวันบนปฏิทินเพื่อเสนอวันซ้อม'
+              : `เดือนนี้ไม่มีรายการ${STATUS_META[activeStatusTab].label}`}
+          </p>
         ) : (
-          <div className="space-y-2 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pr-1">
-            {monthPractices.map((p) => (
+          <div className="space-y-2 mt-2 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pr-1">
+            {listPractices.map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -360,7 +395,7 @@ export function PracticeCalendar({ kids, initialPractices, viewerParentId, onSub
       {/* Propose modal */}
       {proposeOpen && selectedDates.length > 0 && (
         <ProposeModal
-          kids={kids}
+          kids={formKids}
           dates={selectedDates}
           defaults={lastUsed}
           onClose={() => setProposeOpen(false)}

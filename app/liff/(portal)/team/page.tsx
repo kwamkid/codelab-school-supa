@@ -109,7 +109,8 @@ export default function TeamPage() {
     [members, selectedKidId]
   )
 
-  // เสนอซ้อมได้เฉพาะลูกของตัวเองที่อยู่ทีมนี้ (พี่น้องอยู่ทีมเดียวกันก็เลือกได้)
+  // ปฏิทินแสดงชื่อเด็กทุกคนในทีม (t.teammates) แต่ "เสนอซ้อม" ได้เฉพาะลูกตัวเอง
+  // ที่อยู่ทีมนี้ — ฝั่ง server ก็กันไว้อีกชั้น (assertKidInFamily)
   const ownKidsInTeam = useMemo(() => {
     if (!member) return []
     return members
@@ -258,7 +259,8 @@ export default function TeamPage() {
       <div className="bg-white px-3 py-3">
         <PracticeCalendar
           key={t.id}
-          kids={ownKidsInTeam}
+          kids={t.teammates}
+          proposableKids={ownKidsInTeam}
           initialPractices={member.practices}
           viewerParentId={parentId}
           onSubmit={submitPractice}
