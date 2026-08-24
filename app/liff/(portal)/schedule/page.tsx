@@ -16,7 +16,8 @@ import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
 import { toast } from 'sonner'
 import { PageLoading, SectionLoading } from '@/components/ui/loading'
 import { StudentChips } from '@/components/ui/student-badge'
-import { Skeleton, SkeletonRows, LiffPageHeader } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonRows, } from '@/components/ui/skeleton'
+import { LiffPageHeader } from '@/components/liff/page-header'
 import { ScheduleEvent } from '@/components/liff/schedule-calendar'
 
 // Import new components
@@ -269,9 +270,7 @@ function ScheduleContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-primary text-white p-4 pt-6">
-        <h1 className="text-xl font-bold">ตารางเรียน</h1>
-      </div>
+      <LiffPageHeader title="ตารางเรียน" />
 
       <div className="p-3 space-y-3">
         {/* เลือกลูก — ชิปสีประจำตัวเด็ก (ตัวเดียวกับหน้าทีม/ป้ายชื่อในหน้าหลัก) */}

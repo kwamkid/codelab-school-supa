@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { LiffPageHeader } from '@/components/liff/page-header'
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -102,19 +103,7 @@ function AddStudentContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-primary text-white p-4 pt-6">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/liff/profile')}
-            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-bold">เพิ่มข้อมูลนักเรียน</h1>
-        </div>
-      </div>
+      <LiffPageHeader title="เพิ่มข้อมูลนักเรียน" onBack={() => router.push('/liff/profile')} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-4">
         {/* Basic Information */}

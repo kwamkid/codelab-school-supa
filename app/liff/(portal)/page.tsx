@@ -148,7 +148,8 @@ function Dashboard() {
   if (liffLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-primary text-white p-4 pt-6 pb-6">
+        <div className="bg-gradient-to-br from-primary to-orange-500 text-white px-5 pt-7 pb-6 rounded-b-3xl space-y-2">
+          <Skeleton className="h-6 w-28 bg-white/30" />
           <Skeleton className="h-7 w-40 bg-white/30" />
         </div>
         <div className="p-3 space-y-3">
@@ -187,6 +188,17 @@ function Dashboard() {
       <div className="bg-gradient-to-br from-primary to-orange-500 text-white px-5 pt-7 pb-6 rounded-b-3xl">
         <div className="flex items-center justify-between">
           <div>
+            {/* โลโก้ CodeLab สีขาว — แบรนด์อยู่หัวหน้าจอเหมือนหน้าอื่นในแอป */}
+            <div className="flex items-center gap-2 mb-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-just-logo.svg"
+                alt="CodeLab"
+                className="h-6 w-auto"
+                style={{ filter: 'brightness(0) invert(1)' }}
+              />
+              <span className="text-white/90 text-base font-semibold">CodeLab</span>
+            </div>
             <p className="text-white/80 text-sm">สวัสดีค่ะ 👋</p>
             <h1 className="text-xl font-bold">{firstName || 'ผู้ปกครอง'}</h1>
           </div>

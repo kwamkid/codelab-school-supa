@@ -10,7 +10,8 @@ import { useLiff } from '@/components/liff/liff-provider'
 import { StudentBadge, StudentChips } from '@/components/ui/student-badge'
 import { TeacherBadge } from '@/components/ui/teacher-badge'
 import { PageLoading } from '@/components/ui/loading'
-import { Skeleton, SkeletonRows, LiffPageHeader } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonRows, } from '@/components/ui/skeleton'
+import { LiffPageHeader } from '@/components/liff/page-header'
 import { formatDate } from '@/lib/utils'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { getLiffCache, setLiffCache } from '@/lib/line/liff-cache'
@@ -105,9 +106,7 @@ function FeedbackContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-primary text-white p-4 pt-6">
-        <h1 className="text-xl font-bold">Teacher Feedback</h1>
-      </div>
+      <LiffPageHeader title="Teacher Feedback" />
 
       <div className="p-3 space-y-3">
         {/* เลือกลูก — ชิปสีประจำตัว (StudentChips ตัวเดียวกับหน้าตารางเรียน/หน้าทีม) */}

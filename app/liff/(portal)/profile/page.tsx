@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { StudentBadge } from '@/components/ui/student-badge'
+import { LiffPageHeader } from '@/components/liff/page-header'
 import { useLiff } from '@/components/liff/liff-provider'
 import { deleteStudent as deleteStudentService } from '@/lib/services/parents'
 import { liffFetch } from '@/lib/line/liff-fetch'
@@ -492,30 +493,21 @@ function ProfileContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-primary text-white p-4 pt-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigateTo('/liff')}
-              className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 -ml-2"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-xl font-bold">โปรไฟล์</h1>
-          </div>
+      <LiffPageHeader
+        title="โปรไฟล์"
+        onBack={() => navigateTo('/liff')}
+        action={
           <Button
             variant="ghost"
             size="sm"
             onClick={handleLogout}
-            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900"
+            className="text-white hover:bg-white hover:text-gray-900 active:bg-white active:text-gray-900 shrink-0"
             disabled={navigating}
           >
             <LogOut className="h-4 w-4" />
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="p-4 space-y-4">
         {/* ข้อมูลของผู้ปกครองร่วม (account รอง) — เก็บเบอร์/อีเมลของเขาเองไว้ด้วย

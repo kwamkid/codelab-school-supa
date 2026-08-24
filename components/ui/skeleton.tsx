@@ -54,14 +54,3 @@ export function SkeletonChips({ count = 2 }: { count?: number }) {
   )
 }
 
-/**
- * หัวสีของหน้าในแอปผู้ปกครอง — วาดจริงไปเลย (ไม่ต้องเป็น skeleton)
- * เพราะรู้ชื่อหน้าอยู่แล้ว ทำให้สลับแท็บแล้วเห็นชื่อหน้าทันที
- */
-export function LiffPageHeader({ title }: { title: string }) {
-  return (
-    <div className="bg-primary text-white p-4 pt-6">
-      <h1 className="text-xl font-bold">{title}</h1>
-    </div>
-  )
-}
