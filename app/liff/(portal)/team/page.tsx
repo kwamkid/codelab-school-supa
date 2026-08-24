@@ -168,15 +168,23 @@ export default function TeamPage() {
     [call]
   )
 
+  // เปิดปฏิทินของเครื่องให้ได้มากที่สุดตามแพลตฟอร์ม:
+  //   iOS/iPadOS → ไฟล์ .ics (Safari เด้งหน้า "เพิ่มลงปฏิทิน" ของแอป Calendar เลย)
+  //   ที่เหลือ    → ลิงก์ Google Calendar (แอนดรอยด์ส่วนใหญ่มีแอปนี้ กดแล้วเข้าแอปตรง)
+  // ทั้งคู่ต้องเปิดเบราว์เซอร์ภายนอก — ใน webview ของ LINE ดาวน์โหลดไฟล์ไม่ทำงาน
   const addToCalendar = (e: TeamEvent) => {
-    const url = googleCalendarUrl({
-      title: `[VEX] ${e.name}`,
-      startDate: e.dateStart,
-      endDate: e.dateEnd,
-      location: e.place,
-      details: member ? `ทีม ${member.team.teamNumber}${member.team.name ? ` — ${member.team.name}` : ''}` : undefined,
-    })
-    // ในแอป LINE ต้องเปิดเบราว์เซอร์ภายนอก ไม่งั้นเปิดปฏิทินไม่ขึ้น
+    const isApple = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)
+    const url = isApple
+      ? `${window.location.origin}/api/calendar/vex-event?id=${e.id}`
+      : googleCalendarUrl({
+          title: `[VEX] ${e.name}`,
+          startDate: e.dateStart,
+          endDate: e.dateEnd,
+          location: e.place,
+          details: member
+            ? `ทีม ${member.team.teamNumber}${member.team.name ? ` — ${member.team.name}` : ''}`
+            : undefined,
+        })
     if (liff?.isInClient?.()) liff.openWindow({ url, external: true })
     else window.open(url, '_blank')
   }
