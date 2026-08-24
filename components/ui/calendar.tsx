@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  CalendarDays,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -14,6 +15,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 function Calendar({
   className,
@@ -217,4 +219,206 @@ function CalendarDayButton({
   )
 }
 
-export { Calendar, CalendarDayButton }
+
+// ---------------------------------------------------------------------------
+// MonthPicker — "monthly view" ของปฏิทิน: เลือกทั้งเดือน (ไม่ใช่รายวัน)
+// ใช้กับหน้าที่ทำงานเป็นรอบเดือน เช่น รายงานประเมินครูรายเดือน
+// ค่าเป็นสตริง "YYYY-MM" (ไม่แปลงเป็น Date เพื่อกันปัญหา timezone)
+// ---------------------------------------------------------------------------
+
+const TH_MONTHS_FULL = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+]
+const TH_MONTHS_SHORT = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+]
+
+/** "YYYY-MM" → ปี/เดือน (เดือนเริ่มที่ 0) */
+function parseMonth(ym: string): { year: number; month: number } {
+  const [y, m] = ym.split("-").map(Number)
+  return { year: y, month: (m || 1) - 1 }
+}
+
+function toMonthStr(year: number, month: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}`
+}
+
+/** เดือนปัจจุบันเป็น "YYYY-MM" */
+export function currentMonthStr(): string {
+  const now = new Date()
+  return toMonthStr(now.getFullYear(), now.getMonth())
+}
+
+/** บวก/ลบเดือนจาก "YYYY-MM" */
+export function shiftMonth(ym: string, delta: number): string {
+  const { year, month } = parseMonth(ym)
+  const total = year * 12 + month + delta
+  return toMonthStr(Math.floor(total / 12), total % 12)
+}
+
+/** "YYYY-MM" → "มิถุนายน 2569" */
+export function formatMonthTH(ym: string): string {
+  const { year, month } = parseMonth(ym)
+  return `${TH_MONTHS_FULL[month]} ${year + 543}`
+}
+
+interface MonthPickerProps {
+  /** เดือนที่เลือก รูปแบบ "YYYY-MM" */
+  value: string
+  onChange: (month: string) => void
+  /** เดือนแรกสุดที่เลือกได้ "YYYY-MM" */
+  minMonth?: string
+  /** เดือนสุดท้ายที่เลือกได้ "YYYY-MM" (ค่าเริ่มต้น = เดือนปัจจุบัน กันเลือกอนาคต) */
+  maxMonth?: string
+  /** แสดงปุ่ม ‹ › เลื่อนเดือนก่อนหน้า/ถัดไปคร่อมตัวเลือก */
+  withStepper?: boolean
+  disabled?: boolean
+  className?: string
+}
+
+const MONTH_TRIGGER_CLASS =
+  "h-10 min-w-[190px] inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-800"
+
+const MONTH_STEP_CLASS =
+  "h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-slate-700 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+
+function MonthPicker({
+  value,
+  onChange,
+  minMonth,
+  maxMonth = currentMonthStr(),
+  withStepper = true,
+  disabled,
+  className,
+}: MonthPickerProps) {
+  const [open, setOpen] = React.useState(false)
+  const selected = parseMonth(value)
+  // ปีที่กำลังเปิดดูในกริด (เลื่อนดูปีอื่นได้โดยยังไม่เปลี่ยนค่าที่เลือก)
+  const [viewYear, setViewYear] = React.useState(selected.year)
+
+  // เปิด popover ครั้งใหม่ให้กลับไปที่ปีของเดือนที่เลือกอยู่
+  React.useEffect(() => {
+    if (open) setViewYear(parseMonth(value).year)
+  }, [open, value])
+
+  const inRange = (ym: string) =>
+    (!minMonth || ym >= minMonth) && (!maxMonth || ym <= maxMonth)
+
+  const prev = shiftMonth(value, -1)
+  const next = shiftMonth(value, 1)
+
+  const grid = (
+    <div className="p-3 w-[280px]">
+      {/* หัวปี — เลื่อนดูปีอื่น */}
+      <div className="flex items-center justify-between mb-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setViewYear((y) => y - 1)}
+          disabled={!!minMonth && toMonthStr(viewYear - 1, 11) < minMonth}
+          aria-label="ปีก่อนหน้า"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </Button>
+        <div className="text-base font-semibold tabular-nums">{viewYear + 543}</div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setViewYear((y) => y + 1)}
+          disabled={!!maxMonth && toMonthStr(viewYear + 1, 0) > maxMonth}
+          aria-label="ปีถัดไป"
+        >
+          <ChevronRightIcon className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* กริดเดือน 3 คอลัมน์ */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {TH_MONTHS_SHORT.map((label, i) => {
+          const ym = toMonthStr(viewYear, i)
+          const isSelected = ym === value
+          const allowed = inRange(ym)
+          return (
+            <button
+              key={ym}
+              type="button"
+              disabled={!allowed}
+              onClick={() => {
+                onChange(ym)
+                setOpen(false)
+              }}
+              className={cn(
+                "h-9 rounded-md text-base transition-colors",
+                isSelected
+                  ? "bg-primary text-primary-foreground font-medium"
+                  : allowed
+                    ? "hover:bg-gray-100 dark:hover:bg-slate-700"
+                    : "text-gray-300 cursor-not-allowed dark:text-slate-600"
+              )}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          onChange(currentMonthStr())
+          setOpen(false)
+        }}
+        className="mt-3 w-full h-9 rounded-md text-sm text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-700"
+      >
+        เดือนนี้
+      </button>
+    </div>
+  )
+
+  const trigger = (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" disabled={disabled} className={cn(MONTH_TRIGGER_CLASS, !withStepper && className)}>
+          <CalendarDays className="h-4 w-4 text-gray-500 shrink-0" />
+          <span className="flex-1 text-left">{formatMonthTH(value)}</span>
+          <ChevronDownIcon className="h-4 w-4 text-gray-400 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        {grid}
+      </PopoverContent>
+    </Popover>
+  )
+
+  if (!withStepper) return trigger
+
+  return (
+    <div className={cn("flex items-center gap-1.5", className)}>
+      <button
+        type="button"
+        onClick={() => onChange(prev)}
+        disabled={disabled || !inRange(prev)}
+        className={MONTH_STEP_CLASS}
+        aria-label="เดือนก่อนหน้า"
+      >
+        <ChevronLeftIcon className="h-4 w-4" />
+      </button>
+      {trigger}
+      <button
+        type="button"
+        onClick={() => onChange(next)}
+        disabled={disabled || !inRange(next)}
+        className={MONTH_STEP_CLASS}
+        aria-label="เดือนถัดไป"
+      >
+        <ChevronRightIcon className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+export { Calendar, CalendarDayButton, MonthPicker }

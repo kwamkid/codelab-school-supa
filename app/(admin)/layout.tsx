@@ -51,6 +51,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Trophy,
+  ClipboardCheck,
   LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -689,6 +690,12 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           href: '/reports/students',
           icon: Users,
           iconColor: 'text-blue-600'
+        },
+        {
+          name: 'ประเมินครู',
+          href: '/reports/teacher-monthly',
+          icon: ClipboardCheck,
+          iconColor: 'text-indigo-600'
         },
         {
           name: 'VEX Team',
