@@ -35,7 +35,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TimeRangePicker } from '@/components/ui/time-range-picker'
-import { StudentBadge, StudentChips } from '@/components/ui/student-badge'
+import { StudentBadge, StudentChips, StudentMultiChips } from '@/components/ui/student-badge'
 import type { PracticeStatus } from '@/lib/vex/types'
 
 interface Kid { id: string; nickname: string }
@@ -202,8 +202,10 @@ export function PracticeCalendar({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
-      {/* Left column: calendar */}
-      <div className="space-y-4">
+      {/* Left column: calendar
+          min-w-0: ถ้าไม่ใส่ แถบชิปชื่อเด็ก (overflow-x-auto) จะดันความกว้างของ
+          grid track จนหน้าทั้งหน้าเลื่อนออกขวาบนมือถือ */}
+      <div className="space-y-4 min-w-0">
       {/* Calendar nav */}
       <div className="flex items-center justify-between">
         <button
@@ -233,6 +235,7 @@ export function PracticeCalendar({
           value={kidFilter === 'all' ? '' : kidFilter}
           onChange={(id) => setKidFilter(id || 'all')}
           allLabel="ทุกคน"
+          size="sm"
           className="pb-1"
         />
       )}
@@ -317,7 +320,7 @@ export function PracticeCalendar({
                         setViewing(p)
                       }}
                       className={cn(
-                        'w-full text-left text-[10px] leading-tight px-1 py-0.5 rounded border truncate',
+                        'block w-full min-w-0 text-left text-[10px] leading-tight px-1 py-0.5 rounded border truncate',
                         STATUS_META[p.status].chip
                       )}
                       title={`${kidName(p.kid_id)} ${hhmm(p.start_time)}`}
@@ -347,7 +350,7 @@ export function PracticeCalendar({
       </div>{/* /left column */}
 
       {/* Right column: this month's list (sticks alongside the calendar on desktop) */}
-      <div className="lg:sticky lg:top-4">
+      <div className="lg:sticky lg:top-4 min-w-0">
         <h3 className="font-semibold px-1 mb-2">รายการเดือนนี้ ({monthPractices.length})</h3>
 
         {/* แยกตามสถานะเป็นแท็บ — เดิมกองรวมกันจนหาของที่รออนุมัติไม่เจอ */}
@@ -439,7 +442,10 @@ function ProposeModal({
   onCreated: (created: Practice[], remember: LastUsed) => void
 }) {
   // Pre-fill from the last-used values (so proposing the next day is fast).
-  const [kidId, setKidId] = useState(defaults.kidId || kids[0]?.id || '')
+  // เลือกได้หลายคน — จองให้ทั้งทีมทีเดียวจบ (เดิมต้องเปิดฟอร์มทีละคน)
+  const [kidIds, setKidIds] = useState<string[]>(
+    defaults.kidId ? [defaults.kidId] : kids[0] ? [kids[0].id] : []
+  )
   const [start, setStart] = useState(defaults.start || '09:00')
   const [end, setEnd] = useState(defaults.end || '12:00')
   const [note, setNote] = useState(defaults.note || '')
@@ -449,26 +455,33 @@ function ProposeModal({
 
   const submit = async () => {
     if (submitting) return
-    if (!kidId) return toast.error('เลือกเด็ก')
+    if (kidIds.length === 0) return toast.error('เลือกเด็กอย่างน้อย 1 คน')
     if (start && end && end <= start) return toast.error('เวลาสิ้นสุดต้องหลังเวลาเริ่ม')
 
     setSubmitting(true)
     try {
-      // Submit each day (one audit row per day). Collect the created rows.
+      // ส่งทีละ (คน × วัน) — หนึ่งคำขอต่อหนึ่งคนหนึ่งวัน เหมือนที่แอดมินเห็น
       const created: Practice[] = []
-      for (const d of dates) {
-        const p = await onSubmit({
-          kid_id: kidId,
-          practice_date: d,
-          start_time: start || undefined,
-          end_time: end || undefined,
-          note: note.trim() || undefined,
-        })
-        created.push(p)
+      for (const kid of kidIds) {
+        for (const d of dates) {
+          const p = await onSubmit({
+            kid_id: kid,
+            practice_date: d,
+            start_time: start || undefined,
+            end_time: end || undefined,
+            note: note.trim() || undefined,
+          })
+          created.push(p)
+        }
       }
 
-      toast.success(daysCount > 1 ? `ส่งคำขอซ้อม ${daysCount} วันแล้ว` : 'ส่งคำขอซ้อมแล้ว')
-      onCreated(created, { kidId, start, end, note: note.trim() })
+      const kidsCount = kidIds.length
+      toast.success(
+        kidsCount > 1 || daysCount > 1
+          ? `ส่งคำขอซ้อม ${kidsCount} คน × ${daysCount} วัน (${created.length} รายการ)`
+          : 'ส่งคำขอซ้อมแล้ว'
+      )
+      onCreated(created, { kidId: kidIds[0], start, end, note: note.trim() })
     } catch (e: any) {
       toast.error(e?.message || 'ส่งคำขอไม่สำเร็จ')
     } finally {
@@ -488,19 +501,12 @@ function ProposeModal({
     >
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>เด็ก</Label>
-          <Select value={kidId} onValueChange={setKidId}>
-            <SelectTrigger>
-              <SelectValue placeholder="เลือกเด็ก" />
-            </SelectTrigger>
-            <SelectContent>
-              {kids.map((k) => (
-                <SelectItem key={k.id} value={k.id}>
-                  {k.nickname}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>เด็ก {kidIds.length > 1 && `(${kidIds.length} คน)`}</Label>
+          <StudentMultiChips
+            options={kids.map((k) => ({ id: k.id, name: k.nickname }))}
+            values={kidIds}
+            onChange={setKidIds}
+          />
         </div>
 
         <div className="space-y-2">

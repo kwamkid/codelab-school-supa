@@ -109,15 +109,6 @@ export default function TeamPage() {
     [members, selectedKidId]
   )
 
-  // ปฏิทินแสดงชื่อเด็กทุกคนในทีม (t.teammates) แต่ "เสนอซ้อม" ได้เฉพาะลูกตัวเอง
-  // ที่อยู่ทีมนี้ — ฝั่ง server ก็กันไว้อีกชั้น (assertKidInFamily)
-  const ownKidsInTeam = useMemo(() => {
-    if (!member) return []
-    return members
-      .filter((m) => m.team.id === member.team.id)
-      .map((m) => ({ id: m.kidId, nickname: m.nickname }))
-  }, [members, member])
-
   const call = useCallback(
     async (body: any) => {
       const res = await liffFetch('/api/liff/team', { lineUserId: profile?.userId, ...body })
@@ -137,7 +128,7 @@ export default function TeamPage() {
     }) => {
       const res = await call({
         action: 'practice.create',
-        kidId: body.kid_id,
+        kidIds: [body.kid_id],
         dates: [body.practice_date],
         startTime: body.start_time,
         endTime: body.end_time,
@@ -260,7 +251,6 @@ export default function TeamPage() {
         <PracticeCalendar
           key={t.id}
           kids={t.teammates}
-          proposableKids={ownKidsInTeam}
           initialPractices={member.practices}
           viewerParentId={parentId}
           onSubmit={submitPractice}

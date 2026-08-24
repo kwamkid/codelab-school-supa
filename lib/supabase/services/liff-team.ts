@@ -200,11 +200,27 @@ export async function getTeamData(lineUserId: string) {
 
 // ---- mutations ------------------------------------------------------------
 
-// เด็กคนนี้เป็นลูกของ viewer จริงไหม (กันขอซ้อมให้เด็กบ้านอื่น)
+// เด็กคนนี้เป็นลูกของ viewer จริงไหม (ใช้กับ RSVP — ตอบรับแทนบ้านอื่นไม่ได้)
 async function assertKidInFamily(supabase: any, viewer: ViewerContext, kidId: string) {
   const { kids } = await resolveFamilyKids(supabase, viewer);
   const kid = kids.find((k: any) => k.id === kidId);
   if (!kid) throw new Error('ไม่มีสิทธิ์ดำเนินการกับนักเรียนคนนี้');
+  return kid;
+}
+
+// เด็กคนนี้อยู่ "ทีมเดียวกับลูกเรา" ไหม — ใช้กับการจองซ้อม เพราะทีมซ้อมด้วยกัน
+// ผู้ปกครองคนหนึ่งจองให้ทั้งทีมทีเดียวได้ (เจ้าของยืนยัน 24 ส.ค. 26) แต่ยังจอง
+// ข้ามทีมไม่ได้ และแก้/ลบยังทำได้เฉพาะคำขอที่ตัวเองเป็นคนสร้าง
+async function assertKidInMyTeam(supabase: any, viewer: ViewerContext, kidId: string) {
+  const { kids } = await resolveFamilyKids(supabase, viewer);
+  const myTeamIds = new Set(kids.map((k: any) => k.team_id));
+  if (myTeamIds.size === 0) throw new Error('ไม่พบทีมของนักเรียน');
+
+  const db = vexDb();
+  const { data: kid } = await db.from('kids').select('id, team_id').eq('id', kidId).maybeSingle();
+  if (!kid || !myTeamIds.has(kid.team_id)) {
+    throw new Error('จองได้เฉพาะเด็กในทีมเดียวกับลูกของคุณ');
+  }
   return kid;
 }
 
@@ -217,10 +233,19 @@ async function loadViewer(lineUserId: string) {
 
 export async function proposePractice(
   lineUserId: string,
-  input: { kidId: string; dates: string[]; startTime?: string; endTime?: string; note?: string }
+  input: {
+    kidId?: string;
+    kidIds?: string[];
+    dates: string[];
+    startTime?: string;
+    endTime?: string;
+    note?: string;
+  }
 ) {
   const { supabase, viewer } = await loadViewer(lineUserId);
-  const kid = await assertKidInFamily(supabase, viewer, input.kidId);
+
+  const kidIds = (input.kidIds?.length ? input.kidIds : [input.kidId]).filter(Boolean) as string[];
+  if (kidIds.length === 0) throw new Error('เลือกเด็กอย่างน้อย 1 คน');
 
   const dates = (input.dates || []).filter(Boolean);
   if (dates.length === 0) throw new Error('เลือกวันซ้อมอย่างน้อย 1 วัน');
@@ -228,22 +253,27 @@ export async function proposePractice(
     throw new Error('เวลาสิ้นสุดต้องหลังเวลาเริ่ม');
   }
 
+  // ทุกคนต้องอยู่ทีมเดียวกับลูกเรา (จองให้เพื่อนร่วมทีมได้ ข้ามทีมไม่ได้)
+  const resolvedKids = [];
+  for (const id of kidIds) {
+    resolvedKids.push(await assertKidInMyTeam(supabase, viewer, id));
+  }
+
+  const rows = resolvedKids.flatMap((kid: any) =>
+    dates.map((d) => ({
+      team_id: kid.team_id,
+      kid_id: kid.id,
+      parent_id: viewer.parent.id,
+      practice_date: d,
+      start_time: input.startTime || null,
+      end_time: input.endTime || null,
+      note: input.note || null,
+      status: 'proposed',
+    }))
+  );
+
   const db = vexDb();
-  const { data, error } = await db
-    .from('practices')
-    .insert(
-      dates.map((d) => ({
-        team_id: kid.team_id,
-        kid_id: kid.id,
-        parent_id: viewer.parent.id,
-        practice_date: d,
-        start_time: input.startTime || null,
-        end_time: input.endTime || null,
-        note: input.note || null,
-        status: 'proposed',
-      }))
-    )
-    .select('*');
+  const { data, error } = await db.from('practices').insert(rows).select('*');
   if (error) throw new Error(error.message);
   return { ok: true, created: (data || []).length, practices: data || [] };
 }
@@ -259,7 +289,6 @@ export async function updatePractice(
   if (!practice) throw new Error('ไม่พบคำขอ');
   if (practice.parent_id !== viewer.parent.id) throw new Error('ไม่มีสิทธิ์แก้ไขคำขอนี้');
   if (practice.status !== 'proposed') throw new Error('คำขอนี้ถูกตรวจแล้ว แก้ไข/ลบไม่ได้');
-  await assertKidInFamily(supabase, viewer, practice.kid_id);
 
   const update: any = {};
   if (patch.date !== undefined) update.practice_date = patch.date;

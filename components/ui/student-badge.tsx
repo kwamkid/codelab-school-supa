@@ -58,6 +58,12 @@ const SIZES = {
   lg: 'px-4 py-2 text-base',
 } as const
 
+// ขนาดของ "ชิปที่กดได้" — sm ไว้ใช้ตอนมีเด็กหลายคน (ทั้งทีม) จะได้ไม่ล้นจอ
+const CHIP_SIZES = {
+  sm: 'px-3 py-1.5 text-sm',
+  md: 'px-4 py-2 text-base',
+} as const
+
 export function StudentBadge({
   name,
   size = 'sm',
@@ -99,12 +105,14 @@ export function StudentChips({
   value,
   onChange,
   allLabel,
+  size = 'md',
   className,
 }: {
   options: StudentChipOption[]
   value: string
   onChange: (id: string) => void
   allLabel?: string
+  size?: keyof typeof CHIP_SIZES
   className?: string
 }) {
   if (options.length <= 1 && !allLabel) return null
@@ -115,7 +123,8 @@ export function StudentChips({
           type="button"
           onClick={() => onChange('')}
           className={cn(
-            'shrink-0 rounded-full px-4 py-2 text-base font-semibold transition-colors',
+            'shrink-0 rounded-full font-semibold transition-colors',
+            CHIP_SIZES[size],
             value === '' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'
           )}
         >
@@ -131,8 +140,68 @@ export function StudentChips({
             type="button"
             onClick={() => onChange(o.id)}
             className={cn(
-              'shrink-0 rounded-full px-4 py-2 text-base font-semibold transition-colors',
+              'shrink-0 rounded-full font-semibold transition-colors',
+              CHIP_SIZES[size],
               active ? colors.solid : colors.soft
+            )}
+          >
+            {o.name}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * เลือกเด็กได้หลายคน (ชิปติ๊กได้) — ใช้ตอนจองซ้อมทีเดียวหลายคน
+ * ปุ่ม "ทั้งทีม" สลับเลือกทั้งหมด/ล้างทั้งหมด
+ */
+export function StudentMultiChips({
+  options,
+  values,
+  onChange,
+  size = 'sm',
+  allLabel = 'ทั้งทีม',
+  className,
+}: {
+  options: StudentChipOption[]
+  values: string[]
+  onChange: (ids: string[]) => void
+  size?: keyof typeof CHIP_SIZES
+  allLabel?: string
+  className?: string
+}) {
+  const allSelected = options.length > 0 && values.length === options.length
+  return (
+    <div className={cn('flex flex-wrap gap-2', className)}>
+      {options.length > 1 && (
+        <button
+          type="button"
+          onClick={() => onChange(allSelected ? [] : options.map((o) => o.id))}
+          className={cn(
+            'shrink-0 rounded-full font-semibold transition-colors',
+            CHIP_SIZES[size],
+            allSelected ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'
+          )}
+        >
+          {allSelected ? 'ล้างทั้งหมด' : allLabel}
+        </button>
+      )}
+      {options.map((o) => {
+        const colors = paletteFor(o.name)
+        const active = values.includes(o.id)
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() =>
+              onChange(active ? values.filter((v) => v !== o.id) : [...values, o.id])
+            }
+            className={cn(
+              'shrink-0 rounded-full font-semibold transition-colors',
+              CHIP_SIZES[size],
+              active ? colors.solid : cn(colors.soft, 'opacity-70')
             )}
           >
             {o.name}

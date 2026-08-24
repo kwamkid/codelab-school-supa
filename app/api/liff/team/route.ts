@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     if (action === 'practice.create') {
       const result = await proposePractice(user.lineUserId, {
         kidId: body.kidId,
+        kidIds: body.kidIds,
         dates: body.dates,
         startTime: body.startTime,
         endTime: body.endTime,
