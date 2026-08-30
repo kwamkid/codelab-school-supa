@@ -12,6 +12,7 @@ import { TeamHeader } from '../../team-header'
 import { useTeamAuth } from '../../use-team-auth'
 import { PracticeCalendar } from '@/components/vex/practice-calendar'
 import { openPracticeInCalendar } from '@/lib/calendar-link'
+import { PortalRedirect } from '@/components/vex/portal-redirect'
 import { useLiff } from '@/components/liff/liff-provider'
 
 interface SummaryData {
@@ -52,6 +53,8 @@ function ProposePracticeInner({ slug }: { slug: string }) {
   if (loading) return <Loading fullScreen size="lg" />
   if (gate) return <LineGate message={gate} />
   if (!data) return <LineGate message="เกิดข้อผิดพลาด" />
+  // เป็นผู้ปกครองในระบบแล้ว → พาไปใช้แท็บ "ทีม" ในแอปผู้ปกครอง (แอปเดียวจบ)
+  if (data.parentId) return <PortalRedirect liff={liff} />
 
   return (
     <div className="min-h-screen bg-gray-50">

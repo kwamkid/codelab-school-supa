@@ -86,7 +86,34 @@ export async function getVexParentByLineId(lineUserId: string): Promise<VexParen
     select: 'id,display_name,line_display_name',
     limit: '1',
   })
-  const p = rows?.[0]
+  let p = rows?.[0]
+
+  // ไม่เจอในตาราง parents → อาจเป็น "ผู้ปกครองร่วม" (ผู้รับแจ้งเตือนที่ตอบรับคำเชิญ)
+  // เช่นคุณพ่อที่ผูก LINE ไว้เป็นผู้รับเสริม — เดิม /team ไม่รู้จักเลยไล่ให้ไป
+  // สมัครใหม่ทุกครั้งที่เปิดลิงก์ทีม แล้วการสมัครก็สร้างนักเรียนซ้ำเพิ่มทุกรอบ
+  if (!p) {
+    const recipients = await restSelect<{ parent_id: string }>('parent_line_recipients', {
+      line_user_id: `eq.${lineUserId}`,
+      is_active: 'eq.true',
+      accepted_at: 'not.is.null',
+      select: 'parent_id',
+      limit: '1',
+    })
+    const parentId = recipients?.[0]?.parent_id
+    if (!parentId) return null
+
+    const family = await restSelect<{
+      id: string
+      display_name: string | null
+      line_display_name: string | null
+    }>('parents', {
+      id: `eq.${parentId}`,
+      select: 'id,display_name,line_display_name',
+      limit: '1',
+    })
+    p = family?.[0]
+  }
+
   if (!p) return null
   return { id: p.id, displayName: p.display_name || p.line_display_name || null }
 }

@@ -99,7 +99,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       }
     }
 
-    return NextResponse.json({ ...base, events, attendance })
+    return NextResponse.json({ ...base, parentId: parent.id, events, attendance })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Server error'
     return NextResponse.json({ error: message }, { status: 500 })

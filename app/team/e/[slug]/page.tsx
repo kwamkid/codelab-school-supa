@@ -12,18 +12,22 @@ import { LineGate } from '../../line-gate'
 import { TeamHeader } from '../../team-header'
 import { useTeamAuth } from '../../use-team-auth'
 import { EventRsvp } from './event-rsvp'
+import { PortalRedirect } from '@/components/vex/portal-redirect'
+import { useLiff } from '@/components/liff/liff-provider'
 import type { RsvpStatus } from '@/lib/vex/types'
 
 interface SummaryData {
   team: { id: string; team_number: string; name: string | null; level: string }
   kids: { id: string; nickname: string }[]
   parentDisplayName: string | null
+  parentId: string | null
   events: any[]
   attendance: any[]
 }
 
 function EventRsvpInner({ slug }: { slug: string }) {
   const { data, loading, gate, lineUserId, call } = useTeamAuth<SummaryData>(slug, 'event')
+  const { liff } = useLiff()
 
   const save = async (eventId: string, kidId: string, status: RsvpStatus) => {
     await call(`/api/liff/vex/${slug}/attendance`, { event_id: eventId, kid_id: kidId, status })
@@ -32,6 +36,8 @@ function EventRsvpInner({ slug }: { slug: string }) {
   if (loading) return <Loading fullScreen size="lg" />
   if (gate) return <LineGate message={gate} />
   if (!data) return <LineGate message="เกิดข้อผิดพลาด" />
+  // เป็นผู้ปกครองในระบบแล้ว → พาไปใช้แท็บ "ทีม" ในแอปผู้ปกครอง (แอปเดียวจบ)
+  if (data.parentId) return <PortalRedirect liff={liff} />
 
   return (
     <div className="min-h-screen bg-gray-50">

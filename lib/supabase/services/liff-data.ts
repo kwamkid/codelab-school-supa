@@ -634,6 +634,28 @@ interface StudentInput {
   emergencyPhone?: string | null;
 }
 
+// กันสร้างนักเรียนซ้ำ — เทียบชื่อเล่น (ไม่สนตัวพิมพ์/ช่องว่าง) + วันเกิด
+// เคสจริง: คุณพ่อที่เป็นผู้ปกครองร่วมเปิดลิงก์ทีมเก่าแล้วโดนไล่ให้ "ลงทะเบียน"
+// ซ้ำ ๆ → ได้ลูกคนเดิมเพิ่มมาอีก 5 แถวในเดือนเดียว (30 ส.ค. 69)
+async function findExistingStudent(supabase: any, parentId: string, student: StudentInput) {
+  const nickname = (student.nickname || '').trim().toLowerCase();
+  const birthdate = (student.birthdate || '').slice(0, 10);
+  if (!nickname || !birthdate) return null;
+
+  const { data } = await supabase
+    .from('students')
+    .select('id, nickname, birthdate')
+    .eq('parent_id', parentId);
+
+  return (
+    (data || []).find(
+      (row: any) =>
+        (row.nickname || '').trim().toLowerCase() === nickname &&
+        String(row.birthdate || '').slice(0, 10) === birthdate
+    ) || null
+  );
+}
+
 function studentRow(parentId: string, s: StudentInput) {
   return {
     parent_id: parentId,
@@ -716,6 +738,12 @@ export async function registerParentWithStudent(
     parent = created;
   }
 
+  // ลงทะเบียนซ้ำด้วยข้อมูลลูกคนเดิม = ไม่ต้องสร้างใหม่ (กันรายชื่อบานปลาย)
+  const existing = await findExistingStudent(supabase, parent.id, payload.student);
+  if (existing) {
+    return { ok: true, parentId: parent.id, studentId: existing.id, alreadyRegistered: true };
+  }
+
   const { data: student, error: studentError } = await supabase
     .from('students')
     .insert(studentRow(parent.id, payload.student))
@@ -734,6 +762,15 @@ export async function createStudentForParent(lineUserId: string, student: Studen
 
   if (!student?.name || !student?.nickname || !student?.birthdate) {
     return { ok: false, status: 400, message: 'กรุณากรอกข้อมูลนักเรียนให้ครบถ้วน' };
+  }
+
+  const existing = await findExistingStudent(supabase, parent.id, student);
+  if (existing) {
+    return {
+      ok: false,
+      status: 409,
+      message: `มี "${student.nickname}" ในรายชื่อของคุณอยู่แล้ว`,
+    };
   }
 
   const { data, error } = await supabase
