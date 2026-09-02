@@ -25,6 +25,8 @@ const createSchema = z.object({
   notebook_url: z.string().trim().url().max(1000).nullable().optional().or(z.literal('')),
   /** Engineering Notebook ฉบับส่งจริง (PDF บน Drive) */
   notebook_submit_url: z.string().trim().url().max(1000).nullable().optional().or(z.literal('')),
+  // รหัสล็อกอิน vr.vex.com — ตัวอักษร/ตัวเลขล้วน (เช่น 24PV9X) ไม่ใช่ URL
+  vr_skills_key: z.string().trim().max(32).nullable().optional().or(z.literal('')),
 })
 
 export async function GET(request: Request) {
@@ -149,7 +151,8 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid input' }, { status: 400 })
   }
-  const { team_number, name, level, branch_id, coach_teacher_id, notebook_url, notebook_submit_url } = parsed.data
+  const { team_number, name, level, branch_id, coach_teacher_id, notebook_url, notebook_submit_url, vr_skills_key } =
+    parsed.data
 
   const db = vexDb()
 
@@ -185,6 +188,7 @@ export async function POST(request: Request) {
         coach_teacher_id: coach_teacher_id || null,
         notebook_url: notebook_url || null,
         notebook_submit_url: notebook_submit_url || null,
+        vr_skills_key: vr_skills_key ? vr_skills_key.toUpperCase() : null,
         event_token,
         practice_token,
         slug,

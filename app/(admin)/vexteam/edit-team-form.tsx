@@ -31,6 +31,7 @@ interface EditableTeam {
   coach_teacher_id?: string | null
   notebook_url?: string | null
   notebook_submit_url?: string | null
+  vr_skills_key?: string | null
 }
 
 interface Props {
@@ -50,6 +51,8 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
   const [coachId, setCoachId] = useState<string>(team.coach_teacher_id || 'none')
   const [notebookUrl, setNotebookUrl] = useState(team.notebook_url || '')
   const [notebookSubmitUrl, setNotebookSubmitUrl] = useState(team.notebook_submit_url || '')
+  // รหัสล็อกอิน vr.vex.com ของทีม (คู่กับหมายเลขทีม)
+  const [vrSkillsKey, setVrSkillsKey] = useState(team.vr_skills_key || '')
   const [coachOptions, setCoachOptions] = useState<FormSelectOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
@@ -64,6 +67,7 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
       setCoachId(team.coach_teacher_id || 'none')
       setNotebookUrl(team.notebook_url || '')
       setNotebookSubmitUrl(team.notebook_submit_url || '')
+      setVrSkillsKey(team.vr_skills_key || '')
       getBranches()
         .then((list) => setBranches(list.map((b: any) => ({ id: b.id, name: b.name }))))
         .catch(() => {})
@@ -96,6 +100,7 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
           coach_teacher_id: coachId === 'none' ? null : coachId,
           notebook_url: notebookUrl.trim() || null,
           notebook_submit_url: notebookSubmitUrl.trim() || null,
+          vr_skills_key: vrSkillsKey.trim().toUpperCase() || null,
         }),
       })
       const data = await res.json()
@@ -183,6 +188,19 @@ export function EditTeamForm({ team, open, onOpenChange, onSaved }: Props) {
               value={notebookSubmitUrl}
               onChange={(e) => setNotebookSubmitUrl(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit_vr_skills_key">VEX VR — Virtual Skills Key (ไม่บังคับ)</Label>
+            <Input
+              id="edit_vr_skills_key"
+              placeholder="เช่น 24PV9X"
+              value={vrSkillsKey}
+              onChange={(e) => setVrSkillsKey(e.target.value.toUpperCase())}
+              className="font-mono tracking-wider"
+            />
+            <p className="text-sm text-gray-500">
+              ผู้ปกครองใช้คู่กับหมายเลขทีมเพื่อล็อกอิน vr.vex.com — กรอกแล้วจะไปโผล่ในแอปผู้ปกครอง
+            </p>
           </div>
           <div className="space-y-2">
             <Label>ครูผู้ดูแลทีม</Label>

@@ -25,6 +25,8 @@ export interface TeamMemberView {
     coachImage: string | null;
     notebookUrl: string | null;
     notebookSubmitUrl: string | null;
+    /** รหัสล็อกอิน vr.vex.com ประจำทีม (ใช้คู่กับ teamNumber) */
+    vrSkillsKey: string | null;
     teammates: { id: string; nickname: string }[];
   };
 }
@@ -181,6 +183,7 @@ export async function getTeamData(lineUserId: string) {
           coachImage: coach?.image || null,
           notebookUrl: team.notebook_url || null,
           notebookSubmitUrl: team.notebook_submit_url || null,
+          vrSkillsKey: team.vr_skills_key || null,
           teammates,
         },
         practices: teamPractices,

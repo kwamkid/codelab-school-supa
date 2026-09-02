@@ -53,6 +53,7 @@ interface TeamRow {
   coachImage?: string | null
   notebook_url?: string | null
   notebook_submit_url?: string | null
+  vr_skills_key?: string | null
   eventLink: string | null
   practiceLink: string | null
   kids: KidRow[]

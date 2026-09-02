@@ -24,6 +24,8 @@ const updateSchema = z.object({
   notebook_url: z.string().trim().url().max(1000).nullable().optional().or(z.literal('')),
   /** Engineering Notebook ฉบับส่งจริง (PDF) */
   notebook_submit_url: z.string().trim().url().max(1000).nullable().optional().or(z.literal('')),
+  // รหัสล็อกอิน vr.vex.com — ตัวอักษร/ตัวเลขล้วน (เช่น 24PV9X) ไม่ใช่ URL
+  vr_skills_key: z.string().trim().max(32).nullable().optional().or(z.literal('')),
 })
 
 /** Attach the two public link slugs to a team row for the response. */
@@ -126,6 +128,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (parsed.data.coach_teacher_id !== undefined) patch.coach_teacher_id = parsed.data.coach_teacher_id || null
     if (parsed.data.notebook_url !== undefined) patch.notebook_url = parsed.data.notebook_url || null
     if (parsed.data.notebook_submit_url !== undefined) patch.notebook_submit_url = parsed.data.notebook_submit_url || null
+    if (parsed.data.vr_skills_key !== undefined)
+      patch.vr_skills_key = parsed.data.vr_skills_key ? parsed.data.vr_skills_key.toUpperCase() : null
     // Keep slug in sync when the team_number changes (slug = number-event_token).
     if (parsed.data.team_number !== undefined && before.event_token) {
       patch.slug = linkSlug(nextNumber, before.event_token)

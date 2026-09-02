@@ -23,7 +23,16 @@ import { LEVEL_LABELS } from '@/lib/vex/types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { openEventInCalendar, openPracticeInCalendar } from '@/lib/calendar-link'
-import { BookOpen, FileCheck2, ExternalLink, Check, X, CalendarPlus } from 'lucide-react'
+import {
+  BookOpen,
+  FileCheck2,
+  ExternalLink,
+  Check,
+  X,
+  CalendarPlus,
+  Gamepad2,
+  Copy,
+} from 'lucide-react'
 
 interface TeamEvent {
   id: string
@@ -49,6 +58,7 @@ interface Member {
     coachImage: string | null
     notebookUrl: string | null
     notebookSubmitUrl: string | null
+    vrSkillsKey: string | null
     teammates: { id: string; nickname: string }[]
   }
   practices: Practice[]
@@ -63,6 +73,41 @@ function thaiDate(d: string) {
     day: 'numeric',
     month: 'short',
   })
+}
+
+/**
+ * แถวรหัสที่กดคัดลอกได้ — แตะทั้งแถวได้เลย (นิ้วโป้งจิ้มง่ายกว่าปุ่มเล็ก ๆ)
+ * ใช้กับหมายเลขทีม / Virtual Skills Key ที่ต้องเอาไปกรอกใน vr.vex.com
+ */
+function CopyRow({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      toast.success(`คัดลอก${label}แล้ว`)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast.error('คัดลอกไม่สำเร็จ')
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left active:bg-gray-50"
+    >
+      <span className="text-base text-gray-500 shrink-0">{label}</span>
+      <span className="flex items-center gap-2 min-w-0">
+        <span className="font-mono font-bold text-lg tracking-wider truncate">{value}</span>
+        {copied ? (
+          <Check className="h-5 w-5 text-green-600 shrink-0" />
+        ) : (
+          <Copy className="h-5 w-5 text-gray-400 shrink-0" />
+        )}
+      </span>
+    </button>
+  )
 }
 
 /** หัวข้อคั่นส่วน — เต็มความกว้าง พื้นเทา ไม่กินที่เหมือน CardHeader */
@@ -192,6 +237,13 @@ export default function TeamPage() {
       title: `ซ้อม VEX ทีม ${member?.team.teamNumber || ''}${kidName ? ` — ${kidName}` : ''}`.trim(),
       note: p.note,
     })
+
+  // VEX VR เป็นเกม 3 มิติ — ใน webview ของ LINE เล่นไม่ได้ ต้องเปิดเบราว์เซอร์จริง
+  const openVexVr = () => {
+    const url = 'https://vr.vex.com'
+    if (liff?.isInClient?.()) liff.openWindow({ url, external: true })
+    else window.open(url, '_blank')
+  }
 
   const setRsvp = async (eventId: string, status: 'go' | 'no') => {
     if (!member) return
@@ -346,6 +398,30 @@ export default function TeamPage() {
           ))}
         </div>
       )}
+
+      {/* ฝึกเขียนโค้ดบน VEX VR — ทุกทีมเข้าลิงก์เดียวกัน แล้วล็อกอินด้วย
+          หมายเลขทีม + Virtual Skills Key ประจำทีม */}
+      <SectionBar title="ฝึกเขียนโค้ด VEX VR" />
+      <div className="bg-white divide-y divide-gray-100">
+        <div className="px-4 py-3">
+          <Button className="w-full" onClick={openVexVr}>
+            <Gamepad2 className="h-4 w-4 mr-1" />
+            เปิด vr.vex.com
+          </Button>
+          <p className="text-base text-gray-500 mt-2">
+            เปิดแล้วล็อกอินด้วย 2 รหัสด้านล่าง — แตะที่รหัสเพื่อคัดลอก
+          </p>
+        </div>
+        <CopyRow label="รหัสทีม" value={t.teamNumber} />
+        {t.vrSkillsKey ? (
+          <CopyRow label="Virtual Skills Key" value={t.vrSkillsKey} />
+        ) : (
+          <div className="px-4 py-3 text-base text-amber-600">
+            ยังไม่มี Virtual Skills Key — ติดต่อครูผู้ดูแลทีม
+            {t.coachName ? ` (ครู${t.coachName})` : ''}
+          </div>
+        )}
+      </div>
 
       {/* Engineering Notebook */}
       {(t.notebookUrl || t.notebookSubmitUrl) && (

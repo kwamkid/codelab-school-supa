@@ -38,6 +38,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
   const [coachId, setCoachId] = useState<string>('none')
   const [notebookUrl, setNotebookUrl] = useState('')
   const [notebookSubmitUrl, setNotebookSubmitUrl] = useState('')
+  const [vrSkillsKey, setVrSkillsKey] = useState('')
   const [coachOptions, setCoachOptions] = useState<FormSelectOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
@@ -96,6 +97,7 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
           coach_teacher_id: coachId === 'none' ? null : coachId,
           notebook_url: notebookUrl.trim() || null,
           notebook_submit_url: notebookSubmitUrl.trim() || null,
+          vr_skills_key: vrSkillsKey.trim().toUpperCase() || null,
         }),
       })
       const data = await res.json()
@@ -186,6 +188,16 @@ export function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
               placeholder="ลิงก์ PDF บน Google Drive"
               value={notebookSubmitUrl}
               onChange={(e) => setNotebookSubmitUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vr_skills_key">VEX VR — Virtual Skills Key (ไม่บังคับ)</Label>
+            <Input
+              id="vr_skills_key"
+              placeholder="เช่น 24PV9X"
+              value={vrSkillsKey}
+              onChange={(e) => setVrSkillsKey(e.target.value.toUpperCase())}
+              className="font-mono tracking-wider"
             />
           </div>
           <div className="space-y-2">
