@@ -30,8 +30,8 @@ import {
   Check,
   X,
   CalendarPlus,
-  Gamepad2,
   Copy,
+  ClipboardCopy,
 } from 'lucide-react'
 
 interface TeamEvent {
@@ -66,6 +66,8 @@ interface Member {
 }
 
 const CACHE_KEY = 'team-data'
+// ทุกทีมเข้าเว็บเดียวกัน ต่างกันที่รหัสทีม + Virtual Skills Key
+const VEX_VR_URL = 'https://vr.vex.com'
 
 function thaiDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('th-TH', {
@@ -238,11 +240,22 @@ export default function TeamPage() {
       note: p.note,
     })
 
-  // VEX VR เป็นเกม 3 มิติ — ใน webview ของ LINE เล่นไม่ได้ ต้องเปิดเบราว์เซอร์จริง
-  const openVexVr = () => {
-    const url = 'https://vr.vex.com'
-    if (liff?.isInClient?.()) liff.openWindow({ url, external: true })
-    else window.open(url, '_blank')
+  // ผู้ปกครองไม่ได้เล่นเอง — ที่ต้องการคือ "ก๊อปข้อมูลไปส่งต่อ" ให้ลูก/ครู
+  // เลยให้ปุ่มคัดลอกทั้งชุด (เว็บ + รหัสทีม + คีย์) เป็นข้อความพร้อมวางในแชท
+  const copyVrAll = async () => {
+    if (!member) return
+    const lines = [
+      'ฝึกเขียนโค้ด VEX VR',
+      `เว็บ: ${VEX_VR_URL}`,
+      `รหัสทีม: ${member.team.teamNumber}`,
+      member.team.vrSkillsKey ? `Virtual Skills Key: ${member.team.vrSkillsKey}` : null,
+    ].filter(Boolean)
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'))
+      toast.success('คัดลอกข้อมูลทั้งหมดแล้ว', { description: 'วางในแชทส่งต่อได้เลย' })
+    } catch {
+      toast.error('คัดลอกไม่สำเร็จ')
+    }
   }
 
   const setRsvp = async (eventId: string, status: 'go' | 'no') => {
@@ -404,14 +417,15 @@ export default function TeamPage() {
       <SectionBar title="ฝึกเขียนโค้ด VEX VR" />
       <div className="bg-white divide-y divide-gray-100">
         <div className="px-4 py-3">
-          <Button className="w-full" onClick={openVexVr}>
-            <Gamepad2 className="h-4 w-4 mr-1" />
-            เปิด vr.vex.com
+          <Button className="w-full" onClick={copyVrAll}>
+            <ClipboardCopy className="h-4 w-4 mr-1" />
+            คัดลอกข้อมูลทั้งหมด
           </Button>
           <p className="text-base text-gray-500 mt-2">
-            เปิดแล้วล็อกอินด้วย 2 รหัสด้านล่าง — แตะที่รหัสเพื่อคัดลอก
+            ได้เป็นข้อความพร้อมส่งต่อในแชท — หรือแตะทีละแถวด้านล่างเพื่อคัดลอกเฉพาะอันนั้น
           </p>
         </div>
+        <CopyRow label="เว็บ" value={VEX_VR_URL} />
         <CopyRow label="รหัสทีม" value={t.teamNumber} />
         {t.vrSkillsKey ? (
           <CopyRow label="Virtual Skills Key" value={t.vrSkillsKey} />
