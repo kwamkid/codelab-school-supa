@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
-import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle, BookOpen, ExternalLink, FileCheck2, Check } from 'lucide-react'
+import { Copy, Users, UserPlus, Pencil, Trash2, X, MessageCircle, BookOpen, ExternalLink, FileCheck2, Check, Gamepad2} from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { LEVELS, type Level } from '@/lib/vex/types'
 import { LevelBadge } from '@/components/vex/level-badge'
@@ -329,6 +329,19 @@ export function TeamsTab() {
                           ) : (
                             <span className="inline-flex items-center gap-1 text-gray-400">
                               <FileCheck2 className="h-4 w-4" /> ยังไม่ส่ง PDF
+                            </span>
+                          )}
+                          {/* Virtual Skills Key (vr.vex.com) — เห็นจากลิสต์เลยว่าทีมไหน
+                              ยังไม่ได้กรอก และคัดลอกคีย์ไปใช้ได้จากตรงนี้ */}
+                          {t.vr_skills_key ? (
+                            <span className="inline-flex items-center gap-1 text-purple-700">
+                              <Gamepad2 className="h-4 w-4" />
+                              VR: <span className="font-mono font-semibold tracking-wider">{t.vr_skills_key}</span>
+                              <CopyIconButton url={t.vr_skills_key} label="VR key" />
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-gray-400">
+                              <Gamepad2 className="h-4 w-4" /> ยังไม่มี VR key
                             </span>
                           )}
                         </div>
