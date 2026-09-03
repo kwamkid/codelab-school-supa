@@ -283,20 +283,23 @@ export function TeamsTab() {
                             <Badge variant="outline" className="text-[10px] text-gray-500">{t.branchName}</Badge>
                           )}
                         </div>
-                        {/* ครูผู้ดูแลทีม — โชว์เสมอ เพื่อให้เห็นทีมที่ยังไม่ได้ระบุครู */}
-                        <div className="mt-1 flex items-center gap-1.5 text-sm flex-wrap">
-                          {t.coachName ? (
-                            <>
-                              <span className="text-gray-500">ครูผู้ดูแล:</span>
-                              <TeacherBadge name={t.coachName} imageUrl={t.coachImage} size="sm" />
-                            </>
-                          ) : (
-                            <span className="text-amber-600">ยังไม่ได้ระบุครูผู้ดูแล</span>
-                          )}
-                          {/* Engineering Notebook 2 เล่ม: ฉบับกำลังทำ (Canva/Slides)
-                              กับฉบับส่งจริง (PDF) — ทีมที่ยังไม่ใส่ก็เห็นว่ายังไม่มี */}
+                        {/* ครู / Notebook 2 เล่ม / VR key — วางเป็นคอลัมน์ที่ตรงกันทุกการ์ด
+                            กวาดตาลงมาแล้วเห็นทันทีว่าทีมไหนยังขาดอะไร (เดิมเรียงต่อกัน
+                            เป็นแถวเดียวจนอ่านยาก) */}
+                        <div className="mt-1.5 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5 text-sm">
+                          <span className="inline-flex items-center gap-1.5 min-w-0">
+                            {t.coachName ? (
+                              <>
+                                <span className="text-gray-500 shrink-0">ครู:</span>
+                                <TeacherBadge name={t.coachName} imageUrl={t.coachImage} size="sm" />
+                              </>
+                            ) : (
+                              <span className="text-amber-600">ยังไม่ระบุครู</span>
+                            )}
+                          </span>
+                          <span className="inline-flex items-center gap-1 min-w-0">
                           {t.notebook_url ? (
-                            <span className="inline-flex items-center gap-1">
+                            <>
                               <a
                                 href={t.notebook_url}
                                 target="_blank"
@@ -307,14 +310,16 @@ export function TeamsTab() {
                                 <ExternalLink className="h-3 w-3" />
                               </a>
                               <CopyIconButton url={t.notebook_url} label="ลิงก์เล่มกำลังทำ" />
-                            </span>
+                            </>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-gray-400">
                               <BookOpen className="h-4 w-4" /> ยังไม่มีเล่มกำลังทำ
                             </span>
                           )}
+                          </span>
+                          <span className="inline-flex items-center gap-1 min-w-0">
                           {t.notebook_submit_url ? (
-                            <span className="inline-flex items-center gap-1">
+                            <>
                               <a
                                 href={t.notebook_submit_url}
                                 target="_blank"
@@ -325,18 +330,22 @@ export function TeamsTab() {
                                 <ExternalLink className="h-3 w-3" />
                               </a>
                               <CopyIconButton url={t.notebook_submit_url} label="ลิงก์ PDF" />
-                            </span>
+                            </>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-gray-400">
                               <FileCheck2 className="h-4 w-4" /> ยังไม่ส่ง PDF
                             </span>
                           )}
+                          </span>
                           {/* Virtual Skills Key (vr.vex.com) — เห็นจากลิสต์เลยว่าทีมไหน
                               ยังไม่ได้กรอก และคัดลอกคีย์ไปใช้ได้จากตรงนี้ */}
+                          <span className="inline-flex items-center gap-1 min-w-0">
                           {t.vr_skills_key ? (
-                            <span className="inline-flex items-center gap-1 text-purple-700">
-                              <Gamepad2 className="h-4 w-4" />
-                              VR: <span className="font-mono font-semibold tracking-wider">{t.vr_skills_key}</span>
+                            <span className="inline-flex items-center gap-1 text-purple-700 min-w-0">
+                              <Gamepad2 className="h-4 w-4 shrink-0" />
+                              <span className="font-mono font-semibold tracking-wider truncate">
+                                {t.vr_skills_key}
+                              </span>
                               <CopyIconButton url={t.vr_skills_key} label="VR key" />
                             </span>
                           ) : (
@@ -344,6 +353,7 @@ export function TeamsTab() {
                               <Gamepad2 className="h-4 w-4" /> ยังไม่มี VR key
                             </span>
                           )}
+                          </span>
                         </div>
                       </div>
                       <div className={cn('flex items-center gap-2 shrink-0 flex-wrap justify-end', !canManage && 'hidden')}>
