@@ -32,6 +32,10 @@ import {
   CalendarPlus,
   Copy,
   ClipboardCopy,
+  CalendarDays,
+  Trophy,
+  Gamepad2,
+  type LucideIcon,
 } from 'lucide-react'
 
 interface TeamEvent {
@@ -64,6 +68,41 @@ interface Member {
   practices: Practice[]
   events: TeamEvent[]
 }
+
+type TeamTab = 'practice' | 'events' | 'coding' | 'notebook'
+
+// เมนูย่อยของหน้าทีม — คนละสีกันเพื่อให้แยกออกไว ๆ ว่าตอนนี้อยู่เมนูไหน
+// (สีตรงกับหัวข้อในเนื้อหา: ซ้อม=ฟ้า, แข่งขัน=เหลือง, VR=ม่วง, Notebook=เขียว)
+const TEAM_TABS: { value: TeamTab; label: string; icon: LucideIcon; active: string; idle: string }[] = [
+  {
+    value: 'practice',
+    label: 'ซ้อม',
+    icon: CalendarDays,
+    active: 'data-[state=active]:bg-blue-600 data-[state=active]:text-white',
+    idle: 'bg-blue-50 text-blue-700',
+  },
+  {
+    value: 'events',
+    label: 'Event แข่งขัน',
+    icon: Trophy,
+    active: 'data-[state=active]:bg-amber-500 data-[state=active]:text-white',
+    idle: 'bg-amber-50 text-amber-700',
+  },
+  {
+    value: 'coding',
+    label: 'ฝึก coding',
+    icon: Gamepad2,
+    active: 'data-[state=active]:bg-purple-600 data-[state=active]:text-white',
+    idle: 'bg-purple-50 text-purple-700',
+  },
+  {
+    value: 'notebook',
+    label: 'Notebook',
+    icon: BookOpen,
+    active: 'data-[state=active]:bg-green-600 data-[state=active]:text-white',
+    idle: 'bg-green-50 text-green-700',
+  },
+]
 
 const CACHE_KEY = 'team-data'
 // ทุกทีมเข้าเว็บเดียวกัน ต่างกันที่รหัสทีม + Virtual Skills Key
@@ -129,9 +168,8 @@ export default function TeamPage() {
   const [parentId, setParentId] = useState<string | null>(cached?.parentId ?? null)
   const [loading, setLoading] = useState(!cached)
   const [selectedKidId, setSelectedKidId] = useState<string>('')
-  // แท็บในหน้าทีม — ตารางซ้อม / แข่งขัน / ฝึก coding (VEX VR + Engineering Notebook)
-  // สองอย่างหลังเคยต่อท้ายหน้ายาว ๆ แล้วผู้ปกครองเลื่อนไม่ถึง เลยยกขึ้นมาเป็นแท็บ
-  const [tab, setTab] = useState<'practice' | 'events' | 'coding'>('practice')
+  // แท็บย่อยในหน้าทีม — แต่ละอันมีสีของตัวเองให้แยกออกด้วยสายตา
+  const [tab, setTab] = useState<TeamTab>('practice')
 
   const load = useCallback(async () => {
     if (!profile?.userId) return
@@ -340,15 +378,34 @@ export default function TeamPage() {
         )}
       </div>
 
-      {/* แท็บในหน้า — ตารางซ้อม / รายการแข่งขัน */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as 'practice' | 'events' | 'coding')}>
-        <TabsList className="grid w-full grid-cols-3 rounded-none">
-          {/* ชื่อแท็บสั้น ๆ — 3 แท็บบนจอ 390px ถ้ายาวกว่านี้จะเบียดกัน */}
-          <TabsTrigger value="practice" className="text-sm">ตารางซ้อม</TabsTrigger>
-          <TabsTrigger value="events" className="text-sm">
-            แข่งขัน{member.events.length > 0 ? ` (${member.events.length})` : ''}
-          </TabsTrigger>
-          <TabsTrigger value="coding" className="text-sm">ฝึก coding</TabsTrigger>
+      {/* เมนูย่อยของหน้าทีม 4 อัน — ไอคอน+ชื่อ แบบเดียวกับแท็บล่างของแอป
+          แต่ละอันมีสีของตัวเอง (ฟ้า/เหลือง/ม่วง/เขียว) ให้รู้ทันทีว่าอยู่เมนูไหน */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TeamTab)}>
+        {/* ไอคอนบน + ชื่อล่าง: 4 เมนูบนจอ 390px วางเรียงแนวนอนล้วนจะเบียดจนอ่านไม่ออก */}
+        <TabsList className="grid w-full grid-cols-4 gap-1 h-auto rounded-none bg-white p-2">
+          {TEAM_TABS.map((tb) => {
+            const Icon = tb.icon
+            const count = tb.value === 'events' ? member.events.length : 0
+            return (
+              <TabsTrigger
+                key={tb.value}
+                value={tb.value}
+                className={cn(
+                  'flex-col gap-0.5 h-auto py-2 px-1 rounded-lg text-[11px] font-semibold',
+                  'data-[state=active]:shadow-sm',
+                  tb.idle,
+                  tb.active
+                )}
+              >
+                <Icon className="h-6 w-6" />
+                {/* ชื่อยาว (เช่น "Event แข่งขัน") ให้ตกบรรทัดได้ ดีกว่าโดนตัดด้วย ... */}
+                <span className="whitespace-normal leading-tight text-center">
+                  {tb.label}
+                  {count > 0 ? ` (${count})` : ''}
+                </span>
+              </TabsTrigger>
+            )
+          })}
         </TabsList>
       </Tabs>
 
@@ -442,7 +499,12 @@ export default function TeamPage() {
         )}
       </div>
 
-      {/* Engineering Notebook */}
+      </>
+      )}
+
+      {/* แท็บ Engineering Notebook */}
+      {tab === 'notebook' && (
+      <>
       {(t.notebookUrl || t.notebookSubmitUrl) && (
         <>
           <SectionBar title="Engineering Notebook" />
@@ -475,12 +537,9 @@ export default function TeamPage() {
         </>
       )}
       {!t.notebookUrl && !t.notebookSubmitUrl && (
-        <>
-          <SectionBar title="Engineering Notebook" />
-          <p className="bg-white px-4 py-6 text-center text-base text-gray-400">
-            ยังไม่มีลิงก์เล่ม — ติดต่อครูผู้ดูแลทีม{t.coachName ? ` (ครู${t.coachName})` : ''}
-          </p>
-        </>
+        <p className="bg-white px-4 py-8 text-center text-base text-gray-400">
+          ยังไม่มีลิงก์เล่ม — ติดต่อครูผู้ดูแลทีม{t.coachName ? ` (ครู${t.coachName})` : ''}
+        </p>
       )}
       </>
       )}
