@@ -129,8 +129,9 @@ export default function TeamPage() {
   const [parentId, setParentId] = useState<string | null>(cached?.parentId ?? null)
   const [loading, setLoading] = useState(!cached)
   const [selectedKidId, setSelectedKidId] = useState<string>('')
-  // แท็บในหน้าทีม — ตารางซ้อม / รายการแข่งขัน (ลิงก์ EN อยู่ท้ายหน้าทั้งสองแท็บ)
-  const [tab, setTab] = useState<'practice' | 'events'>('practice')
+  // แท็บในหน้าทีม — ตารางซ้อม / แข่งขัน / ฝึก coding (VEX VR + Engineering Notebook)
+  // สองอย่างหลังเคยต่อท้ายหน้ายาว ๆ แล้วผู้ปกครองเลื่อนไม่ถึง เลยยกขึ้นมาเป็นแท็บ
+  const [tab, setTab] = useState<'practice' | 'events' | 'coding'>('practice')
 
   const load = useCallback(async () => {
     if (!profile?.userId) return
@@ -340,12 +341,14 @@ export default function TeamPage() {
       </div>
 
       {/* แท็บในหน้า — ตารางซ้อม / รายการแข่งขัน */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as 'practice' | 'events')}>
-        <TabsList className="grid w-full grid-cols-2 rounded-none">
-          <TabsTrigger value="practice">ตารางซ้อม</TabsTrigger>
-          <TabsTrigger value="events">
-            รายการแข่งขัน{member.events.length > 0 ? ` (${member.events.length})` : ''}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'practice' | 'events' | 'coding')}>
+        <TabsList className="grid w-full grid-cols-3 rounded-none">
+          {/* ชื่อแท็บสั้น ๆ — 3 แท็บบนจอ 390px ถ้ายาวกว่านี้จะเบียดกัน */}
+          <TabsTrigger value="practice" className="text-sm">ตารางซ้อม</TabsTrigger>
+          <TabsTrigger value="events" className="text-sm">
+            แข่งขัน{member.events.length > 0 ? ` (${member.events.length})` : ''}
           </TabsTrigger>
+          <TabsTrigger value="coding" className="text-sm">ฝึก coding</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -412,18 +415,20 @@ export default function TeamPage() {
         </div>
       )}
 
-      {/* ฝึกเขียนโค้ดบน VEX VR — ทุกทีมเข้าลิงก์เดียวกัน แล้วล็อกอินด้วย
-          หมายเลขทีม + Virtual Skills Key ประจำทีม */}
-      <SectionBar title="ฝึกเขียนโค้ด VEX VR" />
+      {/* แท็บ "ฝึก coding" — VEX VR + Engineering Notebook */}
+      {tab === 'coding' && (
+      <>
+      <SectionBar title="เข้า VEX VR" />
       <div className="bg-white divide-y divide-gray-100">
-        <div className="px-4 py-3">
-          <Button className="w-full" onClick={copyVrAll}>
-            <ClipboardCopy className="h-4 w-4 mr-1" />
-            คัดลอกข้อมูลทั้งหมด
-          </Button>
-          <p className="text-base text-gray-500 mt-2">
-            ได้เป็นข้อความพร้อมส่งต่อในแชท — หรือแตะทีละแถวด้านล่างเพื่อคัดลอกเฉพาะอันนั้น
+        <div className="px-4 py-3 flex items-start justify-between gap-3">
+          <p className="text-base text-gray-500">
+            เข้าเว็บแล้วล็อกอินด้วย 2 รหัสด้านล่าง — แตะแถวไหนก็คัดลอกเฉพาะอันนั้น
           </p>
+          {/* ปุ่มรอง — งานหลักของหน้านี้คือ "อ่าน/ก๊อปรหัส" ไม่ใช่กดปุ่มนี้ */}
+          <Button variant="outline" size="sm" onClick={copyVrAll} className="shrink-0">
+            <ClipboardCopy className="h-4 w-4 mr-1" />
+            คัดลอกทั้งหมด
+          </Button>
         </div>
         <CopyRow label="เว็บ" value={VEX_VR_URL} />
         <CopyRow label="รหัสทีม" value={t.teamNumber} />
@@ -468,6 +473,16 @@ export default function TeamPage() {
             )}
           </div>
         </>
+      )}
+      {!t.notebookUrl && !t.notebookSubmitUrl && (
+        <>
+          <SectionBar title="Engineering Notebook" />
+          <p className="bg-white px-4 py-6 text-center text-base text-gray-400">
+            ยังไม่มีลิงก์เล่ม — ติดต่อครูผู้ดูแลทีม{t.coachName ? ` (ครู${t.coachName})` : ''}
+          </p>
+        </>
+      )}
+      </>
       )}
     </div>
   )
