@@ -14,6 +14,7 @@ import { TeacherBadge } from '@/components/ui/teacher-badge';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { liffFetch } from '@/lib/line/liff-fetch';
 
 export interface ScheduleEvent {
   id: string;
@@ -114,24 +115,14 @@ export default function ScheduleCalendar({
       }
       
       // Call API to create makeup request
-      const response = await fetch('/api/liff/leave-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          studentId: selectedEvent.extendedProps.studentId,
-          classId: classId,
-          scheduleId: scheduleId,
-          reason: 'ลาผ่านระบบ LIFF',
-          type: 'scheduled', // Since parent requests in advance
-        })
+      // liffFetch attaches the LINE ID token (server verifies identity) and throws on error
+      await liffFetch('/api/liff/leave-request', {
+        studentId: selectedEvent.extendedProps.studentId,
+        classId: classId,
+        scheduleId: scheduleId,
+        reason: 'ลาผ่านระบบ LIFF',
+        type: 'scheduled', // Since parent requests in advance
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'เกิดข้อผิดพลาด');
-      }
 
       toast.success('บันทึกการลาเรียนเรียบร้อยแล้ว', {
         description: 'รอเจ้าหน้าที่นัดหมายวันเรียนชดเชยใหม่'
