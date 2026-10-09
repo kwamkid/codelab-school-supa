@@ -45,11 +45,11 @@ drop policy if exists "Service role full access on tax_invoices" on public.tax_i
 
 drop policy if exists credit_notes_select_authenticated on public.credit_notes;
 create policy credit_notes_select_authenticated
-  on public.credit_notes for select to authenticated using (true);
+  on public.credit_notes for select to authenticated using ((select public.is_staff()));
 
 drop policy if exists tax_invoices_select_authenticated on public.tax_invoices;
 create policy tax_invoices_select_authenticated
-  on public.tax_invoices for select to authenticated using (true);
+  on public.tax_invoices for select to authenticated using ((select public.is_staff()));
 
 -- 3. fb_conversion_logs — service role only (no policy needed; RLS stays on)
 drop policy if exists "Allow all access" on public.fb_conversion_logs;
