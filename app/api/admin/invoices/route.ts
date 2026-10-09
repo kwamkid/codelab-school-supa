@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,10 @@ async function queryTable(table: string, params: Record<string, string>) {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if (auth.role === 'teacher') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const { searchParams } = new URL(request.url)
   const enrollmentId = searchParams.get('enrollmentId')
 

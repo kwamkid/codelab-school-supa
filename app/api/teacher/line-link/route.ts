@@ -16,6 +16,7 @@ import crypto from 'crypto'
 import { getLineSettings } from '@/lib/supabase/services/line-settings'
 import { requireStaff, bearer } from '@/lib/server/admin-auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { signTeacherLink } from '@/lib/vex/team-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,7 +60,10 @@ export async function POST(request: Request) {
 
   const nonce = crypto.randomBytes(16).toString('hex')
   const state = Buffer.from(
-    JSON.stringify({ r: safeReturn, n: nonce, p: 'teacher_link', t: adminUser.teacher_id })
+    JSON.stringify({
+      r: safeReturn, n: nonce, p: 'teacher_link', t: adminUser.teacher_id,
+      s: signTeacherLink(adminUser.teacher_id, nonce),
+    })
   ).toString('base64url')
 
   const authorizeUrl = new URL('https://access.line.me/oauth2/v2.1/authorize')

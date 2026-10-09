@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,8 @@ const BUCKET_CONFIG: Record<string, { maxSize: number; allowedTypes: string[]; f
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   const supabase = createServiceClient()
 
   try {

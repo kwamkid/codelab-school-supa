@@ -1,6 +1,7 @@
 // app/api/admin/teachers/[id]/soft-delete/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { createClient } from '@/lib/supabase/server';
 
@@ -10,14 +11,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   console.log('[Soft Delete Teacher] Starting soft delete for teacher:', params.id);
 
   try {
     const serviceClient = createServiceClient();
 
-    // Note: Authentication is handled at page level (/teachers page requires admin login)
-    // No need for additional auth check here as it causes session persistence issues
-    // The page itself is protected and only accessible by authenticated admins
+    // Auth: caller must be a super_admin (verified from the Bearer token above).
 
     const teacherId = params.id;
 

@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, User, MapPin, School, Loader2 } from 'lucide-react'
 import { useLiff } from '@/components/liff/liff-provider'
-import { getParent } from '@/lib/services/parents'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { getActiveBranches } from '@/lib/services/branches'
 import { toast } from 'sonner'
@@ -101,9 +100,9 @@ function EditParentProfileContent() {
     try {
       setLoading(true)
       
-      // Load parent data
-      const parent = await getParent(parentId)
-      console.log('[EditParent] Loaded parent data:', parent)
+      // Load parent data via LINE-verified route (only the caller's own family)
+      const res = await liffFetch<{ parent: any }>('/api/liff/profile', { lineUserId: profile?.userId })
+      const parent = res.parent && res.parent.id === parentId ? res.parent : null
       
       if (!parent) {
         toast.error('ไม่พบข้อมูล')

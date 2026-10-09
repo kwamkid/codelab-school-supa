@@ -3,12 +3,15 @@
 // GET            → getDataStatistics()
 // POST           → factoryReset() (runs to completion; progress is not streamed)
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth'
 import { getDataStatistics, factoryReset } from '@/lib/supabase/services/factory-reset'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     return NextResponse.json(await getDataStatistics())
   } catch (error) {
@@ -17,7 +20,9 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     // The onProgress callback can't stream over a single HTTP response; the client
     // shows an indeterminate progress state while this runs to completion.

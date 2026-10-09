@@ -33,6 +33,7 @@ import { Pagination, usePagination } from '@/components/ui/pagination';
 import { Tooltip } from '@/components/ui/tooltip';
 
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { authFetch } from '@/lib/auth-fetch';
 export default function TeachersPage() {
   const confirm = useConfirm();
   const { selectedBranchId, isAllBranches } = useBranch();
@@ -147,7 +148,7 @@ export default function TeachersPage() {
 
     setDeletingTeacherId(teacher.id);
     try {
-      const response = await fetch(`/api/admin/teachers/${teacher.id}/soft-delete`, {
+      const response = await authFetch(`/api/admin/teachers/${teacher.id}/soft-delete`, {
         method: 'POST',
       });
 

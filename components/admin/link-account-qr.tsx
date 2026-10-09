@@ -15,6 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { authFetch } from '@/lib/auth-fetch';
 
 interface LinkAccountQRProps {
   parentId: string;
@@ -32,7 +33,7 @@ export function LinkAccountQR({ parentId, parentName, parentPhone }: LinkAccount
     try {
       setLoading(true);
       setError('');
-      const res = await fetch('/api/admin/link-tokens', {
+      const res = await authFetch('/api/admin/link-tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parentId }),

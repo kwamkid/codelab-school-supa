@@ -3,6 +3,8 @@
 // /api/admin/factory-reset (service-role) instead of importing the server-only service
 // directly (which pulls in next/headers and breaks the client build).
 
+import { authFetch } from '@/lib/auth-fetch'
+
 export interface ResetProgress {
   total: number
   current: number
@@ -12,7 +14,7 @@ export interface ResetProgress {
 }
 
 export async function getDataStatistics(): Promise<Record<string, number>> {
-  const res = await fetch('/api/admin/factory-reset')
+  const res = await authFetch('/api/admin/factory-reset')
   const data = await res.json()
   if (!res.ok) throw new Error(data?.error || 'ไม่สามารถโหลดข้อมูลสถิติได้')
   return data
@@ -25,7 +27,7 @@ export async function factoryReset(
 ): Promise<void> {
   onProgress?.({ total: 1, current: 0, currentTable: '', status: 'preparing' })
 
-  const res = await fetch('/api/admin/factory-reset', { method: 'POST' })
+  const res = await authFetch('/api/admin/factory-reset', { method: 'POST' })
   const data = await res.json().catch(() => ({}))
 
   if (!res.ok) {

@@ -65,10 +65,11 @@ async function verifyAuth(request: NextRequest): Promise<AdminUserData | null> {
 
     // Get admin user details from database
     const supabase = createServiceClient()
+    // user.id is the auth.users id → admin_users.auth_user_id (NOT admin_users.id)
     const { data: adminUser, error: adminError } = await supabase
       .from('admin_users')
       .select('*')
-      .eq('id', user.id)
+      .eq('auth_user_id', user.id)
       .single()
 
     if (adminError || !adminUser || !adminUser.is_active) {
@@ -81,7 +82,13 @@ async function verifyAuth(request: NextRequest): Promise<AdminUserData | null> {
       displayName: adminUser.display_name,
       role: adminUser.role,
       branchIds: adminUser.branch_ids || [],
-      permissions: adminUser.permissions,
+      // admin_users has no `permissions` column — permissions are separate boolean columns
+      permissions: {
+        canManageUsers: (adminUser as any).can_manage_users ?? undefined,
+        canManageSettings: (adminUser as any).can_manage_settings ?? undefined,
+        canViewReports: (adminUser as any).can_view_reports ?? undefined,
+        canManageAllBranches: (adminUser as any).can_manage_all_branches ?? undefined,
+      },
       isActive: adminUser.is_active
     } as AdminUserData
   } catch (error) {
@@ -140,7 +147,7 @@ export async function GET(
       
       // Check branch access
       if (user.role !== 'super_admin' && user.branchIds?.length > 0) {
-        const hasAccess = event.branchIds.some(bid => user.branchIds.includes(bid));
+        const hasAccess = ((event as any).branch_ids || []).some((bid: string) => user.branchIds.includes(bid));
         if (!hasAccess) {
           return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
@@ -168,7 +175,7 @@ export async function GET(
       
       // Filter by branch access
       if (user.role !== 'super_admin' && user.branchIds?.length > 0) {
-        const filtered = registrations.filter(r => user.branchIds.includes(r.branchId));
+        const filtered = registrations.filter((r: any) => user.branchIds.includes(r.branch_id));
         return NextResponse.json(filtered);
       }
       
@@ -293,7 +300,7 @@ export async function PUT(
       }
       
       if (user.role !== 'super_admin' && user.branchIds?.length > 0) {
-        const hasAccess = event.branchIds.some(bid => user.branchIds.includes(bid));
+        const hasAccess = ((event as any).branch_ids || []).some((bid: string) => user.branchIds.includes(bid));
         if (!hasAccess) {
           return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }

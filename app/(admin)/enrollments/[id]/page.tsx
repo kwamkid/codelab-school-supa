@@ -91,6 +91,7 @@ import { FileText } from 'lucide-react';
 import { getInvoiceCompany } from '@/lib/services/invoice-companies';
 import { InvoiceCompany } from '@/types/models';
 import { Tooltip } from '@/components/ui/tooltip';
+import { authFetch } from '@/lib/auth-fetch';
 
 const statusColors = {
   'active': 'bg-green-100 text-green-700',
@@ -260,8 +261,8 @@ export default function EnrollmentDetailPage() {
       // Load invoices + credit notes + invoice company
       try {
         const [invoiceRes, cnRes] = await Promise.all([
-          fetch(`/api/admin/invoices?enrollmentId=${enrollmentId}&_t=${Date.now()}`),
-          fetch(`/api/admin/credit-notes?enrollmentId=${enrollmentId}&_t=${Date.now()}`),
+          authFetch(`/api/admin/invoices?enrollmentId=${enrollmentId}&_t=${Date.now()}`),
+          authFetch(`/api/admin/credit-notes?enrollmentId=${enrollmentId}&_t=${Date.now()}`),
         ]);
         if (invoiceRes.ok) {
           setInvoices(await invoiceRes.json() || []);

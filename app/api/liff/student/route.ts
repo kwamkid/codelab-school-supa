@@ -1,11 +1,15 @@
 // app/api/liff/student/route.ts
-// Create (POST) or update (PATCH) a student on the verified LINE parent's own
+// Create (POST), update (PATCH) or delete (DELETE) a student on the verified LINE parent's own
 // account, from the LIFF portal. Service role + LINE-verified ownership check;
 // replaces the /api/admin/mutation path that 401s for LIFF parents.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveLiffUser } from '@/lib/line/verify-liff-token';
-import { createStudentForParent, updateStudentForParent } from '@/lib/supabase/services/liff-data';
+import {
+  createStudentForParent,
+  updateStudentForParent,
+  deleteStudentForParent,
+} from '@/lib/supabase/services/liff-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +61,36 @@ export async function PATCH(request: NextRequest) {
     console.error('[liff/student PATCH] Error:', error);
     return NextResponse.json(
       { success: false, error: error?.message || 'แก้ไขข้อมูลนักเรียนไม่สำเร็จ' },
+      { status: 500 }
+    );
+  }
+}
+
+// Delete one of the caller's own students (primary account only). Replaces the
+// old LIFF call to /api/admin/students/[id], which is staff-only.
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const user = await resolveLiffUser(request, body);
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'ไม่พบข้อมูลผู้ใช้ LINE' }, { status: 401 });
+    }
+    if (!body.studentId) {
+      return NextResponse.json({ success: false, error: 'Missing studentId' }, { status: 400 });
+    }
+
+    const result = await deleteStudentForParent(user.lineUserId, body.studentId);
+    if (!result.ok) {
+      return NextResponse.json(
+        { success: false, error: result.message },
+        { status: result.status || 400 }
+      );
+    }
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('[liff/student DELETE] Error:', error);
+    return NextResponse.json(
+      { success: false, error: error?.message || 'ลบข้อมูลนักเรียนไม่สำเร็จ' },
       { status: 500 }
     );
   }

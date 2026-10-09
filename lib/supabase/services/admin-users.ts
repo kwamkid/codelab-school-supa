@@ -479,17 +479,26 @@ export async function updateUserPassword(
 // PERMISSIONS
 // ============================================
 
+// Legacy nested permissions object (not a column in generated types)
+type AdminPermissions = {
+  can_manage_users?: boolean | null
+  can_manage_settings?: boolean | null
+  can_view_reports?: boolean | null
+  can_manage_all_branches?: boolean | null
+}
+type AdminUserWithPermissions = AdminUser & { permissions?: AdminPermissions | null }
+
 // Check if user has permission
 export function hasPermission(
-  user: AdminUser,
-  permission: keyof NonNullable<AdminUser['permissions']>
+  user: AdminUserWithPermissions,
+  permission: keyof AdminPermissions
 ): boolean {
   if (user.role === 'super_admin') return true
   return user.permissions?.[permission] || false
 }
 
 // Check if user has branch access
-export function hasBranchAccess(user: AdminUser, branchId: string): boolean {
+export function hasBranchAccess(user: AdminUserWithPermissions, branchId: string): boolean {
   if (user.role === 'super_admin') return true
   if (user.permissions?.can_manage_all_branches) return true
   return user.branch_ids.length === 0 || user.branch_ids.includes(branchId)
@@ -500,7 +509,7 @@ export async function getAccessibleBranchIds(userId: string): Promise<string[]> 
   const user = await getAdminUser(userId)
   if (!user) return []
 
-  if (user.role === 'super_admin' || user.permissions?.can_manage_all_branches) {
+  if (user.role === 'super_admin' || (user as AdminUserWithPermissions).permissions?.can_manage_all_branches) {
     // Return all active branches
     const supabase = createServiceClient()
     const { data } = await supabase

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSettingsManager, bearer } from '@/lib/server/admin-auth'
 import { testFBConnection } from '@/lib/fb/api'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  const auth = await requireSettingsManager(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   try {
     const { accessToken, pixelId } = await request.json()
 

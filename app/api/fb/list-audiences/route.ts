@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { requireSettingsManager, bearer } from '@/lib/server/admin-auth'
 import { getFacebookAdsSettings } from '@/lib/supabase/services/facebook-ads-settings'
 import { listCustomAudiences } from '@/lib/fb/api'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireSettingsManager(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   try {
     const settings = await getFacebookAdsSettings()
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type User } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Check if email already exists
     const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers()
-    const emailExists = existingUser?.users?.some(u => u.email?.toLowerCase() === email.toLowerCase())
+    const emailExists = (existingUser?.users as User[] | undefined)?.some(u => u.email?.toLowerCase() === email.toLowerCase())
 
     if (emailExists) {
       return NextResponse.json({ error: 'Email already exists in authentication system' }, { status: 400 })

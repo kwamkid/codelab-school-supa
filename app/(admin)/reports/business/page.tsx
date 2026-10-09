@@ -27,6 +27,8 @@ import { StickyBar } from '@/components/ui/sticky-bar'
 import { KpiCard } from '@/components/ui/kpi-card'
 import { ChartCard } from '@/components/ui/chart-card'
 import { RateCell } from '@/components/ui/rate-cell'
+import { ExecutiveClasses, type ClassesData } from '@/components/reports/executive-classes'
+import { ExecutiveFollowups } from '@/components/reports/executive-followups'
 import {
   addMonthsYm, bangkokMonth, formatBaht, formatCompact, formatNumber, percent, percentText, thaiMonthLabel,
 } from '@/lib/format'
@@ -63,7 +65,7 @@ interface FamiliesAllRow { month: string; newFamilies: number; returningFamilies
 interface CourseRow { branchId: string; subject: string; enrollments: number; sales: number }
 interface TeacherRow { month: string; branchId: string; teacherId: string; nickname: string; attended: number; feedback: number; photos: number }
 
-interface DashboardData {
+interface DashboardData extends ClassesData {
   generatedAt: string
   from: string
   to: string
@@ -299,6 +301,9 @@ function BusinessDashboard() {
             <KpiCard icon={MessageSquare} gradient="emerald" label="เขียน Feedback" value={percentText(totals.feedback, totals.attended)} sub={`${formatNumber(totals.feedback)} / ${formatNumber(totals.attended)} ครั้ง`} />
           </div>
 
+          {/* งานติดตามลูกค้า — ยังไม่ติดต่อกี่คน (CEO ตามทีม) */}
+          <ExecutiveFollowups branch={branch} />
+
           {/* ยอดรวมแต่ละสาขา */}
           <ChartCard
             title="ยอดรวมแต่ละสาขา"
@@ -410,6 +415,17 @@ function BusinessDashboard() {
               </ResponsiveContainer>
             </ChartCard>
           </div>
+
+          {/* คลาสเรียน — snapshot วันนี้ + เปิดใหม่/เต็มห้อง/เรียนต่อ รายเดือน */}
+          {data && (
+            <ExecutiveClasses
+              data={data}
+              branch={branch}
+              branchName={(id) => branches.find((b) => b.id === id)?.name ?? ''}
+              months={months}
+              today={data.today}
+            />
+          )}
 
           {/* ตารางรายเดือน */}
           <ChartCard
@@ -557,6 +573,7 @@ function BusinessDashboard() {
               <p>• <b>รับเงินจริง</b> (เส้นในกราฟ) = เงินที่บันทึกรับในเดือนนั้น ไม่ว่าลงทะเบียนเดือนไหน จึงไม่เท่ากับ &quot;เก็บแล้ว&quot; ของเดือนเดียวกัน</p>
               <p>• <b>ครอบครัวใหม่</b> = ผู้ปกครองที่ลงคอร์สครั้งแรกในเดือนนั้น (ดูทุกสาขา นับครอบครัวละครั้ง แม้ลงหลายสาขา) · <b>ลูกค้าเก่า</b> = เคยลงคอร์สมาก่อนแล้ว</p>
               <p>• <b>Conversion</b> = มาทดลองเรียนแล้วครอบครัวนั้น (จับคู่ด้วยเบอร์โทร) ลงคอร์สใดก็ได้ในวันทดลองหรือหลังจากนั้น หรือแอดมินกด &quot;ปิดการขาย&quot; ไว้ — เดือนล่าสุดตัวเลขจะค่อย ๆ ขึ้น เพราะบางคนสมัครหลังทดลองหลายสัปดาห์</p>
+              <p>• <b>คลาส</b>: นักเรียน = การลงทะเบียนที่ไม่ยกเลิกจริง · เปิดใหม่ = ตามวันเริ่มคลาส · <b>เต็มห้อง</b> = นักเรียน ÷ ที่นั่ง · <b>เรียนต่อ</b> = เด็กที่จบคลาสในเดือนนั้นแล้วลงคลาสอื่นที่เริ่มภายใน 30 วันก่อน – 60 วันหลังวันจบ · กำลังเรียน/กำลังจะเริ่ม/จบเดือนนี้ = ดู ณ วันนี้ ไม่ขึ้นกับช่วงที่เลือก · <b>ยอดขายต่อคลาส</b> = ยอดลงทะเบียนของคลาสที่เปิดเดือนนั้น ÷ จำนวนคลาส · <b>รายได้ล่วงหน้า</b> = ยอดลงทะเบียนของคลาสที่ยังไม่เริ่ม · <b>เด็กเสี่ยงเลิกเรียน</b> = ไม่ได้มาเรียน (ขาด/ลา/ป่วย) ติดกันตั้งแต่ 2 คาบล่าสุดที่เช็คชื่อ — คาบที่ไม่ได้เช็คชื่อไม่นับ</p>
               <p>• <b>เช็คชื่อ / Feedback</b> นับเฉพาะคาบที่ถึงวันเรียนแล้ว ถ้าครูไม่เช็คชื่อ คาบนั้นจะไม่ถูกนับใน Feedback</p>
               <p>• ข้อมูลก่อน มิ.ย. 69 บันทึกไม่ครบ ใช้เทียบได้คร่าว ๆ · ตัวเลขคำนวณสดทุกครั้งที่เปิดหน้าหรือกดรีเฟรช</p>
             </CardContent>

@@ -4020,8 +4020,7 @@ export type CountingMethod = 'students' | 'parents' | 'registrations'
 // ---------------------------------------------------------------------------
 type PublicSchema = Database['public']
 
-export type Tables<T extends keyof PublicSchema['Tables']> =
-  PublicSchema['Tables'][T]['Row']
+// `Tables<'name'>` (Row type) comes from the generated helper above.
 export type InsertTables<T extends keyof PublicSchema['Tables']> =
   PublicSchema['Tables'][T]['Insert']
 export type UpdateTables<T extends keyof PublicSchema['Tables']> =

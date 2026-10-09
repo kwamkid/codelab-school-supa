@@ -58,6 +58,7 @@ import {
   FileWarning,
   Crown,
   Activity,
+  PhoneCall,
   LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -505,6 +506,13 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       icon: MessageCircle,
       iconColor: 'text-purple-500',
       badge: chatUnreadCount > 0 ? chatUnreadCount : undefined,
+      requiredRole: ['super_admin', 'branch_admin']
+    },
+    {
+      name: 'ติดตามลูกค้า',
+      href: '/followups',
+      icon: PhoneCall,
+      iconColor: 'text-rose-500',
       requiredRole: ['super_admin', 'branch_admin']
     },
     {

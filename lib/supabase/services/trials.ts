@@ -176,7 +176,7 @@ export async function cancelTrialBooking(
     .from('trial_bookings')
     .update({
       status: 'cancelled' as TrialBookingStatus,
-      notes: reason || booking.notes,
+      notes: reason || (booking as any).notes,
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
@@ -450,7 +450,7 @@ export async function rescheduleTrialSession(
     rescheduled_at: new Date().toISOString()
   }
 
-  const existingHistory = currentSession.reschedule_history || []
+  const existingHistory = (currentSession as any).reschedule_history || []
   const updatedHistory = [...existingHistory, historyEntry]
 
   const { error } = await supabase
@@ -544,7 +544,7 @@ export async function checkTrialRoomAvailability(
   const dateString = date.toISOString().split('T')[0]
 
   // Check for holidays
-  const { data: holidays } = await supabase
+  const { data: holidays } = await (supabase as any)
     .from('holidays')
     .select('*')
     .eq('branch_id', branchId)

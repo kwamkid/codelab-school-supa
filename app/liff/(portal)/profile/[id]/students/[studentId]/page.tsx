@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { GradeLevelCombobox } from "@/components/ui/grade-level-combobox"
 import { SchoolNameCombobox } from "@/components/ui/school-name-combobox"
 import { ChevronLeft, User, Calendar, School, AlertCircle, Loader2 } from 'lucide-react'
-import { getStudent } from '@/lib/services/parents'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -96,7 +95,12 @@ function EditStudentContent() {
   const loadStudent = async () => {
     try {
       setLoading(true)
-      const student = await getStudent(parentId, studentId)
+      // LINE-verified route — returns null unless the student is in the caller's family
+      const res = await liffFetch<{ student: any }>('/api/liff/student-detail', {
+        lineUserId: profile?.userId,
+        studentId,
+      })
+      const student = res.student
       
       if (!student) {
         toast.error('ไม่พบข้อมูลนักเรียน')
@@ -108,7 +112,9 @@ function EditStudentContent() {
       let birthdateStr = ''
       const birthdate = student.birthdate as any
       
-      if (birthdate instanceof Date) {
+      if (typeof birthdate === 'string') {
+        birthdateStr = birthdate.slice(0, 10)
+      } else if (birthdate instanceof Date) {
         birthdateStr = birthdate.toISOString().split('T')[0]
       } else if (birthdate && typeof birthdate.toDate === 'function') {
         birthdateStr = birthdate.toDate().toISOString().split('T')[0]

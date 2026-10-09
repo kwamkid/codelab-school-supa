@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect, useRef } from 'react';
 import { Zap, Plus, X, Trash2, Send, Upload, Loader2, ImagePlus } from 'lucide-react';
@@ -221,7 +222,7 @@ function AddQuickReplyDialog({
         const form = new FormData();
         form.append('file', pendingFile);
         form.append('bucket', 'chat-media');
-        const res = await fetch('/api/upload', { method: 'POST', body: form });
+        const res = await authFetch('/api/upload', { method: 'POST', body: form });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         finalImageUrl = data.url;
@@ -230,7 +231,9 @@ function AddQuickReplyDialog({
       await createQuickReply({
         title: title.trim(),
         content: content.trim(),
-        imageUrl: finalImageUrl || undefined,
+        // createQuickReply takes images[] (writes images + image_url) — the old
+        // `imageUrl` key was silently dropped, losing the uploaded picture
+        images: finalImageUrl ? [finalImageUrl] : undefined,
         category: category.trim() || 'general',
       });
 

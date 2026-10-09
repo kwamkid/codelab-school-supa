@@ -28,7 +28,7 @@ export async function logNotification(log: NotificationLog): Promise<void> {
   try {
     const supabase = createServiceClient();
 
-    const { error } = await supabase.from('notification_logs').insert({
+    const { error } = await (supabase.from('notification_logs') as any).insert({
       type: log.type,
       recipient_type: log.recipientType,
       recipient_id: log.recipientId,

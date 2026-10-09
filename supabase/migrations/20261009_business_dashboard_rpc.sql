@@ -24,6 +24,15 @@
 --  * checked        = sessions with ≥1 attendance row
 --  * attended/feedback = attendance rows present|late / those with non-empty feedback
 --  * teacher        = COALESCE(class_schedules.actual_teacher_id, classes.teacher_id)
+--  * classes: students = real non-dropped enrollments; opened = by start_date month
+--    (series starts 12 months before p_from so the page can compare year-on-year);
+--    active/upcoming(60d)/ending-this-month are snapshots as of today;
+--    continuation = finished a class in month M and enrolled in another class
+--    starting within [end-30d, end+60d]
+--  * revenue per class = sum of non-dropped enrollment final_price of classes opened that month
+--  * atRiskStudents = active enrollment in a started class with ≥2 most-recent checked
+--    sessions not attended (absent/leave/sick) in a row
+--  * forwardRevenue = enrollments in classes whose start_date is after today
 
 create or replace function public.get_business_dashboard(
   p_from date default null,
@@ -182,6 +191,95 @@ courses as (
   join subjects s on s.id = c.subject_id, bounds b
   where e.m between b.m_from and b.m_to
   group by 1, 2
+),
+-- ---------- classes ----------
+-- students per class = real non-dropped enrollments (classes.enrolled_count can drift)
+class_students as (
+  select class_id, count(*) as students, sum(final_price) as revenue,
+         sum(least(paid_amount, final_price)) as collected
+  from enrollments where status <> 'dropped' group by 1
+),
+cls as (
+  select c.id, c.name, c.branch_id, c.status, c.start_date, c.end_date, c.start_time, c.end_time,
+         c.days_of_week, c.max_students, c.min_students, c.teacher_id,
+         coalesce(cs.students, 0) as students, coalesce(cs.revenue, 0) as revenue,
+         coalesce(cs.collected, 0) as collected, trim(su.name) as subject,
+         coalesce(t.nickname, t.name) as teacher
+  from classes c
+  left join class_students cs on cs.class_id = c.id
+  left join subjects su on su.id = c.subject_id
+  left join teachers t on t.id = c.teacher_id
+  where c.status <> 'cancelled'
+),
+-- classes opened per month (by start_date) — for growth vs previous month / last year
+classes_monthly as (
+  select date_trunc('month', c.start_date)::date as m, c.branch_id,
+         count(*) as opened, sum(c.students) as students, sum(coalesce(c.max_students, 0)) as seats,
+         sum(c.revenue) as revenue
+  from cls c, bounds b
+  where c.start_date >= (b.m_from - interval '12 months') and c.start_date < (b.m_to + interval '1 month')
+  group by 1, 2
+),
+-- continuation: students whose class ended in month M → enrolled in another class
+-- starting within [end-30d, end+60d]. Recent months keep rising as people re-enroll.
+finished as (
+  select e.student_id, e.branch_id, c.id as class_id, c.end_date,
+         date_trunc('month', c.end_date)::date as m
+  from enrollments e join cls c on c.id = e.class_id, bounds b
+  where e.status <> 'dropped' and c.end_date between b.m_from and least(b.today, (b.m_to + interval '1 month - 1 day')::date)
+),
+continuation as (
+  select f.m, f.branch_id, count(*) as finished,
+         count(*) filter (where exists (
+           select 1 from enrollments e2 join cls c2 on c2.id = e2.class_id
+           where e2.student_id = f.student_id and e2.status <> 'dropped' and c2.id <> f.class_id
+             and c2.start_date between f.end_date - 30 and f.end_date + 60
+         )) as continued
+  from finished f group by 1, 2
+),
+class_row as (
+  select c.*, jsonb_build_object(
+    'id', c.id, 'code', c.name, 'subject', c.subject, 'branchId', c.branch_id, 'status', c.status,
+    'startDate', to_char(c.start_date, 'YYYY-MM-DD'), 'endDate', to_char(c.end_date, 'YYYY-MM-DD'),
+    'startTime', to_char(c.start_time, 'HH24:MI'), 'endTime', to_char(c.end_time, 'HH24:MI'),
+    'daysOfWeek', c.days_of_week, 'teacher', c.teacher,
+    'students', c.students, 'maxStudents', c.max_students, 'minStudents', c.min_students
+  ) as j
+  from cls c
+),
+-- at-risk: active enrollment in a running class whose most recent CHECKED sessions
+-- are consecutive non-attendance (absent/leave/sick). streak = sessions since last
+-- present/late (all checked sessions if never present). Unchecked sessions are skipped.
+att_hist as (
+  select e.id as enrollment_id, e.student_id, e.parent_id, e.branch_id, e.class_id,
+         cs.session_date, a.status::text as st,
+         row_number() over (partition by e.id order by cs.session_date desc) as rn
+  from enrollments e
+  join cls c on c.id = e.class_id and c.status = 'started'
+  join class_schedules cs on cs.class_id = c.id and cs.status <> 'cancelled'
+  join attendance a on a.schedule_id = cs.id and a.student_id = e.student_id, bounds b
+  where e.status = 'active' and cs.session_date <= b.today
+),
+streaks as (
+  select enrollment_id, student_id, parent_id, branch_id, class_id,
+         coalesce(min(rn) filter (where st in ('present', 'late')) - 1, count(*)) as streak,
+         max(session_date) filter (where st in ('present', 'late')) as last_present,
+         max(session_date) as last_checked
+  from att_hist group by 1, 2, 3, 4, 5
+),
+at_risk as (
+  select s.*, 
+         (select count(*) from att_hist h where h.enrollment_id = s.enrollment_id and h.rn <= s.streak and h.st = 'absent') as absent_n,
+         (select count(*) from att_hist h where h.enrollment_id = s.enrollment_id and h.rn <= s.streak and h.st <> 'absent') as excused_n
+  from streaks s where s.streak >= 2
+),
+-- forward revenue: enrollments in classes that haven't started yet
+forward as (
+  select c.branch_id, count(distinct c.id) as classes, sum(c.students) as enrollments,
+         sum(c.revenue) as sales, sum(c.collected) as collected
+  from cls c, bounds b
+  where c.start_date > b.today and c.status not in ('completed', 'started')
+  group by 1
 )
 select jsonb_build_object(
   'generatedAt', now(),
@@ -214,6 +312,56 @@ select jsonb_build_object(
     from months left join families_all fa on fa.m = months.m
   ), '[]'::jsonb),
   'newFamiliesInRange', (select new_families from families_range),
+  'classesMonthly', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'month', to_char(m, 'YYYY-MM'), 'branchId', branch_id,
+      'opened', opened, 'students', students, 'seats', seats, 'revenue', revenue
+    ) order by m, branch_id) from classes_monthly
+  ), '[]'::jsonb),
+  'continuation', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'month', to_char(m, 'YYYY-MM'), 'branchId', branch_id, 'finished', finished, 'continued', continued
+    ) order by m, branch_id) from continuation
+  ), '[]'::jsonb),
+  -- snapshot as of today (ignores the selected range)
+  'classesActive', coalesce((
+    select jsonb_agg(jsonb_build_object('branchId', branch_id, 'classes', n, 'students', st, 'seats', seats))
+    from (
+      select c.branch_id, count(*) as n, sum(c.students) as st, sum(coalesce(c.max_students, 0)) as seats
+      from cls c, bounds b
+      where c.status = 'started' or (c.status <> 'completed' and c.start_date <= b.today and c.end_date >= b.today)
+      group by 1
+    ) x
+  ), '[]'::jsonb),
+  'classesUpcoming', coalesce((
+    select jsonb_agg(cr.j order by cr.start_date, cr.start_time)
+    from class_row cr, bounds b
+    where cr.status not in ('completed', 'started') and cr.start_date > b.today and cr.start_date <= b.today + 60
+  ), '[]'::jsonb),
+  'classesEndingThisMonth', coalesce((
+    select jsonb_agg(cr.j order by cr.end_date)
+    from class_row cr, bounds b
+    where cr.end_date between date_trunc('month', b.today)::date and (date_trunc('month', b.today) + interval '1 month - 1 day')::date
+  ), '[]'::jsonb),
+  'atRiskStudents', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'enrollmentId', r.enrollment_id, 'studentId', r.student_id, 'branchId', r.branch_id,
+      'studentName', st.name, 'studentNickname', st.nickname,
+      'parentName', coalesce(nullif(pa.display_name, ''), pa.line_display_name), 'parentPhone', pa.phone,
+      'classId', r.class_id, 'subject', c.subject, 'teacher', c.teacher,
+      'streak', r.streak, 'absent', r.absent_n, 'excused', r.excused_n,
+      'lastPresent', to_char(r.last_present, 'YYYY-MM-DD'), 'lastChecked', to_char(r.last_checked, 'YYYY-MM-DD')
+    ) order by r.streak desc, r.last_checked desc)
+    from at_risk r
+    join students st on st.id = r.student_id
+    left join parents pa on pa.id = r.parent_id
+    join cls c on c.id = r.class_id
+  ), '[]'::jsonb),
+  'forwardRevenue', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'branchId', branch_id, 'classes', classes, 'enrollments', enrollments, 'sales', sales, 'collected', collected
+    )) from forward
+  ), '[]'::jsonb),
   'courses', coalesce((
     select jsonb_agg(jsonb_build_object(
       'branchId', branch_id, 'subject', subject, 'enrollments', enrollments, 'sales', sales

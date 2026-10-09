@@ -12,6 +12,8 @@ interface PermissionGuardProps {
   requireAllBranches?: boolean;
   fallback?: ReactNode;
   showError?: boolean;
+  /** Reserved — currently unused (ignored at runtime). */
+  action?: string;
 }
 
 /**

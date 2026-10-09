@@ -70,7 +70,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 
     return error;
   } as any;
-  window.Error.prototype = originalError.prototype;
+  (window.Error as any).prototype = originalError.prototype;
 }
 
 export {};

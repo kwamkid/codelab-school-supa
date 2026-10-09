@@ -1,12 +1,15 @@
 // app/api/line/webhook-logs/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireStaff, bearer } from '@/lib/server/admin-auth';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
 // This will get logs from the webhook endpoint
 export async function GET(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
   try {
     // Get the base URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 

@@ -3,10 +3,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { requireStaff, bearer } from '@/lib/server/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if (auth.role === 'teacher') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   try {
     const { contactId } = await request.json();
     if (!contactId) {

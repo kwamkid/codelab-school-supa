@@ -9,6 +9,7 @@ import {
 } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 // === Row mappers ===
 
@@ -426,7 +427,7 @@ export async function sendMessage(
   mediaUrl?: string,
   quickReplyItems?: { label: string; text?: string }[]
 ): Promise<void> {
-  const res = await fetch('/api/admin/chat/send', {
+  const res = await authFetch('/api/admin/chat/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conversationId, content, messageType, mediaUrl, quickReplyItems }),
@@ -443,7 +444,7 @@ export async function sendBatchMessage(
   textBlocks: string[],
   imageUrls: string[]
 ): Promise<void> {
-  const res = await fetch('/api/admin/chat/send', {
+  const res = await authFetch('/api/admin/chat/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

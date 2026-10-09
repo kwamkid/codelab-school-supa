@@ -64,3 +64,20 @@ export function readTeamSessionCookie(request: Request): string | null {
   const m = cookie.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]+)`))
   return m ? decodeURIComponent(m[1]) : null
 }
+
+/**
+ * Teacher LINE-link binding. The OAuth `state` is client-held (base64 JSON), so
+ * the teacher id inside it must be HMAC-signed server-side when the flow starts
+ * (/api/teacher/line-link, after requireStaff) — otherwise anyone could start a
+ * login and forge `t` to attach their LINE account to another teacher.
+ */
+export function signTeacherLink(teacherId: string, nonce: string): string {
+  return sign(`teacher_link:${teacherId}:${nonce}`)
+}
+
+export function verifyTeacherLink(teacherId: string, nonce: string, sig: unknown): boolean {
+  if (typeof sig !== 'string' || !sig || !key()) return false
+  const a = Buffer.from(sig)
+  const b = Buffer.from(signTeacherLink(teacherId, nonce))
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}

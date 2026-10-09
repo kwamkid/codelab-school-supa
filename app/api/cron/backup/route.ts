@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     for (const table of TABLES_TO_BACKUP) {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from(table)
           .select('*')
 

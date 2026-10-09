@@ -4,11 +4,14 @@
 // /api/admin/* routes (called from the admin UI).
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireStaff, bearer } from '@/lib/server/admin-auth';
 import { buildStudentClassReport } from '@/lib/supabase/services/student-report';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   try {
     const { studentId, classId } = await request.json();
     if (!studentId || !classId) {

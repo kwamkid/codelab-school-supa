@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -93,7 +94,7 @@ export default function NotificationLogsPage() {
       params.append('page', currentPage.toString());
       params.append('pageSize', pageSize.toString());
 
-      const response = await fetch(`/api/reports/notification-logs?${params}`);
+      const response = await authFetch(`/api/reports/notification-logs?${params}`);
       const data = await response.json();
 
       setLogs(data.logs || []);

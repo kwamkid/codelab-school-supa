@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -483,7 +484,7 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
     if (!pendingFile) return null;
     const form = new FormData();
     form.append('file', pendingFile);
-    const res = await fetch('/api/upload', { method: 'POST', body: form });
+    const res = await authFetch('/api/upload', { method: 'POST', body: form });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'อัพโหลดรูปไม่สำเร็จ');
     return data.url;

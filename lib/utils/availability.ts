@@ -601,7 +601,7 @@ export async function checkAvailabilityRpc(
       return checkAvailability(params);
     }
 
-    const conflicts: any[] = data || [];
+    const conflicts: any[] = (data as any) || [];
     const issues: AvailabilityIssue[] = [];
     const warnings: AvailabilityWarning[] = [];
 

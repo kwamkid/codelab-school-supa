@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,9 @@ async function postgrestInsert(table: string, data: Record<string, any>) {
  * Should be called AFTER running the reset migration.
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const supabase = createServiceClient();
 

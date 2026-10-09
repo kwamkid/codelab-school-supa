@@ -431,7 +431,7 @@ export async function canDeleteStudent(studentId: string): Promise<{
 export async function getAllStudentsWithParents(): Promise<StudentWithParent[]> {
   const supabase = createServiceClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('v_students_with_parents')
     .select('*')
     .order('birthdate', { ascending: true })
@@ -475,7 +475,7 @@ export async function getStudentWithParent(
 ): Promise<StudentWithParent | null> {
   const supabase = createServiceClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('v_students_with_parents')
     .select('*')
     .eq('id', studentId)
@@ -496,7 +496,7 @@ export async function getStudentsByIds(ids: string[]): Promise<StudentWithParent
 
   const supabase = createServiceClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('v_students_with_parents')
     .select('*')
     .in('id', ids)
@@ -513,7 +513,7 @@ export async function getStudentsByIds(ids: string[]): Promise<StudentWithParent
 export async function getActiveStudents(): Promise<StudentWithParent[]> {
   const supabase = createServiceClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('v_students_with_parents')
     .select('*')
     .eq('is_active', true)

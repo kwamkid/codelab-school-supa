@@ -11,7 +11,6 @@ import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { SchoolNameCombobox } from '@/components/ui/school-name-combobox';
 import { GradeLevelCombobox } from '@/components/ui/grade-level-combobox';
 import { LiffProvider, useLiff } from '@/components/liff/liff-provider';
-import { getParentByLineId } from '@/lib/services/parents';
 import { liffFetch } from '@/lib/line/liff-fetch';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle, User, GraduationCap } from 'lucide-react';
@@ -52,8 +51,9 @@ function LiffRegisterContent() {
       return;
     }
 
-    getParentByLineId(profile.userId)
-      .then((parent) => {
+    // LINE-verified route (anon-key reads of parents are closed)
+    liffFetch<{ parent: any }>('/api/liff/profile', { lineUserId: profile.userId })
+      .then(({ parent }) => {
         if (parent) {
           setExistingParentId(parent.id);
           setParentName(parent.displayName || '');

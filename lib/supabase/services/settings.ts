@@ -88,7 +88,7 @@ export async function getGeneralSettings(): Promise<GeneralSettings | null> {
     return getDefaultSettings()
   }
 
-  return data?.value as GeneralSettings || getDefaultSettings()
+  return data?.value as unknown as GeneralSettings || getDefaultSettings()
 }
 
 // Update general settings
@@ -219,7 +219,7 @@ export async function getMakeupSettings(): Promise<MakeupSettings> {
     return getDefaultMakeupSettings()
   }
 
-  return data?.value as MakeupSettings || getDefaultMakeupSettings()
+  return data?.value as unknown as MakeupSettings || getDefaultMakeupSettings()
 }
 
 // Update makeup settings
@@ -284,7 +284,7 @@ export async function getLineSettings(): Promise<LineSettings> {
     return getDefaultLineSettings()
   }
 
-  return data?.value as LineSettings || getDefaultLineSettings()
+  return data?.value as unknown as LineSettings || getDefaultLineSettings()
 }
 
 // Update LINE settings
@@ -357,7 +357,7 @@ export async function setSetting<T>(
     .from('settings')
     .upsert({
       key,
-      value,
+      value: value as any,
       updated_at: new Date().toISOString(),
       updated_by: userId || null
     })

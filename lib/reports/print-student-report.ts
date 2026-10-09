@@ -9,6 +9,7 @@ import {
   generateCertificateHTML, generateCertificatesHTML, certDate,
   type CertificateFields,
 } from '@/components/reports/certificate-template';
+import { authFetch } from '@/lib/auth-fetch';
 
 // Open a hidden iframe with the document's own styles and trigger print.
 // (Standalone — unlike invoices/openPrintWindow it does not force invoice A4
@@ -42,7 +43,7 @@ async function fetchReport(
   endpoint: string,
   payload: Record<string, unknown>
 ): Promise<StudentClassReport> {
-  const res = await fetch(endpoint, {
+  const res = await authFetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

@@ -31,7 +31,6 @@ import { Input } from '@/components/ui/input'
 import { StudentBadge } from '@/components/ui/student-badge'
 import { LiffPageHeader } from '@/components/liff/page-header'
 import { useLiff } from '@/components/liff/liff-provider'
-import { deleteStudent as deleteStudentService } from '@/lib/services/parents'
 import { liffFetch } from '@/lib/line/liff-fetch'
 import { toast } from 'sonner'
 import type { Parent, Student, Branch } from '@/types/models'
@@ -322,8 +321,12 @@ function ProfileContent() {
     try {
       setIsDeleting(true)
       
-      // Call delete function
-      await deleteStudentService(parentId, deleteStudentData.id)
+      // LINE-verified LIFF route (ownership + primary-account check server-side)
+      await liffFetch(
+        '/api/liff/student',
+        { lineUserId: profile?.userId, studentId: deleteStudentData.id },
+        'DELETE'
+      )
       
       // Update local state
       setStudents(prev => prev.filter(s => s.id !== deleteStudentData.id))

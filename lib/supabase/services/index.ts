@@ -18,6 +18,25 @@ export * from './enrollments'
 export * from './trials'
 export * from './makeup'
 export * from './trial-bookings'
+// Names defined in both './trials' and './trial-bookings' — './trials' wins
+export {
+  cancelTrialBooking,
+  cancelTrialSession,
+  createTrialBooking,
+  createTrialSession,
+  deleteTrialBooking,
+  deleteTrialSession,
+  getTrialBooking,
+  getTrialBookingStats,
+  getTrialBookings,
+  getTrialBookingsByStatus,
+  getTrialSession,
+  getTrialSessions,
+  getTrialSessionsByBooking,
+  updateBookingStatus,
+  updateTrialBooking,
+  updateTrialSession,
+} from './trials'
 
 // Events & Holidays
 export * from './events'
@@ -37,6 +56,13 @@ export * from './notifications'
 
 // LINE Integration
 export * from './line-settings'
+// Names defined in both './settings' and './line-settings' — './line-settings' wins
+export {
+  type LineSettings,
+  getDefaultLineSettings,
+  getLineSettings,
+  updateLineSettings,
+} from './line-settings'
 export * from './line-api'
 export * from './line-notifications'
 export * from './link-tokens'

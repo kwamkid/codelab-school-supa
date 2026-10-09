@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useRef, useCallback, KeyboardEvent, useEffect } from 'react';
 import { Send, ImagePlus, X, Loader2, Film, Zap } from 'lucide-react';
@@ -42,7 +43,7 @@ export function MessageInput({ onSend, onSendBatch, disabled = false, autoFocus 
         form.append('file', mediaPreview.file);
         form.append('bucket', 'chat-media');
 
-        const res = await fetch('/api/upload', { method: 'POST', body: form });
+        const res = await authFetch('/api/upload', { method: 'POST', body: form });
         const data = await res.json();
 
         if (!res.ok) throw new Error(data.error);

@@ -1,4 +1,5 @@
 'use client'
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -118,7 +119,7 @@ export default function TrialReportPage() {
       params.append('page', currentPage.toString())
       params.append('pageSize', pageSize.toString())
 
-      const response = await fetch(`/api/reports/trial?${params}`)
+      const response = await authFetch(`/api/reports/trial?${params}`)
       const data = await response.json()
 
       if (data.success) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireReportScope } from '@/lib/server/report-scope'
 import { normalizeGradeLevel } from '@/lib/constants/grade-levels'
 import { gradeLevels } from '@/lib/constants/grade-levels'
 import { groupSchoolNames } from '@/lib/utils/normalize-school-name'
@@ -30,10 +31,13 @@ async function fetchAllRows<T>(
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServiceClient()
     const { searchParams } = new URL(request.url)
+    const access = await requireReportScope(request.headers.get('authorization'), searchParams.get('branchId'))
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+    const supabase = createServiceClient()
 
-    const branchId = searchParams.get('branchId')
+    const branchId = access.branchId
+    const scopeBranchIds = access.branchIds
     const status = searchParams.get('status') || 'all'
 
     // Step 1: Get all enrollments to map student -> branches
@@ -69,6 +73,14 @@ export async function GET(request: NextRequest) {
       studentIdsInBranch = new Set<string>()
       for (const [studentId, branchIds] of studentBranchMap) {
         if (branchIds.has(branchId)) {
+          studentIdsInBranch.add(studentId)
+        }
+      }
+    } else if (scopeBranchIds) {
+      // Branch admin with several branches, none picked → only their branches
+      studentIdsInBranch = new Set<string>()
+      for (const [studentId, branchIds] of studentBranchMap) {
+        if (scopeBranchIds.some(b => branchIds.has(b))) {
           studentIdsInBranch.add(studentId)
         }
       }

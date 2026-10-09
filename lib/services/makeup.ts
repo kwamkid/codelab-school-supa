@@ -7,6 +7,7 @@ import { getStudentWithParent } from './parents';
 import { getBranch } from './branches';
 import { getSubject } from './subjects';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 // Helper function to convert database row to MakeupClass
 export function dbRowToMakeupClass(row: any): MakeupClass {
@@ -491,7 +492,7 @@ export async function scheduleMakeupClass(
         operation: 'insert',
         data: { type: 'makeup', ref_id: makeupId, payload: { kind: 'scheduled' }, status: 'pending' },
       });
-      fetch('/api/admin/notifications/process', { method: 'POST' }).catch(() => {});
+      authFetch('/api/admin/notifications/process', { method: 'POST' }).catch(() => {});
     } catch (notificationError) {
       console.error('Error enqueueing makeup LINE notification:', notificationError);
     }
@@ -707,7 +708,7 @@ export async function deleteMakeupClass(
   reason?: string
 ): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/makeup/${makeupId}`, {
+    const response = await authFetch(`/api/admin/makeup/${makeupId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

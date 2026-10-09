@@ -21,7 +21,7 @@ export async function getBranches(): Promise<Branch[]> {
       name: item.name,
       address: item.address,
       phone: item.phone,
-      email: item.email,
+      email: (item as any).email,
       openTime: item.open_time || '09:00',
       closeTime: item.close_time || '18:00',
       openDays: item.open_days || [],
@@ -58,7 +58,7 @@ export async function getActiveBranches(): Promise<Branch[]> {
       name: item.name,
       address: item.address,
       phone: item.phone,
-      email: item.email,
+      email: (item as any).email,
       openTime: item.open_time || '09:00',
       closeTime: item.close_time || '18:00',
       openDays: item.open_days || [],
@@ -100,7 +100,7 @@ export async function getBranch(id: string): Promise<Branch | null> {
       name: data.name,
       address: data.address,
       phone: data.phone,
-      email: data.email,
+      email: (data as any).email,
       openTime: data.open_time || '09:00',
       closeTime: data.close_time || '18:00',
       openDays: data.open_days || [],
@@ -109,7 +109,7 @@ export async function getBranch(id: string): Promise<Branch | null> {
       invoiceCompanyId: data.invoice_company_id || undefined,
       isActive: data.is_active,
       createdAt: new Date(data.created_at),
-    };
+    } as Branch;
   } catch (error) {
     console.error('Error getting branch:', error);
     throw error;
@@ -127,7 +127,7 @@ export async function createBranch(branchData: Omit<Branch, 'id' | 'createdAt'>)
         name: branchData.name,
         address: branchData.address,
         phone: branchData.phone,
-        email: branchData.email,
+        email: (branchData as any).email,
         is_active: branchData.isActive,
         invoice_company_id: branchData.invoiceCompanyId || null,
       },
@@ -150,7 +150,7 @@ export async function updateBranch(id: string, branchData: Partial<Branch>): Pro
     if (branchData.name !== undefined) updateData.name = branchData.name;
     if (branchData.address !== undefined) updateData.address = branchData.address;
     if (branchData.phone !== undefined) updateData.phone = branchData.phone;
-    if (branchData.email !== undefined) updateData.email = branchData.email;
+    if ((branchData as any).email !== undefined) updateData.email = (branchData as any).email;
     if (branchData.isActive !== undefined) updateData.is_active = branchData.isActive;
     if (branchData.invoiceCompanyId !== undefined) updateData.invoice_company_id = branchData.invoiceCompanyId || null;
 
@@ -231,7 +231,7 @@ export async function getBranchesByIds(ids: string[]): Promise<Branch[]> {
       name: item.name,
       address: item.address,
       phone: item.phone,
-      email: item.email,
+      email: (item as any).email,
       openTime: item.open_time || '09:00',
       closeTime: item.close_time || '18:00',
       openDays: item.open_days || [],

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  if (auth.role === 'teacher') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
   try {
     const supabase = createServiceClient()
     const { searchParams } = new URL(request.url)

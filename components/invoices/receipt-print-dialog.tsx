@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { authFetch } from '@/lib/auth-fetch';
 import {
   DocumentData,
   generateDocumentHTML,
@@ -49,7 +50,7 @@ export default function ReceiptPrintDialog({
   const loadAndPrint = async () => {
     setPrinting(true);
     try {
-      const res = await fetch(`/api/admin/invoices/${invoiceId}`);
+      const res = await authFetch(`/api/admin/invoices/${invoiceId}`);
       if (!res.ok) throw new Error('Failed to load invoice');
       const result = await res.json();
 

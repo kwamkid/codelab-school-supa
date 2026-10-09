@@ -3,6 +3,7 @@
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
 import { Event, EventSchedule, EventRegistration } from '@/types/models';
+import { authFetch } from '@/lib/auth-fetch';
 
 // ==================== Database Row Interfaces ====================
 
@@ -40,8 +41,8 @@ interface EventScheduleRow {
   start_time: string;
   end_time: string;
   max_attendees: number;
-  max_attendees_by_branch: Record<string, number>;
-  attendees_by_branch: Record<string, number>;
+  max_attendees_by_branch: Record<string, number> | any; // jsonb
+  attendees_by_branch: Record<string, number> | any; // jsonb
   status: string;
 }
 
@@ -62,8 +63,8 @@ interface EventRegistrationRow {
   parent_phone: string;
   parent_email: string | null;
   parent_address: string | null;
-  parents: any[];
-  students: any[];
+  parents: any[] | any; // jsonb
+  students: any[] | any; // jsonb
   attendee_count: number;
   status: string;
   registered_at: string;
@@ -102,7 +103,7 @@ function mapToEvent(row: EventRow): Event {
     reminderDaysBefore: row.reminder_days_before,
     reminderTime: row.reminder_time || undefined,
     status: row.status as Event['status'],
-    viewCount: row.view_count || 0,
+    viewCount: (row as any).view_count || 0,
     isActive: row.is_active,
     createdAt: new Date(row.created_at),
     createdBy: row.created_by || '',
@@ -376,7 +377,7 @@ export async function duplicateEvent(
 // Delete event - Uses API route to bypass RLS restrictions
 export async function deleteEvent(id: string): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/events/${id}`, {
+    const response = await authFetch(`/api/admin/events/${id}`, {
       method: 'DELETE',
     });
 

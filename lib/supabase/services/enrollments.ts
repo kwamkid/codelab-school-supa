@@ -124,7 +124,7 @@ export async function getEnrollments(branchId?: string | null): Promise<Enrollme
 export async function getEnrollmentsFull(branchId?: string | null): Promise<EnrollmentFull[]> {
   const supabase = createServiceClient()
 
-  let query = supabase
+  let query = (supabase as any)
     .from('v_enrollments_full')
     .select('*')
     .order('enrolled_at', { ascending: false })
@@ -166,7 +166,7 @@ export async function getEnrollment(id: string): Promise<Enrollment | null> {
 export async function getEnrollmentFull(id: string): Promise<EnrollmentFull | null> {
   const supabase = createServiceClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('v_enrollments_full')
     .select('*')
     .eq('id', id)
@@ -517,7 +517,7 @@ async function createMakeupForMissedSessions(
 
       const { error } = await supabase
         .from('makeup_classes')
-        .insert(makeupInserts)
+        .insert(makeupInserts as any)
 
       if (error) {
         console.error('Error creating makeup requests:', error)
@@ -651,7 +651,7 @@ export async function transferEnrollment(
   }
 
   // Get existing transfer history
-  const existingHistory = enrollment.transfer_history || []
+  const existingHistory = (enrollment as any).transfer_history || []
   const updatedHistory = [...existingHistory, transferRecord]
 
   // Update enrollment
@@ -683,9 +683,9 @@ export async function getEnrollmentTransferHistory(
   reason: string
 }>> {
   const enrollment = await getEnrollment(enrollmentId)
-  if (!enrollment || !enrollment.transfer_history) return []
+  if (!enrollment || !(enrollment as any).transfer_history) return []
 
-  return enrollment.transfer_history
+  return (enrollment as any).transfer_history
 }
 
 // Get available classes for transfer
@@ -717,7 +717,7 @@ export async function getAvailableClassesForTransfer(
     .select('id, age_min, age_max')
     .in('id', subjectIds)
 
-  const subjectMap = new Map(subjects?.map(s => [s.id, s]) || [])
+  const subjectMap = new Map((subjects as any[] | null)?.map(s => [s.id, s]) || [])
 
   // Filter by age eligibility
   const eligibleClasses = allClasses.filter(cls => {
@@ -760,7 +760,7 @@ export async function updatePaymentStatus(
   }
 
   if (paymentNote) {
-    updateData.payment_note = paymentNote
+    ;(updateData as any).payment_note = paymentNote
   }
 
   if (paymentStatus === 'paid') {
@@ -830,7 +830,7 @@ export async function searchEnrollments(
 ): Promise<EnrollmentFull[]> {
   const supabase = createServiceClient()
 
-  let query = supabase
+  let query = (supabase as any)
     .from('v_enrollments_full')
     .select('*')
 

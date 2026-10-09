@@ -55,8 +55,9 @@ export default function DashboardPage() {
 
       if (error) throw error;
 
-      setEvents(data?.events || []);
-      setRooms(data?.rooms || []);
+      const timetable = data as { events?: TimetableEvent[]; rooms?: TimetableRoom[] } | null;
+      setEvents(timetable?.events || []);
+      setRooms(timetable?.rooms || []);
     } catch (error) {
       console.error('Error loading timetable:', error);
       toast.error('ไม่สามารถโหลดตารางเรียนได้');

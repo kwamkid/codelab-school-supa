@@ -153,7 +153,7 @@ export async function createTeachingMaterial(
       is_active: data.isActive ?? true,
       created_by: createdBy,
       updated_by: createdBy,
-    })
+    } as any)
     .select('id')
     .single()
 

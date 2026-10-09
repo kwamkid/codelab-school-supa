@@ -1,11 +1,15 @@
 // app/api/line/test-connection/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireStaff, bearer } from '@/lib/server/admin-auth';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  if (auth.role === 'teacher') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
   try {
     const body = await request.json();
     const { type, channelId, channelSecret, accessToken } = body;

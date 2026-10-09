@@ -50,7 +50,7 @@ export async function getFacebookAdsSettings(): Promise<FacebookAdsSettings> {
     return getDefaultFacebookAdsSettings()
   }
 
-  return (data?.value as FacebookAdsSettings) || getDefaultFacebookAdsSettings()
+  return (data?.value as unknown as FacebookAdsSettings) || getDefaultFacebookAdsSettings()
 }
 
 /**

@@ -213,7 +213,7 @@ export default function TeachingMaterialForm({
         await updateTeachingMaterial(material.id, cleanedData, user?.uid || '');
         toast.success('อัปเดตสื่อการสอนเรียบร้อยแล้ว');
       } else {
-        await createTeachingMaterial(cleanedData, user?.uid || '');
+        await createTeachingMaterial(cleanedData as Parameters<typeof createTeachingMaterial>[0], user?.uid || '');
         toast.success('เพิ่มสื่อการสอนเรียบร้อยแล้ว');
       }
       

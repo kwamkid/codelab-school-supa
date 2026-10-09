@@ -76,6 +76,8 @@ interface AdminScope {
   role?: 'super_admin' | 'branch_admin' | 'teacher'
   /** null = every branch (super_admin or can_manage_all_branches) */
   branchIds?: string[] | null
+  /** super_admin, or admin_users.can_manage_settings (= who sees the ตั้งค่า menu) */
+  canManageSettings?: boolean
   error?: string
   status?: 401 | 403
 }
@@ -109,20 +111,38 @@ export async function requireStaffScope(token: string | null, opts: { cache?: bo
 
   const rows = await restSelect<{
     id: string; role: any; is_active: boolean; branch_ids: string[] | null; can_manage_all_branches: boolean | null
+    can_manage_settings: boolean | null
   }>('admin_users', {
     auth_user_id: `eq.${user.id}`,
-    select: 'id,role,is_active,branch_ids,can_manage_all_branches',
+    select: 'id,role,is_active,branch_ids,can_manage_all_branches,can_manage_settings',
     limit: '1',
   })
   const me = rows?.[0]
   if (!me || me.is_active === false) return { ok: false, error: 'Forbidden', status: 403 }
 
   const all = me.role === 'super_admin' || !!me.can_manage_all_branches
-  const scope: AdminScope = { ok: true, adminId: me.id, role: me.role, branchIds: all ? null : (me.branch_ids ?? []) }
+  const scope: AdminScope = {
+    ok: true,
+    adminId: me.id,
+    role: me.role,
+    branchIds: all ? null : (me.branch_ids ?? []),
+    canManageSettings: me.role === 'super_admin' || !!me.can_manage_settings,
+  }
   if (opts.cache) {
     if (scopeCache.size > 500) scopeCache.clear()
     scopeCache.set(token, { at: Date.now(), scope })
   }
+  return scope
+}
+
+/**
+ * Integration/config settings (LINE, Facebook, chat channels): same audience as
+ * the sidebar ตั้งค่า menu — super_admin or a staff member with can_manage_settings.
+ */
+export async function requireSettingsManager(token: string | null): Promise<AdminScope> {
+  const scope = await requireStaffScope(token)
+  if (!scope.ok) return scope
+  if (!scope.canManageSettings) return { ok: false, error: 'Forbidden', status: 403 }
   return scope
 }
 

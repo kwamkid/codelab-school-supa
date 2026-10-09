@@ -89,7 +89,7 @@ function getSupabase() {
   )
 }
 
-async function deleteTable(supabase: ReturnType<typeof createClient>, tableName: string): Promise<number> {
+async function deleteTable(supabase: ReturnType<typeof getSupabase>, tableName: string): Promise<number> {
   try {
     const { count } = await supabase
       .from(tableName)
@@ -121,7 +121,7 @@ async function deleteTable(supabase: ReturnType<typeof createClient>, tableName:
 }
 
 async function upsertInChunks(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ReturnType<typeof getSupabase>,
   tableName: string,
   rows: Record<string, unknown>[],
   chunkSize = 500
@@ -371,7 +371,7 @@ export async function POST(request: NextRequest) {
             status: 'failed',
             duration_ms: durationMs,
             error_message: `Restore failed: ${errorMessage}`,
-          }).catch(() => {})
+          }).then(undefined, () => {})
 
           send({
             phase: 'error',

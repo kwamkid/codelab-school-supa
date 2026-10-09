@@ -18,6 +18,7 @@ import { getCreditNotes } from '@/lib/services/credit-notes';
 import { getInvoiceCompanies } from '@/lib/services/invoice-companies';
 import { useDocumentPrint } from '@/hooks/useDocumentPrint';
 import PrintDialogs from '@/components/shared/print-dialogs';
+import { authFetch } from '@/lib/auth-fetch';
 import {
   DocumentData,
   generateDocumentHTML,
@@ -110,7 +111,7 @@ export default function RefundNotesPage() {
 
   const filteredNotes = refundNotes.filter((cn) => {
     if (dateRange) {
-      const docDate = (cn.issuedDate || cn.createdAt).toISOString().slice(0, 10);
+      const docDate = new Date(cn.issuedDate || cn.createdAt).toISOString().slice(0, 10);
       if (docDate < dateRange.from || docDate > dateRange.to) return false;
     }
     if (!searchQuery) return true;
@@ -151,7 +152,7 @@ export default function RefundNotesPage() {
     if (selectedIds.size === 0) return;
     setBulkPrinting(true);
     try {
-      const res = await fetch('/api/admin/credit-notes/bulk', {
+      const res = await authFetch('/api/admin/credit-notes/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),

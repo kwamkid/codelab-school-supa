@@ -73,7 +73,7 @@ export async function getSubjectsByCategory(category: string): Promise<Subject[]
     const { data, error } = await supabase
       .from(TABLE_NAME)
       .select('*')
-      .eq('category', category)
+      .eq('category', category as any)
       .eq('is_active', true)
       .order('name', { ascending: true });
 

@@ -184,7 +184,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const loadAdminUser = useCallback(async (
     client: SupabaseClient<Database>,
     authUserId: string,
-    userEmail?: string
+    userEmail?: string,
+    accessToken?: string
   ): Promise<'ok' | 'inactive' | 'not_found'> => {
     try {
       // Use provided email or fetch it
@@ -217,8 +218,11 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       let adminDataArray;
 
       try {
+        // Token passed explicitly: this runs inside onAuthStateChange, where
+        // awaiting supabase.auth.getSession() (authFetch) can deadlock.
         const response = await fetch(
-          `/api/auth/lookup?email=${encodeURIComponent(emailLower)}`
+          `/api/auth/lookup?email=${encodeURIComponent(emailLower)}`,
+          { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }
         );
 
         if (!response.ok) {
@@ -339,7 +343,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         setUser(toCompatibleUser(session?.user ?? null));
 
         if (session?.user) {
-          const status = await loadAdminUser(supabase, session.user.id, session.user.email);
+          const status = await loadAdminUser(supabase, session.user.id, session.user.email, session.access_token);
           if (!mounted) return;
           const allowed = await enforceAccess(supabase, status);
           if (!allowed) return; // signed out + redirecting
@@ -363,7 +367,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         setUser(toCompatibleUser(session?.user ?? null));
 
         if (session?.user) {
-          const status = await loadAdminUser(supabase, session.user.id, session.user.email);
+          const status = await loadAdminUser(supabase, session.user.id, session.user.email, session.access_token);
           if (!mounted) return;
           const allowed = await enforceAccess(supabase, status);
           if (!allowed) return; // signed out + redirecting
@@ -399,7 +403,10 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         // Check if user is active admin via API route (bypasses RLS)
         const checkRes = await fetch('/api/auth/lookup', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}),
+          },
           body: JSON.stringify({ authUserId: data.user.id, email: email.toLowerCase() }),
         });
         const adminCheck = await checkRes.json();

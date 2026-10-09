@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -408,7 +409,7 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
 
         if (!isChat) {
           try {
-            await fetch('/api/fb/send-conversion', {
+            await authFetch('/api/fb/send-conversion', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

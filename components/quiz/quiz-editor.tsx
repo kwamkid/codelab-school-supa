@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -115,7 +116,7 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
       const fd = new FormData();
       fd.append('file', new File([blob], 'question.jpg', { type: 'image/jpeg' }));
       fd.append('bucket', 'quiz-images');
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const res = await authFetch('/api/upload', { method: 'POST', body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'อัพโหลดไม่สำเร็จ');
       updateQ(qi, { imageUrl: json.url });

@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Zap, Plus, X, Trash2, Search, Loader2, ImagePlus, Pencil } from 'lucide-react';
@@ -263,7 +264,7 @@ function QuickReplyForm({
           const form = new FormData();
           form.append('file', img.file);
           form.append('bucket', 'chat-media');
-          const res = await fetch('/api/upload', { method: 'POST', body: form });
+          const res = await authFetch('/api/upload', { method: 'POST', body: form });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error);
           uploadedUrls.push(data.url);

@@ -34,6 +34,8 @@ export interface TrialFollowup {
   contactNote: string | null
   source: string
   existingCustomer: boolean
+  /** ผลการติดต่อล่าสุด (บันทึกที่หน้า /followups) — null = ยังไม่ติดต่อ */
+  followup: { status: 'contacted' | 'no_answer'; reason: string | null; by: string | null; at: string } | null
 }
 
 export const FOLLOWUP_DAY_OPTIONS = [
@@ -78,7 +80,8 @@ export function TrialFollowupList({ rows, loading, days, onDaysChange, searchTer
       <div className="flex flex-wrap items-center gap-3">
         <FormSelect value={days} onValueChange={onDaysChange} options={FOLLOWUP_DAY_OPTIONS} className="w-[200px]" />
         <p className="text-gray-600">
-          มาทดลองเรียนแล้ว แต่ครอบครัวยังไม่ได้สมัครคอร์สใดเลยหลังวันทดลอง (ดูจากเบอร์โทร) · ถ้าสมัครแล้ว รายชื่อจะหายไปเอง
+          มาทดลองเรียนแล้ว แต่ครอบครัวยังไม่ได้สมัครคอร์สใดเลยหลังวันทดลอง (ดูจากเบอร์โทร) · ถ้าสมัครแล้ว รายชื่อจะหายไปเอง ·{' '}
+          <Link href="/followups#trial" className="text-blue-600 hover:underline">บันทึกการติดต่อที่หน้าติดตามลูกค้า</Link>
         </p>
       </div>
 
@@ -101,6 +104,7 @@ export function TrialFollowupList({ rows, loading, days, onDaysChange, searchTer
                 <TableHead className="min-w-[160px]">วิชา · ครู</TableHead>
                 {showBranch && <TableHead>สาขา</TableHead>}
                 <TableHead className="min-w-[220px]">บันทึก</TableHead>
+                <TableHead className="whitespace-nowrap">สถานะ</TableHead>
                 <TableHead className="w-[1%]" />
               </TableRow>
             </TableHeader>
@@ -135,6 +139,18 @@ export function TrialFollowupList({ rows, loading, days, onDaysChange, searchTer
                       {r.feedback && <div className="line-clamp-2">ครู: {r.feedback}</div>}
                       {r.contactNote && <div className="line-clamp-2">{r.contactNote}</div>}
                       {!r.feedback && !r.contactNote && <span className="text-gray-400">—</span>}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {r.followup ? (
+                        <>
+                          <Pill tone={r.followup.status === 'contacted' ? 'green' : 'amber'}>
+                            {r.followup.status === 'contacted' ? 'ติดต่อแล้ว' : 'ติดต่อไม่ได้'}
+                          </Pill>
+                          {r.followup.reason && <div className="mt-1">{r.followup.reason}</div>}
+                        </>
+                      ) : (
+                        <Pill tone="red">ยังไม่ติดต่อ</Pill>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button asChild variant="outline">

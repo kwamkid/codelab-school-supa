@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       const entryPageId = entry.id // Page ID that received the message
 
       // Find the channel matching this specific page
-      const channel = await getChannelByPlatform(channelType, entryPageId)
+      const channel: any = await getChannelByPlatform(channelType, entryPageId)
         || await getChannelByPlatform(channelType) // fallback to any active channel
 
       if (!channel) {

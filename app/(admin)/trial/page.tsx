@@ -447,8 +447,8 @@ export default function TrialBookingsPage() {
             {paginatedBookings.map((booking) => {
               const createdDate = booking.createdAt instanceof Date ? booking.createdAt
                 : typeof booking.createdAt === 'string' ? new Date(booking.createdAt)
-                : booking.createdAt?.toDate ? booking.createdAt.toDate()
-                : booking.createdAt?.seconds ? new Date(booking.createdAt.seconds * 1000)
+                : (booking.createdAt as any)?.toDate ? (booking.createdAt as any).toDate()
+                : (booking.createdAt as any)?.seconds ? new Date((booking.createdAt as any).seconds * 1000)
                 : null;
               return (
                 <Link key={booking.id} href={`/trial/${booking.id}`}>
@@ -576,8 +576,8 @@ export default function TrialBookingsPage() {
                             <div>{(() => {
                               const d = booking.createdAt instanceof Date ? booking.createdAt
                                 : typeof booking.createdAt === 'string' ? new Date(booking.createdAt)
-                                : booking.createdAt?.toDate ? booking.createdAt.toDate()
-                                : booking.createdAt?.seconds ? new Date(booking.createdAt.seconds * 1000)
+                                : (booking.createdAt as any)?.toDate ? (booking.createdAt as any).toDate()
+                                : (booking.createdAt as any)?.seconds ? new Date((booking.createdAt as any).seconds * 1000)
                                 : null;
                               return d ? `${getShortDayName(d.getDay())} ${formatDate(booking.createdAt)}` : formatDate(booking.createdAt);
                             })()}</div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendFBConversionInternal, ConversionParams } from '@/lib/fb/handler'
 import { hashPhone, hashEmail } from '@/lib/fb/utils'
@@ -10,6 +11,8 @@ import { addToCustomAudience, removeFromCustomAudience } from '@/lib/fb/api'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
     const { member_id, new_phone, new_email, old_phone, old_email } = body

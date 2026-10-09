@@ -3,10 +3,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const supabase = createServiceClient();
     const debug: any = {};
@@ -23,7 +27,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No LINE channels found', updated: 0, debug });
     }
 
-    const channelMap = new Map(channels.map((c: any) => [c.id, c]));
+    const channelMap = new Map<any, any>(channels.map((c: any) => [c.id, c]));
 
     // 2. Find inbound messages in GROUP conversations that need avatar backfill
     const { data: messages } = await (supabase as any)

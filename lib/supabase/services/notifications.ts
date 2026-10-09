@@ -65,7 +65,7 @@ export async function createNotification(data: {
       body: data.body,
       image_url: data.imageUrl || null,
       action_url: data.actionUrl || null,
-      data: data.data || null,
+      data: (data.data || null) as any,
       is_read: false,
     })
     .select('id')
@@ -182,7 +182,7 @@ export async function getUnreadNotifications(userId: string): Promise<Notificati
     return []
   }
 
-  return (data || []).map(mapNotification)
+  return ((data || []) as unknown as Notification[]).map(mapNotification)
 }
 
 // Get all notifications for a user
@@ -209,7 +209,7 @@ export async function getNotifications(
     return []
   }
 
-  return (data || []).map(mapNotification)
+  return ((data || []) as unknown as Notification[]).map(mapNotification)
 }
 
 // Mark notification as read

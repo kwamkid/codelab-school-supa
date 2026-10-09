@@ -15,6 +15,7 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { authFetch } from '@/lib/auth-fetch';
 
 interface AddBillingInfoDialogProps {
   open: boolean;
@@ -55,7 +56,7 @@ export default function AddBillingInfoDialog({
     setSubmitting(true);
 
     try {
-      const res = await fetch(`/api/admin/invoices/${invoice.id}`, {
+      const res = await authFetch(`/api/admin/invoices/${invoice.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 import { Holiday } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 const TABLE_NAME = 'holidays';
 
@@ -202,7 +203,7 @@ export async function updateHoliday(
 // Delete holiday - Uses API route to bypass RLS restrictions
 export async function deleteHoliday(id: string): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/holidays/${id}`, {
+    const response = await authFetch(`/api/admin/holidays/${id}`, {
       method: 'DELETE',
     });
 

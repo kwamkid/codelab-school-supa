@@ -28,6 +28,7 @@ interface AdminUserRow {
 function mapToAdminUser(row: AdminUserRow): AdminUser {
   return {
     id: row.id,
+    authUserId: row.auth_user_id,
     email: row.email,
     displayName: row.display_name,
     nickname: row.nickname || undefined,

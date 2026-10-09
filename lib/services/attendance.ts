@@ -14,6 +14,7 @@ import {
   createMakeupRequest,
 } from './makeup';
 import { getStudentWithParent } from './parents';
+import { authFetch } from '@/lib/auth-fetch';
 
 // Attendance record interface
 export interface AttendanceRecord {
@@ -426,7 +427,7 @@ export async function saveAttendanceWithMakeup(params: {
         })),
       });
       // Best-effort immediate send — don't block the save; cron is the safety net.
-      fetch('/api/admin/notifications/process', { method: 'POST' }).catch(() => {});
+      authFetch('/api/admin/notifications/process', { method: 'POST' }).catch(() => {});
     } catch (e) {
       // Never let enqueue failure break the save (cron will not have it, but save is safe)
       console.error('[saveAttendanceWithMakeup] enqueue feedback failed', e);

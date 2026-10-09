@@ -9,9 +9,22 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { quizId, studentId, studentCode, studentName, schoolName, answers = [], totalTime = 0, originalTotalQuestions } = body
+    const { quizId, studentName, schoolName, answers = [], totalTime = 0, originalTotalQuestions } = body
+    let { studentId, studentCode } = body
     if (!quizId || !studentName || !Array.isArray(answers)) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 })
+    }
+
+    // Public endpoint: only attach the result to a student record when the
+    // client also knows that student's code (same credential as quiz login) —
+    // otherwise anyone could write scores onto an arbitrary student id.
+    if (studentId) {
+      const rows = await restSelect<any>('students', { id: `eq.${studentId}`, select: 'student_code', limit: '1' })
+      const realCode = String(rows?.[0]?.student_code ?? '').trim().toLowerCase()
+      if (!realCode || realCode !== String(studentCode ?? '').trim().toLowerCase()) {
+        studentId = null
+        studentCode = null
+      }
     }
 
     // Authoritative question data (with correct_answer + points)

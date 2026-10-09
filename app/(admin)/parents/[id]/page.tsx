@@ -55,6 +55,7 @@ import { toast } from 'sonner';
 import { SectionLoading } from '@/components/ui/loading';
 import { formatDate, calculateAge } from '@/lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
+import { authFetch } from '@/lib/auth-fetch';
 
 export default function ParentDetailPage() {
   const params = useParams();
@@ -219,7 +220,7 @@ export default function ParentDetailPage() {
     
     setGeneratingQR(true);
     try {
-      const res = await fetch('/api/admin/link-tokens', {
+      const res = await authFetch('/api/admin/link-tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parentId: parent.id }),

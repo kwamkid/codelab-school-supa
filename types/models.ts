@@ -26,6 +26,8 @@ export interface Parent {
 // Admin User - สำหรับ Authentication และ Permissions
 export interface AdminUser {
   id: string; // uid จาก Firebase Auth
+  /** auth.users id (Supabase Auth) — used as notifications.user_id / useAuth().user.uid */
+  authUserId?: string | null;
   email: string;
   displayName: string;
   nickname?: string;

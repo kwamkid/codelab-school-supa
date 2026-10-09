@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type User } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     try {
       // Check if new email is already used by another user
       const { data: allUsers } = await supabaseAdmin.auth.admin.listUsers()
-      const existingUser = allUsers?.users?.find(
+      const existingUser = (allUsers?.users as User[] | undefined)?.find(
         u => u.email?.toLowerCase() === newEmail.toLowerCase() && u.id !== teacherId
       )
 

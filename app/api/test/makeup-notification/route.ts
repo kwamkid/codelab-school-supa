@@ -27,9 +27,20 @@ export async function POST(request: NextRequest) {
     console.log('Type:', type)
 
     // Step 1: Get makeup data
-    const makeup = await getMakeupClass(makeupId)
-    if (!makeup) {
+    // getMakeupClass returns the raw makeup_classes row (snake_case) — map the
+    // fields this route reads (it used camelCase before, so every value was undefined)
+    const row: any = await getMakeupClass(makeupId)
+    if (!row) {
       return NextResponse.json({ success: false, message: 'Makeup class not found' }, { status: 404 })
+    }
+    const makeup = {
+      id: row.id as string,
+      status: row.status as string,
+      studentId: row.student_id as string,
+      parentId: row.parent_id as string,
+      makeupSchedule: row.makeup_date
+        ? { date: row.makeup_date, startTime: row.makeup_start_time, endTime: row.makeup_end_time }
+        : null,
     }
     console.log('Makeup data:', {
       id: makeup.id,

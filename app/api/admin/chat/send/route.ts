@@ -5,10 +5,15 @@ import {
   getConversationWithContact,
   insertOutboundMessage,
 } from '@/lib/services/chat-webhook'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if (auth.role === 'teacher') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   try {
     const { conversationId, content, messageType = 'text', mediaUrl, mediaUrls, senderId, senderName, quickReplyItems } = await request.json()
 

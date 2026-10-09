@@ -1,4 +1,5 @@
 'use client'
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -322,7 +323,7 @@ export default function ScheduleReportPage() {
       params.append('weekStart', formatDateISO(weekStart))
       params.append('weekEnd', formatDateISO(weekEnd))
 
-      const res = await fetch(`/api/reports/schedule?${params}`)
+      const res = await authFetch(`/api/reports/schedule?${params}`)
       const json = await res.json()
       if (json.success) {
         setData(json.data)

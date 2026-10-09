@@ -41,8 +41,14 @@ export async function POST(request: NextRequest) {
       .eq('id', data.scheduleId)
       .single()
 
-    if (scheduleError || !schedule) {
+    if (scheduleError || !schedule || (schedule as any).event_id !== data.eventId) {
       return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
+    }
+
+    // Public endpoint: a negative/huge attendeeCount would corrupt the seat counts
+    // (e.g. -50 frees seats for everyone else).
+    if (!Number.isInteger(data.attendeeCount) || data.attendeeCount < 1 || data.attendeeCount > 100) {
+      return NextResponse.json({ error: 'จำนวนผู้เข้าร่วมไม่ถูกต้อง' }, { status: 400 })
     }
 
     const attendeesByBranch = (schedule as any).attendees_by_branch || {}

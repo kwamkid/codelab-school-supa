@@ -11,7 +11,10 @@ export async function liffFetch<T = any>(
   body?: any,
   method: 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'POST'
 ): Promise<T> {
-  const liff = getLiffInstance();
+  // Pages that init LIFF themselves (e.g. event registration) only have the
+  // global window.liff, not the liff-client singleton.
+  const liff: any =
+    getLiffInstance() ?? (typeof window !== 'undefined' ? (window as any).liff : null);
   let idToken: string | null = null;
   try {
     idToken = liff?.getIDToken?.() ?? null;

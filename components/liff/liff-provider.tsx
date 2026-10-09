@@ -91,18 +91,10 @@ export function LiffProvider({ children, requireLogin = false, liffId, externalB
             console.log('[LiffProvider] Got profile:', userProfile.displayName)
             setProfile(userProfile as LiffProfile)
             
-            // Update parent last login if exists
-            try {
-              const { getParentByLineId, updateParent } = await import('@/lib/services/parents')
-              const parent = await getParentByLineId(userProfile.userId)
-              if (parent) {
-                await updateParent(parent.id, {
-                  lastLoginAt: new Date()
-                })
-              }
-            } catch (error) {
-              console.error('[LiffProvider] Error updating parent:', error)
-            }
+            // Update parent last login (server route, LINE-verified) — fire-and-forget
+            import('@/lib/line/liff-fetch')
+              .then(({ liffFetch }) => liffFetch('/api/liff/last-login', { lineUserId: userProfile.userId }))
+              .catch((error) => console.error('[LiffProvider] Error updating parent:', error))
           } catch (profileError: any) {
             console.error('[LiffProvider] Error getting profile:', profileError)
             

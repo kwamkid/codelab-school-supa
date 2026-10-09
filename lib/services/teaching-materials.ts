@@ -4,13 +4,14 @@ import { TeachingMaterial } from '@/types/models';
 import { convertCanvaToEmbedUrl, needsServerResolution } from '@/lib/utils/canva';
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 // Resolve redirect-style URLs (e.g. canva.link short links) to their final
 // URL by calling our server route, then return the embed URL.
 // For URLs that don't need resolution, this is effectively a sync conversion.
 async function resolveAndConvert(url: string): Promise<{ canvaUrl: string; embedUrl: string }> {
   if (needsServerResolution(url)) {
-    const res = await fetch('/api/admin/resolve-slide-url', {
+    const res = await authFetch('/api/admin/resolve-slide-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
@@ -324,7 +325,7 @@ export async function duplicateTeachingMaterial(
       isActive: original.isActive
     };
 
-    return await createTeachingMaterial(newData, createdBy);
+    return await createTeachingMaterial(newData as Parameters<typeof createTeachingMaterial>[0], createdBy);
   } catch (error) {
     console.error('Error duplicating material:', error);
     throw error;

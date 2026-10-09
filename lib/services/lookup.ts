@@ -90,14 +90,16 @@ export async function getClassLookupData(branchId?: string | null): Promise<Clas
       const { getActiveBranches } = await import('@/lib/services/branches');
       const { getSubjects } = await import('@/lib/services/subjects');
       const { getTeachers } = await import('@/lib/services/teachers');
-      const { getRooms } = await import('@/lib/services/rooms');
+      const { getRoomsByBranch } = await import('@/lib/services/rooms');
 
-      const [branches, subjects, teachers, rooms] = await Promise.all([
+      const [branches, subjects, teachers] = await Promise.all([
         getActiveBranches(),
         getSubjects(),
         getTeachers(),
-        getRooms(),
       ]);
+      // rooms.ts has no "all rooms" getter (the old getRooms import never existed,
+      // so this fallback always threw) — load per active branch instead
+      const rooms = (await Promise.all(branches.map((b) => getRoomsByBranch(b.id)))).flat();
       return { branches, subjects, teachers, rooms, classStats: {} };
     } catch (fallbackError) {
       console.error('Fallback lookup also failed:', fallbackError);

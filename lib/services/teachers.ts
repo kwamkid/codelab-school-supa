@@ -2,6 +2,7 @@ import { Teacher } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
 import { createAdminUserSimple } from './admin-users';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 const TABLE_NAME = 'teachers';
 
@@ -329,7 +330,7 @@ export async function updateTeacher(id: string, teacherData: Partial<Teacher>): 
 // Delete teacher (soft delete) - Uses API route to bypass RLS restrictions
 export async function deleteTeacher(id: string): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/teachers/${id}`, {
+    const response = await authFetch(`/api/admin/teachers/${id}`, {
       method: 'DELETE',
     });
 

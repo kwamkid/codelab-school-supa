@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireStaff, requireSuperAdmin, bearer } from '@/lib/server/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,11 +12,31 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createServiceClient()
-  const { id } = await params
   const { searchParams } = new URL(request.url)
   const force = searchParams.get('force') === 'true'
-  const adminId = searchParams.get('adminId')
+  const token = bearer(request.headers.get('authorization'))
+
+  // Force (cascade) delete = super admin only, verified from the token.
+  // The old `adminId` query param is ignored (it was spoofable).
+  let adminId: string | undefined
+  if (force) {
+    const auth = await requireSuperAdmin(token)
+    if (!auth.ok) {
+      return NextResponse.json(
+        { error: auth.status === 403 ? 'เฉพาะ Super Admin เท่านั้นที่สามารถลบได้' : auth.error },
+        { status: auth.status }
+      )
+    }
+    adminId = auth.adminId
+  } else {
+    const auth = await requireStaff(token)
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+    if (auth.role === 'teacher') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    adminId = auth.adminId
+  }
+
+  const supabase = createServiceClient()
+  const { id } = await params
 
   try {
     console.log('Deleting student:', id, { force, adminId })
@@ -32,21 +53,7 @@ export async function DELETE(
     }
 
     if (force) {
-      // Force delete requires superadmin
-      if (!adminId) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-
-      const { data: adminUser, error: adminError } = await supabase
-        .from('admin_users' as any)
-        .select('role')
-        .eq('id', adminId)
-        .single()
-
-      if (adminError || !adminUser || (adminUser as any).role !== 'super_admin') {
-        return NextResponse.json({ error: 'เฉพาะ Super Admin เท่านั้นที่สามารถลบได้' }, { status: 403 })
-      }
-
+      // Super admin already verified above.
       // Cascade delete all related records
       console.log('Force deleting student with cascade:', id)
 
@@ -99,7 +106,7 @@ export async function DELETE(
         .from('enrollments')
         .select('*', { count: 'exact', head: true })
         .eq('student_id', id)
-        .in('status', ['active', 'pending'])
+        .in('status', ['active', 'pending'] as any)
 
       if (enrollmentCount && enrollmentCount > 0) {
         return NextResponse.json(

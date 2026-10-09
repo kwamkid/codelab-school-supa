@@ -17,6 +17,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing url or channelId' }, { status: 400 });
     }
 
+    // This route is loaded via <img>/<video> src (no Bearer header possible),
+    // so it can't use requireStaff. Instead only proxy LINE's content API —
+    // otherwise any caller could make us send the channel access token to an
+    // arbitrary host (token exfiltration / SSRF).
+    let target: URL;
+    try {
+      target = new URL(url);
+    } catch {
+      return NextResponse.json({ error: 'Invalid url' }, { status: 400 });
+    }
+    if (target.protocol !== 'https:' || target.hostname !== 'api-data.line.me') {
+      return NextResponse.json({ error: 'URL not allowed' }, { status: 400 });
+    }
+
     // Get channel credentials for auth token
     const channel = await getChannelById(channelId);
     if (!channel) {

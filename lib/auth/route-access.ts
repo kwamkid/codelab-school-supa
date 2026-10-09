@@ -20,7 +20,8 @@ export const ROUTE_RULES: RouteRule[] = [
   { prefix: '/reports/payment-gaps', roles: ['super_admin'] },
   { prefix: '/reports/usage', roles: ['super_admin'] },
   { prefix: '/users', roles: ['super_admin'] },
-  // รายงาน / บัญชี — แอดมินสาขาเข้าได้ ครูไม่ได้
+  // รายงาน / บัญชี / ติดตามเด็กเสี่ยง — แอดมินสาขาเข้าได้ ครูไม่ได้
+  { prefix: '/followups', roles: ['super_admin', 'branch_admin'] },
   { prefix: '/reports', roles: ['super_admin', 'branch_admin'] },
   { prefix: '/accounting', roles: ['super_admin', 'branch_admin'] },
 ]

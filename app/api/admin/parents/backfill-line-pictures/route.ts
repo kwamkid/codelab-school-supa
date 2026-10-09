@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getLineSettings } from '@/lib/supabase/services/line-settings';
 
@@ -7,11 +8,15 @@ import { getLineSettings } from '@/lib/supabase/services/line-settings';
 // it. Covers people who registered through LIFF and never chatted (so they have
 // no chat_contacts row to mirror from). Safe to re-run — only fills blanks.
 // GET is allowed too so it can be triggered by just opening the URL once.
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   return runBackfill();
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   return runBackfill();
 }
 

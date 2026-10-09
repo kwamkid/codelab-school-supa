@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireStaff, bearer } from '@/lib/server/admin-auth';
 import {
   detectSlideProvider,
   isValidSlideUrl,
@@ -47,6 +48,8 @@ async function resolveRedirects(startUrl: string): Promise<string> {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   try {
     const { url } = await request.json();
     if (!url || typeof url !== 'string') {

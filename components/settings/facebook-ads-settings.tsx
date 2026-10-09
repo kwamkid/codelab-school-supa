@@ -1,4 +1,5 @@
 'use client'
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -184,7 +185,7 @@ export default function FacebookAdsSettingsComponent() {
       if (logEventFilter !== 'all') params.append('eventType', logEventFilter)
       if (logStatusFilter !== 'all') params.append('fbStatus', logStatusFilter)
 
-      const res = await fetch(`/api/fb/logs?${params}`, { cache: 'no-store' })
+      const res = await authFetch(`/api/fb/logs?${params}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) {
         setLogs(data.logs || [])
@@ -230,7 +231,7 @@ export default function FacebookAdsSettingsComponent() {
 
     setTesting(true)
     try {
-      const res = await fetch('/api/fb/test-connection', {
+      const res = await authFetch('/api/fb/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -260,7 +261,7 @@ export default function FacebookAdsSettingsComponent() {
 
     setSendingTest(true)
     try {
-      const res = await fetch('/api/fb/test-event', {
+      const res = await authFetch('/api/fb/test-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: testPhone.trim() }),
@@ -283,7 +284,7 @@ export default function FacebookAdsSettingsComponent() {
   const loadAudiences = useCallback(async () => {
     setAudiencesLoading(true)
     try {
-      const res = await fetch('/api/fb/list-audiences', { cache: 'no-store' })
+      const res = await authFetch('/api/fb/list-audiences', { cache: 'no-store' })
       const data = await res.json()
       if (data.success) {
         setAudiences(data.audiences || [])
@@ -327,7 +328,7 @@ export default function FacebookAdsSettingsComponent() {
 
     setCreatingAudience(true)
     try {
-      const res = await fetch('/api/fb/create-audience', {
+      const res = await authFetch('/api/fb/create-audience', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -359,7 +360,7 @@ export default function FacebookAdsSettingsComponent() {
     setBulkSyncingType(audienceType)
 
     try {
-      const res = await fetch('/api/fb/bulk-sync', {
+      const res = await authFetch('/api/fb/bulk-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audienceType }),

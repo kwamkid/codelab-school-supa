@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizeSchoolName } from '@/lib/utils/normalize-school-name'
 import { restSelect } from '@/lib/supabase/rest'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -53,8 +54,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/schools - merge or normalize school names
+// POST /api/schools - merge or normalize school names (mass-updates students →
+// admins only; called from the รายงานนักเรียน page). GET stays public: school
+// name autocomplete is also used by LIFF forms.
 export async function POST(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  if (auth.role === 'teacher') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+
   try {
     const supabase = createServiceClient()
     const body = await request.json()

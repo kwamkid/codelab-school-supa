@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getLineSettings } from '@/lib/supabase/services/line-settings'
 import { createServiceClient } from '@/lib/supabase/server'
-import { createTeamSession, TEAM_SESSION_COOKIE, TEAM_SESSION_MAX_AGE } from '@/lib/vex/team-session'
+import { createTeamSession, TEAM_SESSION_COOKIE, TEAM_SESSION_MAX_AGE, verifyTeacherLink } from '@/lib/vex/team-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,12 +41,14 @@ export async function GET(request: NextRequest) {
   let ret = '/team'
   let nonce = ''
   let teacherLinkId: string | null = null
+  let teacherLinkSig: unknown = null
   try {
     if (state) {
       const parsed = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'))
       if (typeof parsed?.n === 'string') nonce = parsed.n
       if (parsed?.p === 'teacher_link' && typeof parsed?.t === 'string') {
         teacherLinkId = parsed.t
+        teacherLinkSig = parsed.s
         // Admin-side return path (state is minted server-side in
         // /api/teacher/line-link, which already clamped it).
         ret =
@@ -68,6 +70,12 @@ export async function GET(request: NextRequest) {
   // CSRF check: nonce in state must match the cookie set at login start.
   const cookieNonce = request.cookies.get('vex_line_state')?.value
   if (!nonce || !cookieNonce || nonce !== cookieNonce) {
+    return NextResponse.redirect(`${base}${ret}?line_error=bad_state`)
+  }
+
+  // Teacher link: the teacher id must carry the server signature minted by
+  // /api/teacher/line-link (state is client-held, cookie nonce alone can be forged).
+  if (teacherLinkId && !verifyTeacherLink(teacherLinkId, nonce, teacherLinkSig)) {
     return NextResponse.redirect(`${base}${ret}?line_error=bad_state`)
   }
 

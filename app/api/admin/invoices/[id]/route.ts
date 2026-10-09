@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
+
+async function guard(request: NextRequest) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if (auth.role === 'teacher') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  return null
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +35,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await guard(request)
+  if (denied) return denied
+
   const { id } = await params
 
   if (!id) {
@@ -187,6 +198,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await guard(request)
+  if (denied) return denied
+
   const { id } = await params
   const supabase = createServiceClient()
 
@@ -296,6 +310,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await guard(request)
+  if (denied) return denied
+
   const { id } = await params
   const supabase = createServiceClient()
 

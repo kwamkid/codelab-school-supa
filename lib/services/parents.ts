@@ -1,6 +1,7 @@
 import { Parent, Student } from '@/types/models';
 import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 const TABLE_NAME = 'parents';
 
@@ -242,7 +243,7 @@ export async function updateParent(id: string, parentData: Partial<Parent>): Pro
     const emailChanged = parentData.email !== undefined && parentData.email !== oldEmail;
     if (phoneChanged || emailChanged) {
       try {
-        await fetch('/api/fb/resend', {
+        await authFetch('/api/fb/resend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -266,7 +267,7 @@ export async function updateParent(id: string, parentData: Partial<Parent>): Pro
 // Delete parent - Uses API route to bypass RLS restrictions
 export async function deleteParent(parentId: string): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/parents/${parentId}`, {
+    const response = await authFetch(`/api/admin/parents/${parentId}`, {
       method: 'DELETE',
     });
 
@@ -441,7 +442,7 @@ export async function deleteStudent(
     if (options?.adminId) params.set('adminId', options.adminId);
     const qs = params.toString();
 
-    const response = await fetch(`/api/admin/students/${studentId}${qs ? `?${qs}` : ''}`, {
+    const response = await authFetch(`/api/admin/students/${studentId}${qs ? `?${qs}` : ''}`, {
       method: 'DELETE',
     });
 
@@ -760,6 +761,7 @@ export async function getAllStudentsWithBranchInfo(branchId?: string): Promise<(
 export async function getStudentWithParent(studentId: string): Promise<(Student & {
   parentName: string;
   parentPhone: string;
+  parentLineUserId?: string | null;
   lineDisplayName?: string;
 }) | null> {
   try {
@@ -771,7 +773,8 @@ export async function getStudentWithParent(studentId: string): Promise<(Student 
         parents:parent_id (
           id,
           display_name,
-          phone
+          phone,
+          line_user_id
         )
       `)
       .eq('id', studentId)
@@ -803,6 +806,7 @@ export async function getStudentWithParent(studentId: string): Promise<(Student 
       isActive: data.is_active ?? true,
       parentName: data.parents?.display_name || 'Unknown',
       parentPhone: data.parents?.phone || '',
+      parentLineUserId: (data.parents as any)?.line_user_id || null,
       lineDisplayName: data.parents?.display_name,
     };
   } catch (error) {

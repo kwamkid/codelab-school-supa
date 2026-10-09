@@ -70,7 +70,7 @@ async function fetchRescheduleData(): Promise<RpcResult> {
   const supabase = getClient();
   const { data, error } = await supabase.rpc('get_reschedule_preview');
   if (error) throw error;
-  return data as RpcResult;
+  return data as unknown as RpcResult;
 }
 
 // Helper: get holiday date set for a branch

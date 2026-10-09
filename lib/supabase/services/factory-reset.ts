@@ -120,7 +120,7 @@ async function countAllRecords(): Promise<number> {
 
   for (const tableName of TABLES_TO_RESET) {
     try {
-      const { count, error } = await supabase
+      const { count, error } = await (supabase as any)
         .from(tableName)
         .select('*', { count: 'exact', head: true })
 
@@ -141,7 +141,7 @@ async function deleteTable(tableName: string): Promise<number> {
 
   try {
     // Get count first
-    const { count } = await supabase
+    const { count } = await (supabase as any)
       .from(tableName)
       .select('*', { count: 'exact', head: true })
 
@@ -149,11 +149,11 @@ async function deleteTable(tableName: string): Promise<number> {
 
     // Delete all records - Supabase requires a filter
     // We use a condition that matches all records
-    const { error } = await supabase.from(tableName).delete().gte('id', '00000000-0000-0000-0000-000000000000')
+    const { error } = await (supabase as any).from(tableName).delete().gte('id', '00000000-0000-0000-0000-000000000000')
 
     if (error) {
       // Try alternative delete method
-      const { error: error2 } = await supabase.from(tableName).delete().neq('id', '')
+      const { error: error2 } = await (supabase as any).from(tableName).delete().neq('id', '')
 
       if (error2) {
         console.error(`Error deleting from ${tableName}:`, error2)
@@ -174,7 +174,7 @@ export async function hasAnyData(): Promise<boolean> {
 
   for (const tableName of TABLES_TO_RESET) {
     try {
-      const { count, error } = await supabase
+      const { count, error } = await (supabase as any)
         .from(tableName)
         .select('*', { count: 'exact', head: true })
 
@@ -196,7 +196,7 @@ export async function getDataStatistics(): Promise<Record<string, number>> {
 
   for (const tableName of TABLES_TO_RESET) {
     try {
-      const { count, error } = await supabase
+      const { count, error } = await (supabase as any)
         .from(tableName)
         .select('*', { count: 'exact', head: true })
 

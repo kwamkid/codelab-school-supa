@@ -51,6 +51,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SectionLoading } from '@/components/ui/loading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import LineWebhookTest from './line-webhook-test';
+import { authFetch } from '@/lib/auth-fetch';
 import {
   Dialog,
   DialogContent,
@@ -313,7 +314,7 @@ export default function ChatChannelSettings() {
 
       // Exchange code for pages
       try {
-        const res = await fetch('/api/admin/chat/facebook/exchange', {
+        const res = await authFetch('/api/admin/chat/facebook/exchange', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -438,7 +439,7 @@ export default function ChatChannelSettings() {
       await loadChannels();
 
       // Auto-sync old messages in background
-      fetch('/api/admin/chat/sync-messages', { method: 'POST' })
+      authFetch('/api/admin/chat/sync-messages', { method: 'POST' })
         .then(r => r.json())
         .then(result => {
           if (result.success) {

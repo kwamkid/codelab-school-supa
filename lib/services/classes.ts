@@ -6,6 +6,7 @@ import { getRoomsByBranch } from './rooms';
 import { getHolidaysForBranch } from './holidays';
 import { adminMutation } from '@/lib/admin-mutation';
 import { checkAvailability, type AvailabilityIssue, type AvailabilityWarning } from '@/lib/utils/availability';
+import { authFetch } from '@/lib/auth-fetch';
 
 const TABLE_NAME = 'classes';
 
@@ -362,7 +363,7 @@ export async function updateClass(
 // Delete class - Uses API route to bypass RLS restrictions
 export async function deleteClass(id: string): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/classes/${id}`, {
+    const response = await authFetch(`/api/admin/classes/${id}`, {
       method: 'DELETE',
     });
 

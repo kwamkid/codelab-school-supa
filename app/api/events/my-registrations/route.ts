@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveLiffUser } from '@/lib/line/verify-liff-token'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,11 +9,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url)
-    const lineUserId = searchParams.get('lineUserId')
-
-    if (!lineUserId) {
-      return NextResponse.json({ error: 'LINE User ID required' }, { status: 400 })
+    // Returns parent name/phone/email → only for a VERIFIED LIFF ID token
+    // (Authorization: Bearer <liff.getIDToken()>). The ?lineUserId= param alone
+    // is no longer trusted (no in-app callers as of Oct 2026).
+    const who = await resolveLiffUser(request, { lineUserId: searchParams.get('lineUserId') })
+    if (!who?.verified) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const lineUserId = who.lineUserId
 
     // Get user's registrations
     const { data: registrations, error } = await supabase
@@ -24,7 +28,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     // Transform data to match expected format
-    const transformedRegistrations = (registrations || []).map(reg => ({
+    const transformedRegistrations = (registrations || []).map((reg: any) => ({
       id: reg.id,
       eventId: reg.event_id,
       scheduleId: reg.schedule_id,

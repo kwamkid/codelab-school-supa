@@ -106,7 +106,7 @@ const DashboardCalendar = forwardRef<FullCalendar, DashboardCalendarProps>(({
     datePickerWrapper.appendChild(dateInput);
     
     // Replace the title with our custom wrapper
-    const titleEl = toolbar.querySelector('.fc-toolbar-title');
+    const titleEl = toolbar.querySelector<HTMLElement>('.fc-toolbar-title');
     if (titleEl && titleEl.parentNode) {
       titleEl.style.cursor = 'pointer';
       titleEl.addEventListener('click', () => dateInput.showPicker?.());

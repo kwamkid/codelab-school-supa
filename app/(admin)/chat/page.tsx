@@ -18,6 +18,7 @@ import { ChatSplitView, MobileView } from '@/components/chat/chat-layout';
 import { TrialBookingForm } from '@/components/shared/trial-booking-form';
 import { CompactEnrollmentForm } from '@/components/shared/compact-enrollment-form';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 type PanelView = 'info' | 'trial' | 'enrollment';
 
@@ -379,7 +380,7 @@ export default function ChatPage() {
     if (!contactId) return;
 
     try {
-      const res = await fetch('/api/admin/chat/refresh-profile', {
+      const res = await authFetch('/api/admin/chat/refresh-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactId }),

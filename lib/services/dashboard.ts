@@ -300,7 +300,7 @@ export async function getOptimizedCalendarEvents(
       .map(scheduleDoc => {
         const classDoc = classesMap.get(scheduleDoc.class_id)!;
 
-        const classData: Class = {
+        const classData = {
           id: classDoc.id,
           subjectId: classDoc.subject_id,
           teacherId: classDoc.teacher_id,
@@ -324,7 +324,7 @@ export async function getOptimizedCalendarEvents(
           registrationFee: classDoc.registration_fee,
           status: classDoc.status,
           createdAt: new Date(classDoc.created_at)
-        };
+        } as unknown as Class;
 
         return {
           id: scheduleDoc.id,
@@ -337,7 +337,7 @@ export async function getOptimizedCalendarEvents(
             status: scheduleDoc.status,
             actualTeacherId: scheduleDoc.actual_teacher_id,
             note: scheduleDoc.note,
-            attendance: scheduleDoc.attendance || undefined,
+            attendance: (scheduleDoc as any).attendance || undefined,
             originalDate: scheduleDoc.original_date ? new Date(scheduleDoc.original_date) : undefined,
             rescheduledAt: scheduleDoc.rescheduled_at ? new Date(scheduleDoc.rescheduled_at) : undefined,
             rescheduledBy: scheduleDoc.rescheduled_by
@@ -462,7 +462,7 @@ export async function getOptimizedCalendarEvents(
             registrationFee: classDoc.registration_fee,
             status: classDoc.status,
             createdAt: new Date(classDoc.created_at)
-          });
+          } as unknown as Class);
         }
       }
     }
@@ -482,10 +482,10 @@ export async function getOptimizedCalendarEvents(
           id: studentData.id,
           name: studentData.name || 'ไม่ระบุชื่อ',
           nickname: studentData.nickname || 'นักเรียน',
-          birthdate: studentData.birthdate ? new Date(studentData.birthdate) : undefined,
-          gender: studentData.gender,
-          schoolName: studentData.school_name,
-          gradeLevel: studentData.grade_level
+          birthdate: (studentData as any).birthdate ? new Date((studentData as any).birthdate) : undefined,
+          gender: (studentData as any).gender,
+          schoolName: (studentData as any).school_name,
+          gradeLevel: (studentData as any).grade_level
         });
       });
     }
@@ -494,7 +494,7 @@ export async function getOptimizedCalendarEvents(
     const makeupGroups = new Map<string, MakeupClass[]>();
 
     for (const doc of (makeupData || [])) {
-      const makeup: MakeupClass = {
+      const makeup = {
         id: doc.id,
         type: doc.type,
         originalClassId: doc.original_class_id,
@@ -526,7 +526,7 @@ export async function getOptimizedCalendarEvents(
         notes: doc.notes,
         originalSessionNumber: doc.original_session_number,
         originalSessionDate: doc.original_session_date ? new Date(doc.original_session_date) : undefined
-      };
+      } as MakeupClass;
 
       if (!makeup.makeupSchedule) continue;
 
@@ -663,7 +663,7 @@ export async function getOptimizedCalendarEvents(
         converted: trialDoc.converted,
         convertedToClassId: trialDoc.converted_to_class_id,
         conversionNote: trialDoc.conversion_note,
-        rescheduleHistory: trialDoc.reschedule_history,
+        rescheduleHistory: (trialDoc as any).reschedule_history,
         createdAt: new Date(trialDoc.created_at),
         completedAt: trialDoc.completed_at ? new Date(trialDoc.completed_at) : undefined
       };

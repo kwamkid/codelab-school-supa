@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -141,7 +142,7 @@ export default function ParentForm({ parent, isEdit = false }: ParentFormProps) 
 
         // Fire FB conversion event for new member
         try {
-          await fetch('/api/fb/send-conversion', {
+          await authFetch('/api/fb/send-conversion', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

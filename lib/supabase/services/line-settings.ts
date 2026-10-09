@@ -119,7 +119,7 @@ export async function updateLineSettings(
       .from('settings')
       .upsert({
         key: SETTINGS_KEY,
-        value: updatedValue,
+        value: updatedValue as any,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'key'
@@ -287,7 +287,7 @@ export async function testLineChannel(
     // For Messaging API test
     if (accessToken) {
       // Call API route to test on server-side
-      const response = await fetch('/api/line/test-connection', {
+      const response = await (await import('@/lib/auth-fetch')).authFetch('/api/line/test-connection', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -303,7 +303,7 @@ export async function testLineChannel(
     }
 
     // For LINE Login test
-    const response = await fetch('/api/line/test-connection', {
+    const response = await (await import('@/lib/auth-fetch')).authFetch('/api/line/test-connection', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

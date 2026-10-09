@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireReportScope } from '@/lib/server/report-scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,12 +59,15 @@ interface TrialSession {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServiceClient()
     const { searchParams } = new URL(request.url)
+    const access = await requireReportScope(request.headers.get('authorization'), searchParams.get('branchId'))
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+    const supabase = createServiceClient()
 
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
-    const branchId = searchParams.get('branchId')
+    const branchId = access.branchId
+    const scopeBranchIds = access.branchIds
     const page = parseInt(searchParams.get('page') || '1')
     const pageSize = parseInt(searchParams.get('pageSize') || '50')
 
@@ -97,6 +101,8 @@ export async function GET(request: NextRequest) {
     }
     if (branchId) {
       query = query.eq('branch_id', branchId)
+    } else if (scopeBranchIds) {
+      query = query.in('branch_id', scopeBranchIds)
     }
 
     // Get paginated results
@@ -132,6 +138,8 @@ export async function GET(request: NextRequest) {
     }
     if (branchId) {
       statsQuery = statsQuery.eq('branch_id', branchId)
+    } else if (scopeBranchIds) {
+      statsQuery = statsQuery.in('branch_id', scopeBranchIds)
     }
 
     const { data: allSessions, error: statsError } = await statsQuery

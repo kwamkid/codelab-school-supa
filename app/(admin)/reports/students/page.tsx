@@ -1,4 +1,5 @@
 'use client'
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -115,7 +116,7 @@ export default function StudentReportPage() {
       params.append('status', statusFilter)
       params.append('_t', Date.now().toString())
 
-      const response = await fetch(`/api/reports/students?${params}`, { cache: 'no-store' })
+      const response = await authFetch(`/api/reports/students?${params}`, { cache: 'no-store' })
       const data = await response.json()
       if (data.success) {
         setStats(data.stats)
@@ -233,7 +234,7 @@ export default function StudentReportPage() {
     setMerging(true)
     try {
       const sources = Array.from(selectedSchools)
-      const res = await fetch('/api/schools', {
+      const res = await authFetch('/api/schools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'merge', target: mergeTarget, sources }),
@@ -256,7 +257,7 @@ export default function StudentReportPage() {
   const handleNormalize = async () => {
     setNormalizing(true)
     try {
-      const res = await fetch('/api/schools', {
+      const res = await authFetch('/api/schools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'normalize' }),

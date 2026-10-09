@@ -188,7 +188,7 @@ export async function sendFBConversionInternal(
 
   const { data: logData, error: logError } = await supabase
     .from('fb_conversion_logs')
-    .insert(logEntry as Record<string, unknown>)
+    .insert(logEntry as any)
     .select('id')
     .single()
 

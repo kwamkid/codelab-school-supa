@@ -1,4 +1,5 @@
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -289,7 +290,7 @@ export function AttendanceChecker({
     const fd = new FormData();
     fd.append('file', new File([blob], 'feedback.jpg', { type: 'image/jpeg' }));
     fd.append('bucket', 'attendance-photos');
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const res = await authFetch('/api/upload', { method: 'POST', body: fd });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'อัพโหลดรูปไม่สำเร็จ');
     return json.url as string;

@@ -4,6 +4,7 @@ import { getClient } from '@/lib/supabase/client';
 import { adminMutation } from '@/lib/admin-mutation';
 import { TrialBooking, TrialSession } from '@/types/models';
 import { checkParentPhoneExists } from './parents';
+import { authFetch } from '@/lib/auth-fetch';
 
 // ==================== Trial Bookings ====================
 
@@ -465,7 +466,7 @@ export async function updateTrialBooking(
           grade_level: student.gradeLevel,
           birthdate: student.birthdate
             ? (typeof student.birthdate === 'string'
-                ? student.birthdate.slice(0, 10)
+                ? (student.birthdate as string).slice(0, 10)
                 : student.birthdate.toISOString().split('T')[0])
             : null,
           subject_interests: student.subjectInterests || []
@@ -533,7 +534,7 @@ export async function deleteBookingStudent(
   studentIndex: number
 ): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/trial-booking/${bookingId}/student`, {
+    const response = await authFetch(`/api/admin/trial-booking/${bookingId}/student`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ studentIndex }),
@@ -877,7 +878,7 @@ export async function createTrialSession(
   data: Omit<TrialSession, 'id' | 'createdAt'>
 ): Promise<string> {
   try {
-    const response = await fetch('/api/admin/trial-session', {
+    const response = await authFetch('/api/admin/trial-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1326,7 +1327,7 @@ export async function convertTrialToEnrollment(
 // Uses API route to bypass RLS restrictions
 export async function deleteTrialBooking(id: string): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/trial-booking/${id}`, {
+    const response = await authFetch(`/api/admin/trial-booking/${id}`, {
       method: 'DELETE',
     });
 

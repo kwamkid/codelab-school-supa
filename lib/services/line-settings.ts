@@ -86,19 +86,19 @@ export async function getLineSettings(): Promise<LineSettings> {
     if (data && data.value) {
       // Map JSONB value to LineSettings
       const settings: LineSettings = {
-        loginChannelId: data.value.loginChannelId,
-        loginChannelSecret: data.value.loginChannelSecret,
-        messagingChannelId: data.value.messagingChannelId,
-        messagingChannelSecret: data.value.messagingChannelSecret,
-        messagingChannelAccessToken: data.value.messagingChannelAccessToken,
-        liffId: data.value.liffId,
-        liffChannelId: data.value.liffChannelId,
-        webhookUrl: data.value.webhookUrl,
-        webhookVerified: data.value.webhookVerified ?? false,
-        richMenuId: data.value.richMenuId,
-        richMenuEnabled: data.value.richMenuEnabled ?? false,
-        enableNotifications: data.value.enableNotifications ?? true,
-        enableFeedbackNotifications: data.value.enableFeedbackNotifications ?? true,
+        loginChannelId: (data.value as any).loginChannelId,
+        loginChannelSecret: (data.value as any).loginChannelSecret,
+        messagingChannelId: (data.value as any).messagingChannelId,
+        messagingChannelSecret: (data.value as any).messagingChannelSecret,
+        messagingChannelAccessToken: (data.value as any).messagingChannelAccessToken,
+        liffId: (data.value as any).liffId,
+        liffChannelId: (data.value as any).liffChannelId,
+        webhookUrl: (data.value as any).webhookUrl,
+        webhookVerified: (data.value as any).webhookVerified ?? false,
+        richMenuId: (data.value as any).richMenuId,
+        richMenuEnabled: (data.value as any).richMenuEnabled ?? false,
+        enableNotifications: (data.value as any).enableNotifications ?? true,
+        enableFeedbackNotifications: (data.value as any).enableFeedbackNotifications ?? true,
         updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
         updatedBy: data.updated_by || undefined
       };
@@ -302,7 +302,7 @@ export async function testLineChannel(
     // For Messaging API test
     if (accessToken) {
       // Call API route to test on server-side
-      const response = await fetch('/api/line/test-connection', {
+      const response = await (await import('@/lib/auth-fetch')).authFetch('/api/line/test-connection', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -318,7 +318,7 @@ export async function testLineChannel(
     }
 
     // For LINE Login test
-    const response = await fetch('/api/line/test-connection', {
+    const response = await (await import('@/lib/auth-fetch')).authFetch('/api/line/test-connection', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

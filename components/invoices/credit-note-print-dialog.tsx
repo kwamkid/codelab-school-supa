@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { authFetch } from '@/lib/auth-fetch';
 import {
   DocumentData,
   generateDocumentHTML,
@@ -39,7 +40,7 @@ export default function CreditNotePrintDialog({
   const loadAndPrint = async () => {
     setPrinting(true);
     try {
-      const res = await fetch(`/api/admin/credit-notes/${creditNoteId}`);
+      const res = await authFetch(`/api/admin/credit-notes/${creditNoteId}`);
       if (!res.ok) throw new Error('Failed to load credit note');
       const result = await res.json();
 

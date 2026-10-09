@@ -55,6 +55,30 @@ const DAY_BADGE_COLORS = [
   'bg-purple-100 text-purple-700', // SAT
 ];
 
+// parent จาก /api/liff/profile (RPC get_liff_profile) → รูปแบบเดียวกับ Parent model
+// ที่หน้านี้ใช้อยู่ (address = undefined ถ้าไม่ได้กรอก, ช่องว่างเป็น '' ไม่ใช่ null)
+function normalizeOwnParent(p: any) {
+  const a = p?.address || {};
+  const hasAddress = a.houseNumber || a.subDistrict || a.province;
+  return {
+    id: p.id,
+    displayName: p.displayName || '',
+    phone: p.phone || '',
+    email: p.email || undefined,
+    preferredBranchId: p.preferredBranchId || undefined,
+    address: hasAddress
+      ? {
+          houseNumber: a.houseNumber || '',
+          street: a.street || '',
+          subDistrict: a.subDistrict || '',
+          district: a.district || '',
+          province: a.province || '',
+          postalCode: a.postalCode || '',
+        }
+      : undefined,
+  };
+}
+
 function formatScheduleDate(date: Date): { dayName: string; rest: string; dayClass: string } {
   const d = date instanceof Date ? date : new Date(date);
   if (isNaN(d.getTime())) {
@@ -129,6 +153,7 @@ export default function EventRegistrationPage() {
   // Phone lookup
   const [phoneLookupDone, setPhoneLookupDone] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
+  const [phoneFound, setPhoneFound] = useState(false);
 
   // Additional fields
   const [specialRequest, setSpecialRequest] = useState('');
@@ -191,8 +216,8 @@ export default function EventRegistrationPage() {
   const checkLineLogin = async () => {
     try {
       // ตรวจสอบว่ามี LIFF SDK และ initialized หรือไม่
-      if (typeof window !== 'undefined' && window.liff) {
-        const liff = window.liff;
+      if (typeof window !== 'undefined' && (window as any).liff) {
+        const liff = (window as any).liff;
         
         // รอให้ LIFF พร้อม
         if (!liff.isReady) {
@@ -205,14 +230,17 @@ export default function EventRegistrationPage() {
             const profile = await liff.getProfile();
             setLineProfile(profile);
             
-            // ถ้ามี profile ให้ดึงข้อมูล parent
-            const { getParentByLineId, getStudentsByParent } = await import('@/lib/services/parents');
-            const parent = await getParentByLineId(profile.userId);
+            // ถ้ามี profile ให้ดึงข้อมูลครอบครัวของตัวเอง ผ่าน route ที่ยืนยันตัวตน LINE
+            // (ห้ามอ่าน parents/students ตรงด้วย anon key)
+            const { liffFetch } = await import('@/lib/line/liff-fetch');
+            const res = await liffFetch<{ hasParent: boolean; parent: any; students: any[] }>(
+              '/api/liff/profile',
+              { lineUserId: profile.userId }
+            );
             
-            if (parent) {
-              setParentData(parent);
-              const students = await getStudentsByParent(parent.id);
-              setExistingStudents(students.filter(s => s.isActive));
+            if (res.hasParent && res.parent) {
+              setParentData(normalizeOwnParent(res.parent));
+              setExistingStudents((res.students || []).filter((s: any) => s.isActive !== false));
             }
           } catch (error) {
             console.log('Error getting LINE profile:', error);
@@ -284,53 +312,23 @@ export default function EventRegistrationPage() {
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length < 10 || phoneLookupDone) return;
 
+    // เบอร์ของตัวเอง (login LINE แล้ว) → เติมข้อมูลจากครอบครัวตัวเองได้
+    if (parentData && (parentData.phone || '').replace(/\D/g, '') === cleaned) {
+      handleUseMyData();
+      setPhoneLookupDone(true);
+      return;
+    }
+
+    // เบอร์อื่น → เช็คได้แค่ว่ามีในระบบไหม (ไม่ดึงข้อมูลครอบครัวอื่นมาแสดง)
     setLookingUp(true);
     try {
-      const { searchParentsUnified } = await import('@/lib/services/parents');
-      const results = await searchParentsUnified(cleaned);
-
-      if (results.length > 0) {
-        const parent = results[0];
-        setParentData(parent);
-
-        // Auto-fill contact
-        setContactForm(prev => ({
-          ...prev,
-          name: parent.displayName || prev.name,
-          email: parent.email || prev.email,
-          address: parent.address
-            ? `${parent.address.houseNumber} ${parent.address.street || ''} ${parent.address.subDistrict} ${parent.address.district} ${parent.address.province} ${parent.address.postalCode}`.trim()
-            : prev.address
-        }));
-
-        // Load students
-        const { getStudentsByParent } = await import('@/lib/services/parents');
-        const students = await getStudentsByParent(parent.id);
-        const activeStudents = students.filter((s: any) => s.isActive);
-        setExistingStudents(activeStudents);
-
-        // Pre-fill students if counting by students
-        if (event?.countingMethod === 'students' && activeStudents.length > 0) {
-          setStudentForms(activeStudents.map((student: any) => ({
-            name: student.name,
-            nickname: student.nickname,
-            birthdate: student.birthdate instanceof Date
-              ? student.birthdate.toISOString().split('T')[0]
-              : new Date(student.birthdate).toISOString().split('T')[0],
-            schoolName: student.schoolName || '',
-            gradeLevel: student.gradeLevel || '',
-            selected: true,
-            isExisting: true
-          })));
-        }
-
-        // Set preferred branch
-        if (parent.preferredBranchId && branches.some((b: any) => b.id === parent.preferredBranchId)) {
-          setSelectedBranch(parent.preferredBranchId);
-        }
-
-        toast.success(`พบข้อมูล ${parent.displayName} ดึงข้อมูลให้แล้ว`);
-      }
+      const res = await fetch('/api/liff/phone-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleaned }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setPhoneFound(!!data?.found);
     } catch (error) {
       console.log('Phone lookup error:', error);
     } finally {
@@ -872,6 +870,7 @@ export default function EventRegistrationPage() {
                     setContactForm({ ...contactForm, phone: val });
                     // Reset lookup when phone changes
                     if (phoneLookupDone) setPhoneLookupDone(false);
+                    if (phoneFound) setPhoneFound(false);
                   }}
                   onBlur={() => handlePhoneLookup(contactForm.phone)}
                   placeholder="0812345678"
@@ -883,10 +882,10 @@ export default function EventRegistrationPage() {
                   </div>
                 )}
               </div>
-              {parentData && !lineProfile && (
-                <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 px-3 py-1.5 rounded-lg">
+              {phoneFound && (
+                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-1.5 rounded-lg">
                   <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span>พบข้อมูลในระบบ: {parentData.displayName} — ดึงข้อมูลให้อัตโนมัติแล้ว</span>
+                  <span>เบอร์นี้มีในระบบแล้ว — กรอกข้อมูลที่เหลือแล้วลงทะเบียนได้เลย</span>
                 </div>
               )}
             </div>

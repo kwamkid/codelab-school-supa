@@ -4,6 +4,7 @@ import { getClassSchedules, fixEnrolledCount } from './classes';
 import { createMakeupRequest, getMakeupClassesByStudent, cancelMakeupClass } from './makeup';
 import { getClass } from './classes';
 import { adminMutation } from '@/lib/admin-mutation';
+import { authFetch } from '@/lib/auth-fetch';
 
 const TABLE_NAME = 'enrollments';
 
@@ -115,12 +116,12 @@ export async function getEnrollmentsPaginated(
 
     // Status filter
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      query = query.eq('status', status as any);
     }
 
     // Payment status filter
     if (paymentStatus && paymentStatus !== 'all') {
-      query = query.eq('payment_status', paymentStatus);
+      query = query.eq('payment_status', paymentStatus as any);
     }
 
     // Order by
@@ -624,7 +625,7 @@ export async function updateEnrollment(
 
     // Fire-and-forget: notify FB audience sync when status changes to completed/dropped
     if (enrollmentData.status === 'completed' || enrollmentData.status === 'dropped') {
-      fetch('/api/fb/enrollment-status-change', {
+      authFetch('/api/fb/enrollment-status-change', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enrollmentId: id, newStatus: enrollmentData.status }),
@@ -681,7 +682,7 @@ export async function cancelEnrollment(
     }
 
     // Fire-and-forget: notify FB audience sync
-    fetch('/api/fb/enrollment-status-change', {
+    authFetch('/api/fb/enrollment-status-change', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enrollmentId: id, newStatus: 'dropped' }),
@@ -968,7 +969,7 @@ export async function deleteEnrollment(
   enrollmentId: string
 ): Promise<void> {
   try {
-    const response = await fetch(`/api/admin/enrollments/${enrollmentId}`, {
+    const response = await authFetch(`/api/admin/enrollments/${enrollmentId}`, {
       method: 'DELETE',
     });
 

@@ -18,6 +18,7 @@ import { getTaxInvoices } from '@/lib/services/tax-invoices';
 import { getInvoiceCompanies } from '@/lib/services/invoice-companies';
 import { useDocumentPrint } from '@/hooks/useDocumentPrint';
 import PrintDialogs from '@/components/shared/print-dialogs';
+import { authFetch } from '@/lib/auth-fetch';
 import {
   DocumentData,
   generateDocumentHTML,
@@ -162,7 +163,7 @@ export default function TaxInvoicesPage() {
     if (selectedIds.size === 0) return;
     setBulkPrinting(true);
     try {
-      const res = await fetch('/api/admin/invoices/bulk', {
+      const res = await authFetch('/api/admin/invoices/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),

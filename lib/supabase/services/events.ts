@@ -329,7 +329,7 @@ export async function getEventRegistrations(
   }
 
   if (options?.status) {
-    query = query.eq('status', options.status)
+    query = query.eq('status', options.status as any)
   }
 
   const { data, error } = await query
@@ -397,7 +397,7 @@ export async function createEventRegistration(
   }
 
   // Calculate current attendees
-  const attendeesByBranch = schedule.attendees_by_branch || {}
+  const attendeesByBranch = (schedule.attendees_by_branch || {}) as Record<string, number>
   const currentAttendees = Object.values(attendeesByBranch)
     .reduce((sum: number, count) => sum + (count as number), 0)
 
@@ -408,9 +408,9 @@ export async function createEventRegistration(
   // Calculate attendee count based on counting method
   let attendeeCount = 1
   if (event.counting_method === 'students') {
-    attendeeCount = registrationData.students?.length || 1
+    attendeeCount = (registrationData.students as any[] | null | undefined)?.length || 1
   } else if (event.counting_method === 'parents') {
-    attendeeCount = registrationData.parents?.length || 1
+    attendeeCount = (registrationData.parents as any[] | null | undefined)?.length || 1
   }
 
   if (currentAttendees + attendeeCount > schedule.max_attendees) {
@@ -478,7 +478,7 @@ export async function cancelEventRegistration(
     throw new Error('ไม่พบข้อมูลรอบเวลา')
   }
 
-  const attendeesByBranch = schedule.attendees_by_branch || {}
+  const attendeesByBranch = (schedule.attendees_by_branch || {}) as Record<string, number>
   const currentBranchCount = attendeesByBranch[registration.branch_id] || 0
   const newBranchCount = Math.max(0, currentBranchCount - registration.attendee_count)
 

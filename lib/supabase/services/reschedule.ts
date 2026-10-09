@@ -112,7 +112,7 @@ export async function rescheduleAllClasses(): Promise<{
       if (schedulesToInsert.length > 0) {
         const { error: insertError } = await supabase
           .from('class_schedules')
-          .insert(schedulesToInsert)
+          .insert(schedulesToInsert as any)
 
         if (insertError) {
           console.error(`Error inserting schedules for ${cls.name}:`, insertError)

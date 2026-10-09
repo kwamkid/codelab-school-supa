@@ -5,6 +5,7 @@
 // POST { parentId, studentId } → deleteOrphanedStudent()
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSuperAdmin, bearer } from '@/lib/server/admin-auth'
 import {
   getDataCleaningStats,
   getOrphanedStudents,
@@ -14,6 +15,8 @@ import {
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const action = request.nextUrl.searchParams.get('action')
   try {
     if (action === 'stats') {
@@ -30,6 +33,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     const { parentId, studentId } = await request.json()
     if (!parentId || !studentId) {

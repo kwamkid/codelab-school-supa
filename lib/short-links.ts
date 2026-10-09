@@ -2,6 +2,8 @@
 // The API route does the real work; these keep the callers consistent so a page
 // can't accidentally hand out the long /liff/events/register/<uuid> URL.
 
+import { authFetch } from '@/lib/auth-fetch'
+
 /** Long registration URL — the fallback when no short link can be made. */
 export function longEventRegistrationUrl(eventId: string, origin?: string): string {
   const base = origin ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -20,7 +22,7 @@ export function shortEventUrl(code: string, origin?: string): string {
  */
 export async function fetchEventShortCode(eventId: string): Promise<string | null> {
   try {
-    const res = await fetch('/api/admin/short-links', {
+    const res = await authFetch('/api/admin/short-links', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId }),

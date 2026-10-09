@@ -809,3 +809,120 @@ export async function updateStudentForParent(
   if (error) throw error;
   return { ok: true };
 }
+
+// ---- student detail / delete (portal profile) -----------------------------
+
+// Full student record for the edit-student page, scoped to the caller's family
+// (secondary recipients resolve to the primary family). null = not found / not theirs.
+export async function getStudentForFamily(lineUserId: string, studentId: string) {
+  const supabase = createServiceClient() as any;
+  const viewer = await getViewerContext(supabase, lineUserId);
+  if (!viewer) return null;
+
+  const { data } = await supabase
+    .from('students')
+    .select('*')
+    .eq('id', studentId)
+    .eq('parent_id', viewer.parent.id)
+    .maybeSingle();
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    studentCode: data.student_code ?? null,
+    parentId: data.parent_id,
+    name: data.name,
+    nameEn: data.name_en ?? null,
+    nickname: data.nickname ?? null,
+    // date column → 'YYYY-MM-DD' (JSON-safe, no timezone shift)
+    birthdate: data.birthdate ? String(data.birthdate).slice(0, 10) : null,
+    gender: data.gender,
+    schoolName: data.school_name ?? null,
+    gradeLevel: data.grade_level ?? null,
+    profileImage: data.profile_image ?? null,
+    allergies: data.allergies ?? null,
+    specialNeeds: data.special_needs ?? null,
+    emergencyContact: data.emergency_contact ?? null,
+    emergencyPhone: data.emergency_phone ?? null,
+    isActive: data.is_active ?? true,
+  };
+}
+
+// Delete one of the caller's own students. Primary account only (secondary
+// recipients are read-only for family data). Same rules as the admin route's
+// non-force path: blocked if the student has active/pending enrollments or any
+// attendance history; otherwise a hard delete.
+export async function deleteStudentForParent(lineUserId: string, studentId: string) {
+  const supabase = createServiceClient() as any;
+  const viewer = await getViewerContext(supabase, lineUserId);
+  if (!viewer) return { ok: false, status: 404, message: 'ไม่พบข้อมูลผู้ปกครอง' };
+  if (viewer.isSecondary) {
+    return { ok: false, status: 403, message: 'เฉพาะผู้ปกครองหลักเท่านั้นที่ลบข้อมูลนักเรียนได้' };
+  }
+
+  const { data: student } = await supabase
+    .from('students')
+    .select('id, parent_id, name, nickname')
+    .eq('id', studentId)
+    .maybeSingle();
+  if (!student || student.parent_id !== viewer.parent.id) {
+    return { ok: false, status: 404, message: 'ไม่พบข้อมูลนักเรียน' };
+  }
+
+  const { count: enrollmentCount } = await supabase
+    .from('enrollments')
+    .select('*', { count: 'exact', head: true })
+    .eq('student_id', studentId)
+    .in('status', ['active', 'pending']);
+  if (enrollmentCount && enrollmentCount > 0) {
+    return { ok: false, status: 400, message: 'ไม่สามารถลบนักเรียนที่มีการลงทะเบียนเรียนอยู่ได้' };
+  }
+
+  const { count: attendanceCount } = await supabase
+    .from('attendance')
+    .select('*', { count: 'exact', head: true })
+    .eq('student_id', studentId);
+  if (attendanceCount && attendanceCount > 0) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'ไม่สามารถลบนักเรียนที่มีประวัติเข้าเรียนได้ กรุณาติดต่อสถาบัน',
+    };
+  }
+
+  const { error } = await supabase
+    .from('students')
+    .delete()
+    .eq('id', studentId)
+    .eq('parent_id', viewer.parent.id);
+  if (error) throw error;
+
+  await logLiffActivity(supabase, viewer, 'student.delete', {
+    studentId,
+    detail: { name: student.name, nickname: student.nickname },
+  });
+  return { ok: true };
+}
+
+// ---- misc -----------------------------------------------------------------
+
+// Stamp parents.last_login_at for the primary account opening the portal.
+// Secondary recipients have no parents row of their own → no-op.
+export async function touchParentLastLogin(lineUserId: string) {
+  const supabase = createServiceClient() as any;
+  await supabase
+    .from('parents')
+    .update({ last_login_at: new Date().toISOString() })
+    .eq('line_user_id', lineUserId);
+}
+
+// Public phone check for the event-registration form. Returns ONLY whether the
+// number exists — never the family's name/address/students (anyone can type a
+// phone number here).
+export async function parentPhoneExists(phone: string): Promise<boolean> {
+  const cleaned = (phone || '').replace(/\D/g, '');
+  if (cleaned.length < 9) return false;
+  const supabase = createServiceClient() as any;
+  const { data } = await supabase.from('parents').select('id').eq('phone', cleaned).limit(1);
+  return (data || []).length > 0;
+}

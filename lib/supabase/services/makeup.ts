@@ -511,7 +511,7 @@ export async function checkTeacherAvailability(
   const dateString = date.toISOString().split('T')[0]
 
   // Check for holidays
-  const { data: holidays } = await supabase
+  const { data: holidays } = await (supabase as any)
     .from('holidays')
     .select('name')
     .eq('branch_id', branchId)

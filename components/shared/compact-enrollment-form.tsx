@@ -382,7 +382,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
       if (studentMode === 'existing' && !selectedStudentId) {
         newErrors.student = 'กรุณาเลือกนักเรียน';
       }
-      if (studentMode === 'new' || (existingStudents.length === 0 && studentMode !== 'new')) {
+      if (studentMode === 'new' || (existingStudents.length === 0 && (studentMode as string) !== 'new')) {
         if (!studentName.trim()) newErrors.studentName = 'กรุณากรอกชื่อนักเรียน';
         if (!studentNickname.trim()) newErrors.studentNickname = 'กรุณากรอกชื่อเล่น';
         if (!studentBirthdate) newErrors.studentBirthdate = 'กรุณาเลือกวันเกิด';

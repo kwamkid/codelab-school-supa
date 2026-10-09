@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireStaff, bearer } from '@/lib/server/admin-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 // Force dynamic rendering
@@ -12,6 +13,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireStaff(bearer(request.headers.get('authorization')))
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if (auth.role === 'teacher') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const supabase = createServiceClient()
   const { id } = await params
 
@@ -58,7 +62,7 @@ export async function DELETE(
 
     // Create deletion log (optional, don't fail if it errors)
     if (deletedBy) {
-      const { error: logError } = await supabase
+      const { error: logError } = await (supabase as any)
         .from('deletion_logs')
         .insert({
           type: 'makeup_class',

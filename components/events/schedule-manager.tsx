@@ -127,7 +127,8 @@ export default function ScheduleManager({ eventId, schedules, branches = [], onU
         await updateEventSchedule(editingSchedule.id, scheduleData);
         toast.success('แก้ไขรอบเวลาเรียบร้อยแล้ว');
       } else {
-        await createEventSchedule(scheduleData);
+        // maxAttendeesByBranch/status are defaulted inside createEventSchedule
+        await createEventSchedule(scheduleData as Parameters<typeof createEventSchedule>[0]);
         toast.success('เพิ่มรอบเวลาเรียบร้อยแล้ว');
       }
 

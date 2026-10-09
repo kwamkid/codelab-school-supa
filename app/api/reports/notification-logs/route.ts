@@ -2,10 +2,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getNotificationLogs, getNotificationStats } from '@/lib/services/notification-logger';
+import { requireReportScope } from '@/lib/server/report-scope';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  // Reports = super_admin + branch_admin (logs are not branch-scoped)
+  const access = await requireReportScope(request.headers.get('authorization'), null);
+  if (!access.ok) return NextResponse.json({ success: false, error: access.error }, { status: access.status });
+
   try {
     const { searchParams } = new URL(request.url);
 

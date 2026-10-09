@@ -1,6 +1,7 @@
 // components/settings/line-webhook-test.tsx
 
 'use client';
+import { authFetch } from '@/lib/auth-fetch'
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -71,7 +72,7 @@ export default function LineWebhookTest({
     setTesting(true);
     
     try {
-      const response = await fetch('/api/line/set-webhook', {
+      const response = await authFetch('/api/line/set-webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

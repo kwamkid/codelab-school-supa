@@ -1,3 +1,4 @@
+import { authFetch } from '@/lib/auth-fetch'
 // lib/services/unified-enrollment.ts
 
 import { createParent, createStudent } from './parents';
@@ -360,7 +361,7 @@ export async function processUnifiedEnrollment(
 
   // 9. Send FB Conversion event (Purchase) via API route
   try {
-    fetch('/api/fb/send-conversion', {
+    authFetch('/api/fb/send-conversion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

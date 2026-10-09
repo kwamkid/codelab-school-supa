@@ -88,9 +88,11 @@ export async function notifyAdminsInBranch(
     const admins = await getAdminUsers(branchId);
     
     // Create notification for each admin
-    const promises = admins.map(admin => 
+    // notifications.user_id = auth.users id (the layout reads them with useAuth().user.uid);
+    // admins who never logged in have no auth id yet — skip them
+    const promises = admins.filter(admin => admin.authUserId).map(admin =>
       createNotification({
-        userId: admin.uid,
+        userId: admin.authUserId as string,
         ...notification
       })
     );

@@ -82,7 +82,7 @@ export const ParentSearchInput = forwardRef<ParentSearchInputRef, ParentSearchIn
       parentId: r.parent.id,
       parentName: r.parent.displayName || r.parent.phone,
       parentPhone: r.parent.phone,
-      parentAddress: r.parent.address,
+      parentAddress: r.parent.address as ParentSearchSelection['parentAddress'],
       students: r.students,
     });
     setSearchTerm('');
