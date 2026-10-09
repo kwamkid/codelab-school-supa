@@ -16,6 +16,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { createRefundNote } from '@/lib/services/credit-notes';
 import { useAuth } from '@/hooks/useAuth';
 
+import { toast } from 'sonner';
 interface IssueRefundNoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -81,7 +82,7 @@ export default function IssueRefundNoteDialog({
       setReason('ยกเลิกการลงทะเบียนเรียน');
     } catch (error) {
       console.error('Error creating refund note:', error);
-      alert('เกิดข้อผิดพลาดในการออกใบบันทึกคืนเงิน');
+      toast.error('เกิดข้อผิดพลาดในการออกใบบันทึกคืนเงิน');
     } finally {
       setSubmitting(false);
     }

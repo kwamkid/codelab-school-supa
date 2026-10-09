@@ -41,6 +41,7 @@ import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate, formatTime } from '@/lib/utils';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface EventFormProps {
   event?: Event;
@@ -882,7 +883,7 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                       />
                     </div>
                     <div className="flex items-end gap-1 ml-auto">
-                      <Button
+                      <Tooltip label="คัดลอก"><Button
                         type="button"
                         variant="ghost"
                         size="sm"
@@ -894,22 +895,20 @@ export default function EventForm({ event, isEdit = false }: EventFormProps) {
                             toast.error('กรุณากรอกข้อมูลให้ครบก่อนคัดลอก');
                           }
                         }}
-                        title="คัดลอก"
                       >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
-                      </Button>
-                      <Button
+                      </Button></Tooltip>
+                      <Tooltip label="ลบ"><Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteSchedule(schedule.tempId)}
                         className="text-red-600 hover:text-red-700"
-                        title="ลบ"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </Button></Tooltip>
                     </div>
                     </div>
                   </div>

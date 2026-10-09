@@ -1,6 +1,9 @@
 'use client';
 
-import { useEffect, useState, useMemo, Suspense, ReactNode } from 'react';
+import { useEffect, useRef, useState, useMemo, Suspense, ReactNode } from 'react';
+import { authFetch } from '@/lib/auth-fetch';
+import { canAccessRoute, routeRuleFor } from '@/lib/auth/route-access';
+import { AccessDenied } from '@/components/auth/role-gate';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -52,6 +55,9 @@ import {
   PanelLeftOpen,
   Trophy,
   ClipboardCheck,
+  FileWarning,
+  Crown,
+  Activity,
   LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -93,12 +99,11 @@ interface MenuLinkProps {
   href: string;
   children: ReactNode;
   className?: string;
-  title?: string;
   onClick?: () => void;
 }
 
 // Custom Link component with loading
-const MenuLink = ({ href, children, className, title, onClick }: MenuLinkProps) => {
+const MenuLink = ({ href, children, className, onClick }: MenuLinkProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -132,7 +137,7 @@ const MenuLink = ({ href, children, className, title, onClick }: MenuLinkProps) 
   };
 
   return (
-    <Link href={href} onClick={handleClick} className={className} title={title}>
+    <Link href={href} onClick={handleClick} className={className}>
       {isLoading ? (
         <div className="flex items-center text-white/70">
           <Loader2 className="mr-3 h-4 w-4 animate-spin" />
@@ -654,7 +659,33 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       name: 'divider-4',
       isDivider: true
     },
-    // --- รายงาน & ตั้งค่า ---
+    // --- ผู้บริหาร (super_admin) / รายงาน & ตั้งค่า ---
+    {
+      name: 'ผู้บริหาร',
+      icon: Crown,
+      iconColor: 'text-amber-500',
+      requiredRole: ['super_admin'],
+      subItems: [
+        {
+          name: 'รายงานผู้บริหาร',
+          href: '/reports/business',
+          icon: BarChart3,
+          iconColor: 'text-indigo-600'
+        },
+        {
+          name: 'ยอดที่ยังไม่ได้ลง',
+          href: '/reports/payment-gaps',
+          icon: FileWarning,
+          iconColor: 'text-orange-500'
+        },
+        {
+          name: 'สถิติการใช้งาน',
+          href: '/reports/usage',
+          icon: Activity,
+          iconColor: 'text-teal-600'
+        },
+      ]
+    },
     {
       name: 'รายงาน',
       icon: BarChart3,
@@ -710,7 +741,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
           iconColor: 'text-purple-600'
         },
         {
-          name: 'พิมพ์ใบประกาศนียบัตร',
+          name: 'ใบประกาศนียบัตร',
           href: '/certificates',
           icon: Award,
           iconColor: 'text-orange-500'
@@ -810,6 +841,37 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
       ]
     },
   ], [pendingMakeupCount, newTrialCount, chatUnreadCount, vexPendingCount]); // dependencies สำหรับ badges
+
+  // สถิติการใช้งานเมนู (/reports/usage) — log 1 แถวต่อการเปิดหน้า ผ่าน /api/admin/track-view
+  // (best-effort ไม่รอผล) · path เดิมซ้ำภายใน 30 วินาทีไม่นับ · uuid ใน path → [id]
+  // menuHref = href ของเมนู sidebar ที่ตรงกับ path ยาวที่สุด (key จัดกลุ่มสถิติ — เปลี่ยนชื่อเมนูไม่แตกแถว), menu = ชื่อไว้แสดง
+  const lastViewRef = useRef<{ path: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!adminUser || !pathname) return;
+    const path = pathname.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '[id]');
+    const now = Date.now();
+    if (lastViewRef.current?.path === path && now - lastViewRef.current.at < 30_000) return;
+    lastViewRef.current = { path, at: now };
+
+    let menu: string | null = null;
+    let menuHref: string | null = null;
+    const walk = (items: NavigationItem[]) => items.forEach((it) => {
+      if (it.href && (pathname === it.href || pathname.startsWith(it.href + '/')) && it.href.length > (menuHref?.length ?? 0)) {
+        menuHref = it.href;
+        menu = it.name;
+      }
+      if (it.subItems) walk(it.subItems);
+    });
+    walk(navigation);
+
+    authFetch('/api/admin/track-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, menu, menuHref }),
+      keepalive: true,
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- navigation changes with badge counts; only a navigation should log
+  }, [pathname, adminUser?.id]);
 
   // ใช้ useMemo เพื่อ filter navigation
   const filteredNavigation = useMemo(
@@ -1004,7 +1066,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                 const ItemIcon = item.icon;
 
                 return (
-                  <div key={item.name} className={item.isDivider ? '' : 'mb-2'}>
+                  <div key={item.name} className={item.isDivider ? '' : 'mb-1'}>
                     {item.isDivider ? (
                       <div className="my-3 border-t border-[#efe9e6] dark:border-border">
                         {item.sectionLabel && (
@@ -1023,7 +1085,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                             toggleExpanded(item.name);
                           }}
                           className={cn(
-                            'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
+                            'flex w-full items-center justify-between rounded-lg px-3 py-2 text-[15px] font-medium transition-colors',
                             sidebarCollapsed && 'lg:justify-center',
                             isSubItemActive(item)
                               ? 'bg-[#fbe9e7] text-[#ef443a] font-semibold dark:bg-primary/15 dark:text-primary'
@@ -1049,7 +1111,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                         </button>
                         </Tooltip>
                         {expandedItems.includes(item.name) && (
-                          <div className={cn('mt-2 ml-8 space-y-1', sidebarCollapsed && 'lg:hidden')}>
+                          <div className={cn('mt-1 ml-6 space-y-0.5', sidebarCollapsed && 'lg:hidden')}>
                             {item.subItems.map((subItem) => {
                               const SubItemIcon = subItem.icon;
 
@@ -1058,9 +1120,9 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                                   key={subItem.name}
                                   href={subItem.href}
                                   className={cn(
-                                    'flex items-center rounded-lg px-3 py-2 text-base font-medium transition-colors',
+                                    'flex items-center rounded-lg px-3 py-1.5 text-[15px] font-medium transition-colors',
                                     isActive(subItem.href)
-                                      ? 'bg-[#ef443a] text-white font-semibold shadow-[0_4px_12px_rgba(239,68,58,0.28)]'
+                                      ? 'bg-[#ef443a] text-white font-semibold'
                                       : 'text-[#8a7d77] hover:bg-[#f3ede9] dark:text-muted-foreground dark:hover:bg-muted'
                                   )}
                                   onClick={() => {
@@ -1072,7 +1134,7 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                                   }}
                                 >
                                   {SubItemIcon && <SubItemIcon className="mr-3 h-4 w-4 opacity-70" />}
-                                  <span className="flex-1">{subItem.name}</span>
+                                  <span className="flex-1 min-w-0 truncate whitespace-nowrap">{subItem.name}</span>
                                   {subItem.badge && (
                                     <span className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-xs font-semibold">
                                       {subItem.badge}
@@ -1090,10 +1152,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
                       <MenuLink
                         href={item.href}
                         className={cn(
-                          'relative flex items-center rounded-lg px-3 py-2.5 text-base font-medium transition-colors',
+                          'relative flex items-center rounded-lg px-3 py-2 text-[15px] font-medium transition-colors',
                           sidebarCollapsed && 'lg:justify-center',
                           isActive(item.href)
-                            ? 'bg-[#ef443a] text-white font-semibold shadow-[0_4px_12px_rgba(239,68,58,0.28)]'
+                            ? 'bg-[#ef443a] text-white font-semibold'
                             : 'text-[#6b5f5a] hover:bg-[#f3ede9] dark:text-foreground/80 dark:hover:bg-muted'
                         )}
                         onClick={() => {
@@ -1321,7 +1383,10 @@ function AdminLayoutContent({ children }: { children: ReactNode }) {
               <Suspense fallback={null}>
                 <PrioritySection pathname={pathname} />
               </Suspense>
-              {children}
+              {/* route guard — lib/auth/route-access.ts (หน้าที่ role นี้เข้าไม่ได้ แม้พิมพ์ URL ตรง) */}
+              {adminUser && !canAccessRoute(pathname, adminUser.role)
+                ? <AccessDenied roles={routeRuleFor(pathname)?.roles} />
+                : children}
             </div>
           </main>
         </div>

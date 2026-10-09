@@ -19,6 +19,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface SecureSlideViewerProps {
   material: TeachingMaterial;
@@ -94,55 +95,50 @@ export default function SecureSlideViewer({
             </div>
             
             <div className="flex items-center gap-2">
-              <Button
+              <Tooltip label="Refresh Slides (R)"><Button
                 variant="outline"
                 size="sm"
                 onClick={refreshSlides}
-                title="Refresh Slides (R)"
                 className="bg-white text-black border-gray-300 hover:bg-gray-100"
               >
                 <RotateCcw className="h-4 w-4" />
-              </Button>
+              </Button></Tooltip>
               
-              <Button
+              <Tooltip label="Exit Fullscreen (F)"><Button
                 variant="outline"
                 size="sm"
                 onClick={toggleFullscreen}
-                title="Exit Fullscreen (F)"
                 className="bg-white text-black border-gray-300 hover:bg-gray-100"
               >
                 <Minimize2 className="h-4 w-4" />
-              </Button>
+              </Button></Tooltip>
               
-              <Button
+              <Tooltip label="Toggle Info (I)"><Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowInfo(!showInfo)}
-                title="Toggle Info (I)"
                 className="bg-white text-black border-gray-300 hover:bg-gray-100"
               >
                 <BookOpen className="h-4 w-4" />
-              </Button>
+              </Button></Tooltip>
               
-              <Button
+              <Tooltip label="Hide controls (H)"><Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowControls(false)}
-                title="Hide controls (H)"
                 className="bg-white text-black border-gray-300 hover:bg-gray-100"
               >
                 Hide
-              </Button>
+              </Button></Tooltip>
               
-              <Button
+              <Tooltip label="Back (Esc)"><Button
                 variant="outline"
                 size="sm"
                 onClick={onBack}
-                title="Back (Esc)"
                 className="bg-red-500 text-white border-red-500 hover:bg-red-600"
               >
                 <X className="h-4 w-4" />
-              </Button>
+              </Button></Tooltip>
             </div>
           </div>
         )}
@@ -277,26 +273,23 @@ export default function SecureSlideViewer({
         </div>
         
         <div className="flex items-center gap-2">
-          <Button
+          <Tooltip label="Refresh Slides (R)"><Button
             variant="outline"
             size="sm"
             onClick={refreshSlides}
-            title="Refresh Slides (R)"
           >
             <RotateCcw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">รีเฟรช</span>
-          </Button>
+          </Button></Tooltip>
           
           <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                title="Keyboard Shortcuts"
-              >
-                <HelpCircle className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
+            <Tooltip label="คีย์ลัด">
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+            </Tooltip>
             <PopoverContent className="w-64" align="end">
               <div className="space-y-2">
                 <h4 className="font-medium text-sm mb-2">คีย์ลัด</h4>
@@ -326,15 +319,14 @@ export default function SecureSlideViewer({
             </PopoverContent>
           </Popover>
           
-          <Button
+          <Tooltip label="Fullscreen (F)"><Button
             size="sm"
             onClick={toggleFullscreen}
-            title="Fullscreen (F)"
             className="bg-blue-600 hover:bg-blue-700"
           >
             <Maximize2 className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">เต็มจอ</span>
-          </Button>
+          </Button></Tooltip>
         </div>
       </div>
 

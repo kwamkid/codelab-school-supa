@@ -30,7 +30,9 @@ import { authFetch } from '@/lib/auth-fetch';
 import FactoryResetDialog from './factory-reset-dialog';
 import { SectionLoading } from '@/components/ui/loading';
 
+import { useConfirm } from '@/components/ui/confirm-dialog';
 export default function GeneralSettingsComponent() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,7 +84,7 @@ export default function GeneralSettingsComponent() {
   };
 
   const handleResetAllPasswords = async () => {
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตรหัสผ่านของผู้ดูแลระบบทุกคนเป็น "codel@b1432"?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้!')) {
+    if (!await confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตรหัสผ่านของผู้ดูแลระบบทุกคนเป็น "codel@b1432"?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้!')) {
       return;
     }
 

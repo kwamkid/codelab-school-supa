@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { getLineSettings } from '@/lib/services/line-settings';
 
+import { Input } from '@/components/ui/input';
 export default function WebhookTestPage() {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [testing, setTesting] = useState(false);
@@ -189,11 +190,11 @@ export default function WebhookTestPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
-            <input
+            <Input
               type="text"
               value={webhookUrl}
               readOnly
-              className="flex-1 px-3 py-2 border rounded-md bg-gray-50 font-mono text-sm"
+              className="flex-1 bg-gray-50 font-mono"
             />
             <Button size="sm" variant="outline" onClick={copyUrl}>
               <Copy className="h-4 w-4" />

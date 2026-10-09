@@ -5,6 +5,7 @@ import {
   BookOpen, Lightbulb, Target, Rocket, Trophy, Brain, Music, Palette,
   Sparkles, ThumbsUp, Flame, Award, Star, type LucideIcon,
 } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 
 // No emoji anywhere — quizzes/categories/grades use these lucide icons.
 export const QUIZ_ICONS: Record<string, LucideIcon> = {
@@ -32,17 +33,15 @@ export function IconPicker({ value, onChange }: { value?: string; onChange: (nam
         const Ic = QUIZ_ICONS[n];
         const active = value === n;
         return (
-          <button
-            key={n}
+          <Tooltip label={n} key={n}><button
             type="button"
             onClick={() => onChange(n)}
             className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center transition-colors ${
               active ? 'border-red-500 bg-red-50 text-red-600' : 'border-gray-200 text-gray-600 hover:border-gray-300'
             }`}
-            title={n}
           >
             <Ic className="h-5 w-5" />
-          </button>
+          </button></Tooltip>
         );
       })}
     </div>

@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { recordMakeupAttendance, updateMakeupAttendance } from '@/lib/services/makeup';
 import { Check, X } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 
 // --- Types ---
 
@@ -157,13 +158,11 @@ function ScheduleCard({
           {studentCount > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
               {item.students.map((s, i) => (
-                <span
-                  key={s.id || `${item.schedule_id}-${i}`}
+                <Tooltip label={s.name} key={s.id || `${item.schedule_id}-${i}`}><span
                   className="rounded-full bg-gray-50 border border-gray-200 px-2.5 py-1 text-sm text-gray-700"
-                  title={s.name}
                 >
                   {s.nickname || s.name}
-                </span>
+                </span></Tooltip>
               ))}
             </div>
           )}

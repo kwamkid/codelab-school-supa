@@ -556,9 +556,9 @@ export default function ParentsPage() {
                               {parent.email && (
                                 <div className="flex items-center gap-1">
                                   <Mail className="h-3 w-3" />
-                                  <span className="truncate max-w-[150px]" title={parent.email}>
+                                  <Tooltip label={parent.email}><span className="truncate max-w-[150px]">
                                     {parent.email}
-                                  </span>
+                                  </span></Tooltip>
                                 </div>
                               )}
                             </div>

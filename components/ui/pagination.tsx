@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface PaginationProps {
   currentPage: number;
@@ -105,28 +106,26 @@ export function Pagination({
         {showNavigation && (
           <div className="flex items-center justify-center gap-1">
             {showFirstLastButtons && (
-              <Button
+              <Tooltip label="หน้าแรก"><Button
                 variant="outline"
                 size="sm"
                 onClick={() => onPageChange(1)}
                 disabled={!canGoFirst}
                 className="h-8 w-8"
-                title="หน้าแรก"
               >
                 <ChevronsLeft className="h-4 w-4" />
-              </Button>
+              </Button></Tooltip>
             )}
 
-            <Button
+            <Tooltip label="หน้าก่อนหน้า"><Button
               variant="outline"
               size="sm"
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
               className="h-8 w-8"
-              title="หน้าก่อนหน้า"
             >
               <ChevronLeft className="h-4 w-4" />
-            </Button>
+            </Button></Tooltip>
 
             {getPageNumbers(true).map((pageNum) => (
               <Button
@@ -140,28 +139,26 @@ export function Pagination({
               </Button>
             ))}
 
-            <Button
+            <Tooltip label="หน้าถัดไป"><Button
               variant="outline"
               size="sm"
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               className="h-8 w-8"
-              title="หน้าถัดไป"
             >
               <ChevronRight className="h-4 w-4" />
-            </Button>
+            </Button></Tooltip>
 
             {showFirstLastButtons && (
-              <Button
+              <Tooltip label="หน้าสุดท้าย"><Button
                 variant="outline"
                 size="sm"
                 onClick={() => onPageChange(totalPages)}
                 disabled={!canGoLast}
                 className="h-8 w-8"
-                title="หน้าสุดท้าย"
               >
                 <ChevronsRight className="h-4 w-4" />
-              </Button>
+              </Button></Tooltip>
             )}
           </div>
         )}
@@ -194,28 +191,26 @@ export function Pagination({
         {showNavigation && (
           <div className="flex items-center gap-2">
             {showFirstLastButtons && (
-              <Button
+              <Tooltip label="หน้าแรก"><Button
                 variant="outline"
                 size="sm"
                 onClick={() => onPageChange(1)}
                 disabled={!canGoFirst}
                 className="w-9"
-                title="หน้าแรก"
               >
                 <ChevronsLeft className="h-4 w-4" />
-              </Button>
+              </Button></Tooltip>
             )}
 
-            <Button
+            <Tooltip label="หน้าก่อนหน้า"><Button
               variant="outline"
               size="sm"
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
               className="w-9"
-              title="หน้าก่อนหน้า"
             >
               <ChevronLeft className="h-4 w-4" />
-            </Button>
+            </Button></Tooltip>
 
             <div className="flex items-center gap-1">
               {getPageNumbers(false).map((pageNum) => (
@@ -231,28 +226,26 @@ export function Pagination({
               ))}
             </div>
 
-            <Button
+            <Tooltip label="หน้าถัดไป"><Button
               variant="outline"
               size="sm"
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               className="w-9"
-              title="หน้าถัดไป"
             >
               <ChevronRight className="h-4 w-4" />
-            </Button>
+            </Button></Tooltip>
 
             {showFirstLastButtons && (
-              <Button
+              <Tooltip label="หน้าสุดท้าย"><Button
                 variant="outline"
                 size="sm"
                 onClick={() => onPageChange(totalPages)}
                 disabled={!canGoLast}
                 className="w-9"
-                title="หน้าสุดท้าย"
               >
                 <ChevronsRight className="h-4 w-4" />
-              </Button>
+              </Button></Tooltip>
             )}
           </div>
         )}

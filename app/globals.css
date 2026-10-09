@@ -437,3 +437,23 @@ button[aria-busy="true"]::after,
   font-size: 14px;
   line-height: 1.2;
 }
+
+/* ===== Shared component classes (design system) =====
+   Used by components/ui/{pill,sticky-bar,loading-overlay,kpi-card}.tsx — prefer the
+   component; use the class directly only where a component doesn't fit. */
+@layer components {
+  /* digits that line up in tables / KPI numbers */
+  .num { @apply tabular-nums; }
+
+  /* small status tag (ป้าย) — readable size, never text-xs (owner: "เล็กไป") */
+  .pill { @apply inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-sm font-medium; }
+
+  /* filter bar that stays at the top of <main> (the admin scroll container) */
+  .sticky-bar {
+    @apply sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3
+      bg-white/95 backdrop-blur border-b border-gray-100 dark:bg-background/95 dark:border-border;
+  }
+
+  /* dim the page while it re-fetches; parent must be `relative` */
+  .loading-overlay { @apply absolute inset-0 z-20 flex items-start justify-center pt-32 bg-white/60 dark:bg-background/60; }
+}

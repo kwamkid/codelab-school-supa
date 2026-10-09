@@ -15,6 +15,7 @@ import {
 import { ChatQuickReply } from '@/types/models';
 import { getQuickReplies, createQuickReply, updateQuickReply, deleteQuickReply } from '@/lib/services/chat';
 import { toast } from 'sonner';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface QuickReplyDialogProps {
   open: boolean;
@@ -166,14 +167,14 @@ export function QuickReplyDialog({ open, onClose, onSelect }: QuickReplyDialogPr
                       </div>
 
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
-                          onClick={(e) => handleEdit(reply, e)} title="แก้ไข">
+                        <Tooltip label="แก้ไข"><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                          onClick={(e) => handleEdit(reply, e)}>
                           <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
-                          onClick={(e) => handleDelete(reply.id, e)} title="ลบ">
+                        </Button></Tooltip>
+                        <Tooltip label="ลบ"><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                          onClick={(e) => handleDelete(reply.id, e)}>
                           <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        </Button></Tooltip>
                       </div>
                     </div>
                   ))}

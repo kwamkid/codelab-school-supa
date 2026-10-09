@@ -23,6 +23,7 @@ import { SectionLoading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Check, X, CalendarClock, RotateCcw, Clock } from 'lucide-react'
 import type { PracticeStatus } from '@/lib/vex/types'
+import { Tooltip } from '@/components/ui/tooltip'
 
 interface PracticeRow {
   id: string
@@ -382,16 +383,15 @@ export function PracticesReview({
                       ) : (
                         <>
                           <Badge className={STATUS_META[p.status].chip}>{STATUS_META[p.status].label}</Badge>
-                          <Button
+                          <Tooltip label="ย้อนกลับเป็นรออนุมัติ"><Button
                             size="sm"
                             variant="ghost"
                             onClick={() => review(p.id, 'proposed')}
                             disabled={busyId === p.id}
                             className="gap-1 text-gray-500"
-                            title="ย้อนกลับเป็นรออนุมัติ"
                           >
                             <RotateCcw className="h-4 w-4" />
-                          </Button>
+                          </Button></Tooltip>
                         </>
                       )}
                     </div>

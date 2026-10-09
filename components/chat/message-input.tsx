@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { QuickReplyDialog } from './quick-reply-dialog';
+import { Tooltip } from '@/components/ui/tooltip';
 
+import { Textarea } from '@/components/ui/textarea';
 interface MessageInputProps {
   onSend: (content: string, messageType?: string, mediaUrl?: string) => void;
   /** Batch send: text blocks + images in 1 API request (saves LINE credits) */
@@ -183,32 +185,30 @@ export function MessageInput({ onSend, onSendBatch, disabled = false, autoFocus 
 
       <div className="flex items-end gap-1">
         {/* Quick Reply button */}
-        <Button
+        <Tooltip label="ข้อความสำเร็จรูป"><Button
           type="button"
           size="icon"
           variant="ghost"
           onClick={() => setQuickReplyOpen(!quickReplyOpen)}
           disabled={disabled || uploading}
           className="shrink-0 rounded-xl w-10 h-10 text-gray-500 hover:text-amber-600 hover:bg-amber-50"
-          title="ข้อความสำเร็จรูป"
         >
           <Zap className="w-5 h-5" />
-        </Button>
+        </Button></Tooltip>
 
         {/* Media button */}
-        <Button
+        <Tooltip label="ส่งรูป/วิดีโอ"><Button
           type="button"
           size="icon"
           variant="ghost"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || uploading}
           className="shrink-0 rounded-xl w-10 h-10 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
-          title="ส่งรูป/วิดีโอ"
         >
           <ImagePlus className="w-5 h-5" />
-        </Button>
+        </Button></Tooltip>
 
-        <textarea
+        <Textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => {
@@ -220,7 +220,7 @@ export function MessageInput({ onSend, onSendBatch, disabled = false, autoFocus 
           disabled={disabled || uploading}
           rows={1}
           className={cn(
-            'flex-1 resize-none rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 px-4 py-2.5 text-base font-[family-name:var(--font-chat)]',
+            'flex-1 min-h-0 shadow-none resize-none rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 px-4 py-2.5 text-base font-[family-name:var(--font-chat)]',
             'text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none',
             'focus:border-blue-300 dark:focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30',
             'disabled:opacity-50 disabled:cursor-not-allowed',

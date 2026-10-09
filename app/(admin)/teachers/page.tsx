@@ -30,8 +30,11 @@ import { ActionButton } from '@/components/ui/action-button';
 import { getClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Pagination, usePagination } from '@/components/ui/pagination';
+import { Tooltip } from '@/components/ui/tooltip';
 
+import { useConfirm } from '@/components/ui/confirm-dialog';
 export default function TeachersPage() {
+  const confirm = useConfirm();
   const { selectedBranchId, isAllBranches } = useBranch();
   const { adminUser } = useAuth();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -117,7 +120,7 @@ export default function TeachersPage() {
   }, [searchTerm, selectedBranchId, resetPagination]);
 
   const handleResetPassword = async (teacher: Teacher) => {
-    if (!confirm(`ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ ${teacher.email}?`)) return;
+    if (!await confirm(`ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ ${teacher.email}?`)) return;
 
     try {
       const supabase = getClient();
@@ -134,7 +137,7 @@ export default function TeachersPage() {
   };
 
   const handleDeleteTeacher = async (teacher: Teacher) => {
-    if (!confirm(
+    if (!await confirm(
       `คุณแน่ใจหรือไม่ว่าต้องการลบครูผู้สอน "${teacher.name}"?\n\n` +
       `การกระทำนี้จะทำให้ครูไม่สามารถเข้าสู่ระบบได้ แต่ข้อมูลการสอนจะยังคงอยู่ในระบบ\n\n` +
       `(เฉพาะ Super Admin เท่านั้นที่สามารถลบครูได้)`
@@ -374,30 +377,28 @@ export default function TeachersPage() {
                         <div className="flex items-center justify-end gap-1">
                           <PermissionGuard action="update">
                             <Link href={`/teachers/${teacher.id}/edit`}>
-                              <Button variant="ghost" size="sm" title="แก้ไขข้อมูล">
+                              <Tooltip label="แก้ไขข้อมูล"><Button variant="ghost" size="sm">
                                 <Edit className="h-4 w-4" />
-                              </Button>
+                              </Button></Tooltip>
                             </Link>
                           </PermissionGuard>
 
                           <PermissionGuard action="update">
-                            <Button
+                            <Tooltip label="Reset Password"><Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleResetPassword(teacher)}
-                              title="Reset Password"
                             >
                               <Key className="h-4 w-4" />
-                            </Button>
+                            </Button></Tooltip>
                           </PermissionGuard>
 
                           {adminUser?.role === 'super_admin' && teacher.isActive && (
-                            <Button
+                            <Tooltip label="ลบครูผู้สอน (Soft Delete)"><Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteTeacher(teacher)}
                               disabled={deletingTeacherId === teacher.id}
-                              title="ลบครูผู้สอน (Soft Delete)"
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               {deletingTeacherId === teacher.id ? (
@@ -405,7 +406,7 @@ export default function TeachersPage() {
                               ) : (
                                 <Trash2 className="h-4 w-4" />
                               )}
-                            </Button>
+                            </Button></Tooltip>
                           )}
                         </div>
                       </TableCell>

@@ -47,12 +47,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 
+import { useConfirm } from '@/components/ui/confirm-dialog';
 interface RoomWithBranch extends Room {
   branchName: string;
   branchCode: string;
 }
 
 export default function RoomsPage() {
+  const confirm = useConfirm();
   const searchParams = useSearchParams();
   const initialBranchId = searchParams.get('branch');
   const { selectedBranchId, isAllBranches } = useBranch();
@@ -218,7 +220,7 @@ export default function RoomsPage() {
       setDeactivateRoom(room);
     } else {
       // No active classes — deactivate directly
-      if (!confirm(`ปิดห้อง "${room.name}" ใช่มั้ย?`)) return;
+      if (!await confirm(`ปิดห้อง "${room.name}" ใช่มั้ย?`)) return;
       try {
         await updateRoom(room.branchId, room.id, { isActive: false });
         toast.success(`ปิดห้อง "${room.name}" เรียบร้อยแล้ว`);

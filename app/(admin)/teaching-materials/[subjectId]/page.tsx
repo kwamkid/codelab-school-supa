@@ -65,6 +65,7 @@ import { Subject, TeachingMaterial } from '@/types/models';
 import { toast } from 'sonner';
 import { ActionButton } from '@/components/ui/action-button';
 import { useAuth } from '@/hooks/useAuth';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export default function SubjectMaterialsPage() {
   const params = useParams();
@@ -355,37 +356,34 @@ export default function SubjectMaterialsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
-                          <Button
+                          <Tooltip label="เลื่อนขึ้น"><Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleMoveUp(index)}
                             disabled={index === 0 || reordering}
-                            title="เลื่อนขึ้น"
                           >
                             <ArrowUp className="h-4 w-4" />
-                          </Button>
+                          </Button></Tooltip>
                           
-                          <Button
+                          <Tooltip label="เลื่อนลง"><Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleMoveDown(index)}
                             disabled={index === activeMaterials.length - 1 || reordering}
-                            title="เลื่อนลง"
                           >
                             <ArrowDown className="h-4 w-4" />
-                          </Button>
+                          </Button></Tooltip>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
-                          <Button
+                          <Tooltip label="ดูตัวอย่าง"><Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setPreviewMaterial(material)}
-                            title="ดูตัวอย่าง"
                           >
                             <Play className="h-4 w-4" />
-                          </Button>
+                          </Button></Tooltip>
                           
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

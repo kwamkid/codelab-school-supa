@@ -16,6 +16,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { Room, Subject } from '@/types/models';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface TimeSlot {
   startTime: string;
@@ -323,10 +324,10 @@ export function RoomAvailability({ roomAvailability, subjects = [] }: RoomAvaila
                         )}
                         <div className="flex items-center gap-2">
                           {room.hasProjector && (
-                            <Projector className="h-3.5 w-3.5 text-green-600" title="มี Projector" />
+                            <Tooltip label="มี Projector"><Projector className="h-3.5 w-3.5 text-green-600" /></Tooltip>
                           )}
                           {room.hasWhiteboard && (
-                            <PenTool className="h-3.5 w-3.5 text-green-600" title="มี Whiteboard" />
+                            <Tooltip label="มี Whiteboard"><PenTool className="h-3.5 w-3.5 text-green-600" /></Tooltip>
                           )}
                         </div>
                       </div>
@@ -358,8 +359,9 @@ export function RoomAvailability({ roomAvailability, subjects = [] }: RoomAvaila
                       const displayName = getDisplayName(segment);
                       
                       return (
-                        <div
-                          key={`${room.id}-segment-${idx}-${segment.startTime}`}
+                        <Tooltip label={segment.available 
+                            ? `ว่าง: ${segment.startTime} - ${segment.endTime}` 
+                            : `${displayName}: ${segment.startTime} - ${segment.endTime}`} key={`${room.id}-segment-${idx}-${segment.startTime}`}><div
                           className={cn(
                             "absolute top-1 bottom-1 rounded border transition-all hover:z-10 hover:shadow-md",
                             colors.useCustomColor ? '' : colors.bg,
@@ -376,10 +378,6 @@ export function RoomAvailability({ roomAvailability, subjects = [] }: RoomAvaila
                               opacity: colors.opacity
                             })
                           }}
-                          title={segment.available 
-                            ? `ว่าง: ${segment.startTime} - ${segment.endTime}` 
-                            : `${displayName}: ${segment.startTime} - ${segment.endTime}`
-                          }
                         >
                           <div className={cn(
                             "text-xs font-medium h-full flex items-center px-2", 
@@ -391,7 +389,7 @@ export function RoomAvailability({ roomAvailability, subjects = [] }: RoomAvaila
                               <span className="truncate">{displayName}</span>
                             )}
                           </div>
-                        </div>
+                        </div></Tooltip>
                       );
                     })}
                   </div>

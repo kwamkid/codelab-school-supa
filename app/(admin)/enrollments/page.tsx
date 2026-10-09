@@ -90,6 +90,7 @@ import { PermissionGuard } from '@/components/auth/permission-guard';
 import { ActionButton } from '@/components/ui/action-button';
 import { SectionLoading, InlineLoading } from '@/components/ui/loading';
 import { Pagination, usePagination } from '@/components/ui/pagination';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const statusColors = {
   'active': 'bg-green-100 text-green-700',
@@ -687,7 +688,7 @@ export default function EnrollmentsPage() {
                               <InlineLoading />
                             ) : classInfo ? (
                               <div className="min-w-0">
-                                <p className="text-sm text-gray-700 truncate" title={classInfo.name}>{classInfo.name}</p>
+                                <Tooltip label={classInfo.name}><p className="text-sm text-gray-700 truncate">{classInfo.name}</p></Tooltip>
                                 <p className="text-sm text-gray-500">
                                   {subject?.name || ''}{' '}
                                   <span className="text-gray-400">

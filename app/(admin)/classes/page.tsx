@@ -60,6 +60,7 @@ import { ActionButton } from '@/components/ui/action-button';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { useAuth } from '@/hooks/useAuth';
 import { Pagination, usePagination } from '@/components/ui/pagination';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const statusColors = {
   'draft': 'bg-gray-100 text-gray-700',
@@ -344,16 +345,15 @@ export default function ClassesPage() {
         </div>
         <div className="flex gap-2">
           {isSuperAdmin() && (
-            <Button
+            <Tooltip label="อัปเดตสถานะคลาส"><Button
               variant="outline"
               size="icon"
               onClick={handleUpdateClassStatuses}
               disabled={updatingStatus}
-              title="อัปเดตสถานะคลาส"
               className="h-9 w-9"
             >
               <RefreshCw className={`h-4 w-4 ${updatingStatus ? 'animate-spin' : ''}`} />
-            </Button>
+            </Button></Tooltip>
           )}
           <PermissionGuard requiredRole={['super_admin', 'branch_admin']}>
             <Link href="/classes/new">
@@ -529,10 +529,10 @@ export default function ClassesPage() {
                                 style={{ backgroundColor: getSubjectColor(cls.subjectId) }}
                               />
                               <div className="min-w-0">
-                                <div className="font-medium truncate" title={cls.name}>
+                                <Tooltip label={cls.name}><div className="font-medium truncate">
                                   {cls.name}
-                                </div>
-                                <div className="text-xs text-gray-500 truncate" title={cls.code}>{cls.code}</div>
+                                </div></Tooltip>
+                                <Tooltip label={cls.code}><div className="text-xs text-gray-500 truncate">{cls.code}</div></Tooltip>
                               </div>
                             </div>
                           </TableCell>

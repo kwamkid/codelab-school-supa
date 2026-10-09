@@ -67,6 +67,8 @@ import { SectionLoading } from '@/components/ui/loading';
 import { StatusFilterTabs } from '@/components/ui/status-filter-tabs';
 import TrialSessionDialog from '@/components/trial/trial-session-dialog';
 import { MarkAttendedDialog } from '@/components/trial/mark-attended-dialog';
+import { TrialFollowupList, type TrialFollowup } from '@/components/trial/trial-followup-list';
+import { authFetch } from '@/lib/auth-fetch';
 
 const statusConfig = {
   new: { label: 'ใหม่', color: 'bg-blue-100 text-blue-700', icon: AlertCircle },
@@ -134,6 +136,21 @@ export default function TrialBookingsPage() {
     queryKey: QUERY_KEYS.trialStats(selectedBranchId),
     queryFn: () => getTrialBookingStats(selectedBranchId),
     staleTime: Infinity,
+  });
+
+  // แท็บ "ควรโทรตาม" — มาทดลองเรียนแล้วแต่ยังไม่สมัคร (RPC get_trial_followups)
+  const [followupDays, setFollowupDays] = useState('120');
+  const { data: followups = [], isLoading: loadingFollowups } = useQuery({
+    queryKey: ['trialFollowups', selectedBranchId, followupDays],
+    queryFn: async (): Promise<TrialFollowup[]> => {
+      const qs = new URLSearchParams({ days: followupDays });
+      if (selectedBranchId) qs.set('branchId', selectedBranchId);
+      const res = await authFetch(`/api/admin/trial/followups?${qs}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'โหลดรายชื่อไม่สำเร็จ');
+      return json.rows;
+    },
+    staleTime: 60_000,
   });
 
   const { data: branches = [] } = useQuery({
@@ -388,6 +405,7 @@ export default function TrialBookingsPage() {
           { value: 'new', label: 'ใหม่', count: statusCounts.new, activeBg: 'bg-blue-500', inactiveBg: 'bg-blue-50', inactiveLabel: 'text-blue-600', inactiveCount: 'text-blue-700', always: true },
           { value: 'contacted', label: 'ติดต่อแล้ว', count: statusCounts.contacted, activeBg: 'bg-yellow-400', inactiveBg: 'bg-yellow-50', inactiveLabel: 'text-yellow-600', inactiveCount: 'text-yellow-700', always: true },
           { value: 'scheduled', label: 'นัดหมายแล้ว', count: statusCounts.scheduled, activeBg: 'bg-purple-500', inactiveBg: 'bg-purple-50', inactiveLabel: 'text-purple-600', inactiveCount: 'text-purple-700', always: true },
+          { value: 'followup', label: 'ควรโทรตาม', count: followups.length, activeBg: 'bg-red-500', inactiveBg: 'bg-red-50', inactiveLabel: 'text-red-600', inactiveCount: 'text-red-700', always: true },
           { value: 'completed', label: 'เรียนแล้ว', count: statusCounts.completed, activeBg: 'bg-green-500', inactiveBg: 'bg-green-50', inactiveLabel: 'text-green-600', inactiveCount: 'text-green-700', always: true },
           { value: 'converted', label: 'ลงทะเบียนแล้ว', count: statusCounts.converted, activeBg: 'bg-emerald-500', inactiveBg: 'bg-emerald-50', inactiveLabel: 'text-emerald-600', inactiveCount: 'text-emerald-700', always: true },
           { value: 'cancelled', label: 'ยกเลิก', count: statusCounts.cancelled, activeBg: 'bg-gray-500', inactiveBg: 'bg-gray-50', inactiveLabel: 'text-gray-500', inactiveCount: 'text-gray-600', always: true, separatorBefore: true },
@@ -402,6 +420,17 @@ export default function TrialBookingsPage() {
         onChange={setSearchTerm}
       />
 
+      {selectedStatus === 'followup' ? (
+        <TrialFollowupList
+          rows={followups}
+          loading={loadingFollowups}
+          days={followupDays}
+          onDaysChange={setFollowupDays}
+          searchTerm={searchTerm}
+          showBranch={isAllBranches}
+        />
+      ) : (
+      <>
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
         {filteredBookings.length === 0 ? (
@@ -652,6 +681,8 @@ export default function TrialBookingsPage() {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

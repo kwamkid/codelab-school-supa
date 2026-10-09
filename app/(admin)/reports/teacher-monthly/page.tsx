@@ -16,8 +16,11 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SortableTableHead, useSortableTable } from '@/components/ui/sortable-table-head'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Loading, PageLoading } from '@/components/ui/loading'
+import { PageLoading } from '@/components/ui/loading'
 import { cn } from '@/lib/utils'
+import { thaiDateLabel } from '@/lib/format'
+import { KpiCard } from '@/components/ui/kpi-card'
+import { LoadingOverlay } from '@/components/ui/loading-overlay'
 import {
   ClipboardCheck, Download, MessageSquare, UserCheck,
   CalendarCheck, Users, ImageIcon, AlertTriangle,
@@ -215,11 +218,7 @@ export default function TeacherMonthlyReportPage() {
 
   return (
     <div className="p-4 sm:p-6 text-base relative">
-      {loading && data && (
-        <div className="absolute inset-0 z-20 bg-white/60 flex items-start justify-center pt-32">
-          <Loading size="md" />
-        </div>
-      )}
+      <LoadingOverlay show={loading && !!data} />
       <div className={cn(loading && data && 'pointer-events-none')}>
         <PageHeader
           title="ประเมินครูรายเดือน"
@@ -246,49 +245,11 @@ export default function TeacherMonthlyReportPage() {
 
           {/* สรุปรวม */}
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            <div className="rounded-xl p-4 text-white bg-gradient-to-br from-indigo-500 to-indigo-600">
-              <div className="flex items-center gap-2 text-white/90 text-sm">
-                <CalendarCheck className="h-4 w-4" /> คาบที่สอน
-              </div>
-              <div className="text-3xl font-bold mt-1">{t?.sessions ?? 0}</div>
-              <div className="text-white/80 text-sm mt-1">
-                ชดเชย {t?.makeup ?? 0} · ทดลอง {t?.trial ?? 0}
-              </div>
-            </div>
-            <div className="rounded-xl p-4 text-white bg-gradient-to-br from-blue-500 to-blue-600">
-              <div className="flex items-center gap-2 text-white/90 text-sm">
-                <Users className="h-4 w-4" /> เช็คชื่อแล้ว
-              </div>
-              <div className="text-3xl font-bold mt-1">{pct(t?.checked ?? 0, t?.sessions ?? 0)}%</div>
-              <div className="text-white/80 text-sm mt-1">
-                {t?.checked ?? 0} คาบ · ยังไม่เช็ค {(t?.sessions ?? 0) - (t?.checked ?? 0)}
-              </div>
-            </div>
-            <div className="rounded-xl p-4 text-white bg-gradient-to-br from-violet-500 to-violet-600">
-              <div className="flex items-center gap-2 text-white/90 text-sm">
-                <UserCheck className="h-4 w-4" /> ครูเช็คเอง
-              </div>
-              <div className="text-3xl font-bold mt-1">{pct(t?.selfChecked ?? 0, t?.sessions ?? 0)}%</div>
-              <div className="text-white/80 text-sm mt-1">
-                {t?.selfChecked ?? 0} คาบ · คนอื่นเช็คให้ {(t?.otherChecked ?? 0) + (t?.unknownChecked ?? 0)}
-              </div>
-            </div>
-            <div className="rounded-xl p-4 text-white bg-gradient-to-br from-emerald-500 to-emerald-600">
-              <div className="flex items-center gap-2 text-white/90 text-sm">
-                <MessageSquare className="h-4 w-4" /> ส่ง Feedback
-              </div>
-              <div className="text-3xl font-bold mt-1">{pct(t?.fbSessions ?? 0, t?.sessions ?? 0)}%</div>
-              <div className="text-white/80 text-sm mt-1">
-                {t?.fbSessions ?? 0} คาบ · {t?.fbStudents ?? 0} คน
-              </div>
-            </div>
-            <div className="rounded-xl p-4 text-white bg-gradient-to-br from-rose-500 to-rose-600">
-              <div className="flex items-center gap-2 text-white/90 text-sm">
-                <AlertTriangle className="h-4 w-4" /> ครูที่ยังไม่ส่งเลย
-              </div>
-              <div className="text-3xl font-bold mt-1">{t?.noFbTeachers ?? 0}</div>
-              <div className="text-white/80 text-sm mt-1">จากครู {t?.teachers ?? 0} คนที่มีคาบสอน</div>
-            </div>
+            <KpiCard icon={CalendarCheck} gradient="indigo" label="คาบที่สอน" value={<>{t?.sessions ?? 0}</>} sub={<>ชดเชย {t?.makeup ?? 0} · ทดลอง {t?.trial ?? 0}</>} />
+            <KpiCard icon={Users} gradient="blue" label="เช็คชื่อแล้ว" value={<>{pct(t?.checked ?? 0, t?.sessions ?? 0)}%</>} sub={<>{t?.checked ?? 0} คาบ · ยังไม่เช็ค {(t?.sessions ?? 0) - (t?.checked ?? 0)}</>} />
+            <KpiCard icon={UserCheck} gradient="violet" label="ครูเช็คเอง" value={<>{pct(t?.selfChecked ?? 0, t?.sessions ?? 0)}%</>} sub={<>{t?.selfChecked ?? 0} คาบ · คนอื่นเช็คให้ {(t?.otherChecked ?? 0) + (t?.unknownChecked ?? 0)}</>} />
+            <KpiCard icon={MessageSquare} gradient="emerald" label="ส่ง Feedback" value={<>{pct(t?.fbSessions ?? 0, t?.sessions ?? 0)}%</>} sub={<>{t?.fbSessions ?? 0} คาบ · {t?.fbStudents ?? 0} คน</>} />
+            <KpiCard icon={AlertTriangle} gradient="rose" label="ครูที่ยังไม่ส่งเลย" value={<>{t?.noFbTeachers ?? 0}</>} sub={<>จากครู {t?.teachers ?? 0} คนที่มีคาบสอน</>} />
           </div>
 
           {/* ตาราง */}

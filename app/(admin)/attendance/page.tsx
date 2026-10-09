@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 import { SectionLoading } from '@/components/ui/loading';
 import { AttendanceDialog } from '@/components/attendance/attendance-dialog';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface ClassWithDetails extends Class {
   subject?: Subject;
@@ -642,17 +643,16 @@ export default function AttendancePage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button
+                          <Tooltip label="เช็คชื่อ"><Button
                             size="icon"
                             variant="ghost"
                             onClick={(e) => {
                               e.stopPropagation();
                               openAttendance(cls);
                             }}
-                            title="เช็คชื่อ"
                           >
                             <ClipboardCheck className="h-4 w-4" />
-                          </Button>
+                          </Button></Tooltip>
                         </TableCell>
                       </TableRow>
                     );

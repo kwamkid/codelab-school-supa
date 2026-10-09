@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { User, Users, GraduationCap, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TeacherBadge } from '@/components/ui/teacher-badge';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
@@ -107,16 +108,17 @@ function clashDotColor(event: TimetableEvent): string {
 function ClashBadge({ hidden, onPick }: { hidden: TimetableEvent[]; onPick: (e: TimetableEvent) => void }) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          onClick={(e) => e.stopPropagation()}
-          className="absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded-full bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 shadow-sm cursor-pointer"
-          title={`มีอีก ${hidden.length} คาบที่เวลาชนกัน`}
-        >
-          +{hidden.length}
-        </button>
-      </PopoverTrigger>
+      <Tooltip label={`มีอีก ${hidden.length} คาบที่เวลาชนกัน`}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded-full bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 shadow-sm cursor-pointer"
+          >
+            +{hidden.length}
+          </button>
+        </PopoverTrigger>
+      </Tooltip>
       <PopoverContent align="end" className="w-64 p-2">
         <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-1 pb-1.5 flex items-center gap-1">
           <Clock className="h-3.5 w-3.5" /> เวลาชนกันในห้องนี้

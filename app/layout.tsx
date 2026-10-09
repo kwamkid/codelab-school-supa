@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import '@/lib/suppress-warnings';
 
 
@@ -39,7 +40,7 @@ export default function RootLayout({
             <AuthProvider>
               <TooltipProvider delayDuration={200}>
                 <Toaster />
-                {children}
+                <ConfirmProvider>{children}</ConfirmProvider>
               </TooltipProvider>
             </AuthProvider>
           </QueryProvider>

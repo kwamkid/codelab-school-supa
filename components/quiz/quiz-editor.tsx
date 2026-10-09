@@ -17,6 +17,7 @@ import { DIFFICULTY_OPTIONS } from '@/lib/quiz/translations';
 import { IconPicker } from '@/components/quiz/quiz-icons';
 import { QuizImportDialog } from '@/components/quiz/quiz-import-dialog';
 import { toast } from 'sonner';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface QForm {
   questionTh: string;
@@ -245,9 +246,9 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
                 <div className="relative inline-block">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={q.imageUrl} alt="" className="max-h-40 rounded-lg border" />
-                  <button type="button" onClick={() => updateQ(qi, { imageUrl: '' })} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow" title="ลบรูป">
+                  <Tooltip label="ลบรูป"><button type="button" onClick={() => updateQ(qi, { imageUrl: '' })} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow">
                     <X className="h-3.5 w-3.5" />
-                  </button>
+                  </button></Tooltip>
                 </div>
               ) : (
                 <label className="flex items-center justify-center gap-2 w-full sm:w-64 h-20 rounded-lg border-2 border-dashed cursor-pointer hover:bg-gray-50 text-sm text-gray-500">
@@ -263,14 +264,13 @@ export default function QuizEditor({ quizId }: { quizId?: string }) {
               <Label className="text-xs">ตัวเลือก (เลือกข้อที่ถูก)</Label>
               {[0, 1, 2, 3].map((oi) => (
                 <div key={oi} className="flex items-center gap-2">
-                  <button
+                  <Tooltip label="ตั้งเป็นคำตอบที่ถูก"><button
                     type="button"
                     onClick={() => updateQ(qi, { correctAnswer: oi })}
                     className={`shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold ${q.correctAnswer === oi ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 text-gray-500'}`}
-                    title="ตั้งเป็นคำตอบที่ถูก"
                   >
                     {String.fromCharCode(65 + oi)}
-                  </button>
+                  </button></Tooltip>
                   <Input value={q.optionsTh[oi]} onChange={(e) => setOption(qi, oi, 'th', e.target.value)} placeholder={`ตัวเลือก ${String.fromCharCode(65 + oi)} (ไทย)`} className="flex-1" />
                   <Input value={q.optionsEn[oi]} onChange={(e) => setOption(qi, oi, 'en', e.target.value)} placeholder="EN (optional)" className="flex-1" />
                 </div>

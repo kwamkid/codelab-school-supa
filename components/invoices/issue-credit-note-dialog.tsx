@@ -16,6 +16,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { createCreditNote } from '@/lib/services/credit-notes';
 import { useAuth } from '@/hooks/useAuth';
 
+import { toast } from 'sonner';
 interface IssueCreditNoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -92,7 +93,7 @@ export default function IssueCreditNoteDialog({
       setReason('ยกเลิกการลงทะเบียนเรียน');
     } catch (error) {
       console.error('Error creating credit note:', error);
-      alert('เกิดข้อผิดพลาดในการออกใบลดหนี้');
+      toast.error('เกิดข้อผิดพลาดในการออกใบลดหนี้');
     } finally {
       setSubmitting(false);
     }

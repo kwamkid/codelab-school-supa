@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/utils';
 
+import { Checkbox } from '@/components/ui/checkbox';
 interface WebhookLog {
   id: string;
   timestamp: Date;
@@ -119,11 +120,9 @@ export default function WebhookLogsPage() {
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded"
+              onCheckedChange={(v) => setAutoRefresh(v === true)}
             />
             <span className="text-sm">Auto refresh (5s)</span>
           </label>

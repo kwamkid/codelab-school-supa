@@ -16,6 +16,7 @@ import {
 import { ChatQuickReply } from '@/types/models';
 import { getQuickReplies, createQuickReply, deleteQuickReply } from '@/lib/services/chat';
 import { toast } from 'sonner';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface QuickReplyPanelProps {
   open: boolean;
@@ -135,14 +136,13 @@ export function QuickReplyPanel({ open, onClose, onSelect }: QuickReplyPanelProp
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <Button
+                      <Tooltip label="ลบ"><Button
                         size="sm" variant="ghost"
                         className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                        title="ลบ"
                         onClick={(e) => handleDelete(reply.id, e)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      </Button></Tooltip>
                     </div>
                   </div>
                 ))}

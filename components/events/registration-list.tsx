@@ -59,6 +59,7 @@ import {
 import { toast } from 'sonner';
 import { formatDate, formatPhoneNumber } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface RegistrationListProps {
   eventId: string;
@@ -833,15 +834,14 @@ export default function RegistrationList({
                             <Eye className="h-4 w-4" />
                           </Button>
                           {registration.status === 'confirmed' && (
-                            <Button
+                            <Tooltip label="แก้ไขรอบเวลา/สาขา"><Button
                               variant="ghost"
                               size="sm"
                               onClick={() => openEditDialog(registration)}
                               className="text-blue-600 hover:text-blue-700"
-                              title="แก้ไขรอบเวลา/สาขา"
                             >
                               <Pencil className="h-4 w-4" />
-                            </Button>
+                            </Button></Tooltip>
                           )}
                           {registration.status === 'confirmed' && (
                             <Button

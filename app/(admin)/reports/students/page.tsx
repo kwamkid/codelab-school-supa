@@ -42,7 +42,9 @@ import {
 import { useBranch } from '@/contexts/BranchContext'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
+import { Tooltip } from '@/components/ui/tooltip'
 
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 interface SchoolWithBranch {
   displayName: string
   count: number
@@ -420,9 +422,9 @@ export default function StudentReportPage() {
                       .sort((a, b) => b.count - a.count)
                       .map((branch) => (
                         <div key={branch.branchId} className="flex items-center gap-3">
-                          <span className="text-sm w-32 shrink-0 truncate" title={branch.branchName}>
+                          <Tooltip label={branch.branchName}><span className="text-sm w-32 shrink-0 truncate">
                             {branch.branchName}
-                          </span>
+                          </span></Tooltip>
                           <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
                             <div
                               className="bg-purple-500 h-full rounded-full transition-all"
@@ -507,9 +509,9 @@ export default function StudentReportPage() {
                       const maxCount = Math.max(...stats.bySchool.map(s => s.count))
                       return stats.bySchool.slice(0, 15).map((school) => (
                         <div key={school.displayName} className="flex items-center gap-3">
-                          <span className="text-sm flex-1 min-w-0 truncate" title={school.displayName}>
+                          <Tooltip label={school.displayName}><span className="text-sm flex-1 min-w-0 truncate">
                             {school.displayName}
-                          </span>
+                          </span></Tooltip>
                           <div className="w-24 bg-gray-100 rounded-full h-5 overflow-hidden shrink-0">
                             <div
                               className="bg-green-500 h-full rounded-full transition-all"
@@ -730,7 +732,7 @@ export default function StudentReportPage() {
             {selectedSchools.size >= 2 && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
                 <p className="text-sm font-medium">เลือกชื่อหลักที่จะใช้:</p>
-                <div className="space-y-1">
+                <RadioGroup value={mergeTarget} onValueChange={setMergeTarget} className="gap-1">
                   {Array.from(selectedSchools).map((name) => (
                     <label
                       key={name}
@@ -738,18 +740,11 @@ export default function StudentReportPage() {
                         mergeTarget === name ? 'bg-blue-100 font-medium' : ''
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="mergeTarget"
-                        value={name}
-                        checked={mergeTarget === name}
-                        onChange={() => setMergeTarget(name)}
-                        className="accent-blue-600"
-                      />
-                      <span className="text-sm">{name}</span>
+                      <RadioGroupItem value={name} />
+                      <span>{name}</span>
                     </label>
                   ))}
-                </div>
+                </RadioGroup>
               </div>
             )}
           </div>

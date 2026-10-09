@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -14,11 +15,10 @@ export function ThemeToggle() {
   const isDark = mounted && theme === 'dark';
 
   return (
-    <Button
+    <Tooltip label={isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}><Button
       variant="ghost"
       size="icon"
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      title={isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
       aria-label="Toggle theme"
     >
       {mounted && isDark ? (
@@ -26,6 +26,6 @@ export function ThemeToggle() {
       ) : (
         <Moon className="h-5 w-5" />
       )}
-    </Button>
+    </Button></Tooltip>
   );
 }

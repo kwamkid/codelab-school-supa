@@ -49,6 +49,7 @@ import {
   FacebookAdsSettings,
 } from '@/lib/services/facebook-ads-settings'
 import { useAuth } from '@/hooks/useAuth'
+import { Tooltip } from '@/components/ui/tooltip'
 
 interface FBAudience {
   id: string
@@ -589,24 +590,22 @@ export default function FacebookAdsSettingsComponent() {
                     }
                     className="flex-1"
                   />
-                  <Button
+                  <Tooltip label="เลือกจาก Audiences ที่มี"><Button
                     variant="outline"
                     size="icon"
-                    title="เลือกจาก Audiences ที่มี"
                     onClick={() => openAudiencePicker(field)}
                     disabled={!settings.adAccountId || !settings.fbAccessToken}
                   >
                     <List className="w-4 h-4" />
-                  </Button>
-                  <Button
+                  </Button></Tooltip>
+                  <Tooltip label="สร้าง Audience ใหม่"><Button
                     variant="outline"
                     size="icon"
-                    title="สร้าง Audience ใหม่"
                     onClick={() => openCreateAudience(field)}
                     disabled={!settings.adAccountId || !settings.fbAccessToken}
                   >
                     <Plus className="w-4 h-4" />
-                  </Button>
+                  </Button></Tooltip>
                 </div>
                 <p className="text-xs text-muted-foreground">{desc}</p>
               </div>
@@ -622,7 +621,7 @@ export default function FacebookAdsSettingsComponent() {
           {settings.adAccountId && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Graph API Query:</span>
-              <code
+              <Tooltip label="คลิกเพื่อคัดลอก"><code
                 className="bg-muted px-2 py-1 rounded cursor-pointer hover:bg-muted/80 select-all"
                 onClick={() => {
                   const cleanId = settings.adAccountId.replace(/^act_/, '')
@@ -630,10 +629,9 @@ export default function FacebookAdsSettingsComponent() {
                   navigator.clipboard.writeText(query)
                   toast.success('คัดลอก query แล้ว')
                 }}
-                title="คลิกเพื่อคัดลอก"
               >
                 act_{settings.adAccountId.replace(/^act_/, '')}/customaudiences?fields=id,name,approximate_count_lower_bound
-              </code>
+              </code></Tooltip>
             </div>
           )}
 

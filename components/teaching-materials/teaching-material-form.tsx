@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import { Loader2, Save, X, Plus, Trash2, Link, AlertCircle, List } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface TeachingMaterialFormProps {
   subjectId: string;
@@ -615,7 +616,7 @@ export default function TeachingMaterialForm({
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {commonTags.map(tag => (
-                <div key={tag.value} className="flex items-center space-x-2" title={tag.tooltip}>
+                <Tooltip label={tag.tooltip} key={tag.value}><div className="flex items-center space-x-2">
                   <Checkbox
                     id={`tag-${tag.value}`}
                     checked={formData.tags.includes(tag.value)}
@@ -628,7 +629,7 @@ export default function TeachingMaterialForm({
                     {tag.label}
                     <span className="text-xs text-gray-500 ml-1">({tag.tooltip})</span>
                   </Label>
-                </div>
+                </div></Tooltip>
               ))}
             </div>
           </CardContent>

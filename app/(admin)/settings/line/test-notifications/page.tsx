@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
+import { toast } from 'sonner';
 interface TestResult {
   success: boolean;
   message: string;
@@ -133,7 +134,7 @@ export default function TestNotificationsPage() {
 
   const handleTestSend = async () => {
     if (!selectedParent || !selectedStudent || !selectedClass) {
-      alert('กรุณาเลือกข้อมูลให้ครบถ้วน');
+      toast.error('กรุณาเลือกข้อมูลให้ครบถ้วน');
       return;
     }
 

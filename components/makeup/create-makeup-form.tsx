@@ -45,12 +45,14 @@ import { DateRangePicker } from '@/components/ui/date-range-picker';
 import Link from 'next/link';
 import { SectionLoading } from '@/components/ui/loading';
 
+import { useConfirm } from '@/components/ui/confirm-dialog';
 interface CreateMakeupFormProps {
   mode: 'create' | 'edit';
   makeupId?: string;
 }
 
 export default function CreateMakeupForm({ mode, makeupId }: CreateMakeupFormProps) {
+  const confirm = useConfirm();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { selectedBranchId, isAllBranches } = useBranch();
@@ -351,7 +353,7 @@ export default function CreateMakeupForm({ mode, makeupId }: CreateMakeupFormPro
       }
       if (availabilityWarnings.length > 0) {
         const confirmMessage = `มีคลาส/กิจกรรมอื่นในช่วงเวลานี้:\n${availabilityWarnings.map(w => `- ${w.message}`).join('\n')}\n\nคุณต้องการจัด Makeup Class ในเวลานี้หรือไม่?`;
-        if (!confirm(confirmMessage)) return;
+        if (!await confirm(confirmMessage)) return;
       }
     }
     if (!user) {

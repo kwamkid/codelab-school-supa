@@ -103,7 +103,7 @@ export async function notifyParentPractice(
       text =
         `❌ คำขอซ้อม${who}ไม่ได้รับการอนุมัติ\n📅 ${when}` +
         (reason ? `\n📝 เหตุผล: ${reason}` : '') +
-        `\nกรุณาติดต่อแอดมินหรือเสนอวันใหม่`
+        `\nกรุณาติดต่อแอดมินหรือจองวันใหม่`
     } else if (kind === 'scheduled') {
       // Admin-created practice (not a reply to a parent request)
       if (allDates && allDates.length > 1) {

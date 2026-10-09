@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Tooltip } from '@/components/ui/tooltip'
 
 // Shared badge for a teacher's name (+ avatar) so teachers look identical
 // everywhere (classes list, dashboard, attendance, chat, LIFF, etc.).
@@ -81,7 +82,7 @@ export function PersonBadge({
           </AvatarFallback>
         </Avatar>
       )}
-      <span className="truncate font-medium" title={name}>{name}</span>
+      <Tooltip label={name}><span className="truncate font-medium">{name}</span></Tooltip>
     </span>
   )
 }

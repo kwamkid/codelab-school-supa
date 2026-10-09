@@ -58,6 +58,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip } from '@/components/ui/tooltip';
 
 type StudentWithInfo = Student & { 
   parentName: string; 
@@ -383,10 +384,10 @@ export default function StudentsPage() {
                         <TableCell>
                           {student.schoolName ? (
                             <div>
-                              <p className="font-medium flex items-center gap-1" title={student.schoolName}>
+                              <Tooltip label={student.schoolName}><p className="font-medium flex items-center gap-1">
                                 <School className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                 <span className="truncate">{student.schoolName}</span>
-                              </p>
+                              </p></Tooltip>
                               {student.gradeLevel && (
                                 <p className="text-gray-500 truncate">{student.gradeLevel}</p>
                               )}
@@ -397,13 +398,12 @@ export default function StudentsPage() {
                         </TableCell>
                         <TableCell>
                           <div className="min-w-0">
-                            <Link 
+                            <Tooltip label={student.parentName}><Link 
                               href={`/parents/${student.parentId}`}
                               className="font-medium text-blue-600 hover:underline block truncate"
-                              title={student.parentName}
                             >
                               {student.parentName}
-                            </Link>
+                            </Link></Tooltip>
                             <p className="text-gray-500 flex items-center gap-1">
                               <Phone className="h-3 w-3 flex-shrink-0" />
                               <span className="truncate">{student.parentPhone}</span>

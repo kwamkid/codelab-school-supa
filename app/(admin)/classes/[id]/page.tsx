@@ -79,6 +79,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 const statusColors = {
   'draft': 'bg-gray-100 text-gray-700',
@@ -1036,7 +1037,7 @@ export default function ClassDetailPage() {
             <div className="space-y-3 py-2">
               <div>
                 <label className="text-sm font-medium">พักตั้งแต่วันที่</label>
-                <Input type="date" value={pauseFrom} onChange={(e) => setPauseFrom(e.target.value)} className="mt-1" />
+                <DateRangePicker mode="single" value={pauseFrom} onChange={(d) => setPauseFrom(d || '')} placeholder="เลือกวันที่" className="mt-1" />
               </div>
               <div>
                 <label className="text-sm font-medium">เหตุผล</label>

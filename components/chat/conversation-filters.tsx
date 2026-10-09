@@ -3,6 +3,7 @@
 import { X, Mail, UserCheck, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Branch } from '@/types/models';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export interface ChatFilters {
   platform: 'all' | 'line' | 'facebook_instagram';
@@ -77,9 +78,8 @@ function IconFilter({
   activeClass?: string;
 }) {
   return (
-    <button
+    <Tooltip label={title}><button
       onClick={onClick}
-      title={title}
       className={cn(
         'p-1.5 rounded-full transition-colors shrink-0',
         active
@@ -88,7 +88,7 @@ function IconFilter({
       )}
     >
       {icon}
-    </button>
+    </button></Tooltip>
   );
 }
 
@@ -116,9 +116,8 @@ export function ConversationFilters({
       {/* Row 1: Icon filters */}
       <div className="flex items-center gap-0.5">
         {/* LINE */}
-        <button
+        <Tooltip label="LINE"><button
           onClick={() => update({ platform: filters.platform === 'line' ? 'all' : 'line' })}
-          title="LINE"
           className={cn(
             'p-1 rounded-full transition-colors shrink-0',
             filters.platform === 'line'
@@ -128,12 +127,11 @@ export function ConversationFilters({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/social/line_oa.svg" alt="LINE" className="w-5 h-5 rounded-full" />
-        </button>
+        </button></Tooltip>
 
         {/* FB/IG */}
-        <button
+        <Tooltip label="Facebook / Instagram"><button
           onClick={() => update({ platform: filters.platform === 'facebook_instagram' ? 'all' : 'facebook_instagram' })}
-          title="Facebook / Instagram"
           className={cn(
             'p-1 rounded-full transition-colors shrink-0',
             filters.platform === 'facebook_instagram'
@@ -143,7 +141,7 @@ export function ConversationFilters({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/social/facebook.svg" alt="Facebook" className="w-5 h-5 rounded-full" />
-        </button>
+        </button></Tooltip>
 
         <div className="w-px h-4 bg-gray-200 dark:bg-slate-600 mx-0.5 shrink-0" />
 
@@ -178,13 +176,12 @@ export function ConversationFilters({
 
         {/* Clear all */}
         {activeCount > 0 && (
-          <button
+          <Tooltip label="ล้างตัวกรอง"><button
             onClick={clearAll}
             className="p-1 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors shrink-0"
-            title="ล้างตัวกรอง"
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </button></Tooltip>
         )}
       </div>
 

@@ -90,6 +90,7 @@ import PrintDialogs from '@/components/shared/print-dialogs';
 import { FileText } from 'lucide-react';
 import { getInvoiceCompany } from '@/lib/services/invoice-companies';
 import { InvoiceCompany } from '@/types/models';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const statusColors = {
   'active': 'bg-green-100 text-green-700',
@@ -1137,14 +1138,13 @@ export default function EnrollmentDetailPage() {
                                 ขอใบกำกับภาษี
                               </Button>
                             )}
-                            <Button
+                            <Tooltip label={isTaxInv ? 'พิมพ์ใบกำกับภาษี' : 'พิมพ์ใบเสร็จ'}><Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handlePrintReceipt(inv.id)}
-                              title={isTaxInv ? 'พิมพ์ใบกำกับภาษี' : 'พิมพ์ใบเสร็จ'}
                             >
                               <Printer className="h-4 w-4" />
-                            </Button>
+                            </Button></Tooltip>
                           </div>
                         </div>
                         {needsFix && (
@@ -1248,14 +1248,13 @@ export default function EnrollmentDetailPage() {
                           {cn.reason && ` · ${cn.reason}`}
                         </p>
                       </div>
-                      <Button
+                      <Tooltip label="พิมพ์ใบลดหนี้"><Button
                         variant="ghost"
                         size="sm"
                         onClick={() => print.printCreditNote(cn.id)}
-                        title="พิมพ์ใบลดหนี้"
                       >
                         <Printer className="h-4 w-4" />
-                      </Button>
+                      </Button></Tooltip>
                     </div>
                   ))}
                 </div>
@@ -1277,14 +1276,13 @@ export default function EnrollmentDetailPage() {
                           {cn.reason && ` · ${cn.reason}`}
                         </p>
                       </div>
-                      <Button
+                      <Tooltip label="พิมพ์ใบบันทึกคืนเงิน"><Button
                         variant="ghost"
                         size="sm"
                         onClick={() => print.printCreditNote(cn.id)}
-                        title="พิมพ์ใบบันทึกคืนเงิน"
                       >
                         <Printer className="h-4 w-4" />
-                      </Button>
+                      </Button></Tooltip>
                     </div>
                   ))}
                 </div>

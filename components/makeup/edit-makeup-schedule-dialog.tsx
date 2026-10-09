@@ -34,6 +34,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBranch } from '@/contexts/BranchContext';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 
+import { useConfirm } from '@/components/ui/confirm-dialog';
 interface EditMakeupScheduleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,6 +52,7 @@ export default function EditMakeupScheduleDialog({
   classInfo,
   onUpdated
 }: EditMakeupScheduleDialogProps) {
+  const confirm = useConfirm();
   const { user, adminUser, canAccessBranch } = useAuth();
   const { selectedBranchId, isAllBranches } = useBranch();
   const [loading, setLoading] = useState(false);
@@ -185,7 +187,7 @@ export default function EditMakeupScheduleDialog({
     if (availabilityWarnings.length > 0) {
       const confirmMessage = `มีคลาส/กิจกรรมอื่นในช่วงเวลานี้:\n${availabilityWarnings.map(w => `- ${w.message}`).join('\n')}\n\nคุณต้องการเปลี่ยนวันนัด Makeup Class หรือไม่?`;
       
-      if (!confirm(confirmMessage)) {
+      if (!await confirm(confirmMessage)) {
         return;
       }
     }

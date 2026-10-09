@@ -4,7 +4,7 @@
 // ใช้ร่วมกัน 2 ที่: /team (ลิงก์ทีมแบบ token) และแท็บ "ทีม" ในแอปผู้ปกครอง
 // (/liff/team) — ฝั่งเรียกใช้เป็นคนต่อ API เอง คอมโพเนนต์นี้ไม่รู้จัก endpoint ไหนเลย
 // Month grid: tap days to SELECT them (multi-select, toggle) → an action bar
-// appears → "เสนอซ้อม" opens one form (kid + start/end time + note) that submits
+// appears → "จองซ้อม" opens one form (kid + start/end time + note) that submits
 // one practice request per selected day. Each proposed practice shows as a chip
 // coloured by its approval status. Below the grid, a list of this month's
 // proposals. Tapping a chip opens its detail.
@@ -37,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TimeRangePicker } from '@/components/ui/time-range-picker'
 import { StudentBadge, StudentChips, StudentMultiChips } from '@/components/ui/student-badge'
 import type { PracticeStatus } from '@/lib/vex/types'
+import { Tooltip } from '@/components/ui/tooltip'
 
 interface Kid { id: string; nickname: string }
 export interface Practice {
@@ -55,7 +56,7 @@ interface Props {
   /** เด็กทุกคนในทีม — ใช้แสดงชื่อบนปฏิทิน/ตัวกรอง (เห็นของบ้านอื่นด้วย) */
   kids: Kid[]
   /**
-   * เด็กที่ "เสนอซ้อมให้ได้" — ค่าเริ่มต้นคือทุกคนในทีม (พฤติกรรมเดิมของ /team)
+   * เด็กที่ "จองซ้อมให้ได้" — ค่าเริ่มต้นคือทุกคนในทีม (พฤติกรรมเดิมของ /team)
    * ฝั่งแอปผู้ปกครองส่งเฉพาะลูกตัวเอง เพราะ server กันไม่ให้จองแทนบ้านอื่น
    */
   proposableKids?: Kid[]
@@ -122,7 +123,7 @@ export function PracticeCalendar({
     note: '',
   })
 
-  // จิ้มเลือกหลายวันบนปฏิทินก่อน แล้วค่อยกด "เสนอซ้อม" เปิดฟอร์มครั้งเดียว
+  // จิ้มเลือกหลายวันบนปฏิทินก่อน แล้วค่อยกด "จองซ้อม" เปิดฟอร์มครั้งเดียว
   const [selectedDates, setSelectedDates] = useState<string[]>([]) // YYYY-MM-DD[]
   const [proposeOpen, setProposeOpen] = useState(false)
   const [viewing, setViewing] = useState<Practice | null>(null)
@@ -253,7 +254,7 @@ export function PracticeCalendar({
             ล้าง
           </Button>
           <Button size="sm" onClick={() => setProposeOpen(true)}>
-            เสนอซ้อม
+            จองซ้อม
           </Button>
         </div>
       )}
@@ -315,8 +316,7 @@ export function PracticeCalendar({
                 </div>
                 <div className="space-y-0.5 mt-0.5">
                   {items.slice(0, 3).map((p) => (
-                    <button
-                      key={p.id}
+                    <Tooltip label={`${kidName(p.kid_id)} ${hhmm(p.start_time)}`} key={p.id}><button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -326,10 +326,9 @@ export function PracticeCalendar({
                         'block w-full min-w-0 text-left text-[10px] leading-tight px-1 py-0.5 rounded border truncate',
                         STATUS_META[p.status].chip
                       )}
-                      title={`${kidName(p.kid_id)} ${hhmm(p.start_time)}`}
                     >
                       {kidName(p.kid_id)}
-                    </button>
+                    </button></Tooltip>
                   ))}
                   {items.length > 3 && (
                     <div className="text-[10px] text-gray-400 text-center">+{items.length - 3}</div>
@@ -370,7 +369,7 @@ export function PracticeCalendar({
         {listPractices.length === 0 ? (
           <p className="text-center text-gray-500 py-6 text-base">
             {monthPractices.length === 0
-              ? 'แตะวันบนปฏิทินเพื่อเสนอวันซ้อม'
+              ? 'แตะวันบนปฏิทินเพื่อจองวันซ้อม'
               : `เดือนนี้ไม่มีรายการ${STATUS_META[activeStatusTab].label}`}
           </p>
         ) : (
@@ -495,7 +494,7 @@ function ProposeModal({
 
   return (
     <ModalShell
-      title="เสนอวันซ้อม"
+      title="จองวันซ้อม"
       subtitle={
         daysCount === 1
           ? format(new Date(dates[0] + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: th })
