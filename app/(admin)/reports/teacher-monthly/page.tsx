@@ -301,11 +301,6 @@ export default function TeacherMonthlyReportPage() {
                           {r.name && r.name !== r.nickname && (
                             <div className="text-xs text-gray-500 truncate max-w-[160px]">{r.name}</div>
                           )}
-                          {!r.isActive && (
-                            <span className="inline-block mt-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
-                              ปิดใช้งาน
-                            </span>
-                          )}
                         </TableCell>
                         <TableCell className="tabular-nums font-semibold">{r.sessions}</TableCell>
                         <TableCell>

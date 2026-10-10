@@ -371,7 +371,7 @@ select jsonb_build_object(
   'teachers', coalesce((
     select jsonb_agg(jsonb_build_object(
       'month', to_char(a.m, 'YYYY-MM'), 'branchId', a.branch_id,
-      'teacherId', a.teacher_id, 'nickname', coalesce(t.nickname, t.name, '-'),
+      'teacherId', a.teacher_id, 'nickname', coalesce(t.nickname, t.name, '-'), 'isActive', coalesce(t.is_active, true),
       'attended', a.attended, 'feedback', a.feedback, 'photos', a.photos
     ) order by a.m, t.nickname)
     from att a left join teachers t on t.id = a.teacher_id

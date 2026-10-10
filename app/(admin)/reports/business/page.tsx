@@ -63,7 +63,7 @@ interface MonthRow {
 
 interface FamiliesAllRow { month: string; newFamilies: number; returningFamilies: number }
 interface CourseRow { branchId: string; subject: string; enrollments: number; sales: number }
-interface TeacherRow { month: string; branchId: string; teacherId: string; nickname: string; attended: number; feedback: number; photos: number }
+interface TeacherRow { month: string; branchId: string; teacherId: string; nickname: string; isActive: boolean; attended: number; feedback: number; photos: number }
 
 interface DashboardData extends ClassesData {
   generatedAt: string
@@ -85,6 +85,8 @@ type Totals = Omit<MonthRow, 'month' | 'branchId'>
 
 const ALL = 'all'
 const FIRST_MONTH = '2025-07' // เดือนแรกที่มีข้อมูลในระบบ
+/** ระบบ Teacher Feedback เริ่มใช้เดือนนี้ — เดือนก่อนหน้าเป็น 0% ทุกคน ไม่ใช่ครูไม่เขียน จึงไม่แสดง */
+const FEEDBACK_START = '2026-06'
 
 const ZERO: Totals = {
   enrollments: 0, sales: 0, cash: 0, collected: 0, unpaid: 0, unrecorded: 0, unrecordedCount: 0,
@@ -225,9 +227,11 @@ function BusinessDashboard() {
     return list.map((c) => ({ ...c, share: total ? c.sales / total : 0, bar: c.sales / max }))
   }, [data, branch, isAll])
 
-  // ครู × เดือน (เฉพาะเดือนที่มีการเช็คชื่อ)
+  // ครู × เดือน (เฉพาะเดือนที่มีการเช็คชื่อ) — ไม่แสดงครูที่ลาออกแล้ว (teachers.is_active=false)
+  // และเดือนก่อนเริ่มใช้ระบบ feedback (FEEDBACK_START)
   const teacherGrid = useMemo(() => {
-    const rows = (data?.teachers ?? []).filter((t) => isAll || t.branchId === branch)
+    const rows = (data?.teachers ?? []).filter((t) =>
+      t.isActive !== false && t.month >= FEEDBACK_START && (isAll || t.branchId === branch))
     const tMonths = Array.from(new Set(rows.map((r) => r.month))).sort()
     const map = new Map<string, { nickname: string; attended: number; feedback: number; photos: number; m: Record<string, { a: number; f: number }> }>()
     for (const r of rows) {
@@ -530,7 +534,7 @@ function BusinessDashboard() {
           {/* Feedback ครูรายเดือน */}
           <ChartCard
             title="Feedback ครูรายเดือน"
-            description="% ของครั้งที่เด็กมาเรียน (มา/สาย) ที่ครูเขียน feedback · นับคนที่สอนจริง (รวมสอนแทน) · – = ไม่มีคาบที่เช็คชื่อในเดือนนั้น"
+            description="% ของครั้งที่เด็กมาเรียน (มา/สาย) ที่ครูเขียน feedback · นับคนที่สอนจริง (รวมสอนแทน) · เฉพาะครูที่ยังทำงานอยู่ ตั้งแต่ มิ.ย. 69 (เริ่มใช้ระบบ feedback) · – = ไม่มีคาบที่เช็คชื่อในเดือนนั้น"
             contentClassName="overflow-x-auto"
           >
             {teacherGrid.list.length === 0 ? (
