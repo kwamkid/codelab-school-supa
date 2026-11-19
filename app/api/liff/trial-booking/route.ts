@@ -10,6 +10,9 @@ export const dynamic = 'force-dynamic'
 
 interface BookingRequest {
   source: 'online' | 'walkin' | 'phone'
+  fbc?: string
+  fbp?: string
+  clientUserAgent?: string
   parentName: string
   parentPhone: string
   parentEmail?: string
@@ -93,7 +96,11 @@ export async function POST(request: NextRequest) {
       parent_email: body.parentEmail?.trim() || null,
       branch_id: body.branchId,
       status: 'new',
-      contact_note: body.contactNote?.trim() || null
+      contact_note: body.contactNote?.trim() || null,
+      // Meta click ids from the browser (Conversions API match keys)
+      fbc: typeof body.fbc === 'string' ? body.fbc.slice(0, 500) : null,
+      fbp: typeof body.fbp === 'string' ? body.fbp.slice(0, 200) : null,
+      client_user_agent: typeof body.clientUserAgent === 'string' ? body.clientUserAgent.slice(0, 500) : null,
     }
 
     console.log('Creating booking with data:', bookingData)
@@ -149,6 +156,9 @@ export async function POST(request: NextRequest) {
         email: body.parentEmail || undefined,
         entity_id: bookingId,
         branch_id: body.branchId,
+        fbc: bookingData.fbc || undefined,
+        fbp: bookingData.fbp || undefined,
+        client_user_agent: bookingData.client_user_agent || undefined,
       })
       console.log('[FB CAPI] Trial booking result:', JSON.stringify(fbResult))
     } catch (fbErr) {

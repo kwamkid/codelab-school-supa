@@ -63,6 +63,9 @@ export interface UnifiedEnrollmentData {
   paymentType: PaymentType;
   initialPaymentAmount?: number;
 
+  // Chat contact this enrollment was made from (links chat ↔ parent for Meta attribution)
+  chatContactId?: string;
+
   // Billing
   billingType?: 'personal' | 'company';
   billingName?: string;
@@ -112,6 +115,7 @@ export async function processUnifiedEnrollment(
   }
 
   const enrollments: UnifiedEnrollmentResult['enrollments'] = [];
+  let purchaseValue = 0; // full course price for Meta Purchase (not the deposit)
 
   // 2. Process each student
   for (const studentData of data.students) {
@@ -159,6 +163,7 @@ export async function processUnifiedEnrollment(
       discountAmount = data.discount;
     }
     const finalPrice = Math.max(0, originalPrice - discountAmount);
+    purchaseValue += finalPrice;
 
     // 5. Create enrollment
     const enrollmentId = await createEnrollment({
@@ -369,10 +374,11 @@ export async function processUnifiedEnrollment(
         phone: data.parentPhone,
         email: data.parentEmail,
         member_id: parentId,
+        chat_contact_id: data.chatContactId,
         entity_id: enrollments[0]?.enrollmentId || parentId,
         branch_id: data.branchId,
         custom_data: {
-          value: data.initialPaymentAmount || 0,
+          value: purchaseValue,
           currency: 'THB',
           content_name: data.students.map(s => s.name).join(', '),
         },

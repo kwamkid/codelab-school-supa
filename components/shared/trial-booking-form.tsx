@@ -31,6 +31,7 @@ import { getTeachers } from '@/lib/services/teachers';
 import { getRoomsByBranch } from '@/lib/services/rooms';
 import { createTrialBooking, createTrialSession } from '@/lib/services/trial-bookings';
 import { AvailabilityIssue } from '@/lib/utils/availability';
+import { getMetaClickIds } from '@/lib/fb/click-ids';
 
 interface StudentForm {
   id: string; // stable key
@@ -393,6 +394,7 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...bookingData,
+            ...getMetaClickIds(),
             students: bookingData.students.map((s: any) => ({
               ...s,
               birthdate: s.birthdate ? s.birthdate.toISOString() : undefined,
@@ -407,20 +409,20 @@ export function TrialBookingForm({ context, prefill, onSuccess, onCancel }: Tria
       } else {
         bookingId = await createTrialBooking(bookingData);
 
-        if (!isChat) {
-          try {
-            await authFetch('/api/fb/send-conversion', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                event_type: 'trial',
-                phone: parentPhone.replace(/[-\s]/g, ''),
-                entity_id: bookingId,
-                branch_id: selectedBranch,
-              }),
-            });
-          } catch {}
-        }
+        try {
+          await authFetch('/api/fb/send-conversion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event_type: 'trial',
+              phone: parentPhone.replace(/[-\s]/g, ''),
+              entity_id: bookingId,
+              branch_id: selectedBranch,
+              // From chat: ties the lead to the Messenger chat (click-to-Messenger ads)
+              chat_contact_id: isChat ? prefill?.contactId : undefined,
+            }),
+          });
+        } catch {}
       }
 
       if (withSession) {

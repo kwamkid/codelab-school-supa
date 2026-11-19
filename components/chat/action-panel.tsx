@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, ReactNode } from 'react';
+import { AdSourceList } from '@/components/shared/ad-source';
 import { Phone, Mail, Tag, Link as LinkIcon, BookOpen, GraduationCap, ArrowLeft, X, Plus, MapPin, UserCheck, Unlink, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -318,6 +319,9 @@ export default function ActionPanel({
           )}
         </div>
       )}
+
+      {/* มาจากโฆษณาไหน (ซ่อนเองถ้าไม่มี) */}
+      <AdSourceList contactId={contact?.id} />
 
       {/* Tags section */}
       <div className="px-6 py-4 border-b dark:border-slate-700">

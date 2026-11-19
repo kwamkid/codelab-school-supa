@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { processInboundMessage, getChannelByPlatform, findOrCreateContact, findOrCreateConversation, insertOutboundMessage } from '@/lib/services/chat-webhook'
 import { createServiceClient } from '@/lib/supabase/server'
+import { referralFromEvent, recordAdReferral, rememberContactPhone, extractThaiMobile } from '@/lib/fb/ad-referral'
 
 export const dynamic = 'force-dynamic'
 
@@ -258,6 +259,19 @@ export async function POST(request: NextRequest) {
             platformMessageId: msg.mid,
             metadata,
           })
+        }
+
+        // Ad source + phone typed in chat (best effort — never breaks the webhook)
+        const referral = referralFromEvent(event)
+        const text: string | undefined = event.message?.text
+        if (referral?.ad_id || extractThaiMobile(text)) {
+          try {
+            const contactId = await findOrCreateContact(channel.id, senderId, displayName, avatarUrl)
+            if (referral?.ad_id) await recordAdReferral(contactId, channelType, referral)
+            await rememberContactPhone(contactId, text)
+          } catch (refErr) {
+            console.error('FB ad referral error:', refErr)
+          }
         }
       }
     }

@@ -8,7 +8,18 @@ export interface FBConversionEventData {
   userData: {
     ph?: string[] // hashed phone(s)
     em?: string[] // hashed email(s)
+    fn?: string[] // hashed first name
+    ln?: string[] // hashed last name
+    external_id?: string[] // hashed parent id
     country?: string[]
+    fbc?: string // click id (not hashed)
+    fbp?: string // browser id (not hashed)
+    client_user_agent?: string
+    // Conversions API for Business Messaging (click-to-Messenger / IG ads)
+    page_id?: string
+    page_scoped_user_id?: string
+    ig_account_id?: string
+    ig_sid?: string
   }
   customData?: {
     value?: number
@@ -17,7 +28,8 @@ export interface FBConversionEventData {
     content_category?: string
     [key: string]: unknown
   }
-  actionSource?: 'website' | 'system_generated'
+  actionSource?: 'website' | 'system_generated' | 'business_messaging'
+  messagingChannel?: 'messenger' | 'instagram'
 }
 
 export interface FBApiResult {
@@ -43,6 +55,7 @@ export async function sendConversionEvent(
           event_time: eventData.eventTime,
           event_id: eventData.eventId,
           action_source: eventData.actionSource || 'website',
+          ...(eventData.messagingChannel ? { messaging_channel: eventData.messagingChannel } : {}),
           user_data: {
             ...eventData.userData,
           },

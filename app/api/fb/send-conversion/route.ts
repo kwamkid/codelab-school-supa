@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       is_resend: body.is_resend || false,
       resend_suffix: body.resend_suffix,
       original_log_id: body.original_log_id,
+      chat_contact_id: typeof body.chat_contact_id === 'string' ? body.chat_contact_id : undefined,
     }
 
     if (!params.event_type || !params.entity_id) {

@@ -504,6 +504,7 @@ export function CompactEnrollmentForm({ context, prefill, onSuccess, onCancel }:
           paymentMethod,
           paymentType,
           initialPaymentAmount: paymentAmount,
+          chatContactId: prefill?.contactId,
           // Billing (always send name/phone for receipt)
           billingName: billingName || parentName || undefined,
           billingPhone: billingPhone || parentPhone || undefined,

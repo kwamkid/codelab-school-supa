@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { ParentBadge } from '@/components/ui/parent-badge';
 import { StudentMiniCard } from '@/components/students/student-mini-card';
 import { LineRecipientsCard } from '@/components/parents/line-recipients-card';
+import { AdSourceCard } from '@/components/shared/ad-source';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -468,6 +469,9 @@ export default function ParentDetailPage() {
 
           {/* ผู้รับแจ้งเตือน LINE เพิ่มเติม (พ่อ/แม่คนที่ 2) */}
           <LineRecipientsCard parentId={parentId} />
+
+          {/* มาจากโฆษณาไหน (ซ่อนเองถ้าไม่มี) */}
+          <AdSourceCard parentId={parentId} />
         </div>
 
         {/* Parent info column — left side (contact + address) */}
