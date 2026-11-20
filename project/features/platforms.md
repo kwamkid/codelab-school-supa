@@ -8,4 +8,4 @@
 
 | Platform | Status | Notes |
 |---|---|---|
-| Meta Ads (click-to-Messenger) attribution + CAPI | partial | Live 2026-11-20 (bec7585). Missing: page webhook field `messaging_referrals`. See features/app-features.md "Ad source on customers" |
+| Meta Ads (click-to-Messenger) attribution + CAPI | live | Live 2026-11-20 (bec7585); `messaging_referrals` subscribed 2026-11-20 (842c08c). See features/app-features.md "Ad source on customers" |

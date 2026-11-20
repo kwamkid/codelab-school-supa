@@ -19,7 +19,7 @@
 ### features/
 | File | KB | Sections | About |
 |---|---|---|---|
-| [app-features.md](features/app-features.md) | 2 | 3 | What the app can do, in customer wording: what it does · what it uses/connects · limits · date. |
+| [app-features.md](features/app-features.md) | 1 | 3 | What the app can do, in customer wording: what it does · what it uses/connects · limits · date. |
 | [platforms.md](features/platforms.md) | 1 | 0 | Outside systems the app connects to, with status live / partial / planned / none. |
 
 ### jobs/
@@ -29,15 +29,10 @@
 | [ideas.md](jobs/ideas.md) | 1 | 3 | Loose ideas not committed to: `## YYYY-MM-DD — <title>`. |
 | [todo.md](jobs/todo.md) | 1 | 1 | Work not yet picked up by any chat, grouped by topic. |
 
-### jobs/doing/
-| File | KB | Sections | About |
-|---|---|---|---|
-| [meta-ads-attribution.md](jobs/doing/meta-ads-attribution.md) | 1 | 2 | Topic work list. |
-
 ### jobs/done/
 | File | KB | Sections | About |
 |---|---|---|---|
-| [2026-11.md](jobs/done/2026-11.md) | 1 | 1 | Finished topics this month, newest on top. |
+| [2026-11.md](jobs/done/2026-11.md) | 1 | 1 | Finished topics, newest first. |
 
 ### knowledge/learning/
 | File | KB | Sections | About |

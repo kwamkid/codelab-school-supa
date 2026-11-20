@@ -13,7 +13,7 @@
 ## Ad source on customers ("มาจากโฆษณา") — 2026-11-20
 - Chat side panel and parent page show which Meta ad (campaign / ad name, Messenger/IG, first + latest date) the family opened the chat from; kept forever, so it is known after Meta's 7-day window.
 - Uses the FB/IG webhook referral + Marketing API names; chats are linked to parents by a phone typed in chat or by booking/enrolling from the chat.
-- Limits: only chats from 2026-11-20 on (no backfill); ad clicks on an existing thread with no new message are missed until `messaging_referrals` is subscribed.
+- Limits: only chats from 2026-11-20 on (no backfill). `messaging_referrals` subscribed, so ad clicks on an existing thread are recorded too.
 
 ## Meta Conversions API match keys — 2026-11-20
 - Purchase/Lead events now carry business_messaging (page + Messenger id), fbc/fbp from the online trial form, name and parent id; Purchase value = full course price. Chat trial bookings send Lead.

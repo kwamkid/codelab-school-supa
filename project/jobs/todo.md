@@ -9,4 +9,5 @@
 ---
 
 ## 📊 Teacher attendance data — 2026-11-20
-- [ ] Teachers "เช็ค" and "แพรวรุ่ง": sessions checked (Sep–Nov) but 0 students marked present/late — check whether these classes have no enrolled students or were all marked absent (`get_teacher_monthly_report`, attendance rows)
+- [x] Teachers "เช็ค" and "แพรวรุ่ง": sessions checked (Sep–Nov) but 0 students marked present/late — check whether these classes have no enrolled students or were all marked absent (`get_teacher_monthly_report`, attendance rows)
+  → they never checked: rows were auto-written by makeup requests / LIFF leave (checked_by NULL). RPCs now exclude them via `attendance_is_auto()` — 842c08c
