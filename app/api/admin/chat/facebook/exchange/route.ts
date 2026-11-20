@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
         // Subscribe page to messaging webhook
         try {
           await fetch(
-            `https://graph.facebook.com/v19.0/${page.id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks&access_token=${page.access_token}`,
+            `https://graph.facebook.com/v19.0/${page.id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,messaging_referrals&access_token=${page.access_token}`,
             { method: 'POST' }
           );
         } catch {
